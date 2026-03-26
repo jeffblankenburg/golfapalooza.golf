@@ -1,0 +1,260 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+async function checkIsAdmin() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("users")
+    .select("is_admin")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile?.is_admin) return null;
+
+  return user;
+}
+
+/**
+ * @swagger
+ * /api/admin/contests:
+ *   get:
+ *     summary: List contests for an event with participant counts
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: query
+ *         name: trip_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Contests list
+ *       401:
+ *         description: Unauthorized
+ */
+export async function GET(request: Request) {
+  const admin = await checkIsAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const tripId = searchParams.get("trip_id");
+
+  if (!tripId) {
+    return NextResponse.json({ error: "trip_id is required" }, { status: 400 });
+  }
+
+  const adminClient = createAdminClient();
+
+  const { data: contests, error } = await adminClient
+    .from("contests")
+    .select("*, contest_participants(count)")
+    .eq("trip_id", tripId)
+    .order("sort_order");
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  const formatted = contests?.map((c) => ({
+    id: c.id,
+    trip_id: c.trip_id,
+    name: c.name,
+    contest_type: c.contest_type,
+    day_number: c.day_number,
+    sort_order: c.sort_order,
+    participant_count:
+      Array.isArray(c.contest_participants) && c.contest_participants.length > 0
+        ? (c.contest_participants[0] as { count: number }).count
+        : 0,
+  }));
+
+  return NextResponse.json({ contests: formatted });
+}
+
+/**
+ * @swagger
+ * /api/admin/contests:
+ *   post:
+ *     summary: Create a new contest
+ *     tags: [Admin]
+ *     responses:
+ *       200:
+ *         description: Contest created
+ *       401:
+ *         description: Unauthorized
+ */
+export async function POST(request: Request) {
+  const admin = await checkIsAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const { trip_id, name, contest_type, day_number, sort_order } =
+      await request.json();
+
+    if (!trip_id || !name || !contest_type) {
+      return NextResponse.json(
+        { error: "trip_id, name, and contest_type are required" },
+        { status: 400 }
+      );
+    }
+
+    const adminClient = createAdminClient();
+
+    const { data, error } = await adminClient
+      .from("contests")
+      .insert({
+        trip_id,
+        name,
+        contest_type,
+        day_number: day_number || null,
+        sort_order: sort_order || 0,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Auto-add all event participants to this contest
+    const { data: participants } = await adminClient
+      .from("event_participants")
+      .select("user_id")
+      .eq("trip_id", trip_id);
+
+    if (participants && participants.length > 0) {
+      const entries = participants.map((p) => ({
+        contest_id: data.id,
+        user_id: p.user_id,
+      }));
+
+      await adminClient
+        .from("contest_participants")
+        .upsert(entries, { onConflict: "contest_id,user_id" });
+    }
+
+    return NextResponse.json({ contest: data });
+  } catch (error) {
+    console.error("Create contest error:", error);
+    return NextResponse.json(
+      { error: "Failed to create contest" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * @swagger
+ * /api/admin/contests:
+ *   put:
+ *     summary: Update a contest
+ *     tags: [Admin]
+ *     responses:
+ *       200:
+ *         description: Contest updated
+ *       401:
+ *         description: Unauthorized
+ */
+export async function PUT(request: Request) {
+  const admin = await checkIsAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const { id, name, contest_type, day_number, sort_order } =
+      await request.json();
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Contest id is required" },
+        { status: 400 }
+      );
+    }
+
+    const adminClient = createAdminClient();
+
+    const { error } = await adminClient
+      .from("contests")
+      .update({
+        name,
+        contest_type,
+        day_number: day_number || null,
+        sort_order: sort_order ?? 0,
+      })
+      .eq("id", id);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Update contest error:", error);
+    return NextResponse.json(
+      { error: "Failed to update contest" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * @swagger
+ * /api/admin/contests:
+ *   delete:
+ *     summary: Delete a contest
+ *     tags: [Admin]
+ *     responses:
+ *       200:
+ *         description: Contest deleted
+ *       401:
+ *         description: Unauthorized
+ */
+export async function DELETE(request: Request) {
+  const admin = await checkIsAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const { id } = await request.json();
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Contest id is required" },
+        { status: 400 }
+      );
+    }
+
+    const adminClient = createAdminClient();
+
+    // contest_participants will cascade delete
+    const { error } = await adminClient
+      .from("contests")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Delete contest error:", error);
+    return NextResponse.json(
+      { error: "Failed to delete contest" },
+      { status: 500 }
+    );
+  }
+}

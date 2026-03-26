@@ -20,6 +20,7 @@ NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 GOLF_COURSE_API_KEY=your-golfcourseapi-key  # Optional, for external course search
+NEXT_PUBLIC_GIPHY_API_KEY=your-giphy-api-key  # For GIF search in chat
 ```
 
 ## API Documentation
@@ -33,6 +34,7 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/courses?q={query}` | Search courses by name or location |
+| GET | `/api/courses?lat={lat}&lng={lng}&radius={miles}` | Search courses by GPS coordinates |
 | GET | `/api/courses/{courseId}` | Get course details with tees and holes |
 
 #### Rounds (`/api/rounds`)
@@ -88,6 +90,10 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 Located in `supabase/migrations/`:
 - `00001_initial_schema.sql` - Users and auth setup
 - `00002_golf_scoring_schema.sql` - Golf scoring tables and RLS policies
+- `00003_fix_rls_recursion.sql` - Fix RLS recursion for SELECT policies
+- `00004_fix_rls_all_operations.sql` - Fix RLS recursion for INSERT/UPDATE/DELETE
+
+**IMPORTANT: Always create NEW migration files.** Never modify existing migrations that may have already been run. Use sequential numbering (00004, 00005, etc.) for new migrations. Each migration should be atomic and handle its own rollback safety (use `DROP ... IF EXISTS` before `CREATE`).
 
 ## Key Features
 
@@ -201,3 +207,25 @@ Use these tags to group related endpoints:
 - `Handicap` - Handicap calculation and history
 - `Auth` - Authentication endpoints
 - `Admin` - Admin user management
+
+## Feature Planning & Issue Tracking
+
+**GitHub Issues are the source of truth for feature planning and persistence.**
+
+When planning new features or significant changes:
+
+1. **Create a GitHub Issue** using `gh issue create` with a detailed description including:
+   - Overview and problem statement
+   - User experience flow
+   - Technical implementation plan
+   - Edge cases and error handling
+   - Acceptance criteria
+
+2. **Reference issues** when implementing features
+
+3. **Close issues** when features are complete
+
+Draft issue content can be written to `docs/issues/` as markdown files, then use:
+```bash
+gh issue create --title "Feature: Title" --body-file docs/issues/feature-name.md
+```

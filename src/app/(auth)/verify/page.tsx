@@ -85,7 +85,8 @@ export default function VerifyPage() {
       }
 
       sessionStorage.removeItem("pendingPhone");
-      window.location.href = "/scoring";
+      // Redirect to home page
+      window.location.href = "/";
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -147,7 +148,7 @@ export default function VerifyPage() {
                 value={digit}
                 onChange={(e) => handleChange(index, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(index, e)}
-                className="w-12 h-14 text-center text-2xl font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className="w-12 h-14 text-center text-2xl font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                 disabled={loading}
               />
             ))}

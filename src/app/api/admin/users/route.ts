@@ -26,41 +26,12 @@ async function checkIsAdmin() {
  * /api/admin/users:
  *   get:
  *     summary: List all users
- *     description: Get a list of all users (admin only). Also returns current_user info.
  *     tags: [Admin]
  *     responses:
  *       200:
  *         description: List of users
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 users:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: string
- *                         format: uuid
- *                       phone:
- *                         type: string
- *                       display_name:
- *                         type: string
- *                       full_name:
- *                         type: string
- *                       is_admin:
- *                         type: boolean
- *                 current_user:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: string
- *                     display_name:
- *                       type: string
  *       401:
- *         description: Unauthorized (not admin)
+ *         description: Unauthorized
  */
 export async function GET() {
   const admin = await checkIsAdmin();
@@ -69,7 +40,6 @@ export async function GET() {
   }
 
   const adminClient = createAdminClient();
-
   const { data: users, error } = await adminClient
     .from("users")
     .select("*")
@@ -87,38 +57,10 @@ export async function GET() {
  * /api/admin/users:
  *   post:
  *     summary: Create a new user
- *     description: Create a new user with phone authentication (admin only)
  *     tags: [Admin]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [phone, displayName]
- *             properties:
- *               phone:
- *                 type: string
- *                 description: 10-digit US phone number
- *               displayName:
- *                 type: string
- *               fullName:
- *                 type: string
  *     responses:
  *       200:
  *         description: User created
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 userId:
- *                   type: string
- *                   format: uuid
- *       400:
- *         description: Invalid input or duplicate phone
  *       401:
  *         description: Unauthorized
  */
@@ -139,7 +81,6 @@ export async function POST(request: Request) {
     }
 
     const phone10 = phone.replace(/\D/g, "").slice(-10);
-
     if (phone10.length !== 10) {
       return NextResponse.json(
         { error: "Invalid phone number" },
@@ -178,12 +119,26 @@ export async function POST(request: Request) {
     });
 
     if (profileError) {
-      // Rollback: delete auth user
       await adminClient.auth.admin.deleteUser(authUser.user.id);
       return NextResponse.json(
         { error: "Failed to create user profile" },
         { status: 500 }
       );
+    }
+
+    // Auto-add to Loozers group chat
+    const { data: loozersRoom } = await adminClient
+      .from("chat_rooms")
+      .select("id")
+      .eq("type", "group")
+      .eq("name", "Loozers")
+      .single();
+
+    if (loozersRoom) {
+      await adminClient.from("chat_room_members").insert({
+        room_id: loozersRoom.id,
+        user_id: authUser.user.id,
+      });
     }
 
     return NextResponse.json({ success: true, userId: authUser.user.id });
@@ -201,30 +156,10 @@ export async function POST(request: Request) {
  * /api/admin/users:
  *   put:
  *     summary: Update a user
- *     description: Update user details (admin only)
  *     tags: [Admin]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [userId]
- *             properties:
- *               userId:
- *                 type: string
- *                 format: uuid
- *               displayName:
- *                 type: string
- *               fullName:
- *                 type: string
- *               phone:
- *                 type: string
  *     responses:
  *       200:
  *         description: User updated
- *       400:
- *         description: Invalid input
  *       401:
  *         description: Unauthorized
  */
@@ -235,7 +170,7 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const { userId, displayName, fullName, phone } = await request.json();
+    const { userId, displayName, fullName, phone, permissions } = await request.json();
 
     if (!userId) {
       return NextResponse.json(
@@ -246,7 +181,6 @@ export async function PUT(request: Request) {
 
     const adminClient = createAdminClient();
 
-    // Get current user data
     const { data: currentUser } = await adminClient
       .from("users")
       .select("phone")
@@ -254,9 +188,8 @@ export async function PUT(request: Request) {
       .single();
 
     const phone10 = phone ? phone.replace(/\D/g, "").slice(-10) : null;
-
-    // If phone changed, update auth.users
     const phoneChanged = phone10 && currentUser?.phone !== phone10;
+
     if (phoneChanged) {
       const { error: authError } = await adminClient.auth.admin.updateUserById(
         userId,
@@ -271,11 +204,11 @@ export async function PUT(request: Request) {
       }
     }
 
-    // Update public.users
-    const updates: Record<string, string | null> = {};
+    const updates: Record<string, unknown> = {};
     if (displayName !== undefined) updates.display_name = displayName;
     if (fullName !== undefined) updates.full_name = fullName;
     if (phoneChanged && phone10) updates.phone = phone10;
+    if (permissions !== undefined) updates.permissions = permissions;
 
     if (Object.keys(updates).length > 0) {
       const { error } = await adminClient
@@ -303,21 +236,7 @@ export async function PUT(request: Request) {
  * /api/admin/users:
  *   patch:
  *     summary: Toggle admin status
- *     description: Toggle a user's admin status (admin only)
  *     tags: [Admin]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [userId, isAdmin]
- *             properties:
- *               userId:
- *                 type: string
- *                 format: uuid
- *               isAdmin:
- *                 type: boolean
  *     responses:
  *       200:
  *         description: Admin status updated
@@ -341,7 +260,6 @@ export async function PATCH(request: Request) {
     }
 
     const adminClient = createAdminClient();
-
     const { error } = await adminClient
       .from("users")
       .update({ is_admin: isAdmin })
@@ -366,24 +284,10 @@ export async function PATCH(request: Request) {
  * /api/admin/users:
  *   delete:
  *     summary: Delete a user
- *     description: Delete a user from the system (admin only). Cannot delete yourself.
  *     tags: [Admin]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [userId]
- *             properties:
- *               userId:
- *                 type: string
- *                 format: uuid
  *     responses:
  *       200:
  *         description: User deleted
- *       400:
- *         description: Cannot delete own account
  *       401:
  *         description: Unauthorized
  */
@@ -403,7 +307,6 @@ export async function DELETE(request: Request) {
       );
     }
 
-    // Prevent deleting yourself
     if (userId === admin.id) {
       return NextResponse.json(
         { error: "Cannot delete your own account" },
@@ -412,8 +315,6 @@ export async function DELETE(request: Request) {
     }
 
     const adminClient = createAdminClient();
-
-    // Delete from auth.users (cascades to public.users)
     const { error } = await adminClient.auth.admin.deleteUser(userId);
 
     if (error) {

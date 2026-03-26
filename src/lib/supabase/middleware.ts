@@ -38,7 +38,6 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/verify");
   const isProtectedRoute =
     !isAuthRoute &&
-    request.nextUrl.pathname !== "/" &&
     !request.nextUrl.pathname.startsWith("/api");
 
   // Redirect unauthenticated users to login
@@ -51,7 +50,7 @@ export async function updateSession(request: NextRequest) {
   // Redirect authenticated users away from auth pages
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = "/scoring";
+    url.pathname = "/";
     return NextResponse.redirect(url);
   }
 

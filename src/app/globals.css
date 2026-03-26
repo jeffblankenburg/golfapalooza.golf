@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f9fafb;
+  --foreground: #111827;
 }
 
 @theme inline {
@@ -10,17 +10,111 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* High-contrast gray scale for outdoor/sunlight readability.
+     Values 300-500 are shifted darker so text and borders stay
+     visible on bright screens. Backgrounds (50-200) are unchanged. */
+  --color-gray-300: #9ca3af;  /* default: #d1d5db */
+  --color-gray-400: #6b7280;  /* default: #9ca3af */
+  --color-gray-500: #4b5563;  /* default: #6b7280 */
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Ensure form elements always have dark text on light backgrounds */
+input,
+textarea,
+select {
+  color: #111827;
+  background-color: #ffffff;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af;
+}
+
+/* RSVP button pulse */
+@keyframes rsvp-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-rsvp-pulse {
+  animation: rsvp-pulse 2.5s ease-in-out infinite;
+}
+
+/* Slide-up animation for drawers */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+/* Tapback pop-in animation */
+@keyframes tapback-pop {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-tapback-pop {
+  animation: tapback-pop 0.2s ease-out;
+}
+
+/* Fade-in for hole image transitions */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* iOS-style safe area padding */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Override any dark mode preferences */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #f9fafb;
+    --foreground: #111827;
+  }
+
+  input,
+  textarea,
+  select {
+    color: #111827;
+    background-color: #ffffff;
+  }
 }

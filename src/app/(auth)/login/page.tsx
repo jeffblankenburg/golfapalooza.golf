@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 function formatPhone(value: string): string {
   const numbers = value.replace(/\D/g, "");
@@ -64,7 +65,14 @@ export default function LoginPage() {
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-b from-green-800 to-green-950">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Golfapalooza</h1>
+          <Image
+            src="/logo.png"
+            alt="Golfapalooza"
+            width={200}
+            height={144}
+            className="mx-auto mb-4 drop-shadow-lg"
+            priority
+          />
           <p className="text-green-200">Sign in to continue</p>
         </div>
 
@@ -78,7 +86,7 @@ export default function LoginPage() {
             value={phone}
             onChange={handlePhoneChange}
             placeholder="(555) 123-4567"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-lg"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-lg text-gray-900 bg-white placeholder-gray-400"
             autoComplete="tel"
           />
 

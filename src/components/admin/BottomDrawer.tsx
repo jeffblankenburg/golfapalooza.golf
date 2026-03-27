@@ -37,18 +37,18 @@ export function BottomDrawer({ open, onClose, title, subtitle, children }: Botto
     >
       {/* Drawer panel — sits above the bottom nav (h-16 = 4rem) */}
       <div
-        className={`absolute left-0 right-0 bottom-16 pb-safe bg-white rounded-t-2xl shadow-2xl transition-transform duration-200 ease-out ${
+        className={`absolute left-0 right-0 bottom-16 pb-safe bg-white rounded-t-2xl shadow-2xl transition-transform duration-200 ease-out flex flex-col overflow-hidden ${
           open ? "translate-y-0" : "translate-y-[calc(100%+4rem)]"
         }`}
         style={{ maxHeight: "calc(100vh - 4rem - env(safe-area-inset-top, 0px))" }}
       >
         {/* Handle bar */}
-        <div className="flex justify-center pt-3 pb-1">
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
           <div className="w-10 h-1 rounded-full bg-gray-300" />
         </div>
 
         {/* Header */}
-        <div className="px-4 pb-3 pt-1 flex items-start justify-between">
+        <div className="px-4 pb-3 pt-1 flex items-start justify-between flex-shrink-0">
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-bold text-gray-900 truncate">{title}</h2>
             {subtitle && <p className="text-xs text-gray-500 truncate">{subtitle}</p>}
@@ -62,10 +62,7 @@ export function BottomDrawer({ open, onClose, title, subtitle, children }: Botto
         </div>
 
         {/* Scrollable content */}
-        <div
-          className="overflow-y-auto border-t border-gray-100"
-          style={{ maxHeight: "calc(100vh - 4rem - 100px - env(safe-area-inset-top, 0px))" }}
-        >
+        <div className="overflow-y-auto border-t border-gray-100 min-h-0 flex-1">
           {children}
         </div>
       </div>

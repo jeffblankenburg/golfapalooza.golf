@@ -263,7 +263,7 @@ export function ContestManager({ tripId }: { tripId: string }) {
               className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
               style={{ backgroundColor: "transparent" }}
             >
-              <option value="kgb_cup">KGB Cup</option>
+              <option value="ryder_cup">Ryder Cup</option>
               <option value="scramble">Scramble</option>
               <option value="cornhole_singles">Cornhole Singles</option>
               <option value="cornhole_doubles">Cornhole Doubles</option>
@@ -365,7 +365,7 @@ export function ContestManager({ tripId }: { tripId: string }) {
                   className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
                   style={{ backgroundColor: "transparent" }}
                 >
-                  <option value="kgb_cup">KGB Cup</option>
+                  <option value="ryder_cup">Ryder Cup</option>
                   <option value="scramble">Scramble</option>
                   <option value="cornhole_singles">Cornhole Singles</option>
                   <option value="cornhole_doubles">Cornhole Doubles</option>
@@ -454,7 +454,7 @@ export function ContestManager({ tripId }: { tripId: string }) {
             </div>
 
             {/* Tee Assignments */}
-            {(selectedContest.contest_type === "kgb_cup" ||
+            {(selectedContest.contest_type === "ryder_cup" ||
               selectedContest.contest_type === "scramble") && (
               <>
                 <div className="px-4 py-2 bg-gray-50 mt-1">

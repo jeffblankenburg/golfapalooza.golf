@@ -95,7 +95,7 @@ export default async function HomePage() {
     }
 
     // Fetch user's next tee time from two sources:
-    // 1. tee_time_players (individual assignment, e.g. KGB Cup)
+    // 1. tee_time_players (individual assignment, e.g. Ryder Cup)
     // 2. scramble_team_members → tee_times.scramble_team_id (scramble days)
 
     type TeeTimeMatch = {

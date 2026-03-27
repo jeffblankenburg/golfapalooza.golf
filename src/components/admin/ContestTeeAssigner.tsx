@@ -110,7 +110,7 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
     fetchData();
   }, [fetchData]);
 
-  const isKgbCup = contest?.contest_type === "kgb_cup";
+  const isRyderCup = contest?.contest_type === "ryder_cup";
 
   // Get the single tee_id if all 18 holes share the same tee
   const singleTeeId =
@@ -141,10 +141,10 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
 
     const body: Record<string, unknown> = { contest_id: contest.id };
 
-    if (isKgbCup && singleTeeId) {
+    if (isRyderCup && singleTeeId) {
       body.tee_id = singleTeeId;
-    } else if (isKgbCup) {
-      // KGB Cup but no tee selected
+    } else if (isRyderCup) {
+      // Ryder Cup but no tee selected
       const firstTee = assignments.get(1);
       if (firstTee) {
         body.tee_id = firstTee;
@@ -222,15 +222,15 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
 
   return (
     <div className="space-y-4">
-      {/* Quick-fill row (shown for both modes — for KGB Cup it IS the picker) */}
+      {/* Quick-fill row (shown for both modes — for Ryder Cup it IS the picker) */}
         <div>
-          {!isKgbCup && (
+          {!isRyderCup && (
             <p className="text-xs text-gray-500 mb-2">Set all holes to:</p>
           )}
           <div className="flex flex-wrap gap-2">
             {tees.map((tee) => {
               const colors = getTeeColorClasses(tee.tee_color);
-              const isSelected = isKgbCup
+              const isSelected = isRyderCup
                 ? singleTeeId === tee.id
                 : false;
 
@@ -258,8 +258,8 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
           </div>
         </div>
 
-        {/* KGB Cup summary */}
-        {isKgbCup && summary && summary.parts.length === 1 && (
+        {/* Ryder Cup summary */}
+        {isRyderCup && summary && summary.parts.length === 1 && (
           <p className="text-sm text-gray-600">
             All 18 holes from {summary.parts[0].tee.tee_name} Tees (Par{" "}
             {summary.totalPar})
@@ -267,7 +267,7 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
         )}
 
         {/* Scramble per-hole list */}
-        {!isKgbCup && (
+        {!isRyderCup && (
           <div className="space-y-1">
             {Array.from({ length: 18 }, (_, i) => i + 1).map((holeNum) => {
               const selectedTeeId = assignments.get(holeNum);
@@ -330,7 +330,7 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
         )}
 
         {/* Scramble summary */}
-        {!isKgbCup && summary && summary.parts.length > 0 && (
+        {!isRyderCup && summary && summary.parts.length > 0 && (
           <div className="pt-2 border-t border-gray-100">
             <p className="text-sm text-gray-600">
               {summary.parts

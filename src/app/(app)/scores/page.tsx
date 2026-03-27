@@ -43,7 +43,7 @@ export default async function ScoresPage() {
     .from("contests")
     .select("id, name, day_number, contest_type")
     .eq("trip_id", trip.id)
-    .in("contest_type", ["scramble", "kgb_cup"])
+    .in("contest_type", ["scramble", "ryder_cup"])
     .order("day_number");
 
   // Fetch all scramble teams

@@ -46,7 +46,7 @@ interface Day {
 type View = "days" | "groups";
 
 const DAYS: Day[] = [
-  { number: 1, label: "Day 1", sublabel: "Wednesday — KGB Cup" },
+  { number: 1, label: "Day 1", sublabel: "Wednesday" },
   { number: 2, label: "Day 2", sublabel: "Thursday — Scramble" },
   { number: 3, label: "Day 3", sublabel: "Friday — Scramble" },
   { number: 4, label: "Day 4", sublabel: "Saturday — Scramble" },

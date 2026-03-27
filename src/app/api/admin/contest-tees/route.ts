@@ -141,7 +141,7 @@ export async function GET(req: NextRequest) {
  *                     type: string
  *                   tee_id:
  *                     type: string
- *                 description: Single tee for all 18 holes (KGB Cup)
+ *                 description: Single tee for all 18 holes (Ryder Cup)
  *               - type: object
  *                 properties:
  *                   contest_id:

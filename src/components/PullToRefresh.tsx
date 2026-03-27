@@ -3,19 +3,12 @@
 import { useEffect } from "react";
 
 /**
- * Invisible pull-to-refresh for iOS standalone PWA.
- * Detects a downward swipe when already at the top of the page
+ * Invisible pull-to-refresh for iOS PWA and mobile browsers.
+ * Detects a downward swipe when at the top of the page
  * and triggers a native reload — no spinners, no UI.
  */
 export function PullToRefresh() {
   useEffect(() => {
-    // Only activate in standalone PWA mode
-    const isStandalone =
-      ("standalone" in navigator && (navigator as { standalone?: boolean }).standalone) ||
-      window.matchMedia("(display-mode: standalone)").matches;
-
-    if (!isStandalone) return;
-
     let startY = 0;
     let pulling = false;
     const threshold = 150;
@@ -30,7 +23,6 @@ export function PullToRefresh() {
     function onTouchMove(e: TouchEvent) {
       if (!pulling) return;
       const dy = e.touches[0].clientY - startY;
-      // If pulling down past threshold while at top, refresh
       if (dy > threshold && window.scrollY === 0) {
         pulling = false;
         window.location.reload();

@@ -1,12 +1,11 @@
-// Custom service worker code merged by next-pwa via customWorkerDir
-// Handles push notifications and notification click events
+// Service Worker for Golfapalooza Push Notifications
 
 self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(clients.claim());
 });
 
 self.addEventListener("push", (event) => {
@@ -46,17 +45,17 @@ self.addEventListener("notificationclick", (event) => {
   ).href;
 
   event.waitUntil(
-    self.clients
+    clients
       .matchAll({ type: "window", includeUncontrolled: true })
-      .then((clientList) => {
-        for (const client of clientList) {
+      .then((windowClients) => {
+        for (const client of windowClients) {
           if (client.url.includes(self.location.origin) && "focus" in client) {
             client.navigate(urlToOpen);
             return client.focus();
           }
         }
-        if (self.clients.openWindow) {
-          return self.clients.openWindow(urlToOpen);
+        if (clients.openWindow) {
+          return clients.openWindow(urlToOpen);
         }
       })
   );

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendBulkNotifications } from "@/lib/notifications/service";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getEffectiveUserId } from "@/lib/simulator";
 
 /**
  * @swagger
@@ -201,7 +202,7 @@ export async function POST(
     .from("chat_messages")
     .insert({
       room_id: roomId,
-      sender_id: user.id,
+      sender_id: await getEffectiveUserId(user.id),
       content: content || null,
       image_url: imageUrl || null,
       reply_to_id: replyToId || null,
@@ -219,13 +220,14 @@ export async function POST(
     .from("chat_room_members")
     .select("user_id")
     .eq("room_id", roomId)
-    .neq("user_id", user.id);
+    .neq("user_id", await getEffectiveUserId(user.id));
 
   if (members?.length) {
+    const effectiveId = await getEffectiveUserId(user.id);
     const { data: sender } = await admin
       .from("users")
       .select("display_name")
-      .eq("id", user.id)
+      .eq("id", effectiveId)
       .single();
 
     const senderName = sender?.display_name || "Someone";

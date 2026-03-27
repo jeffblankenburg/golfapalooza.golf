@@ -42,8 +42,8 @@ export default async function AppLayout({
     .eq("id", effectiveUserId)
     .single();
 
-  // Hide admin nav during user simulation
-  const isAdmin = simulating ? false : (profile?.is_admin ?? false);
+  // Show admin nav if the simulated user is also an admin
+  const isAdmin = profile?.is_admin ?? false;
 
   // Get unread notification count for effective user
   const { count: unreadCount } = await queryClient

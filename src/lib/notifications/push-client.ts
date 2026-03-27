@@ -34,7 +34,9 @@ export async function subscribeToPush(): Promise<boolean> {
     const permission = await Notification.requestPermission();
     if (permission !== "granted") return false;
 
-    const registration = await navigator.serviceWorker.ready;
+    // Manually register our service worker
+    const registration = await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
 
     // Check for existing subscription
     let subscription = await registration.pushManager.getSubscription();

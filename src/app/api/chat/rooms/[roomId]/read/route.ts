@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
 
 /**
  * @swagger
@@ -49,12 +51,16 @@ export async function POST(
     );
   }
 
-  const { error } = await supabase
+  const effectiveUserId = await getEffectiveUserId(user.id);
+  const simulating = await isSimulating();
+  const client = simulating ? createAdminClient() : supabase;
+
+  const { error } = await client
     .from("chat_read_receipts")
     .upsert(
       {
         room_id: roomId,
-        user_id: user.id,
+        user_id: effectiveUserId,
         last_read_message_id: messageId,
         last_read_at: new Date().toISOString(),
       },

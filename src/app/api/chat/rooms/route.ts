@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getEffectiveUserId } from "@/lib/simulator";
 
 /**
  * @swagger
@@ -21,11 +22,14 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const effectiveUserId = await getEffectiveUserId(user.id);
+
   // Get rooms the user is a member of
-  const { data: memberships, error: memError } = await supabase
+  const admin = createAdminClient();
+  const { data: memberships, error: memError } = await admin
     .from("chat_room_members")
     .select("room_id")
-    .eq("user_id", user.id);
+    .eq("user_id", effectiveUserId);
 
   if (memError) {
     return NextResponse.json({ error: memError.message }, { status: 500 });
@@ -38,7 +42,7 @@ export async function GET() {
   const roomIds = memberships.map((m) => m.room_id);
 
   // Get rooms with members
-  const { data: rooms, error: roomError } = await supabase
+  const { data: rooms, error: roomError } = await admin
     .from("chat_rooms")
     .select(`
       id, type, name, created_at,
@@ -53,7 +57,6 @@ export async function GET() {
   }
 
   // Get last message for each room and unread counts
-  const admin = createAdminClient();
   const roomsWithMeta = await Promise.all(
     (rooms || []).map(async (room) => {
       // Last message
@@ -71,7 +74,7 @@ export async function GET() {
         .from("chat_read_receipts")
         .select("last_read_at")
         .eq("room_id", room.id)
-        .eq("user_id", user.id)
+        .eq("user_id", effectiveUserId)
         .single();
 
       let unreadCount = 0;
@@ -82,7 +85,7 @@ export async function GET() {
           .select("id", { count: "exact", head: true })
           .eq("room_id", room.id)
           .gt("created_at", lastReadAt)
-          .neq("sender_id", user.id);
+          .neq("sender_id", effectiveUserId);
 
         unreadCount = count || 0;
       }
@@ -92,14 +95,14 @@ export async function GET() {
       if (room.type === "dm") {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const otherMember = (room.members as any[])?.find(
-          (m) => m.user?.id !== user.id
+          (m) => m.user?.id !== effectiveUserId
         );
         displayName = otherMember?.user?.display_name || "Direct Message";
       } else if (!displayName) {
         // Unnamed group — show member names
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const otherNames = (room.members as any[])
-          ?.filter((m) => m.user?.id !== user.id)
+          ?.filter((m) => m.user?.id !== effectiveUserId)
           .map((m) => m.user?.display_name)
           .filter(Boolean);
         displayName = otherNames?.join(", ") || "Group Chat";
@@ -162,13 +165,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const effectiveUserId = await getEffectiveUserId(user.id);
+
   const body = await request.json();
   // Support both legacy { userId } and new { userIds } format
   const userIds: string[] = body.userIds || (body.userId ? [body.userId] : []);
   const groupName: string | undefined = body.name;
 
   // Filter out current user and deduplicate
-  const otherUserIds = [...new Set(userIds.filter((id: string) => id !== user.id))];
+  const otherUserIds = [...new Set(userIds.filter((id: string) => id !== effectiveUserId))];
 
   if (otherUserIds.length === 0) {
     return NextResponse.json(
@@ -178,7 +183,7 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminClient();
-  const allMemberIds = [user.id, ...otherUserIds].sort();
+  const allMemberIds = [effectiveUserId, ...otherUserIds].sort();
   const isDM = otherUserIds.length === 1;
 
   // Find existing room with exactly these members
@@ -186,7 +191,7 @@ export async function POST(request: NextRequest) {
   const { data: myRooms } = await admin
     .from("chat_room_members")
     .select("room_id")
-    .eq("user_id", user.id);
+    .eq("user_id", effectiveUserId);
 
   if (myRooms?.length) {
     const myRoomIds = myRooms.map((r) => r.room_id);
@@ -225,7 +230,7 @@ export async function POST(request: NextRequest) {
     .insert({
       type: isDM ? "dm" : "group",
       name: isDM ? null : (groupName || null),
-      created_by: user.id,
+      created_by: effectiveUserId,
     })
     .select("id")
     .single();

@@ -53,7 +53,7 @@ export default async function ChatRoomPage({
     // Unnamed group — show member names like iMessage
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const otherNames = (room.members as any[])
-      ?.filter((m) => m.user?.id !== user.id)
+      ?.filter((m) => m.user?.id !== effectiveUserId)
       .map((m) => m.user?.display_name)
       .filter(Boolean);
     displayName = otherNames?.join(", ") || "Group Chat";

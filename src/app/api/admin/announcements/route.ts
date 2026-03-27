@@ -285,7 +285,7 @@ export async function DELETE(request: NextRequest) {
       .from("scheduled_announcements")
       .update({ status: "cancelled" })
       .eq("id", id)
-      .eq("status", "pending");
+      .in("status", ["pending", "sent"]);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

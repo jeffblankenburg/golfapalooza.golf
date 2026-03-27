@@ -105,6 +105,7 @@ export function AnnouncementManager() {
   const [sending, setSending] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [recipientListOpen, setRecipientListOpen] = useState(false);
 
@@ -262,6 +263,18 @@ export function AnnouncementManager() {
     });
     if (res.ok) {
       showToastMsg("Scheduled announcement cancelled");
+      fetchData();
+    }
+  };
+
+  const handleDeleteSent = async (id: string) => {
+    const res = await fetch("/api/admin/announcements", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    if (res.ok) {
+      showToastMsg("Announcement deleted");
       fetchData();
     }
   };
@@ -693,6 +706,22 @@ export function AnnouncementManager() {
         onCancel={() => setCancellingId(null)}
       />
 
+      {/* Confirm Delete Sent Modal */}
+      <ConfirmModal
+        open={deletingId !== null}
+        title="Delete Announcement"
+        message="Remove this announcement from the sent history?"
+        confirmLabel="Delete"
+        destructive
+        onConfirm={async () => {
+          if (deletingId) {
+            await handleDeleteSent(deletingId);
+            setDeletingId(null);
+          }
+        }}
+        onCancel={() => setDeletingId(null)}
+      />
+
       {/* User Picker Drawer */}
       <BottomDrawer
         open={showUserPicker}
@@ -849,16 +878,22 @@ export function AnnouncementManager() {
                     )}
                     <AudienceLabel announcement={a} />
                   </div>
-                  <div className="flex flex-col items-end shrink-0">
+                  <div className="flex flex-col items-end shrink-0 gap-1">
                     <span className="text-xs text-gray-400">
                       {timeAgo(a.sent_at!)}
                     </span>
                     {a.recipient_count !== undefined && (
-                      <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
                         {a.recipient_count}{" "}
                         {a.recipient_count === 1 ? "recipient" : "recipients"}
                       </span>
                     )}
+                    <button
+                      onClick={() => setDeletingId(a.id)}
+                      className="text-xs text-red-600 font-medium"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               </div>

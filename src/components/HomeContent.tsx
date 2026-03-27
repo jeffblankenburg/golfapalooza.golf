@@ -207,7 +207,7 @@ export function HomeContent({
             onClick={async () => {
               setPushRequesting(true);
               const success = await subscribeToPush();
-              setPushPermission(success ? "granted" : getPermissionStatus());
+              setPushPermission(success ? "granted" : Notification.permission);
               setPushRequesting(false);
             }}
             disabled={pushRequesting}

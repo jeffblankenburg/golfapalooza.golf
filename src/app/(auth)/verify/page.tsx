@@ -127,17 +127,17 @@ export default function VerifyPage() {
     : "";
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-b from-green-800 to-green-950">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-white">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Enter Code</h1>
-          <p className="text-green-200">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Enter Code</h1>
+          <p className="text-gray-500">
             We sent a code to {formattedPhone}
           </p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <div className="flex justify-center gap-2 mb-4">
+        <div className="space-y-4">
+          <div className="flex justify-center gap-2">
             {code.map((digit, index) => (
               <input
                 key={index}
@@ -148,33 +148,33 @@ export default function VerifyPage() {
                 value={digit}
                 onChange={(e) => handleChange(index, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(index, e)}
-                className="w-12 h-14 text-center text-2xl font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
+                className="w-12 h-14 text-center text-2xl font-bold border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
                 disabled={loading}
               />
             ))}
           </div>
 
           {error && (
-            <p className="text-sm text-red-600 text-center mb-4">{error}</p>
+            <p className="text-sm text-red-600 text-center">{error}</p>
           )}
 
           {loading && (
-            <p className="text-sm text-gray-600 text-center mb-4">Verifying...</p>
+            <p className="text-sm text-gray-500 text-center">Verifying...</p>
           )}
 
-          <div className="flex flex-col gap-2 mt-6">
+          <div className="flex flex-col items-center gap-2 pt-4">
             <button
               type="button"
               onClick={handleResend}
               disabled={resending}
-              className="text-green-700 font-medium hover:text-green-800 disabled:text-gray-400"
+              className="text-green-700 font-medium active:text-green-800 disabled:text-gray-400"
             >
               {resending ? "Sending..." : "Resend code"}
             </button>
             <button
               type="button"
               onClick={handleDifferentNumber}
-              className="text-gray-600 hover:text-gray-800"
+              className="text-gray-500 active:text-gray-700"
             >
               Use different number
             </button>

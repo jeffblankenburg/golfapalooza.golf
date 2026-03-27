@@ -62,7 +62,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-b from-green-800 to-green-950">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-white">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <Image
@@ -70,34 +70,37 @@ export default function LoginPage() {
             alt="Golfapalooza"
             width={200}
             height={144}
-            className="mx-auto mb-4 drop-shadow-lg"
+            className="mx-auto mb-4"
             priority
           />
-          <p className="text-green-200">Sign in to continue</p>
+          <p className="text-gray-500">Sign in to continue</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-6">
-          <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-            Phone Number
-          </label>
-          <input
-            id="phone"
-            type="tel"
-            value={phone}
-            onChange={handlePhoneChange}
-            placeholder="(555) 123-4567"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-lg text-gray-900 bg-white placeholder-gray-400"
-            autoComplete="tel"
-          />
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+              Phone Number
+            </label>
+            <input
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={handlePhoneChange}
+              placeholder="(555) 123-4567"
+              autoFocus
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent text-[16px] text-gray-900 bg-white placeholder-gray-400"
+              autoComplete="tel"
+            />
+          </div>
 
           {error && (
-            <p className="mt-2 text-sm text-red-600">{error}</p>
+            <p className="text-sm text-red-600">{error}</p>
           )}
 
           <button
             type="submit"
             disabled={!isValid || loading}
-            className="w-full mt-4 bg-green-700 text-white font-semibold py-3 rounded-lg hover:bg-green-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="w-full bg-green-700 text-white font-semibold py-3 rounded-xl active:bg-green-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? "Sending..." : "Send Code"}
           </button>

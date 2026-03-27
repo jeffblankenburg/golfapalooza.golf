@@ -14,6 +14,10 @@ export const US_TIMEZONE_OPTIONS = [
  * e.g. naiveDatetimeToUTC("2026-09-02T16:30", "America/New_York") → "2026-09-02T20:30:00.000Z"
  */
 export function naiveDatetimeToUTC(naiveDatetime: string, timezone: string): string {
+  if (!naiveDatetime || !naiveDatetime.includes("T")) {
+    return new Date().toISOString();
+  }
+
   // Parse the naive datetime parts
   const [datePart, timePart] = naiveDatetime.split("T");
   const [year, month, day] = datePart.split("-").map(Number);

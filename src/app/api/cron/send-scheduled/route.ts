@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
           type: "announcement",
           title: announcement.title,
           body: announcement.body || undefined,
+          data: { announcement_id: announcement.id },
         });
       }
 

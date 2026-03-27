@@ -74,17 +74,26 @@ export async function GET() {
     }
 
     // Get recipient counts from notifications table for sent announcements
-    const { data: notifRaw } = await adminClient
-      .from("notifications")
-      .select("title, body, created_at")
-      .eq("type", "announcement")
-      .order("created_at", { ascending: false })
-      .limit(500);
+    const sentAnnouncementIds = (announcements || [])
+      .filter((a) => a.status === "sent")
+      .map((a) => a.id);
 
     const countMap = new Map<string, number>();
-    for (const row of notifRaw || []) {
-      const key = `${row.title}||${row.body}||${row.created_at}`;
-      countMap.set(key, (countMap.get(key) || 0) + 1);
+
+    if (sentAnnouncementIds.length > 0) {
+      const { data: notifRaw } = await adminClient
+        .from("notifications")
+        .select("data")
+        .eq("type", "announcement")
+        .order("created_at", { ascending: false })
+        .limit(500);
+
+      for (const row of notifRaw || []) {
+        const annId = (row.data as Record<string, unknown>)?.announcement_id as string | undefined;
+        if (annId) {
+          countMap.set(annId, (countMap.get(annId) || 0) + 1);
+        }
+      }
     }
 
     const scheduled = (announcements || [])
@@ -99,10 +108,9 @@ export async function GET() {
     const sent = (announcements || [])
       .filter((a) => a.status === "sent")
       .map((a) => {
-        const key = `${a.title}||${a.body}||${a.sent_at}`;
         return {
           ...a,
-          recipient_count: countMap.get(key) || 0,
+          recipient_count: countMap.get(a.id) || 0,
           audience_names: a.audience_type === "custom" && Array.isArray(a.audience_user_ids)
             ? (a.audience_user_ids as string[]).map((id) => userMap.get(id) || "Unknown")
             : undefined,
@@ -203,8 +211,15 @@ export async function POST(request: NextRequest) {
 
     // If send_now, actually deliver the notifications
     if (send_now) {
+      const notifPayload = {
+        type: "announcement",
+        title,
+        body: body || undefined,
+        data: { announcement_id: data.id },
+      };
+
       if (audience_type === "everyone") {
-        await sendAnnouncement({ title, body: body || undefined });
+        await sendAnnouncement({ title, body: body || undefined, data: { announcement_id: data.id } });
       } else {
         let userIds: string[] = [];
 
@@ -219,11 +234,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (userIds.length > 0) {
-          await sendBulkNotifications(userIds, {
-            type: "announcement",
-            title,
-            body: body || undefined,
-          });
+          await sendBulkNotifications(userIds, notifPayload);
         }
       }
     }

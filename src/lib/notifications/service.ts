@@ -138,5 +138,5 @@ export async function sendAnnouncement(payload: Omit<NotificationPayload, "type"
   if (!users?.length) return;
 
   const userIds = users.map((u) => u.id);
-  await sendBulkNotifications(userIds, { ...payload, type: "announcement" });
+  await sendBulkNotifications(userIds, { type: "announcement", ...payload });
 }

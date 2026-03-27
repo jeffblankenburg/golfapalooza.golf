@@ -18,20 +18,16 @@ interface BroadcastList {
   user_count: number;
 }
 
-interface SentAnnouncement {
-  title: string;
-  body: string | null;
-  sent_at: string;
-  recipient_count: number;
-}
-
-interface ScheduledAnnouncement {
+interface AnnouncementRecord {
   id: string;
   title: string;
   body: string | null;
   audience_type: string;
+  audience_names?: string[];
   scheduled_for: string;
   status: string;
+  sent_at: string | null;
+  recipient_count?: number;
 }
 
 type AudienceType = "event" | "everyone" | "custom";
@@ -70,6 +66,26 @@ function UserAvatar({ user }: { user: User }) {
   );
 }
 
+function AudienceLabel({ announcement }: { announcement: AnnouncementRecord }) {
+  const { audience_type, audience_names } = announcement;
+
+  if (audience_type === "everyone") {
+    return <p className="text-xs text-gray-400 mt-1">Everyone</p>;
+  }
+  if (audience_type === "event") {
+    return <p className="text-xs text-gray-400 mt-1">Current Event</p>;
+  }
+  // Custom — show all recipient names
+  if (audience_names && audience_names.length > 0) {
+    return (
+      <p className="text-xs text-gray-400 mt-1">
+        {audience_names.join(", ")}
+      </p>
+    );
+  }
+  return <p className="text-xs text-gray-400 mt-1">Custom</p>;
+}
+
 export function AnnouncementManager() {
   // Form state
   const [title, setTitle] = useState("");
@@ -79,6 +95,7 @@ export function AnnouncementManager() {
   const [scheduledFor, setScheduledFor] = useState("");
   const [sending, setSending] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [recipientListOpen, setRecipientListOpen] = useState(false);
 
@@ -95,8 +112,8 @@ export function AnnouncementManager() {
   const [eventParticipantIds, setEventParticipantIds] = useState<string[]>([]);
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
   const [broadcastLists, setBroadcastLists] = useState<BroadcastList[]>([]);
-  const [sentAnnouncements, setSentAnnouncements] = useState<SentAnnouncement[]>([]);
-  const [scheduledAnnouncements, setScheduledAnnouncements] = useState<ScheduledAnnouncement[]>([]);
+  const [sentAnnouncements, setSentAnnouncements] = useState<AnnouncementRecord[]>([]);
+  const [scheduledAnnouncements, setScheduledAnnouncements] = useState<AnnouncementRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -198,16 +215,16 @@ export function AnnouncementManager() {
           showToastMsg(err.error || "Failed to schedule");
         }
       } else {
-        const recipientIds = getRecipientIds();
-        const res = await fetch("/api/notifications/send", {
+        const res = await fetch("/api/admin/announcements", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            ...(audience === "everyone"
-              ? { announcement: true }
-              : { userIds: recipientIds, type: "announcement" }),
             title: title.trim(),
-            body: body.trim() || undefined,
+            body: body.trim() || null,
+            audience_type: audience,
+            audience_user_ids: audience === "custom" ? Array.from(selectedUserIds) : undefined,
+            trip_id: audience === "event" ? activeTripId : undefined,
+            send_now: true,
           }),
         });
         if (res.ok) {
@@ -632,7 +649,7 @@ export function AnnouncementManager() {
         </div>
       </div>
 
-      {/* Confirm Modal */}
+      {/* Confirm Send/Schedule Modal */}
       <ConfirmModal
         open={showConfirm}
         title={timing === "schedule" ? "Schedule Announcement" : "Send Announcement"}
@@ -640,6 +657,22 @@ export function AnnouncementManager() {
         confirmLabel={timing === "schedule" ? "Schedule" : "Send"}
         onConfirm={handleSend}
         onCancel={() => setShowConfirm(false)}
+      />
+
+      {/* Confirm Cancel Modal */}
+      <ConfirmModal
+        open={cancellingId !== null}
+        title="Cancel Announcement"
+        message="Are you sure you want to cancel this scheduled announcement?"
+        confirmLabel="Cancel Announcement"
+        destructive
+        onConfirm={async () => {
+          if (cancellingId) {
+            await handleCancelScheduled(cancellingId);
+            setCancellingId(null);
+          }
+        }}
+        onCancel={() => setCancellingId(null)}
       />
 
       {/* User Picker Drawer */}
@@ -755,12 +788,10 @@ export function AnnouncementManager() {
                         {a.body}
                       </p>
                     )}
-                    <p className="text-xs text-gray-400 mt-1 capitalize">
-                      {a.audience_type === "event" ? "Current event" : a.audience_type}
-                    </p>
+                    <AudienceLabel announcement={a} />
                   </div>
                   <button
-                    onClick={() => handleCancelScheduled(a.id)}
+                    onClick={() => setCancellingId(a.id)}
                     className="text-xs text-red-600 font-medium px-2 py-1 rounded-lg hover:bg-red-50 flex-shrink-0"
                   >
                     Cancel
@@ -783,9 +814,9 @@ export function AnnouncementManager() {
           </div>
         ) : (
           <div className="space-y-2">
-            {sentAnnouncements.map((a, i) => (
+            {sentAnnouncements.map((a) => (
               <div
-                key={`${a.sent_at}-${i}`}
+                key={a.id}
                 className="bg-white rounded-xl border border-gray-200 px-4 py-3"
               >
                 <div className="flex items-start justify-between gap-2">
@@ -798,15 +829,18 @@ export function AnnouncementManager() {
                         {a.body}
                       </p>
                     )}
+                    <AudienceLabel announcement={a} />
                   </div>
                   <div className="flex flex-col items-end shrink-0">
                     <span className="text-xs text-gray-400">
-                      {timeAgo(a.sent_at)}
+                      {timeAgo(a.sent_at!)}
                     </span>
-                    <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                      {a.recipient_count}{" "}
-                      {a.recipient_count === 1 ? "recipient" : "recipients"}
-                    </span>
+                    {a.recipient_count !== undefined && (
+                      <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                        {a.recipient_count}{" "}
+                        {a.recipient_count === 1 ? "recipient" : "recipients"}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

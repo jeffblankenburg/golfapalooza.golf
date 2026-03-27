@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  sendBulkNotifications,
+  sendAnnouncement,
+} from "@/lib/notifications/service";
 
 async function checkIsAdmin() {
   const supabase = await createClient();
@@ -41,45 +45,71 @@ export async function GET() {
   try {
     const adminClient = createAdminClient();
 
-    // 1. Get scheduled announcements (pending + sent)
-    const { data: scheduled } = await adminClient
+    // Get all announcements from the scheduled_announcements table
+    const { data: announcements } = await adminClient
       .from("scheduled_announcements")
-      .select("id, title, body, audience_type, scheduled_for, status, sent_at, created_at")
+      .select("id, title, body, audience_type, audience_user_ids, scheduled_for, status, sent_at, created_at")
       .in("status", ["pending", "sent"])
       .order("created_at", { ascending: false })
       .limit(50);
 
-    // 2. Get sent announcement history from notifications table (deduped)
-    const { data: raw } = await adminClient
+    // Collect all custom user IDs to resolve display names
+    const allCustomIds = new Set<string>();
+    for (const a of announcements || []) {
+      if (a.audience_type === "custom" && Array.isArray(a.audience_user_ids)) {
+        for (const id of a.audience_user_ids) allCustomIds.add(id as string);
+      }
+    }
+
+    // Resolve user display names
+    let userMap = new Map<string, string>();
+    if (allCustomIds.size > 0) {
+      const { data: users } = await adminClient
+        .from("users")
+        .select("id, display_name")
+        .in("id", Array.from(allCustomIds));
+      if (users) {
+        userMap = new Map(users.map((u) => [u.id, u.display_name]));
+      }
+    }
+
+    // Get recipient counts from notifications table for sent announcements
+    const { data: notifRaw } = await adminClient
       .from("notifications")
       .select("title, body, created_at")
       .eq("type", "announcement")
       .order("created_at", { ascending: false })
       .limit(500);
 
-    // Group notification rows into distinct announcements
-    const grouped = new Map<string, { title: string; body: string | null; sent_at: string; recipient_count: number }>();
-    for (const row of raw || []) {
+    const countMap = new Map<string, number>();
+    for (const row of notifRaw || []) {
       const key = `${row.title}||${row.body}||${row.created_at}`;
-      const existing = grouped.get(key);
-      if (existing) {
-        existing.recipient_count++;
-      } else {
-        grouped.set(key, {
-          title: row.title,
-          body: row.body,
-          sent_at: row.created_at,
-          recipient_count: 1,
-        });
-      }
+      countMap.set(key, (countMap.get(key) || 0) + 1);
     }
 
-    const sent = Array.from(grouped.values()).slice(0, 50);
+    const scheduled = (announcements || [])
+      .filter((a) => a.status === "pending")
+      .map((a) => ({
+        ...a,
+        audience_names: a.audience_type === "custom" && Array.isArray(a.audience_user_ids)
+          ? (a.audience_user_ids as string[]).map((id) => userMap.get(id) || "Unknown")
+          : undefined,
+      }));
 
-    return NextResponse.json({
-      scheduled: (scheduled || []).filter((s) => s.status === "pending"),
-      sent,
-    });
+    const sent = (announcements || [])
+      .filter((a) => a.status === "sent")
+      .map((a) => {
+        const key = `${a.title}||${a.body}||${a.sent_at}`;
+        return {
+          ...a,
+          recipient_count: countMap.get(key) || 0,
+          audience_names: a.audience_type === "custom" && Array.isArray(a.audience_user_ids)
+            ? (a.audience_user_ids as string[]).map((id) => userMap.get(id) || "Unknown")
+            : undefined,
+        };
+      });
+
+    return NextResponse.json({ scheduled, sent });
   } catch (error) {
     console.error("Get announcements error:", error);
     return NextResponse.json({ error: "Failed to load announcements" }, { status: 500 });
@@ -90,7 +120,7 @@ export async function GET() {
  * @swagger
  * /api/admin/announcements:
  *   post:
- *     summary: Schedule a future announcement
+ *     summary: Create an announcement (send now or schedule)
  *     tags: [Admin, Notifications]
  *     requestBody:
  *       required: true
@@ -115,9 +145,11 @@ export async function GET() {
  *               scheduled_for:
  *                 type: string
  *                 format: date-time
+ *               send_now:
+ *                 type: boolean
  *     responses:
  *       200:
- *         description: Announcement scheduled
+ *         description: Announcement created
  *       401:
  *         description: Unauthorized
  */
@@ -128,17 +160,27 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { title, body, audience_type, audience_user_ids, trip_id, scheduled_for } =
+    const { title, body, audience_type, audience_user_ids, trip_id, scheduled_for, send_now } =
       await request.json();
 
-    if (!title || !audience_type || !scheduled_for) {
+    if (!title || !audience_type) {
       return NextResponse.json(
-        { error: "title, audience_type, and scheduled_for are required" },
+        { error: "title and audience_type are required" },
+        { status: 400 }
+      );
+    }
+
+    if (!send_now && !scheduled_for) {
+      return NextResponse.json(
+        { error: "scheduled_for is required when not sending now" },
         { status: 400 }
       );
     }
 
     const adminClient = createAdminClient();
+    const now = new Date().toISOString();
+
+    // Record in scheduled_announcements
     const { data, error } = await adminClient
       .from("scheduled_announcements")
       .insert({
@@ -147,7 +189,9 @@ export async function POST(request: NextRequest) {
         audience_type,
         audience_user_ids: audience_type === "custom" ? audience_user_ids : null,
         trip_id: audience_type === "event" ? trip_id : null,
-        scheduled_for,
+        scheduled_for: send_now ? now : scheduled_for,
+        status: send_now ? "sent" : "pending",
+        sent_at: send_now ? now : null,
         created_by: admin.id,
       })
       .select()
@@ -157,10 +201,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // If send_now, actually deliver the notifications
+    if (send_now) {
+      if (audience_type === "everyone") {
+        await sendAnnouncement({ title, body: body || undefined });
+      } else {
+        let userIds: string[] = [];
+
+        if (audience_type === "event" && trip_id) {
+          const { data: participants } = await adminClient
+            .from("event_participants")
+            .select("user_id")
+            .eq("trip_id", trip_id);
+          userIds = (participants || []).map((p) => p.user_id);
+        } else if (audience_type === "custom") {
+          userIds = audience_user_ids || [];
+        }
+
+        if (userIds.length > 0) {
+          await sendBulkNotifications(userIds, {
+            type: "announcement",
+            title,
+            body: body || undefined,
+          });
+        }
+      }
+    }
+
     return NextResponse.json({ announcement: data });
   } catch (error) {
-    console.error("Schedule announcement error:", error);
-    return NextResponse.json({ error: "Failed to schedule announcement" }, { status: 500 });
+    console.error("Create announcement error:", error);
+    return NextResponse.json({ error: "Failed to create announcement" }, { status: 500 });
   }
 }
 

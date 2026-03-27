@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { subscribeToPush } from "@/lib/notifications/push-client";
 
 interface TripData {
   trip_name: string;
@@ -143,12 +144,22 @@ export function HomeContent({
   );
   const [saving, setSaving] = useState(false);
   const [participantsExpanded, setParticipantsExpanded] = useState(false);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported" | "loading">("loading");
+  const [pushRequesting, setPushRequesting] = useState(false);
 
   useEffect(() => {
     if (trip?.start_date) {
       setDaysLeft(getCountdown(trip.start_date, simulatedDate));
     }
   }, [trip?.start_date, simulatedDate]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setPushPermission(Notification.permission);
+    } else {
+      setPushPermission("unsupported");
+    }
+  }, []);
 
   const openModal = () => {
     setSelectedLikelihood(currentLikelihood || 99);
@@ -180,6 +191,33 @@ export function HomeContent({
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-6">
+      {/* Push Notification Permission Banner */}
+      {pushPermission === "default" && (
+        <div className="bg-white rounded-2xl p-4 border border-amber-200 shadow-sm flex items-start gap-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex-shrink-0">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-gray-900 text-sm">Enable Notifications</p>
+            <p className="text-xs text-gray-500 mt-0.5">Get alerts for announcements, tee times, and scores.</p>
+          </div>
+          <button
+            onClick={async () => {
+              setPushRequesting(true);
+              const success = await subscribeToPush();
+              setPushPermission(success ? "granted" : getPermissionStatus());
+              setPushRequesting(false);
+            }}
+            disabled={pushRequesting}
+            className="px-3 py-1.5 bg-green-600 text-white text-sm font-semibold rounded-lg active:bg-green-700 flex-shrink-0 disabled:opacity-50"
+          >
+            {pushRequesting ? "..." : "Allow"}
+          </button>
+        </div>
+      )}
+
       {/* Countdown Card */}
       {trip && daysLeft !== null && daysLeft > 0 && (
         <div className="bg-white rounded-2xl p-6 border-2 border-green-600 shadow-sm">

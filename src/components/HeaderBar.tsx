@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { NotificationDrawer } from "./NotificationDrawer";
+import { isPushSupported, getPermissionStatus, subscribeToPush } from "@/lib/notifications/push-client";
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -30,6 +31,25 @@ export function HeaderBar({
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
   const [chatUnreadCount] = useState(initialChatUnreadCount);
   const [showNotifications, setShowNotifications] = useState(false);
+  const pushChecked = useRef(false);
+
+  // Auto-subscribe to push on mount if permission already granted
+  useEffect(() => {
+    if (pushChecked.current) return;
+    pushChecked.current = true;
+
+    if (isPushSupported() && getPermissionStatus() === "granted") {
+      subscribeToPush();
+    }
+  }, []);
+
+  const handleBellClick = async () => {
+    // If push is supported but permission hasn't been requested yet, ask now
+    if (isPushSupported() && getPermissionStatus() === "default") {
+      await subscribeToPush();
+    }
+    setShowNotifications(true);
+  };
 
   useEffect(() => {
     const supabase = createClient();
@@ -122,7 +142,7 @@ export function HeaderBar({
           <div className="flex items-center gap-1 -mr-1">
             {/* Notification bell */}
             <button
-              onClick={() => setShowNotifications(true)}
+              onClick={handleBellClick}
               className="relative flex items-center justify-center w-10 h-10"
             >
               <svg

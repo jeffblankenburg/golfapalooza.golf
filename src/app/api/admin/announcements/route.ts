@@ -291,6 +291,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Also remove associated notifications from users' notification lists
+    await adminClient
+      .from("notifications")
+      .delete()
+      .eq("data->>announcement_id", id);
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Cancel announcement error:", error);

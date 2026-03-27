@@ -22,12 +22,22 @@ interface NotificationPayload {
 
 async function sendPushToUser(userId: string, payload: NotificationPayload) {
   const supabase = createAdminClient();
-  const { data: subscriptions } = await supabase
+  const { data: subscriptions, error: subError } = await supabase
     .from("push_subscriptions")
     .select("endpoint, p256dh, auth")
     .eq("user_id", userId);
 
-  if (!subscriptions?.length) return;
+  if (subError) {
+    console.error(`[Push] Failed to fetch subscriptions for user ${userId}:`, subError.message);
+    return;
+  }
+
+  if (!subscriptions?.length) {
+    console.log(`[Push] No subscriptions found for user ${userId}`);
+    return;
+  }
+
+  console.log(`[Push] Sending to ${subscriptions.length} subscription(s) for user ${userId}`);
 
   const pushPayload = JSON.stringify({
     title: payload.title,
@@ -47,6 +57,14 @@ async function sendPushToUser(userId: string, payload: NotificationPayload) {
     )
   );
 
+  // Log results
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    if (result.status === "rejected") {
+      console.error(`[Push] Failed for user ${userId} endpoint ${subscriptions[i].endpoint.slice(0, 60)}...: ${result.reason?.statusCode || result.reason?.message || result.reason}`);
+    }
+  }
+
   // Clean up expired subscriptions
   const expiredEndpoints = results
     .map((result, i) => {
@@ -58,6 +76,7 @@ async function sendPushToUser(userId: string, payload: NotificationPayload) {
     .filter(Boolean);
 
   if (expiredEndpoints.length > 0) {
+    console.log(`[Push] Cleaning up ${expiredEndpoints.length} expired subscription(s) for user ${userId}`);
     await supabase
       .from("push_subscriptions")
       .delete()

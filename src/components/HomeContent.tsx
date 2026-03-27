@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { subscribeToPush } from "@/lib/notifications/push-client";
+import { getTimezoneAbbreviation } from "@/lib/utils/timezone";
 
 interface TripData {
   trip_name: string;
@@ -117,6 +118,7 @@ export function HomeContent({
   simulatedDate = null,
   participants = [],
   nextScheduleItem = null,
+  timezone,
 }: {
   displayName: string;
   trip: TripData | null;
@@ -132,6 +134,7 @@ export function HomeContent({
   simulatedDate?: string | null;
   participants?: { likelihood: number; displayName: string }[];
   nextScheduleItem?: { title: string; location: string | null; time: string | null; dayLabel: string } | null;
+  timezone?: string;
 }) {
   const router = useRouter();
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
@@ -207,7 +210,9 @@ export function HomeContent({
             onClick={async () => {
               setPushRequesting(true);
               const success = await subscribeToPush();
-              setPushPermission(success ? "granted" : Notification.permission);
+              if (success) {
+                setPushPermission("granted");
+              }
               setPushRequesting(false);
             }}
             disabled={pushRequesting}
@@ -322,6 +327,11 @@ export function HomeContent({
                 hour: "numeric",
                 minute: "2-digit",
               })}
+              {timezone && (
+                <span className="ml-1 text-xs font-normal text-gray-400">
+                  {getTimezoneAbbreviation(timezone)}
+                </span>
+              )}
               {myStartingHole && (
                 <span className="ml-2 text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
                   Hole {myStartingHole}

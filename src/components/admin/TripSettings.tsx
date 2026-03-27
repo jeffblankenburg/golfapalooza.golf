@@ -3,12 +3,14 @@
 import { useEffect, useState, useCallback } from "react";
 import { AccoladesManager } from "./AccoladesManager";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import { US_TIMEZONE_OPTIONS } from "@/lib/utils/timezone";
 
 interface TripData {
   id: string;
   trip_name: string;
   trip_year: number;
   start_date: string;
+  timezone: string;
   location: string | null;
   hotel_name: string | null;
   hotel_address: string | null;
@@ -30,7 +32,7 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [allEvents, setAllEvents] = useState<TripSummary[]>([]);
   const [showCreate, setShowCreate] = useState(false);
-  const [newTrip, setNewTrip] = useState({ trip_name: "", trip_year: "", start_date: "", status: "active" });
+  const [newTrip, setNewTrip] = useState({ trip_name: "", trip_year: "", start_date: "", status: "active", timezone: "America/New_York" });
   const [creating, setCreating] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
@@ -142,6 +144,7 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
           trip_year: parseInt(newTrip.trip_year),
           start_date: newTrip.start_date,
           status: newTrip.status,
+          timezone: newTrip.timezone,
         }),
       });
 
@@ -150,7 +153,7 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
         throw new Error(data.error || "Failed to create");
       }
 
-      setNewTrip({ trip_name: "", trip_year: "", start_date: "", status: "active" });
+      setNewTrip({ trip_name: "", trip_year: "", start_date: "", status: "active", timezone: "America/New_York" });
       setShowCreate(false);
       await fetchTrip();
       await fetchAllEvents();
@@ -269,6 +272,18 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
               className="w-full text-right text-[16px] text-gray-900 bg-transparent outline-none"
               style={{ backgroundColor: "transparent" }}
             />
+          </Field>
+          <Field label="Timezone">
+            <select
+              value={trip.timezone || "America/New_York"}
+              onChange={(e) => setTrip({ ...trip, timezone: e.target.value })}
+              className="w-full text-right text-[16px] text-gray-900 bg-transparent outline-none"
+              style={{ backgroundColor: "transparent" }}
+            >
+              {US_TIMEZONE_OPTIONS.map((tz) => (
+                <option key={tz.value} value={tz.value}>{tz.label}</option>
+              ))}
+            </select>
           </Field>
         </div>
 
@@ -403,8 +418,8 @@ function AllEventsList({
   onArchive?: () => void;
   showCreate: boolean;
   setShowCreate: (v: boolean) => void;
-  newTrip: { trip_name: string; trip_year: string; start_date: string; status: string };
-  setNewTrip: (v: { trip_name: string; trip_year: string; start_date: string; status: string }) => void;
+  newTrip: { trip_name: string; trip_year: string; start_date: string; status: string; timezone: string };
+  setNewTrip: (v: { trip_name: string; trip_year: string; start_date: string; status: string; timezone: string }) => void;
   creating: boolean;
   handleCreate: () => void;
 }) {
@@ -508,6 +523,19 @@ function AllEventsList({
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
               style={{ backgroundColor: "white" }}
             />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Timezone</label>
+            <select
+              value={newTrip.timezone}
+              onChange={(e) => setNewTrip({ ...newTrip, timezone: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
+              style={{ backgroundColor: "white" }}
+            >
+              {US_TIMEZONE_OPTIONS.map((tz) => (
+                <option key={tz.value} value={tz.value}>{tz.label}</option>
+              ))}
+            </select>
           </div>
           <div className="flex gap-2">
             <button

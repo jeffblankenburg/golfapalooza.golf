@@ -138,6 +138,7 @@ export async function POST(request: Request) {
         trip_year,
         start_date,
         status: insertStatus,
+        timezone: body.timezone || "America/New_York",
       })
       .select()
       .single();
@@ -173,7 +174,7 @@ export async function PUT(request: Request) {
 
   try {
     const body = await request.json();
-    const { id, trip_name, trip_year, start_date, location, hotel_name, hotel_address, notes, course_id, show_tee_times, show_teams, show_rooms } = body;
+    const { id, trip_name, trip_year, start_date, location, hotel_name, hotel_address, notes, course_id, show_tee_times, show_teams, show_rooms, timezone } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Trip ID is required" }, { status: 400 });
@@ -198,6 +199,7 @@ export async function PUT(request: Request) {
         ...(show_tee_times !== undefined ? { show_tee_times } : {}),
         ...(show_teams !== undefined ? { show_teams } : {}),
         ...(show_rooms !== undefined ? { show_rooms } : {}),
+        ...(timezone !== undefined ? { timezone } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);

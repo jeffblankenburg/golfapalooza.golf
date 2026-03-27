@@ -1,5 +1,7 @@
 "use client";
 
+import { getTimezoneAbbreviation } from "@/lib/utils/timezone";
+
 interface ItineraryItem {
   id: string;
   title: string;
@@ -49,10 +51,12 @@ export function ScheduleView({
   items,
   startDate,
   teeTimesByDay = {},
+  timezone,
 }: {
   items: ItineraryItem[];
   startDate: string;
   teeTimesByDay?: Record<number, TeeTimeInfo>;
+  timezone?: string;
 }) {
   const preEvent = items.filter((i) => i.day_number === null);
   const days = [1, 2, 3, 4];
@@ -118,7 +122,7 @@ export function ScheduleView({
           <div key={dayNum} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="px-4 py-3 bg-green-50 border-b border-gray-200">
               <h2 className="text-sm font-semibold text-green-800 uppercase tracking-wide">
-                Day {dayNum} — {getDayLabel(startDate, dayNum)}
+                Day {dayNum} — {getDayLabel(startDate, dayNum)}{timezone ? ` (${getTimezoneAbbreviation(timezone)})` : ""}
               </h2>
             </div>
             <div className="divide-y divide-gray-100">

@@ -15,7 +15,7 @@ export default async function SchedulePage() {
 
   const { data: trip } = await supabase
     .from("trip_settings")
-    .select("id, start_date, show_tee_times")
+    .select("id, start_date, show_tee_times, timezone")
     .eq("status", "active")
     .single();
 
@@ -138,5 +138,5 @@ export default async function SchedulePage() {
     }
   }
 
-  return <ScheduleView items={items || []} startDate={trip.start_date} teeTimesByDay={trip.show_tee_times ? myTeeTimesByDay : {}} />;
+  return <ScheduleView items={items || []} startDate={trip.start_date} teeTimesByDay={trip.show_tee_times ? myTeeTimesByDay : {}} timezone={trip.timezone} />;
 }

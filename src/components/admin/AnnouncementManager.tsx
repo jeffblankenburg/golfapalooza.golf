@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ConfirmModal } from "./ConfirmModal";
 import { BottomDrawer } from "./BottomDrawer";
+import { naiveDatetimeToUTC, formatInTimezone, getTimezoneAbbreviation } from "@/lib/utils/timezone";
 
 interface User {
   id: string;
@@ -47,7 +48,15 @@ function timeAgo(dateStr: string): string {
   return date.toLocaleDateString();
 }
 
-function formatScheduledTime(dateStr: string): string {
+function formatScheduledTime(dateStr: string, timezone?: string): string {
+  if (timezone) {
+    return formatInTimezone(dateStr, timezone, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
   return new Date(dateStr).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
@@ -111,6 +120,7 @@ export function AnnouncementManager() {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [eventParticipantIds, setEventParticipantIds] = useState<string[]>([]);
   const [activeTripId, setActiveTripId] = useState<string | null>(null);
+  const [tripTimezone, setTripTimezone] = useState("America/New_York");
   const [broadcastLists, setBroadcastLists] = useState<BroadcastList[]>([]);
   const [sentAnnouncements, setSentAnnouncements] = useState<AnnouncementRecord[]>([]);
   const [scheduledAnnouncements, setScheduledAnnouncements] = useState<AnnouncementRecord[]>([]);
@@ -140,6 +150,7 @@ export function AnnouncementManager() {
       const activeTrip = tripsData.trip;
       if (activeTrip) {
         setActiveTripId(activeTrip.id);
+        if (activeTrip.timezone) setTripTimezone(activeTrip.timezone);
         const participantsRes = await fetch(
           `/api/admin/participants?trip_id=${activeTrip.id}`
         );
@@ -203,7 +214,7 @@ export function AnnouncementManager() {
             audience_type: audience,
             audience_user_ids: audience === "custom" ? Array.from(selectedUserIds) : undefined,
             trip_id: audience === "event" ? activeTripId : undefined,
-            scheduled_for: new Date(scheduledFor).toISOString(),
+            scheduled_for: naiveDatetimeToUTC(scheduledFor, tripTimezone),
           }),
         });
         if (res.ok) {
@@ -325,13 +336,15 @@ export function AnnouncementManager() {
     const count = getRecipientCount();
     const label = count === 1 ? "1 Loozer" : `${count} Loozers`;
     if (timing === "schedule") {
-      const when = new Date(scheduledFor).toLocaleString(undefined, {
+      const utcISO = naiveDatetimeToUTC(scheduledFor, tripTimezone);
+      const when = formatInTimezone(utcISO, tripTimezone, {
         month: "short",
         day: "numeric",
         hour: "numeric",
         minute: "2-digit",
       });
-      return `Schedule this announcement for ${label} on ${when}?`;
+      const tzAbbr = getTimezoneAbbreviation(tripTimezone);
+      return `Schedule this announcement for ${label} on ${when} ${tzAbbr}?`;
     }
     return `Send this announcement to ${label} now?`;
   };
@@ -626,13 +639,18 @@ export function AnnouncementManager() {
           </div>
 
           {timing === "schedule" && (
-            <input
-              type="datetime-local"
-              value={scheduledFor}
-              onChange={(e) => setScheduledFor(e.target.value)}
-              min={new Date().toISOString().slice(0, 16)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
-            />
+            <div>
+              <input
+                type="datetime-local"
+                value={scheduledFor}
+                onChange={(e) => setScheduledFor(e.target.value)}
+                min={new Date().toISOString().slice(0, 16)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Times are in {getTimezoneAbbreviation(tripTimezone)}
+              </p>
+            </div>
           )}
 
           <button
@@ -777,7 +795,7 @@ export function AnnouncementManager() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
-                        {formatScheduledTime(a.scheduled_for)}
+                        {formatScheduledTime(a.scheduled_for, tripTimezone)} {getTimezoneAbbreviation(tripTimezone)}
                       </span>
                     </div>
                     <p className="font-semibold text-sm text-gray-900 truncate">

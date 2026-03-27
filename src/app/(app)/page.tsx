@@ -314,6 +314,7 @@ export default async function HomePage() {
       simulatedDate={simDate}
       participants={participants}
       nextScheduleItem={nextScheduleItem}
+      timezone={trip?.timezone}
     />
   );
 }

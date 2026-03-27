@@ -82,7 +82,7 @@ export async function GET(request: Request) {
     .from("course_tees")
     .select("*")
     .eq("course_id", course.id)
-    .order("tee_name");
+    .order("course_rating", { ascending: false });
 
   // Determine which tee's holes to return
   const selectedTeeId = teeId || tees?.[0]?.id;

@@ -144,23 +144,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
-    // Auto-add to all contests for this event
-    const { data: contests } = await adminClient
-      .from("contests")
-      .select("id")
-      .eq("trip_id", trip_id);
-
-    if (contests && contests.length > 0) {
-      const contestEntries = contests.map((c) => ({
-        contest_id: c.id,
-        user_id,
-      }));
-
-      await adminClient
-        .from("contest_participants")
-        .upsert(contestEntries, { onConflict: "contest_id,user_id" });
-    }
-
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Add participant error:", error);

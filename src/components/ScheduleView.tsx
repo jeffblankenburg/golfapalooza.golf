@@ -39,12 +39,20 @@ function formatDateReadable(dateStr: string | null): string {
   return `${MONTH_SHORT[month - 1]} ${day}`;
 }
 
+interface TeeTimeInfo {
+  tee_time: string;
+  starting_hole: number | null;
+  teammates: string[];
+}
+
 export function ScheduleView({
   items,
   startDate,
+  teeTimesByDay = {},
 }: {
   items: ItineraryItem[];
   startDate: string;
+  teeTimesByDay?: Record<number, TeeTimeInfo>;
 }) {
   const preEvent = items.filter((i) => i.day_number === null);
   const days = [1, 2, 3, 4];
@@ -84,7 +92,27 @@ export function ScheduleView({
       {/* Daily Schedules */}
       {days.map((dayNum, idx) => {
         const dayItemsList = dayItems[idx];
-        if (dayItemsList.length === 0) return null;
+        const teeTime = teeTimesByDay[dayNum];
+        if (dayItemsList.length === 0 && !teeTime) return null;
+
+        // Build merged list: itinerary items + tee time, sorted by time
+        type ScheduleEntry =
+          | { type: "item"; item: ItineraryItem }
+          | { type: "tee_time"; info: TeeTimeInfo };
+
+        const entries: ScheduleEntry[] = dayItemsList.map((item) => ({ type: "item" as const, item }));
+        if (teeTime) {
+          entries.push({ type: "tee_time" as const, info: teeTime });
+        }
+
+        entries.sort((a, b) => {
+          const timeA = a.type === "item" ? a.item.start_time : a.info.tee_time;
+          const timeB = b.type === "item" ? b.item.start_time : b.info.tee_time;
+          if (!timeA && !timeB) return 0;
+          if (!timeA) return 1;
+          if (!timeB) return -1;
+          return timeA.localeCompare(timeB);
+        });
 
         return (
           <div key={dayNum} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -94,26 +122,57 @@ export function ScheduleView({
               </h2>
             </div>
             <div className="divide-y divide-gray-100">
-              {dayItemsList.map((item) => (
-                <div key={item.id} className="px-4 py-3 flex items-start gap-3">
-                  <div className="flex-shrink-0 w-20 pt-0.5">
-                    <p className="text-xs font-medium text-green-700">
-                      {formatTime(item.start_time)}
-                    </p>
-                    {item.end_time && (
-                      <p className="text-xs text-gray-400">
-                        {formatTime(item.end_time)}
+              {entries.map((entry, i) => {
+                if (entry.type === "tee_time") {
+                  const { info } = entry;
+                  return (
+                    <div key={`tee-${dayNum}`} className="px-4 py-3 flex items-start gap-3 bg-green-50/50">
+                      <div className="flex-shrink-0 w-20 pt-0.5">
+                        <p className="text-xs font-medium text-green-700">
+                          {formatTime(info.tee_time)}
+                        </p>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-green-800">
+                          My Tee Time
+                          {info.starting_hole && (
+                            <span className="ml-2 text-xs font-medium bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">
+                              Hole {info.starting_hole}
+                            </span>
+                          )}
+                        </p>
+                        {info.teammates.length > 0 && (
+                          <p className="text-xs text-green-600 mt-0.5">
+                            {info.teammates.join(", ")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                const { item } = entry;
+                return (
+                  <div key={item.id} className="px-4 py-3 flex items-start gap-3">
+                    <div className="flex-shrink-0 w-20 pt-0.5">
+                      <p className="text-xs font-medium text-green-700">
+                        {formatTime(item.start_time)}
                       </p>
-                    )}
+                      {item.end_time && (
+                        <p className="text-xs text-gray-400">
+                          {formatTime(item.end_time)}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">{item.title}</p>
+                      {item.location && (
+                        <p className="text-xs text-gray-500 mt-0.5">{item.location}</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">{item.title}</p>
-                    {item.location && (
-                      <p className="text-xs text-gray-500 mt-0.5">{item.location}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         );

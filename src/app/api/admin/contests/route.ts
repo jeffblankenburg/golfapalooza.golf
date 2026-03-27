@@ -56,7 +56,7 @@ export async function GET(request: Request) {
 
   const { data: contests, error } = await adminClient
     .from("contests")
-    .select("*, contest_participants(count)")
+    .select("*, contest_participants(count), scramble_teams(count)")
     .eq("trip_id", tripId)
     .order("sort_order");
 
@@ -74,6 +74,10 @@ export async function GET(request: Request) {
     participant_count:
       Array.isArray(c.contest_participants) && c.contest_participants.length > 0
         ? (c.contest_participants[0] as { count: number }).count
+        : 0,
+    team_count:
+      Array.isArray(c.scramble_teams) && c.scramble_teams.length > 0
+        ? (c.scramble_teams[0] as { count: number }).count
         : 0,
   }));
 
@@ -125,23 +129,6 @@ export async function POST(request: Request) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    // Auto-add all event participants to this contest
-    const { data: participants } = await adminClient
-      .from("event_participants")
-      .select("user_id")
-      .eq("trip_id", trip_id);
-
-    if (participants && participants.length > 0) {
-      const entries = participants.map((p) => ({
-        contest_id: data.id,
-        user_id: p.user_id,
-      }));
-
-      await adminClient
-        .from("contest_participants")
-        .upsert(entries, { onConflict: "contest_id,user_id" });
     }
 
     return NextResponse.json({ contest: data });

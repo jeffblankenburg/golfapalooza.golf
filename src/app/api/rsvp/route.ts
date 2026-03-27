@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
 
 /**
  * @swagger
@@ -33,11 +35,15 @@ export async function GET() {
     return NextResponse.json({ rsvp: null });
   }
 
-  const { data: rsvp } = await supabase
+  const simulating = await isSimulating();
+  const effectiveUserId = await getEffectiveUserId(user.id);
+  const dbClient = simulating ? createAdminClient() : supabase;
+
+  const { data: rsvp } = await dbClient
     .from("event_participants")
     .select("likelihood")
     .eq("trip_id", trip.id)
-    .eq("user_id", user.id)
+    .eq("user_id", effectiveUserId)
     .maybeSingle();
 
   return NextResponse.json({ rsvp });
@@ -75,6 +81,11 @@ export async function POST(request: Request) {
       );
     }
 
+    // Simulator support: save RSVP for the simulated user
+    const simulating = await isSimulating();
+    const effectiveUserId = await getEffectiveUserId(user.id);
+    const dbClient = simulating ? createAdminClient() : supabase;
+
     const { data: trip } = await supabase
       .from("trip_settings")
       .select("id")
@@ -89,29 +100,29 @@ export async function POST(request: Request) {
     }
 
     // Check if already participating
-    const { data: existing } = await supabase
+    const { data: existing } = await dbClient
       .from("event_participants")
       .select("id")
       .eq("trip_id", trip.id)
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .maybeSingle();
 
     if (existing) {
       // Update likelihood
-      const { error } = await supabase
+      const { error } = await dbClient
         .from("event_participants")
         .update({ likelihood })
         .eq("trip_id", trip.id)
-        .eq("user_id", user.id);
+        .eq("user_id", effectiveUserId);
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
     } else {
       // Insert new participation
-      const { error: insertError } = await supabase
+      const { error: insertError } = await dbClient
         .from("event_participants")
-        .insert({ trip_id: trip.id, user_id: user.id, likelihood });
+        .insert({ trip_id: trip.id, user_id: effectiveUserId, likelihood });
 
       if (insertError) {
         return NextResponse.json(
@@ -121,7 +132,8 @@ export async function POST(request: Request) {
       }
 
       // Auto-add to all contests for this event
-      const { data: contests } = await supabase
+      const adminClient = createAdminClient();
+      const { data: contests } = await adminClient
         .from("contests")
         .select("id")
         .eq("trip_id", trip.id);
@@ -129,13 +141,9 @@ export async function POST(request: Request) {
       if (contests && contests.length > 0) {
         const entries = contests.map((c) => ({
           contest_id: c.id,
-          user_id: user.id,
+          user_id: effectiveUserId,
         }));
 
-        // Use admin client for contest_participants since user may not have
-        // write access to that table
-        const { createAdminClient } = await import("@/lib/supabase/admin");
-        const adminClient = createAdminClient();
         await adminClient
           .from("contest_participants")
           .upsert(entries, { onConflict: "contest_id,user_id" });

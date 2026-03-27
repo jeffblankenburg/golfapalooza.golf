@@ -23,25 +23,6 @@ interface TripSummary {
   status: string;
 }
 
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTH_NAMES = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-
-function formatDate(dateStr: string, offset: number): string {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const d = new Date(year, month - 1, day + offset);
-  return `${DAY_NAMES[d.getDay()]} ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`;
-}
-
-const DAY_LABELS = [
-  { offset: 0, label: "KGB Cup" },
-  { offset: 1, label: "Scramble" },
-  { offset: 2, label: "Scramble" },
-  { offset: 3, label: "Scramble" },
-];
-
 export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: string; hideEventList?: boolean } = {}) {
   const [trip, setTrip] = useState<TripData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -291,24 +272,6 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
           </Field>
         </div>
 
-        {/* Derived Schedule */}
-        {trip.start_date && (
-          <div className="px-4 py-3 bg-green-50 border-t border-gray-200">
-            <p className="text-xs font-semibold text-green-800 uppercase tracking-wide mb-2">
-              Schedule
-            </p>
-            <div className="space-y-1">
-              {DAY_LABELS.map(({ offset, label }) => (
-                <div key={offset} className="flex justify-between text-sm">
-                  <span className="text-green-700 font-medium">
-                    Day {offset + 1} ({formatDate(trip.start_date, offset)})
-                  </span>
-                  <span className="text-green-600">{label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Location */}

@@ -374,12 +374,36 @@ function DaySection({
   showForm: boolean;
   formCard: React.ReactNode;
 }) {
+  const [open, setOpen] = useState(true);
+
+  // Auto-expand when a form is shown inside this section
+  const hasActiveForm = showForm || (editingId !== null && items.some((i) => i.id === editingId));
+  if (hasActiveForm && !open) setOpen(true);
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-          {title}
-        </h2>
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex items-center gap-2 flex-1 text-left"
+        >
+          <svg
+            className={`w-4 h-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+            {title}
+          </h2>
+          {!open && items.length > 0 && (
+            <span className="text-xs text-gray-400 font-normal normal-case">
+              ({items.length} item{items.length !== 1 ? "s" : ""})
+            </span>
+          )}
+        </button>
         <button
           onClick={onAdd}
           className="text-xs font-medium text-green-700 active:text-green-900"
@@ -388,59 +412,63 @@ function DaySection({
         </button>
       </div>
 
-      <div className="divide-y divide-gray-100">
-        {items.length === 0 && !showForm && (
-          <p className="px-4 py-4 text-sm text-gray-400 text-center">No items yet</p>
-        )}
-        {items.map((item) => (
-          <div key={item.id}>
-            {editingId === item.id ? (
-              <div className="px-4 py-2">{formCard}</div>
-            ) : (
-              <div className="px-4 py-3 flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900">{item.title}</p>
-                  {item.location && (
-                    <p className="text-xs text-gray-500 mt-0.5">{item.location}</p>
-                  )}
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {isPreEvent ? (
-                      <>
-                        {formatDateShort(item.start_date)}
-                        {item.start_time ? ` ${formatTime(item.start_time)}` : ""}
-                        {item.end_date ? ` — ${formatDateShort(item.end_date)}` : ""}
-                        {item.end_time && !item.end_date ? ` - ${formatTime(item.end_time)}` : ""}
-                        {item.end_time && item.end_date ? ` ${formatTime(item.end_time)}` : ""}
-                      </>
-                    ) : (
-                      <>
-                        {formatTime(item.start_time)}
-                        {item.end_time ? ` - ${formatTime(item.end_time)}` : ""}
-                      </>
-                    )}
-                  </p>
-                </div>
-                <div className="flex gap-2 flex-shrink-0">
-                  <button
-                    onClick={() => onEdit(item)}
-                    className="text-xs text-blue-600 font-medium"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => onDelete(item.id)}
-                    className="text-xs text-red-500 font-medium"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
+      {open && (
+        <>
+          <div className="divide-y divide-gray-100">
+            {items.length === 0 && !showForm && (
+              <p className="px-4 py-4 text-sm text-gray-400 text-center">No items yet</p>
             )}
+            {items.map((item) => (
+              <div key={item.id}>
+                {editingId === item.id ? (
+                  <div className="px-4 py-2">{formCard}</div>
+                ) : (
+                  <div className="px-4 py-3 flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">{item.title}</p>
+                      {item.location && (
+                        <p className="text-xs text-gray-500 mt-0.5">{item.location}</p>
+                      )}
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {isPreEvent ? (
+                          <>
+                            {formatDateShort(item.start_date)}
+                            {item.start_time ? ` ${formatTime(item.start_time)}` : ""}
+                            {item.end_date ? ` — ${formatDateShort(item.end_date)}` : ""}
+                            {item.end_time && !item.end_date ? ` - ${formatTime(item.end_time)}` : ""}
+                            {item.end_time && item.end_date ? ` ${formatTime(item.end_time)}` : ""}
+                          </>
+                        ) : (
+                          <>
+                            {formatTime(item.start_time)}
+                            {item.end_time ? ` - ${formatTime(item.end_time)}` : ""}
+                          </>
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => onEdit(item)}
+                        className="text-xs text-blue-600 font-medium"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => onDelete(item.id)}
+                        className="text-xs text-red-500 font-medium"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {showForm && editingId === null && <div className="px-4 pb-4">{formCard}</div>}
+          {showForm && editingId === null && <div className="px-4 pb-4">{formCard}</div>}
+        </>
+      )}
     </div>
   );
 }

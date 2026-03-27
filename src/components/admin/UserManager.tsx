@@ -33,6 +33,7 @@ export function UserManager({ ref }: { ref?: Ref<{ openAdd: () => void }> }) {
     displayName: "",
     fullName: "",
   });
+  const [editIsAdmin, setEditIsAdmin] = useState(false);
   const [editPermissions, setEditPermissions] = useState<
     Record<string, boolean>
   >({});
@@ -77,7 +78,8 @@ export function UserManager({ ref }: { ref?: Ref<{ openAdd: () => void }> }) {
         ? {
             userId: editingUser.id,
             ...formData,
-            permissions: editPermissions,
+            isAdmin: editIsAdmin,
+            permissions: editIsAdmin ? editPermissions : {},
           }
         : formData;
 
@@ -106,6 +108,7 @@ export function UserManager({ ref }: { ref?: Ref<{ openAdd: () => void }> }) {
   const openAdd = () => {
     setEditingUser(null);
     setFormData({ phone: "", displayName: "", fullName: "" });
+    setEditIsAdmin(false);
     setEditPermissions({});
     setError("");
     setShowModal(true);
@@ -118,6 +121,7 @@ export function UserManager({ ref }: { ref?: Ref<{ openAdd: () => void }> }) {
       displayName: user.display_name,
       fullName: user.full_name || "",
     });
+    setEditIsAdmin(user.is_admin);
     setEditPermissions(user.permissions || {});
     setError("");
     setShowModal(true);
@@ -127,19 +131,6 @@ export function UserManager({ ref }: { ref?: Ref<{ openAdd: () => void }> }) {
     setShowModal(false);
     setEditingUser(null);
     setError("");
-  };
-
-  const handleToggleAdmin = async (user: User) => {
-    try {
-      const res = await fetch("/api/admin/users", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, isAdmin: !user.is_admin }),
-      });
-      if (res.ok) fetchUsers();
-    } catch {
-      setError("Failed to update admin status");
-    }
   };
 
   const handleDelete = (user: User) => {
@@ -316,11 +307,31 @@ export function UserManager({ ref }: { ref?: Ref<{ openAdd: () => void }> }) {
                 </div>
 
                 {editingUser && (
-                  <div className="pt-3 border-t border-gray-100">
-                    <PermissionsEditor
-                      permissions={editPermissions}
-                      onChange={setEditPermissions}
-                    />
+                  <div className="pt-3 border-t border-gray-100 space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => setEditIsAdmin(!editIsAdmin)}
+                      className="flex items-center justify-between w-full py-1"
+                    >
+                      <span className="text-sm font-semibold text-gray-700">Admin Access</span>
+                      <div
+                        className={`w-11 h-6 rounded-full transition-colors relative ${
+                          editIsAdmin ? "bg-green-600" : "bg-gray-300"
+                        }`}
+                      >
+                        <div
+                          className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                            editIsAdmin ? "translate-x-[22px]" : "translate-x-0.5"
+                          }`}
+                        />
+                      </div>
+                    </button>
+                    {editIsAdmin && (
+                      <PermissionsEditor
+                        permissions={editPermissions}
+                        onChange={setEditPermissions}
+                      />
+                    )}
                   </div>
                 )}
               </form>

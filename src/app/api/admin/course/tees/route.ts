@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { course_id, tee_name, course_rating, slope_rating, par, duplicate_from } = body;
+    const { course_id, tee_name, tee_color, course_rating, slope_rating, par, duplicate_from } = body;
 
     if (!course_id || !tee_name) {
       return NextResponse.json(
@@ -45,11 +45,12 @@ export async function POST(request: Request) {
     let sourceRating = course_rating || 72.0;
     let sourceSlope = slope_rating || 113;
     let sourcePar = par || 72;
+    let sourceColor = tee_color || null;
 
     if (duplicate_from) {
       const { data: sourceTee } = await adminClient
         .from("course_tees")
-        .select("course_rating, slope_rating, par")
+        .select("course_rating, slope_rating, par, tee_color")
         .eq("id", duplicate_from)
         .single();
 
@@ -57,6 +58,7 @@ export async function POST(request: Request) {
         sourceRating = sourceTee.course_rating;
         sourceSlope = sourceTee.slope_rating;
         sourcePar = sourceTee.par;
+        sourceColor = sourceTee.tee_color;
       }
     }
 
@@ -66,6 +68,7 @@ export async function POST(request: Request) {
       .insert({
         course_id,
         tee_name,
+        tee_color: sourceColor,
         course_rating: sourceRating,
         slope_rating: sourceSlope,
         par: sourcePar,
@@ -148,7 +151,7 @@ export async function PUT(request: Request) {
 
   try {
     const body = await request.json();
-    const { tee_id, tee_name, course_rating, slope_rating, par } = body;
+    const { tee_id, tee_name, tee_color, course_rating, slope_rating, par } = body;
 
     if (!tee_id) {
       return NextResponse.json(
@@ -163,6 +166,7 @@ export async function PUT(request: Request) {
       .from("course_tees")
       .update({
         tee_name: tee_name || "White",
+        tee_color: tee_color || null,
         course_rating: course_rating || 72.0,
         slope_rating: slope_rating || 113,
         par: par || 72,

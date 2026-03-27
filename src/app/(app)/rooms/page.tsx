@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { RoomList } from "@/components/RoomList";
+import { getEffectiveUserId } from "@/lib/simulator";
 
 export default async function RoomsPage() {
   const supabase = await createClient();
@@ -7,9 +8,11 @@ export default async function RoomsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const effectiveUserId = await getEffectiveUserId(user!.id);
+
   const { data: trip } = await supabase
     .from("trip_settings")
-    .select("id")
+    .select("id, show_rooms")
     .eq("status", "active")
     .single();
 
@@ -19,6 +22,17 @@ export default async function RoomsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Rooms</h1>
         <p className="text-gray-500 text-center py-8">
           Room assignments haven&apos;t been set up yet.
+        </p>
+      </div>
+    );
+  }
+
+  if (!trip.show_rooms) {
+    return (
+      <div className="px-4 pt-6">
+        <h1 className="text-2xl font-bold text-gray-900">Rooms</h1>
+        <p className="text-gray-500 text-center py-8">
+          Room assignments are coming soon!
         </p>
       </div>
     );
@@ -71,7 +85,7 @@ export default async function RoomsPage() {
     <RoomList
       rooms={rooms}
       facilities={facilitiesResult.data || []}
-      currentUserId={user!.id}
+      currentUserId={effectiveUserId}
     />
   );
 }

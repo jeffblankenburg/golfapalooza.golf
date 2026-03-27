@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { ActionItemsList } from "@/components/ActionItemsList";
+import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
 
 export default async function ActionsPage() {
   const supabase = await createClient();
@@ -11,6 +13,10 @@ export default async function ActionsPage() {
   if (!user) {
     redirect("/login");
   }
+
+  const simulating = await isSimulating();
+  const effectiveUserId = await getEffectiveUserId(user.id);
+  const queryClient = simulating ? createAdminClient() : supabase;
 
   const { data: trip } = await supabase
     .from("trip_settings")
@@ -28,15 +34,15 @@ export default async function ActionsPage() {
   }
 
   const [itemsResult, completionsResult] = await Promise.all([
-    supabase
+    queryClient
       .from("action_items")
       .select("*")
       .eq("trip_id", trip.id)
       .order("sort_order"),
-    supabase
+    queryClient
       .from("user_action_completions")
       .select("action_item_id, completed_at")
-      .eq("user_id", user.id),
+      .eq("user_id", effectiveUserId),
   ]);
 
   return (

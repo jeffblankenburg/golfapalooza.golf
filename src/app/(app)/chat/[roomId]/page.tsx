@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { ChatRoom } from "@/components/chat/ChatRoom";
+import { getEffectiveUserId } from "@/lib/simulator";
 
 export default async function ChatRoomPage({
   params,
@@ -14,6 +15,8 @@ export default async function ChatRoomPage({
   if (!user) {
     redirect("/login");
   }
+
+  const effectiveUserId = await getEffectiveUserId(user.id);
 
   // Get room info with members
   const { data: room } = await supabase
@@ -34,7 +37,7 @@ export default async function ChatRoomPage({
   // Get current user's display name
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const currentMember = (room.members as any[])?.find(
-    (m) => m.user?.id === user.id
+    (m) => m.user?.id === effectiveUserId
   );
   const currentUserName = currentMember?.user?.display_name || "You";
 
@@ -43,7 +46,7 @@ export default async function ChatRoomPage({
   if (room.type === "dm") {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const otherMember = (room.members as any[])?.find(
-      (m) => m.user?.id !== user.id
+      (m) => m.user?.id !== effectiveUserId
     );
     displayName = otherMember?.user?.display_name || "Direct Message";
   } else if (!displayName) {
@@ -61,7 +64,7 @@ export default async function ChatRoomPage({
       roomId={roomId}
       roomName={displayName || "Chat"}
       roomType={room.type}
-      currentUserId={user.id}
+      currentUserId={effectiveUserId}
       currentUserName={currentUserName}
       memberCount={room.members?.length || 0}
     />

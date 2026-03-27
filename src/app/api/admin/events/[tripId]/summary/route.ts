@@ -38,6 +38,7 @@ export async function GET(
     tripResult,
     participantsResult,
     contestsResult,
+    scrambleDaysResult,
     itineraryResult,
     facilitiesResult,
     actionItemsResult,
@@ -56,6 +57,11 @@ export async function GET(
       .from("contests")
       .select("id", { count: "exact", head: true })
       .eq("trip_id", tripId),
+    adminClient
+      .from("contests")
+      .select("id", { count: "exact", head: true })
+      .eq("trip_id", tripId)
+      .eq("contest_type", "scramble"),
     adminClient
       .from("itinerary_items")
       .select("id", { count: "exact", head: true })
@@ -95,6 +101,7 @@ export async function GET(
     counts: {
       participants: participantsResult.count ?? 0,
       contests: contestsResult.count ?? 0,
+      scramble_days: scrambleDaysResult.count ?? 0,
       itinerary_items: itineraryResult.count ?? 0,
       facilities_linked: facilitiesResult.count ?? 0,
       action_items: actionItemsResult.count ?? 0,

@@ -6,9 +6,39 @@ import { ConfirmModal } from "@/components/admin/ConfirmModal";
 interface TeeData {
   id: string;
   tee_name: string;
+  tee_color: string | null;
   course_rating: number;
   slope_rating: number;
   par: number;
+}
+
+const TEE_COLOR_OPTIONS = [
+  { value: "black", label: "Black", bg: "bg-gray-900", text: "text-white", ring: "ring-gray-900" },
+  { value: "blue", label: "Blue", bg: "bg-blue-600", text: "text-white", ring: "ring-blue-600" },
+  { value: "white", label: "White", bg: "bg-white border border-gray-300", text: "text-gray-900", ring: "ring-gray-400" },
+  { value: "gold", label: "Gold", bg: "bg-yellow-400", text: "text-gray-900", ring: "ring-yellow-400" },
+  { value: "red", label: "Red", bg: "bg-red-600", text: "text-white", ring: "ring-red-600" },
+  { value: "green", label: "Green", bg: "bg-green-700", text: "text-white", ring: "ring-green-700" },
+  { value: "silver", label: "Silver", bg: "bg-gray-400", text: "text-white", ring: "ring-gray-400" },
+];
+
+function isHexColor(color: string | null): boolean {
+  return !!color && /^#[0-9a-fA-F]{6}$/.test(color);
+}
+
+function getContrastText(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.5 ? "text-gray-900" : "text-white";
+}
+
+function getTeeColorClasses(color: string | null) {
+  const match = TEE_COLOR_OPTIONS.find((c) => c.value === color);
+  if (match) return { ...match, isCustom: false, hex: null };
+  if (isHexColor(color)) return { bg: "", text: getContrastText(color!), ring: "", isCustom: true, hex: color };
+  return { bg: "bg-gray-100", text: "text-gray-600", ring: "ring-gray-300", isCustom: false, hex: null };
 }
 
 interface HoleData {
@@ -49,6 +79,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
   const [editingTee, setEditingTee] = useState<TeeData | null>(null);
   const [showAddTee, setShowAddTee] = useState(false);
   const [newTeeName, setNewTeeName] = useState("");
+  const [newTeeColor, setNewTeeColor] = useState<string | null>(null);
   const [newTeeRating, setNewTeeRating] = useState("72.0");
   const [newTeeSlope, setNewTeeSlope] = useState("113");
   const [newTeePar, setNewTeePar] = useState("72");
@@ -192,6 +223,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
         body: JSON.stringify({
           course_id: course.id,
           tee_name: newTeeName.trim(),
+          tee_color: newTeeColor,
           course_rating: parseFloat(newTeeRating) || 72.0,
           slope_rating: parseInt(newTeeSlope) || 113,
           par: parseInt(newTeePar) || 72,
@@ -206,6 +238,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
       setTeeStatus("saved");
       setShowAddTee(false);
       setNewTeeName("");
+      setNewTeeColor(null);
       setNewTeeRating("72.0");
       setNewTeeSlope("113");
       setNewTeePar("72");
@@ -227,6 +260,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
         body: JSON.stringify({
           tee_id: editingTee.id,
           tee_name: editingTee.tee_name,
+          tee_color: editingTee.tee_color,
           course_rating: editingTee.course_rating,
           slope_rating: editingTee.slope_rating,
           par: editingTee.par,
@@ -352,6 +386,38 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
     fileInputRef.current?.click();
   }
 
+  async function deleteImage(holeId: string, imageType: "overhead" | "green") {
+    const key = `${holeId}-${imageType}`;
+    setUploadingHole(key);
+    try {
+      const res = await fetch(
+        `/api/admin/course/holes/upload?holeId=${holeId}&imageType=${imageType}`,
+        { method: "DELETE" }
+      );
+      const data = await res.json();
+      if (data.error) {
+        setError(data.error);
+        return;
+      }
+      setHoles((prev) =>
+        prev.map((h) =>
+          h.id === holeId
+            ? {
+                ...h,
+                [imageType === "overhead"
+                  ? "overhead_image_url"
+                  : "green_image_url"]: null,
+              }
+            : h
+        )
+      );
+    } catch {
+      setError("Failed to delete image");
+    } finally {
+      setUploadingHole(null);
+    }
+  }
+
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     const upload = pendingUpload.current;
@@ -386,7 +452,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
                 ...h,
                 [upload.imageType === "overhead"
                   ? "overhead_image_url"
-                  : "green_image_url"]: data.url,
+                  : "green_image_url"]: `${data.url}?t=${Date.now()}`,
               }
             : h
         )
@@ -456,8 +522,9 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
     );
   }
 
-  const selectedTee = tees.find((t) => t.id === selectedTeeId);
-  const isFirstTee = tees.length > 0 && tees[0].id === selectedTeeId;
+  // Sort tees by course rating descending
+  const sortedTees = [...tees].sort((a, b) => b.course_rating - a.course_rating);
+  const selectedTee = sortedTees.find((t) => t.id === selectedTeeId);
 
   return (
     <div className="space-y-6">
@@ -510,18 +577,27 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
 
         {/* Tee tab bar */}
         <div className="flex items-center gap-2 px-4 py-3 overflow-x-auto border-b border-gray-100">
-          {tees.map((tee) => (
+          {sortedTees.map((tee) => {
+            const colors = getTeeColorClasses(tee.tee_color);
+            const isSelected = tee.id === selectedTeeId;
+            return (
             <button
               key={tee.id}
               onClick={() => switchTee(tee.id)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0 ${
-                tee.id === selectedTeeId
-                  ? "bg-green-600 text-white"
-                  : "bg-gray-100 text-gray-600 active:bg-gray-200"
+                colors.isCustom
+                  ? `${colors.text} ${isSelected ? "" : "opacity-60"}`
+                  : isSelected
+                    ? `${colors.bg} ${colors.text} ring-2 ${colors.ring} ring-offset-1`
+                    : `${colors.bg} ${colors.text} opacity-60`
               }`}
+              style={colors.isCustom ? {
+                backgroundColor: colors.hex!,
+                ...(isSelected ? { outlineColor: colors.hex!, outlineWidth: "2px", outlineStyle: "solid", outlineOffset: "2px" } : {}),
+              } : undefined}
             >
               {tee.tee_name}
-              {tee.id === selectedTeeId && (
+              {isSelected && (
                 <span
                   role="button"
                   tabIndex={0}
@@ -553,7 +629,8 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
                 </span>
               )}
             </button>
-          ))}
+          );
+          })}
           <button
             onClick={() => {
               setShowAddTee(true);
@@ -621,6 +698,10 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
                 type="number"
               />
             </div>
+            <TeeColorPicker
+              value={editingTee.tee_color}
+              onChange={(v) => setEditingTee({ ...editingTee, tee_color: v })}
+            />
             <div className="flex gap-2">
               <button
                 onClick={updateTee}
@@ -689,6 +770,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
                 type="number"
               />
             </div>
+            <TeeColorPicker value={newTeeColor} onChange={setNewTeeColor} />
             <div className="flex gap-2">
               <button
                 onClick={addTee}
@@ -747,11 +829,14 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
               key={hole.id}
               hole={hole}
               courseId={course.id}
-              showImages={isFirstTee}
+              courseName={courseName}
+              teeName={selectedTee?.tee_name || ""}
+              showImages
               onUpdate={(field, value) => updateHole(i, field, value)}
               onUpload={(imageType) =>
                 triggerUpload(hole.id, hole.hole_number, imageType)
               }
+              onDelete={(imageType) => deleteImage(hole.id, imageType)}
               uploadingKey={uploadingHole}
             />
           ))}
@@ -815,20 +900,27 @@ function Field({
 function HoleRow({
   hole,
   courseId,
+  courseName,
+  teeName,
   showImages,
   onUpdate,
   onUpload,
+  onDelete,
   uploadingKey,
 }: {
   hole: HoleData;
   courseId: string;
+  courseName: string;
+  teeName: string;
   showImages: boolean;
   onUpdate: (field: "par" | "handicap_index" | "yards", value: string) => void;
   onUpload: (imageType: "overhead" | "green") => void;
+  onDelete: (imageType: "overhead" | "green") => void;
   uploadingKey: string | null;
 }) {
   const isUploadingOverhead = uploadingKey === `${hole.id}-overhead`;
   const isUploadingGreen = uploadingKey === `${hole.id}-green`;
+  const modalSubtitle = `${courseName} · ${teeName} · Hole ${hole.hole_number}`;
 
   return (
     <div className="px-4 py-3">
@@ -869,20 +961,23 @@ function HoleRow({
         </div>
       </div>
 
-      {/* Image uploads — only shown on first tee since images are shared */}
       {showImages && (
         <div className="flex gap-2 ml-11">
           <ImageButton
             label="Overhead"
+            subtitle={modalSubtitle}
             imageUrl={hole.overhead_image_url}
             uploading={isUploadingOverhead}
-            onClick={() => onUpload("overhead")}
+            onUpload={() => onUpload("overhead")}
+            onDelete={() => onDelete("overhead")}
           />
           <ImageButton
             label="Green"
+            subtitle={modalSubtitle}
             imageUrl={hole.green_image_url}
             uploading={isUploadingGreen}
-            onClick={() => onUpload("green")}
+            onUpload={() => onUpload("green")}
+            onDelete={() => onDelete("green")}
           />
         </div>
       )}
@@ -892,24 +987,62 @@ function HoleRow({
 
 function ImageButton({
   label,
+  subtitle,
   imageUrl,
   uploading,
-  onClick,
+  onUpload,
+  onDelete,
 }: {
   label: string;
+  subtitle: string;
   imageUrl: string | null;
   uploading: boolean;
-  onClick: () => void;
+  onUpload: () => void;
+  onDelete: () => void;
 }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={uploading}
-      className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-lg text-xs active:bg-gray-50 transition-colors disabled:opacity-50"
-    >
-      {uploading ? (
+  const [showModal, setShowModal] = useState(false);
+
+  if (uploading) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-lg text-xs opacity-50">
         <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
-      ) : imageUrl ? (
+        <span className="text-gray-600">{label}</span>
+      </div>
+    );
+  }
+
+  // No image — show upload button
+  if (!imageUrl) {
+    return (
+      <button
+        onClick={onUpload}
+        className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-lg text-xs active:bg-gray-50 transition-colors"
+      >
+        <svg
+          className="w-4 h-4 text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+          />
+        </svg>
+        <span className="text-gray-600">{label}</span>
+      </button>
+    );
+  }
+
+  // Has image — show checkmark, click opens modal
+  return (
+    <>
+      <button
+        onClick={() => setShowModal(true)}
+        className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-lg text-xs active:bg-gray-50 transition-colors"
+      >
         <div className="w-4 h-4 rounded bg-green-100 flex items-center justify-center">
           <svg
             className="w-3 h-3 text-green-600"
@@ -925,22 +1058,200 @@ function ImageButton({
             />
           </svg>
         </div>
-      ) : (
-        <svg
-          className="w-4 h-4 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+        <span className="text-gray-600">{label}</span>
+      </button>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowModal(false)}
           />
-        </svg>
+          <div className="relative w-full max-w-lg bg-white rounded-t-3xl p-6 pb-8 animate-slide-up max-h-[85vh] overflow-y-auto">
+            <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-gray-900">{label}</h3>
+            <p className="text-sm text-gray-500 mb-4">{subtitle}</p>
+            <img
+              src={imageUrl}
+              alt={label}
+              className="w-full rounded-xl border border-gray-200 mb-6"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  onUpload();
+                }}
+                className="flex-1 bg-green-600 text-white font-semibold py-3 rounded-xl active:scale-95 transition-transform text-sm"
+              >
+                Replace
+              </button>
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  onDelete();
+                }}
+                className="flex-1 bg-red-50 text-red-600 font-semibold py-3 rounded-xl active:scale-95 transition-transform text-sm"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-      <span className="text-gray-600">{label}</span>
-    </button>
+    </>
+  );
+}
+
+function TeeColorPicker({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (v: string | null) => void;
+}) {
+  const [showModal, setShowModal] = useState(false);
+  const isCustom = isHexColor(value);
+  const currentColor = getTeeColorClasses(value);
+  const hasColor = value !== null;
+
+  return (
+    <>
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5">
+          Color
+        </label>
+        <button
+          type="button"
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+        >
+          {hasColor ? (
+            <span
+              className={`w-5 h-5 rounded-full shrink-0 ${isCustom ? "" : currentColor.bg}`}
+              style={isCustom ? { backgroundColor: value! } : undefined}
+            />
+          ) : (
+            <span className="w-5 h-5 rounded-full shrink-0 border-2 border-dashed border-gray-300" />
+          )}
+          <span className="text-gray-700">
+            {hasColor
+              ? isCustom
+                ? value
+                : TEE_COLOR_OPTIONS.find((o) => o.value === value)?.label || value
+              : "Choose a color"}
+          </span>
+        </button>
+      </div>
+
+      {showModal && (
+        <TeeColorModal
+          value={value}
+          onChange={onChange}
+          onClose={() => setShowModal(false)}
+        />
+      )}
+    </>
+  );
+}
+
+function TeeColorModal({
+  value,
+  onChange,
+  onClose,
+}: {
+  value: string | null;
+  onChange: (v: string | null) => void;
+  onClose: () => void;
+}) {
+  const isCustom = isHexColor(value);
+  const [customHex, setCustomHex] = useState(isCustom ? value! : "#6b7280");
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-white rounded-t-3xl p-6 pb-8 animate-slide-up">
+        <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+        <h3 className="text-lg font-bold text-gray-900 mb-1">Tee Color</h3>
+        <p className="text-sm text-gray-500 mb-5">Choose a preset or pick a custom color</p>
+
+        {/* Presets */}
+        <div className="flex flex-wrap gap-3 mb-6">
+          {TEE_COLOR_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => {
+                onChange(opt.value);
+                onClose();
+              }}
+              className={`w-10 h-10 rounded-full ${opt.bg} ${
+                value === opt.value
+                  ? `ring-2 ${opt.ring} ring-offset-2`
+                  : ""
+              }`}
+              title={opt.label}
+            />
+          ))}
+        </div>
+
+        {/* Custom picker */}
+        <div className="flex items-center gap-3 mb-6">
+          <input
+            type="color"
+            value={customHex}
+            onChange={(e) => setCustomHex(e.target.value)}
+            className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer p-0.5"
+          />
+          <input
+            type="text"
+            value={customHex}
+            onChange={(e) => {
+              const v = e.target.value;
+              setCustomHex(v);
+            }}
+            maxLength={7}
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            placeholder="#000000"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              if (isHexColor(customHex)) {
+                onChange(customHex);
+                onClose();
+              }
+            }}
+            disabled={!isHexColor(customHex)}
+            className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-xl active:scale-95 transition-transform disabled:opacity-50"
+          >
+            Apply
+          </button>
+        </div>
+
+        {/* Clear / Cancel */}
+        <div className="flex gap-3">
+          {value && (
+            <button
+              type="button"
+              onClick={() => {
+                onChange(null);
+                onClose();
+              }}
+              className="flex-1 py-3 bg-gray-100 text-gray-600 font-semibold rounded-xl active:scale-95 transition-transform text-sm"
+            >
+              Clear Color
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-3 bg-gray-100 text-gray-600 font-semibold rounded-xl active:scale-95 transition-transform text-sm"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

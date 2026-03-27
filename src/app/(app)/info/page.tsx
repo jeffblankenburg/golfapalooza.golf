@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { TripInfo } from "@/components/TripInfo";
 import { PastEvents } from "@/components/PastEvents";
 import { RsvpStatus } from "@/components/RsvpStatus";
+import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
 
 export default async function InfoPage() {
   const supabase = await createClient();
@@ -9,6 +11,10 @@ export default async function InfoPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  const simulating = await isSimulating();
+  const effectiveUserId = await getEffectiveUserId(user!.id);
+  const queryClient = simulating ? createAdminClient() : supabase;
 
   const { data: trip } = await supabase
     .from("trip_settings")
@@ -23,11 +29,11 @@ export default async function InfoPage() {
 
   let rsvpLikelihood: number | null = null;
   if (trip && user) {
-    const { data: rsvp } = await supabase
+    const { data: rsvp } = await queryClient
       .from("event_participants")
       .select("likelihood")
       .eq("trip_id", trip.id)
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .maybeSingle();
     rsvpLikelihood = rsvp?.likelihood ?? null;
   }

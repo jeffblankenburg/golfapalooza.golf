@@ -29,6 +29,7 @@ interface Contest {
   id: string;
   name: string;
   day_number: number | null;
+  team_count: number;
 }
 
 type View = "days" | "teams";
@@ -91,7 +92,7 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
     });
 
     if (res.ok) {
-      await fetchTeams(selectedContest.id);
+      await Promise.all([fetchTeams(selectedContest.id), fetchContests()]);
     }
     setSaving(null);
   };
@@ -107,7 +108,9 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ team_id: team.id }),
         });
-        if (selectedContest) await fetchTeams(selectedContest.id);
+        if (selectedContest) {
+          await Promise.all([fetchTeams(selectedContest.id), fetchContests()]);
+        }
       },
     });
   };
@@ -247,7 +250,7 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
             >
               <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0">
                 <span className="text-green-700 font-bold text-sm">
-                  {contest.day_number || "?"}
+                  {contest.team_count}
                 </span>
               </div>
               <div className="flex-1">
@@ -255,7 +258,7 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
                   {contest.name}
                 </p>
                 <p className="text-xs text-gray-400">
-                  {getDayLabel(contest.day_number)}
+                  {getDayLabel(contest.day_number)} · {contest.team_count} team{contest.team_count !== 1 ? "s" : ""}
                 </p>
               </div>
               <svg className="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">

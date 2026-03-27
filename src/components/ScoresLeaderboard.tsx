@@ -15,17 +15,34 @@ interface Team {
   members: TeamMember[];
 }
 
+interface TeeTimeGroup {
+  id: string;
+  tee_time: string | null;
+  starting_hole: number | null;
+  members: TeamMember[];
+}
+
 interface DayData {
   contest_id: string;
   name: string;
   day_number: number | null;
+  contest_type: string;
   teams: Team[];
+  teeTimeGroups: TeeTimeGroup[];
 }
 
 function getDayOfWeek(startDate: string, dayNumber: number): string {
   const [year, month, day] = startDate.split("-").map(Number);
   const date = new Date(year, month - 1, day + (dayNumber - 1));
   return date.toLocaleDateString("en-US", { weekday: "short" });
+}
+
+function formatTeeTime(time: string): string {
+  const [h, m] = time.split(":");
+  const hour = parseInt(h);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const h12 = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  return `${h12}:${m} ${ampm}`;
 }
 
 function calcPoints(team: Team): number | null {
@@ -118,12 +135,55 @@ export function ScoresLeaderboard({
           <p className="text-sm">Teams not yet assigned for this day.</p>
         </div>
       ) : !hasScores ? (
-        <div className="text-center py-12 text-gray-400">
-          <p className="text-sm">Scores not yet posted.</p>
-          <p className="text-xs mt-1">
-            {rankedTeams.length} team{rankedTeams.length !== 1 ? "s" : ""} assigned
-          </p>
-        </div>
+        currentDay.teeTimeGroups.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-xs text-gray-400 uppercase font-semibold tracking-wide mb-3">
+              Tee Times — {currentDay.name}
+            </p>
+            {currentDay.teeTimeGroups.map((group) => (
+              <div
+                key={group.id}
+                className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-16 pt-0.5">
+                    {group.tee_time ? (
+                      <p className="text-sm font-semibold text-green-700">
+                        {formatTeeTime(group.tee_time)}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-300">TBD</p>
+                    )}
+                    {group.starting_hole && (
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        Hole {group.starting_hole}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap gap-x-1.5 gap-y-0.5">
+                      {group.members.map((member, i) => (
+                        <span key={i} className="text-sm text-gray-900">
+                          {member.display_name}
+                          {i < group.members.length - 1 && (
+                            <span className="text-gray-300 ml-1">&middot;</span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12 text-gray-400">
+            <p className="text-sm">Scores not yet posted.</p>
+            <p className="text-xs mt-1">
+              {rankedTeams.length} team{rankedTeams.length !== 1 ? "s" : ""} assigned
+            </p>
+          </div>
+        )
       ) : (
         <div className="space-y-2.5">
           {rankedTeams.map((team) => {

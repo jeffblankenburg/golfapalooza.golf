@@ -43,21 +43,26 @@ export function RoomList({
   facilities: Facility[];
   currentUserId: string;
 }) {
+  // Sort all rooms by room number ascending
+  const sortedRooms = [...rooms].sort((a, b) =>
+    a.room_number.localeCompare(b.room_number, undefined, { numeric: true })
+  );
+
   // Find current user's room
   let myRoom: Room | null = null;
   let myRoommates: Occupant[] = [];
-  let myFacility: Facility | null = null;
 
-  for (const room of rooms) {
+  for (const room of sortedRooms) {
     const occupants = getOccupants(room);
     if (occupants.some((o) => o.id === currentUserId)) {
       myRoom = room;
       myRoommates = occupants.filter((o) => o.id !== currentUserId);
-      myFacility =
-        facilities.find((f) => f.id === room.facility_id) || null;
       break;
     }
   }
+
+  // Keep facilities in props to avoid changing the page component contract
+  void facilities;
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-6">
@@ -74,12 +79,6 @@ export function RoomList({
               {myRoom.room_number}
             </span>
           </div>
-          <p className="text-green-600/70 text-sm mt-1">
-            {myRoom.bed_type} · {myRoom.showers} shower
-            {myRoom.showers !== 1 ? "s" : ""}
-            {myRoom.smoking ? " · Smoking" : ""}
-            {myFacility ? ` · ${myFacility.name}` : ""}
-          </p>
           {myRoommates.length > 0 && (
             <div className="mt-4 space-y-2">
               <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">
@@ -114,90 +113,57 @@ export function RoomList({
         </div>
       )}
 
-      {/* All Rooms grouped by facility */}
-      {facilities.length > 0 && (
+      {/* All Rooms */}
+      {sortedRooms.length > 0 && (
         <div>
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
             All Rooms
           </h2>
-          <div className="space-y-4">
-            {facilities.map((facility) => {
-              const facilityRooms = rooms.filter(
-                (r) => r.facility_id === facility.id
-              );
-              if (facilityRooms.length === 0) return null;
-
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden divide-y divide-gray-100">
+            {sortedRooms.map((room) => {
+              const occupants = getOccupants(room);
               return (
-                <div key={facility.id}>
-                  {facilities.length > 1 && (
-                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                      {facility.name}
-                    </h3>
-                  )}
-                  <div className="space-y-3">
-                    {facilityRooms.map((room) => {
-                      const occupants = getOccupants(room);
-                      return (
-                        <div
-                          key={room.id}
-                          className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
-                        >
-                          <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                            <h4 className="text-sm font-semibold text-gray-700">
-                              Room {room.room_number}
-                            </h4>
-                            <p className="text-xs text-gray-400 mt-0.5">
-                              {room.bed_type} · {room.showers} shower
-                              {room.showers !== 1 ? "s" : ""}
-                              {room.smoking ? " · Smoking" : ""}
-                            </p>
-                          </div>
-                          {occupants.length > 0 ? (
-                            <div className="divide-y divide-gray-100">
-                              {occupants.map((occupant) => (
-                                <div
-                                  key={occupant.id}
-                                  className="flex items-center gap-3 px-4 py-3"
-                                >
-                                  {occupant.avatar_url ? (
-                                    <img
-                                      src={occupant.avatar_url}
-                                      alt=""
-                                      className="w-8 h-8 rounded-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-sm font-bold">
-                                      {(occupant.display_name || "?")[0].toUpperCase()}
-                                    </div>
-                                  )}
-                                  <span
-                                    className={`text-sm font-medium ${
-                                      occupant.id === currentUserId
-                                        ? "text-green-700"
-                                        : "text-gray-900"
-                                    }`}
-                                  >
-                                    {occupant.display_name}
-                                    {occupant.id === currentUserId && (
-                                      <span className="text-green-600 text-xs ml-1">
-                                        (you)
-                                      </span>
-                                    )}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
+                <div key={room.id} className="flex items-center gap-3 px-4 py-3">
+                  <span className="w-10 text-sm font-semibold text-gray-500 shrink-0 self-start pt-1.5">
+                    {room.room_number}
+                  </span>
+                  {occupants.length > 0 ? (
+                    <div className="flex-1 space-y-2">
+                      {occupants.map((occupant) => (
+                        <div key={occupant.id} className="flex items-center gap-3">
+                          {occupant.avatar_url ? (
+                            <img
+                              src={occupant.avatar_url}
+                              alt=""
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
                           ) : (
-                            <div className="px-4 py-4">
-                              <p className="text-sm text-gray-400 italic">
-                                No occupants
-                              </p>
+                            <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-sm font-bold">
+                              {(occupant.display_name || "?")[0].toUpperCase()}
                             </div>
                           )}
+                          <span
+                            className={`text-sm font-medium ${
+                              occupant.id === currentUserId
+                                ? "text-green-700"
+                                : "text-gray-900"
+                            }`}
+                          >
+                            {occupant.display_name}
+                            {occupant.id === currentUserId && (
+                              <span className="text-green-600 text-xs ml-1">
+                                (you)
+                              </span>
+                            )}
+                          </span>
                         </div>
-                      );
-                    })}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-sm text-gray-400 italic">
+                      No occupants
+                    </span>
+                  )}
                 </div>
               );
             })}

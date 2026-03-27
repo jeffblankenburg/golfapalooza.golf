@@ -19,11 +19,19 @@ const likelihoodOptions = [
 ];
 
 
-function getCountdown(startDate: string) {
+function getCountdown(startDate: string, simulatedDate: string | null) {
   const [year, month, day] = startDate.split("-").map(Number);
   const tripDate = new Date(year, month - 1, day);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let today: Date;
+  if (simulatedDate) {
+    // Strip time portion if present (e.g. "2026-09-03T14:30" → "2026-09-03")
+    const datePart = simulatedDate.includes("T") ? simulatedDate.split("T")[0] : simulatedDate;
+    const [sy, sm, sd] = datePart.split("-").map(Number);
+    today = new Date(sy, sm - 1, sd);
+  } else {
+    const now = new Date();
+    today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }
   const diffMs = tripDate.getTime() - today.getTime();
   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
   return diffDays;
@@ -101,6 +109,13 @@ export function HomeContent({
   rsvpLikelihood,
   myRoomNumber,
   myFacilityName,
+  myTeeTime,
+  myStartingHole,
+  myTeammates,
+  teeTimeDay,
+  simulatedDate = null,
+  participants = [],
+  nextScheduleItem = null,
 }: {
   displayName: string;
   trip: TripData | null;
@@ -109,6 +124,13 @@ export function HomeContent({
   rsvpLikelihood: number | null;
   myRoomNumber?: string | null;
   myFacilityName?: string | null;
+  myTeeTime?: string | null;
+  myStartingHole?: number | null;
+  myTeammates?: string[];
+  teeTimeDay?: string | null;
+  simulatedDate?: string | null;
+  participants?: { likelihood: number; displayName: string }[];
+  nextScheduleItem?: { title: string; location: string | null; time: string | null; dayLabel: string } | null;
 }) {
   const router = useRouter();
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
@@ -120,12 +142,13 @@ export function HomeContent({
     rsvpLikelihood
   );
   const [saving, setSaving] = useState(false);
+  const [participantsExpanded, setParticipantsExpanded] = useState(false);
 
   useEffect(() => {
     if (trip?.start_date) {
-      setDaysLeft(getCountdown(trip.start_date));
+      setDaysLeft(getCountdown(trip.start_date, simulatedDate));
     }
-  }, [trip?.start_date]);
+  }, [trip?.start_date, simulatedDate]);
 
   const openModal = () => {
     setSelectedLikelihood(currentLikelihood || 99);
@@ -157,15 +180,25 @@ export function HomeContent({
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-6">
-      {/* Greeting */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Hey, {displayName}
-        </h1>
-        <p className="text-gray-500 mt-1">Welcome back, Loozer.</p>
-      </div>
+      {/* Countdown Card */}
+      {trip && daysLeft !== null && daysLeft > 0 && (
+        <div className="bg-white rounded-2xl p-6 border-2 border-green-600 shadow-sm">
+          <p className="text-green-600 text-sm font-medium uppercase tracking-wide">
+            {trip.trip_name}
+          </p>
+          <div className="flex items-baseline gap-2 mt-2">
+            <span className="text-5xl font-bold text-green-700">{daysLeft}</span>
+            <span className="text-xl text-green-600">
+              {daysLeft === 1 ? "day" : "days"} to go
+            </span>
+          </div>
+          {trip.location && (
+            <p className="text-green-600/70 mt-2 text-sm">{trip.location}</p>
+          )}
+        </div>
+      )}
 
-      {/* RSVP Button */}
+      {/* RSVP Button (not yet responded) */}
       {trip && !hasRsvpd && (
         <button
           onClick={openModal}
@@ -183,32 +216,135 @@ export function HomeContent({
         </button>
       )}
 
-      {/* Countdown Card */}
-      {trip && daysLeft !== null && (
-        <div className="bg-white rounded-2xl p-6 border-2 border-green-600 shadow-sm">
-          <p className="text-green-600 text-sm font-medium uppercase tracking-wide">
-            {trip.trip_name}
-          </p>
-          {daysLeft > 0 ? (
-            <>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-5xl font-bold text-green-700">{daysLeft}</span>
-                <span className="text-xl text-green-600">
-                  {daysLeft === 1 ? "day" : "days"} to go
-                </span>
+      {/* Participants Card (after RSVP) */}
+      {trip && hasRsvpd && participants.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="flex items-center">
+            <button
+              onClick={() => setParticipantsExpanded(!participantsExpanded)}
+              className="flex-1 flex items-center justify-between px-4 py-3 active:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="font-semibold text-gray-900">Participants</span>
+                <span className="text-xs text-gray-400">({participants.length})</span>
               </div>
-              {trip.location && (
-                <p className="text-green-600/70 mt-2 text-sm">{trip.location}</p>
-              )}
-            </>
-          ) : daysLeft === 0 ? (
-            <p className="text-3xl font-bold mt-2 text-green-700">It&apos;s go time!</p>
-          ) : (
-            <p className="text-xl font-semibold mt-2 text-green-600">
-              Trip completed
-            </p>
+              <svg className={`w-4 h-4 text-gray-400 transition-transform ${participantsExpanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <button
+              onClick={openModal}
+              className="flex items-center gap-1.5 text-sm text-green-600 px-4 py-3 active:bg-gray-50 transition-colors border-l border-gray-100"
+            >
+              <span>{likelihoodOptions.find(o => o.value === currentLikelihood)?.label}</span>
+              <span className="text-green-600/60">{currentLikelihood}%</span>
+              <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
+          </div>
+          {participantsExpanded && (
+            <div className="border-t border-gray-100 px-4 py-3 space-y-3">
+              {likelihoodOptions.map((option) => {
+                const group = participants.filter(p => p.likelihood === option.value);
+                if (group.length === 0) return null;
+                return (
+                  <div key={option.value}>
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
+                      {option.label} ({group.length})
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      {group.map(p => p.displayName).join(", ")}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
+      )}
+
+      {/* My Tee Time Card */}
+      {myTeeTime && (
+        <Link
+          href="/scores"
+          className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-200 shadow-sm active:scale-95 transition-transform"
+        >
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-green-50 text-green-600">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-gray-900">
+              {new Date(`1970-01-01T${myTeeTime}`).toLocaleTimeString("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+              {myStartingHole && (
+                <span className="ml-2 text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                  Hole {myStartingHole}
+                </span>
+              )}
+            </p>
+            {myTeammates && myTeammates.length > 0 && (
+              <p className="text-sm text-gray-500">{myTeammates.join(", ")}</p>
+            )}
+            {teeTimeDay && (
+              <p className="text-xs text-gray-400 mt-0.5">{teeTimeDay}</p>
+            )}
+          </div>
+          <svg
+            className="w-5 h-5 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
+        </Link>
+      )}
+
+      {/* Up Next Card */}
+      {nextScheduleItem && (
+        <Link
+          href="/schedule"
+          className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-200 shadow-sm active:scale-95 transition-transform"
+        >
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-green-50 text-green-600">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-gray-900">
+              {nextScheduleItem.title}
+              {nextScheduleItem.time && (
+                <span className="ml-2 text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                  {new Date(`1970-01-01T${nextScheduleItem.time}`).toLocaleTimeString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </span>
+              )}
+            </p>
+            {nextScheduleItem.location && (
+              <p className="text-sm text-gray-500">{nextScheduleItem.location}</p>
+            )}
+            <p className="text-xs text-gray-400 mt-0.5">{nextScheduleItem.dayLabel}</p>
+          </div>
+          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
       )}
 
       {/* My Room Card */}

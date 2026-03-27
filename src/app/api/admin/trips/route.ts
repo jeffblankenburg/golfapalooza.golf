@@ -173,7 +173,7 @@ export async function PUT(request: Request) {
 
   try {
     const body = await request.json();
-    const { id, trip_name, trip_year, start_date, location, hotel_name, hotel_address, notes, course_id } = body;
+    const { id, trip_name, trip_year, start_date, location, hotel_name, hotel_address, notes, course_id, show_tee_times, show_teams, show_rooms } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Trip ID is required" }, { status: 400 });
@@ -195,6 +195,9 @@ export async function PUT(request: Request) {
         hotel_address: hotel_address || null,
         notes: notes || null,
         ...(course_id !== undefined ? { course_id: course_id || null } : {}),
+        ...(show_tee_times !== undefined ? { show_tee_times } : {}),
+        ...(show_teams !== undefined ? { show_teams } : {}),
+        ...(show_rooms !== undefined ? { show_rooms } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);

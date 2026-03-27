@@ -170,7 +170,7 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const { userId, displayName, fullName, phone, permissions } = await request.json();
+    const { userId, displayName, fullName, phone, isAdmin, permissions } = await request.json();
 
     if (!userId) {
       return NextResponse.json(
@@ -208,6 +208,7 @@ export async function PUT(request: Request) {
     if (displayName !== undefined) updates.display_name = displayName;
     if (fullName !== undefined) updates.full_name = fullName;
     if (phoneChanged && phone10) updates.phone = phone10;
+    if (isAdmin !== undefined) updates.is_admin = isAdmin;
     if (permissions !== undefined) updates.permissions = permissions;
 
     if (Object.keys(updates).length > 0) {

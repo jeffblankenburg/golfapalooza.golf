@@ -111,21 +111,6 @@ export function TripInfo({
           </div>
         </div>
       )}
-
-      {/* What to Know */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-            What to Know
-          </h2>
-        </div>
-        <div className="px-4 py-4 space-y-3">
-          <BulletItem text="Day 1 is the KGB Cup — a Ryder Cup-style team competition." />
-          <BulletItem text="Days 2-4 are 4-man scramble format." />
-          <BulletItem text="All scores are tracked live in this app." />
-          <BulletItem text="Use the Chat tab to trash talk your fellow Loozers." />
-        </div>
-      </div>
     </div>
   );
 }
@@ -135,15 +120,6 @@ function InfoRow({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between px-4 py-3">
       <span className="text-sm text-gray-500">{label}</span>
       <span className="text-sm font-medium text-gray-900">{value}</span>
-    </div>
-  );
-}
-
-function BulletItem({ text }: { text: string }) {
-  return (
-    <div className="flex gap-2">
-      <span className="text-green-600 mt-0.5 flex-shrink-0">&#8226;</span>
-      <p className="text-sm text-gray-700">{text}</p>
     </div>
   );
 }

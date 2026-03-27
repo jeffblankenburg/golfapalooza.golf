@@ -58,7 +58,7 @@ export async function POST(request: Request) {
 
     const { data, error: uploadError } = await adminClient.storage
       .from("course-images")
-      .upload(path, file, { cacheControl: "3600", upsert: true });
+      .upload(path, file, { cacheControl: "31536000", upsert: true });
 
     if (uploadError) {
       return NextResponse.json(
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
       .from("course-images")
       .getPublicUrl(data.path);
 
-    const imageUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+    const imageUrl = urlData.publicUrl;
 
     // Update hole record with image URL
     const column =
@@ -97,6 +97,73 @@ export async function POST(request: Request) {
     console.error("Upload hole image error:", error);
     return NextResponse.json(
       { error: "Failed to upload image" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE - Remove an image from a hole
+export async function DELETE(request: Request) {
+  const admin = await checkIsAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const holeId = searchParams.get("holeId");
+    const imageType = searchParams.get("imageType");
+
+    if (!holeId || !imageType) {
+      return NextResponse.json(
+        { error: "holeId and imageType are required" },
+        { status: 400 }
+      );
+    }
+
+    if (imageType !== "overhead" && imageType !== "green") {
+      return NextResponse.json(
+        { error: "imageType must be 'overhead' or 'green'" },
+        { status: 400 }
+      );
+    }
+
+    const adminClient = createAdminClient();
+    const column =
+      imageType === "overhead" ? "overhead_image_url" : "green_image_url";
+
+    // Get current URL to extract storage path
+    const { data: hole } = await adminClient
+      .from("course_holes")
+      .select("overhead_image_url, green_image_url")
+      .eq("id", holeId)
+      .single();
+
+    const currentUrl = hole?.[column as keyof typeof hole] as string | null;
+    if (currentUrl) {
+      // Try to remove from storage (best-effort)
+      const url = currentUrl;
+      const match = url.match(/course-images\/(.+?)(\?|$)/);
+      if (match) {
+        await adminClient.storage.from("course-images").remove([match[1]]);
+      }
+    }
+
+    // Null out the URL in the database
+    const { error } = await adminClient
+      .from("course_holes")
+      .update({ [column]: null })
+      .eq("id", holeId);
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Delete hole image error:", error);
+    return NextResponse.json(
+      { error: "Failed to delete image" },
       { status: 500 }
     );
   }

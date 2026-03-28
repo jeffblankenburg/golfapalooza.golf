@@ -229,7 +229,14 @@ export function ContestManager({ tripId }: { tripId: string }) {
     );
   }
 
-  const attendees = users.filter((u) => u.is_participating);
+  const [showRealNames, setShowRealNames] = useState(false);
+
+  const getName = (player: { display_name: string; full_name: string | null }) =>
+    showRealNames && player.full_name ? player.full_name : player.display_name;
+
+  const attendees = [...users.filter((u) => u.is_participating)].sort((a, b) =>
+    getName(a).localeCompare(getName(b))
+  );
 
   const drawerSubtitle = selectedContest
     ? `${contestParticipantIds.size} of ${attendees.length} attendees${selectedContest.day_number ? ` · Day ${selectedContest.day_number}` : ""}`
@@ -393,7 +400,7 @@ export function ContestManager({ tripId }: { tripId: string }) {
                 Participants
               </span>
             </div>
-            <div className="flex gap-2 px-4 py-2">
+            <div className="flex gap-2 px-4 py-2 items-center">
               <button
                 onClick={selectAllContestParticipants}
                 disabled={saving !== null}
@@ -407,6 +414,13 @@ export function ContestManager({ tripId }: { tripId: string }) {
                 className="text-xs text-red-600 font-medium px-2 py-1 rounded-lg hover:bg-red-50"
               >
                 None
+              </button>
+              <div className="flex-1" />
+              <button
+                onClick={() => setShowRealNames(!showRealNames)}
+                className="text-xs text-green-700 font-medium"
+              >
+                Show {showRealNames ? "nicknames" : "real names"}
               </button>
             </div>
             <div className="divide-y divide-gray-50">
@@ -434,11 +448,11 @@ export function ContestManager({ tripId }: { tripId: string }) {
                       <img src={user.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-sm font-bold">
-                        {(user.display_name || "?")[0].toUpperCase()}
+                        {getName(user)[0].toUpperCase()}
                       </div>
                     )}
                     <span className="text-sm font-medium text-gray-900 flex-1">
-                      {user.display_name || user.full_name || "Unknown"}
+                      {getName(user)}
                     </span>
                     {saving === user.id && (
                       <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />

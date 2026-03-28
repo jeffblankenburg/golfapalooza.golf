@@ -9,6 +9,7 @@ import { BottomDrawer } from "@/components/admin/BottomDrawer";
 interface PlayerInfo {
   id: string;
   display_name: string;
+  full_name: string | null;
   avatar_url: string | null;
 }
 
@@ -39,6 +40,7 @@ interface Foursome {
 interface UnassignedPlayer {
   user_id: string;
   display_name: string;
+  full_name: string | null;
   avatar_url: string | null;
 }
 
@@ -284,6 +286,16 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
     });
   };
 
+  // ── Name toggle ──
+
+  const [showRealNames, setShowRealNames] = useState(false);
+
+  const getName = (player: { display_name: string; full_name: string | null }) =>
+    showRealNames && player.full_name ? player.full_name : player.display_name;
+
+  const sortByName = <T extends { display_name: string; full_name: string | null }>(list: T[]) =>
+    [...list].sort((a, b) => getName(a).localeCompare(getName(b)));
+
   // ── Helpers ──
 
   const team1 = teams.find((t) => t.team_number === 1);
@@ -331,6 +343,7 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
             available.push({
               user_id: player.id,
               display_name: player.display_name,
+              full_name: player.full_name,
               avatar_url: player.avatar_url,
             });
           }
@@ -775,44 +788,54 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
             <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <div className="divide-y divide-gray-50">
-            {unassigned.map((player) => {
-              const selected = drawerSelections.has(player.user_id);
-              return (
-                <button
-                  key={player.user_id}
-                  onClick={() => toggleDrawerSelection(player.user_id)}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-gray-50 transition-colors"
-                >
-                  <div
-                    className={`w-6 h-6 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                      selected ? "bg-green-600 border-green-600" : "border-gray-300"
-                    }`}
+          <div>
+            <div className="flex items-center justify-end px-4 py-2 border-b border-gray-100">
+              <button
+                onClick={() => setShowRealNames(!showRealNames)}
+                className="text-xs text-green-700 font-medium"
+              >
+                Show {showRealNames ? "nicknames" : "real names"}
+              </button>
+            </div>
+            <div className="divide-y divide-gray-50">
+              {sortByName(unassigned).map((player) => {
+                const selected = drawerSelections.has(player.user_id);
+                return (
+                  <button
+                    key={player.user_id}
+                    onClick={() => toggleDrawerSelection(player.user_id)}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-gray-50 transition-colors"
                   >
-                    {selected && (
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </div>
-                  {player.avatar_url ? (
-                    <img src={player.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-sm font-bold">
-                      {(player.display_name || "?")[0].toUpperCase()}
+                    <div
+                      className={`w-6 h-6 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                        selected ? "bg-green-600 border-green-600" : "border-gray-300"
+                      }`}
+                    >
+                      {selected && (
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
                     </div>
-                  )}
-                  <span className="text-sm font-medium text-gray-900 flex-1">
-                    {player.display_name}
-                  </span>
-                </button>
-              );
-            })}
-            {unassigned.length === 0 && (
-              <div className="px-4 py-6 text-center text-sm text-gray-400">
-                All players have been assigned to a team.
-              </div>
-            )}
+                    {player.avatar_url ? (
+                      <img src={player.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-sm font-bold">
+                        {getName(player)[0].toUpperCase()}
+                      </div>
+                    )}
+                    <span className="text-sm font-medium text-gray-900 flex-1">
+                      {getName(player)}
+                    </span>
+                  </button>
+                );
+              })}
+              {unassigned.length === 0 && (
+                <div className="px-4 py-6 text-center text-sm text-gray-400">
+                  All players have been assigned to a team.
+                </div>
+              )}
+            </div>
           </div>
         )}
       </BottomDrawer>

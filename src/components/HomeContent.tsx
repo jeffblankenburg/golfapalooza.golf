@@ -195,7 +195,7 @@ export function HomeContent({
   const hasRsvpd = currentLikelihood !== null;
 
   return (
-    <div className="px-4 pt-6 pb-8 space-y-6">
+    <div className="px-4 pt-6 pb-8 space-y-3">
       {/* Push Notification Permission Banner */}
       {pushPermission === "default" && (
         <div className="bg-white rounded-2xl p-4 border border-amber-200 shadow-sm flex items-start gap-3">
@@ -512,7 +512,7 @@ export function HomeContent({
       )}
 
       {/* Quick Links */}
-      <div>
+      <div className="mt-3">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
           Quick Links
         </h2>

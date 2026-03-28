@@ -218,9 +218,16 @@ export function RoomManager({ tripId: propTripId }: { tripId?: string } = {}) {
   const unassigned = users.filter((u) => !u.room_id);
   const anyAssigned = users.some((u) => u.room_id);
 
+  const [showRealNames, setShowRealNames] = useState(false);
+
+  const getName = (player: { display_name: string; full_name: string | null }) =>
+    showRealNames && player.full_name ? player.full_name : player.display_name;
+
   // Drawer: show only unassigned Loozers + those already in this room
   const drawerUsers = selectedRoom
-    ? users.filter((u) => !u.room_id || u.room_id === selectedRoom.id)
+    ? [...users.filter((u) => !u.room_id || u.room_id === selectedRoom.id)].sort((a, b) =>
+        getName(a).localeCompare(getName(b))
+      )
     : [];
 
   const assignedToSelected = selectedRoom
@@ -316,6 +323,14 @@ export function RoomManager({ tripId: propTripId }: { tripId?: string } = {}) {
             : undefined
         }
       >
+        <div className="flex items-center justify-end px-4 py-2 border-b border-gray-100">
+          <button
+            onClick={() => setShowRealNames(!showRealNames)}
+            className="text-xs text-green-700 font-medium"
+          >
+            Show {showRealNames ? "nicknames" : "real names"}
+          </button>
+        </div>
         <div className="divide-y divide-gray-50">
           {drawerUsers.map((user) => {
             const inThisRoom = user.room_id === selectedRoom?.id;
@@ -342,11 +357,11 @@ export function RoomManager({ tripId: propTripId }: { tripId?: string } = {}) {
                   <img src={user.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-sm font-bold">
-                    {(user.display_name || "?")[0].toUpperCase()}
+                    {getName(user)[0].toUpperCase()}
                   </div>
                 )}
                 <span className="text-sm font-medium text-gray-900 flex-1">
-                  {user.display_name || user.full_name || "Unknown"}
+                  {getName(user)}
                 </span>
                 {saving === user.id && (
                   <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />

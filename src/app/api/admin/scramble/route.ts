@@ -41,7 +41,7 @@ export async function GET(request: Request) {
     const { data: teams, error: teamsError } = await adminClient
       .from("scramble_teams")
       .select(
-        "id, contest_id, team_handicap, gross_score, course_par, created_at, scramble_team_members(id, user_id, user:users(id, display_name, avatar_url))"
+        "id, contest_id, team_handicap, gross_score, course_par, created_at, scramble_team_members(id, user_id, user:users(id, display_name, full_name, avatar_url))"
       )
       .eq("contest_id", contestId)
       .order("created_at");
@@ -64,7 +64,7 @@ export async function GET(request: Request) {
     // Fetch all contest participants (the pool of available players)
     const { data: participants } = await adminClient
       .from("contest_participants")
-      .select("user_id, user:users(id, display_name, avatar_url)")
+      .select("user_id, user:users(id, display_name, full_name, avatar_url)")
       .eq("contest_id", contestId);
 
     // Build set of assigned user IDs
@@ -83,6 +83,7 @@ export async function GET(request: Request) {
         return {
           user_id: p.user_id,
           display_name: user?.display_name || "Unknown",
+          full_name: user?.full_name || null,
           avatar_url: user?.avatar_url || null,
         };
       });
@@ -112,13 +113,14 @@ export async function GET(request: Request) {
       const members = ((team as Record<string, unknown>).scramble_team_members as Array<{
         id: string;
         user_id: string;
-        user: { id: string; display_name: string; avatar_url: string | null } | Array<{ id: string; display_name: string; avatar_url: string | null }> | null;
+        user: { id: string; display_name: string; full_name: string | null; avatar_url: string | null } | Array<{ id: string; display_name: string; full_name: string | null; avatar_url: string | null }> | null;
       }>).map((m) => {
         const user = Array.isArray(m.user) ? m.user[0] : m.user;
         return {
           id: m.id,
           user_id: m.user_id,
           display_name: user?.display_name || "Unknown",
+          full_name: user?.full_name || null,
           avatar_url: user?.avatar_url || null,
         };
       });

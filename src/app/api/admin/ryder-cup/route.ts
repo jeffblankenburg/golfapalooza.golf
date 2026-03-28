@@ -78,7 +78,7 @@ export async function GET(request: Request) {
     const { data: pairs } = await adminClient
       .from("ryder_cup_pairs")
       .select(
-        "id, team_id, player_a_id, player_b_id, sort_order, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name, avatar_url), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name, avatar_url)"
+        "id, team_id, player_a_id, player_b_id, sort_order, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name, full_name, avatar_url), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name, full_name, avatar_url)"
       )
       .in("team_id", teamIds)
       .order("sort_order");
@@ -98,8 +98,8 @@ export async function GET(request: Request) {
         id: p.id,
         team_id: p.team_id,
         sort_order: p.sort_order,
-        player_a: playerA ? { id: playerA.id, display_name: playerA.display_name, avatar_url: playerA.avatar_url } : null,
-        player_b: playerB ? { id: playerB.id, display_name: playerB.display_name, avatar_url: playerB.avatar_url } : null,
+        player_a: playerA ? { id: playerA.id, display_name: playerA.display_name, full_name: playerA.full_name, avatar_url: playerA.avatar_url } : null,
+        player_b: playerB ? { id: playerB.id, display_name: playerB.display_name, full_name: playerB.full_name, avatar_url: playerB.avatar_url } : null,
       };
     });
 
@@ -142,7 +142,7 @@ async function getUnassigned(
 ) {
   const { data: participants } = await adminClient
     .from("contest_participants")
-    .select("user_id, user:users(id, display_name, avatar_url)")
+    .select("user_id, user:users(id, display_name, full_name, avatar_url)")
     .eq("contest_id", contestId);
 
   return (participants || [])
@@ -152,6 +152,7 @@ async function getUnassigned(
       return {
         user_id: p.user_id,
         display_name: user?.display_name || "Unknown",
+        full_name: user?.full_name || null,
         avatar_url: user?.avatar_url || null,
       };
     });

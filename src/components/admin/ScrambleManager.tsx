@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import { BottomDrawer } from "@/components/admin/BottomDrawer";
 
 interface TeamMember {
   id: string;
   user_id: string;
   display_name: string;
+  full_name: string | null;
   avatar_url: string | null;
 }
 
@@ -22,6 +24,7 @@ interface Team {
 interface UnassignedPlayer {
   user_id: string;
   display_name: string;
+  full_name: string | null;
   avatar_url: string | null;
 }
 
@@ -43,7 +46,9 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
   const [view, setView] = useState<View>("days");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
-  const [addingToTeam, setAddingToTeam] = useState<string | null>(null);
+  const [drawerTeamId, setDrawerTeamId] = useState<string | null>(null);
+  const [drawerSelections, setDrawerSelections] = useState<Set<string>>(new Set());
+  const [showRealNames, setShowRealNames] = useState(false);
 
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
@@ -147,7 +152,7 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
                 ...t,
                 members: [
                   ...t.members,
-                  { id: `temp-${userId}`, user_id: userId, display_name: player.display_name, avatar_url: player.avatar_url },
+                  { id: `temp-${userId}`, user_id: userId, display_name: player.display_name, full_name: player.full_name, avatar_url: player.avatar_url },
                 ],
               }
             : t
@@ -167,7 +172,6 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
       if (selectedContest) await fetchTeams(selectedContest.id);
     }
 
-    setAddingToTeam(null);
     setSaving(null);
   };
 
@@ -184,7 +188,7 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
     );
     setUnassigned((prev) => [
       ...prev,
-      { user_id: member.user_id, display_name: member.display_name, avatar_url: member.avatar_url },
+      { user_id: member.user_id, display_name: member.display_name, full_name: member.full_name, avatar_url: member.avatar_url },
     ]);
 
     const res = await fetch("/api/admin/scramble/members", {
@@ -199,6 +203,40 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
 
     setSaving(null);
   };
+
+  // ── Drawer helpers ──
+
+  const openDrawer = (teamId: string) => {
+    setDrawerTeamId(teamId);
+    setDrawerSelections(new Set());
+  };
+
+  const toggleDrawerSelection = (userId: string) => {
+    setDrawerSelections((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
+
+  const closeDrawer = async () => {
+    if (drawerTeamId && drawerSelections.size > 0) {
+      for (const userId of drawerSelections) {
+        await addMember(drawerTeamId, userId);
+      }
+    }
+    setDrawerTeamId(null);
+    setDrawerSelections(new Set());
+  };
+
+  // ── Name helpers ──
+
+  const getName = (player: { display_name: string; full_name: string | null }) =>
+    showRealNames && player.full_name ? player.full_name : player.display_name;
+
+  const sortByName = <T extends { display_name: string; full_name: string | null }>(list: T[]) =>
+    [...list].sort((a, b) => getName(a).localeCompare(getName(b)));
 
   // ── Helpers ──
 
@@ -384,43 +422,15 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
                     </div>
                   )}
 
-                  {/* Add Player */}
+                  {/* Add Players */}
                   {unassigned.length > 0 && (
                     <div className="mt-1 mb-1">
-                      {addingToTeam === team.id ? (
-                        <div className="space-y-1 mt-2 mb-1">
-                          {unassigned.map((player) => (
-                            <button
-                              key={player.user_id}
-                              onClick={() => addMember(team.id, player.user_id)}
-                              disabled={saving !== null}
-                              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 active:bg-gray-100 text-left text-sm"
-                            >
-                              {player.avatar_url ? (
-                                <img src={player.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
-                              ) : (
-                                <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[9px] font-bold">
-                                  {(player.display_name || "?")[0].toUpperCase()}
-                                </span>
-                              )}
-                              <span className="text-gray-700">{player.display_name}</span>
-                            </button>
-                          ))}
-                          <button
-                            onClick={() => setAddingToTeam(null)}
-                            className="text-xs text-gray-400 mt-1"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setAddingToTeam(team.id)}
-                          className="text-xs text-green-700 font-medium"
-                        >
-                          + Add Player
-                        </button>
-                      )}
+                      <button
+                        onClick={() => openDrawer(team.id)}
+                        className="text-xs text-green-700 font-medium"
+                      >
+                        + Add Players
+                      </button>
                     </div>
                   )}
                 </div>
@@ -500,6 +510,52 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
           onConfirm={() => confirmModal?.onConfirm()}
           onCancel={() => setConfirmModal(null)}
         />
+
+        <BottomDrawer
+          open={!!drawerTeamId}
+          onClose={closeDrawer}
+          title={`Add to Team ${drawerTeamId ? teams.findIndex((t) => t.id === drawerTeamId) + 1 : ""}`}
+          subtitle={`${drawerSelections.size} selected · ${unassigned.length} available`}
+        >
+          <div className="flex items-center justify-end px-4 py-2 border-b border-gray-100">
+            <button
+              onClick={() => setShowRealNames(!showRealNames)}
+              className="text-xs text-green-700 font-medium"
+            >
+              Show {showRealNames ? "nicknames" : "real names"}
+            </button>
+          </div>
+          {sortByName(unassigned).map((player) => {
+            const selected = drawerSelections.has(player.user_id);
+            return (
+              <button
+                key={player.user_id}
+                onClick={() => toggleDrawerSelection(player.user_id)}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                  selected ? "bg-green-50" : "active:bg-gray-50"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                  selected ? "border-green-600 bg-green-600" : "border-gray-300"
+                }`}>
+                  {selected && (
+                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                {player.avatar_url ? (
+                  <img src={player.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                ) : (
+                  <span className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-sm font-bold">
+                    {getName(player)[0].toUpperCase()}
+                  </span>
+                )}
+                <span className="text-sm font-medium text-gray-900">{getName(player)}</span>
+              </button>
+            );
+          })}
+        </BottomDrawer>
       </div>
     );
   }

@@ -27,6 +27,20 @@ export default async function HomePage() {
     .eq("status", "active")
     .single();
 
+  // Fetch course info for countdown display
+  let courseVenue: string | null = null;
+  if (trip?.course_id) {
+    const { data: course } = await supabase
+      .from("courses")
+      .select("name, city, state")
+      .eq("id", trip.course_id)
+      .single();
+    if (course) {
+      const parts = [course.name, course.city, course.state].filter(Boolean);
+      courseVenue = parts.join(", ") || null;
+    }
+  }
+
   // Fetch action item counts, RSVP status, and room assignment
   let incompleteActionCount = 0;
   let totalActionCount = 0;
@@ -315,6 +329,7 @@ export default async function HomePage() {
       participants={participants}
       nextScheduleItem={nextScheduleItem}
       timezone={trip?.timezone}
+      courseName={courseVenue}
     />
   );
 }

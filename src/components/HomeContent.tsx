@@ -119,6 +119,7 @@ export function HomeContent({
   participants = [],
   nextScheduleItem = null,
   timezone,
+  courseName = null,
 }: {
   displayName: string;
   trip: TripData | null;
@@ -135,6 +136,7 @@ export function HomeContent({
   participants?: { likelihood: number; displayName: string }[];
   nextScheduleItem?: { title: string; location: string | null; time: string | null; dayLabel: string } | null;
   timezone?: string;
+  courseName?: string | null;
 }) {
   const router = useRouter();
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
@@ -223,21 +225,41 @@ export function HomeContent({
         </div>
       )}
 
+      {/* Event Info Card */}
+      {trip && (
+        <div className="bg-white rounded-2xl p-5 border-2 border-green-600 shadow-sm flex items-center gap-4">
+          <img
+            src="/logo.png"
+            alt={trip.trip_name}
+            className="w-20 h-20 object-contain flex-shrink-0"
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-green-700 font-bold text-lg">{trip.trip_name}</p>
+            {(() => {
+              const [y, m, d] = trip.start_date.split("-").map(Number);
+              const date = new Date(y, m - 1, d);
+              const formatted = date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+              const venue = courseName || trip.location;
+              return (
+                <>
+                  <p className="text-green-600 font-semibold text-sm">{formatted}</p>
+                  {venue && (
+                    <p className="text-green-600/60 text-xs">{venue}</p>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
       {/* Countdown Card */}
       {trip && daysLeft !== null && daysLeft > 0 && (
-        <div className="bg-white rounded-2xl p-6 border-2 border-green-600 shadow-sm">
-          <p className="text-green-600 text-sm font-medium uppercase tracking-wide">
-            {trip.trip_name}
-          </p>
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-5xl font-bold text-green-700">{daysLeft}</span>
-            <span className="text-xl text-green-600">
-              {daysLeft === 1 ? "day" : "days"} to go
-            </span>
-          </div>
-          {trip.location && (
-            <p className="text-green-600/70 mt-2 text-sm">{trip.location}</p>
-          )}
+        <div className="bg-green-50 rounded-xl px-4 py-3 border border-green-200 flex items-baseline justify-center gap-2">
+          <span className="text-3xl font-bold text-green-700">{daysLeft}</span>
+          <span className="text-base text-green-600">
+            {daysLeft === 1 ? "day" : "days"} to go
+          </span>
         </div>
       )}
 

@@ -37,7 +37,7 @@ export async function getCourseData(): Promise<CourseData | null> {
     .from("course_tees")
     .select("*")
     .eq("course_id", course.id)
-    .order("tee_name");
+    .order("course_rating", { ascending: false });
 
   if (!tees || tees.length === 0) return null;
 
@@ -48,18 +48,20 @@ export async function getCourseData(): Promise<CourseData | null> {
     .eq("course_id", course.id)
     .order("hole_number");
 
-  // Images are stored on the first tee's holes — collect them
-  const firstTeeId = tees[0].id;
+  // Images may be stored on any tee's holes — collect the first non-null for each hole
   const imageMap: Record<
     number,
     { overhead: string | null; green: string | null }
   > = {};
   for (const h of (allHoles || []) as DbHole[]) {
-    if (h.tee_id === firstTeeId) {
-      imageMap[h.hole_number] = {
-        overhead: h.overhead_image_url,
-        green: h.green_image_url,
-      };
+    if (!imageMap[h.hole_number]) {
+      imageMap[h.hole_number] = { overhead: null, green: null };
+    }
+    if (h.overhead_image_url && !imageMap[h.hole_number].overhead) {
+      imageMap[h.hole_number].overhead = h.overhead_image_url;
+    }
+    if (h.green_image_url && !imageMap[h.hole_number].green) {
+      imageMap[h.hole_number].green = h.green_image_url;
     }
   }
 
@@ -85,18 +87,20 @@ export async function getCourseData(): Promise<CourseData | null> {
       (t: {
         id: string;
         tee_name: string;
+        tee_color: string | null;
         course_rating: number;
         slope_rating: number;
         par: number;
       }) => ({
         id: t.id,
         name: t.tee_name,
+        color: t.tee_color,
         rating: t.course_rating,
         slope: t.slope_rating,
         par: t.par,
       })
     ),
     holesByTee,
-    defaultTeeId: firstTeeId,
+    defaultTeeId: tees[0].id,
   };
 }

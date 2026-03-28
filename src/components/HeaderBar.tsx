@@ -168,7 +168,8 @@ export function HeaderBar({
                 alt="Golfapalooza"
                 width={49}
                 height={36}
-                className="h-9 w-auto"
+                className="h-9"
+                style={{ width: "auto" }}
                 priority
               />
             </Link>

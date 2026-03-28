@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
     .from("course_tees")
     .select("id, tee_name, tee_color, course_rating, slope_rating, par, total_yards")
     .eq("course_id", trip.course_id)
-    .order("par", { ascending: false });
+    .order("course_rating", { ascending: false });
 
   if (!tees || tees.length === 0) {
     return NextResponse.json({

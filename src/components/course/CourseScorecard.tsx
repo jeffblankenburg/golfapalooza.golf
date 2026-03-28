@@ -9,6 +9,7 @@ import {
   getNinePar,
   getNineYards,
 } from "@/lib/course-data";
+import { getTeeColorClasses } from "@/lib/tee-colors";
 import { HoleDetailModal } from "./HoleDetailModal";
 
 function NineTable({
@@ -112,7 +113,7 @@ export function CourseScorecard({ course }: { course: CourseData }) {
   const totalYards = getNineYards(front) + getNineYards(back);
 
   return (
-    <div className="space-y-5">
+    <div className="px-4 pt-4 space-y-5">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">{course.name}</h1>
@@ -121,28 +122,42 @@ export function CourseScorecard({ course }: { course: CourseData }) {
 
       {/* Tee Selector */}
       {course.tees.length > 1 ? (
-        <div className="flex items-center gap-2 overflow-x-auto">
-          {course.tees.map((tee) => (
-            <button
-              key={tee.id}
-              onClick={() => setSelectedTeeId(tee.id)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0 ${
-                tee.id === selectedTeeId
-                  ? "bg-green-600 text-white"
-                  : "bg-gray-100 text-gray-600 active:bg-gray-200"
-              }`}
+        <div className="flex items-center gap-2 overflow-x-auto py-1 px-1 -mx-1">
+          {course.tees.map((tee) => {
+            const colors = getTeeColorClasses(tee.color);
+            const isSelected = tee.id === selectedTeeId;
+            return (
+              <button
+                key={tee.id}
+                onClick={() => setSelectedTeeId(tee.id)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0 ${
+                  isSelected
+                    ? `${colors.isCustom ? "" : colors.bg} ${colors.text} ring-2 ${colors.isCustom ? "" : colors.ring} ring-offset-1`
+                    : `${colors.isCustom ? "" : colors.bg} ${colors.text} opacity-50`
+                }`}
+                style={colors.isCustom ? {
+                  backgroundColor: colors.hex!,
+                  ...(isSelected ? { boxShadow: `0 0 0 2px white, 0 0 0 4px ${colors.hex}` } : {}),
+                } : undefined}
+              >
+                {tee.name}
+              </button>
+            );
+          })}
+        </div>
+      ) : selectedTee ? (() => {
+        const colors = getTeeColorClasses(selectedTee.color);
+        return (
+          <div className="flex items-center gap-3 text-sm">
+            <span
+              className={`px-3 py-1 rounded-full font-semibold ${colors.isCustom ? "" : colors.bg} ${colors.text}`}
+              style={colors.isCustom ? { backgroundColor: colors.hex! } : undefined}
             >
-              {tee.name}
-            </button>
-          ))}
-        </div>
-      ) : selectedTee ? (
-        <div className="flex items-center gap-3 text-sm">
-          <span className="px-3 py-1 rounded-full bg-green-50 text-green-700 font-semibold">
-            {selectedTee.name} Tees
-          </span>
-        </div>
-      ) : null}
+              {selectedTee.name} Tees
+            </span>
+          </div>
+        );
+      })() : null}
 
       {/* Tee info */}
       {selectedTee && (

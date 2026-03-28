@@ -142,18 +142,15 @@ export function HoleDetailModal({ holes, initialHole, onClose }: Props) {
 
         {/* Swipeable Image Area */}
         <div
-          className="flex-1 min-h-0 overflow-hidden bg-gray-100"
+          className="flex-1 min-h-[400px] overflow-hidden bg-white relative"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
+          style={{
+            transform: `translateX(${dragOffset}px)`,
+            transition: isAnimating ? "transform 0.3s ease-out" : "none",
+          }}
         >
-          <div
-            className="w-full h-full relative"
-            style={{
-              transform: `translateX(${dragOffset}px)`,
-              transition: isAnimating ? "transform 0.3s ease-out" : "none",
-            }}
-          >
             {currentImageUrl ? (
               <Image
                 key={`${hole.number}-${imageView}`}
@@ -185,7 +182,6 @@ export function HoleDetailModal({ holes, initialHole, onClose }: Props) {
                 </p>
               </div>
             )}
-          </div>
         </div>
 
         {/* Stats Bar */}

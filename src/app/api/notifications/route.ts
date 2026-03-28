@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
     .from("notifications")
     .select("*")
     .eq("user_id", user.id)
+    .neq("type", "chat_message")
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -108,6 +109,32 @@ export async function PATCH(request: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+  }
+
+  return NextResponse.json({ success: true });
+}
+
+export async function DELETE(request: NextRequest) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await request.json();
+
+  if (!id) {
+    return NextResponse.json({ error: "id is required" }, { status: 400 });
+  }
+
+  const { error } = await supabase
+    .from("notifications")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

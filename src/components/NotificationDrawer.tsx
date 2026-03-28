@@ -94,7 +94,10 @@ export function NotificationDrawer({
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          setNotifications((prev) => [payload.new as Notification, ...prev]);
+          const notif = payload.new as Notification;
+          if (notif.type !== "chat_message") {
+            setNotifications((prev) => [notif, ...prev]);
+          }
         }
       )
       .subscribe();
@@ -112,6 +115,15 @@ export function NotificationDrawer({
     });
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     onMarkAllRead();
+  };
+
+  const handleDelete = async (id: string) => {
+    await fetch("/api/notifications", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
   const hasUnread = notifications.some((n) => !n.read);
@@ -192,9 +204,14 @@ export function NotificationDrawer({
                       </p>
                     )}
                   </div>
-                  {!notification.read && (
-                    <div className="w-2 h-2 rounded-full bg-green-600 flex-shrink-0 mt-2" />
-                  )}
+                  <button
+                    onClick={() => handleDelete(notification.id)}
+                    className="flex items-center justify-center w-5 h-5 text-gray-300 hover:text-gray-500 flex-shrink-0 mt-0.5"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
               ))}
             </div>

@@ -10,6 +10,7 @@ export interface HoleData {
 export interface TeeInfo {
   id: string;
   name: string;
+  color: string | null;
   rating: number;
   slope: number;
   par: number;

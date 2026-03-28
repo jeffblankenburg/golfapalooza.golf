@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
@@ -29,7 +29,7 @@ export function HeaderBar({
   avatarUrl: string | null;
 }) {
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
-  const [chatUnreadCount] = useState(initialChatUnreadCount);
+  const [chatUnreadCount, setChatUnreadCount] = useState(initialChatUnreadCount);
   const [showNotifications, setShowNotifications] = useState(false);
   const pushChecked = useRef(false);
 
@@ -43,11 +43,25 @@ export function HeaderBar({
     }
   }, []);
 
+  const refetchCount = useCallback(() => {
+    const supabase = createClient();
+    supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("read", false)
+      .neq("type", "chat_message")
+      .then(({ count }) => {
+        setUnreadCount(count || 0);
+      });
+  }, [userId]);
+
   const handleBellClick = async () => {
     // If push is supported but permission hasn't been requested yet, ask now
     if (isPushSupported() && getPermissionStatus() === "default") {
       await subscribeToPush();
     }
+    refetchCount();
     setShowNotifications(true);
   };
 
@@ -64,8 +78,10 @@ export function HeaderBar({
           table: "notifications",
           filter: `user_id=eq.${userId}`,
         },
-        () => {
-          setUnreadCount((prev) => prev + 1);
+        (payload) => {
+          if ((payload.new as { type?: string })?.type !== "chat_message") {
+            setUnreadCount((prev) => prev + 1);
+          }
         }
       )
       .on(
@@ -77,14 +93,58 @@ export function HeaderBar({
           filter: `user_id=eq.${userId}`,
         },
         () => {
-          // Refetch count on updates (mark as read)
-          supabase
-            .from("notifications")
-            .select("id", { count: "exact", head: true })
-            .eq("user_id", userId)
-            .eq("read", false)
-            .then(({ count }) => {
-              setUnreadCount(count || 0);
+          refetchCount();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          refetchCount();
+        }
+      )
+      .subscribe();
+
+    // Chat badge: listen for new messages and read receipt updates
+    const chatChannel = supabase
+      .channel("chat-badge")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_messages",
+        },
+        (payload) => {
+          const msg = payload.new as { sender_id?: string };
+          if (msg.sender_id !== userId) {
+            setChatUnreadCount((prev) => prev + 1);
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "chat_read_receipts",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          // User read messages — refetch total unread from API
+          fetch("/api/chat/rooms")
+            .then((res) => res.json())
+            .then((data) => {
+              const total = (data.rooms || []).reduce(
+                (sum: number, r: { unreadCount?: number }) => sum + (r.unreadCount || 0),
+                0
+              );
+              setChatUnreadCount(total);
             });
         }
       )
@@ -92,6 +152,7 @@ export function HeaderBar({
 
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(chatChannel);
     };
   }, [userId]);
 

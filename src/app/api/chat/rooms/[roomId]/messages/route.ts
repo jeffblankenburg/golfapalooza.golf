@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendBulkNotifications } from "@/lib/notifications/service";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getEffectiveUserId } from "@/lib/simulator";
+import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
 
 /**
  * @swagger
@@ -198,11 +198,15 @@ export async function POST(
     );
   }
 
-  const { data: message, error } = await supabase
+  const effectiveUserId = await getEffectiveUserId(user.id);
+  const simulating = await isSimulating();
+  const client = simulating ? createAdminClient() : supabase;
+
+  const { data: message, error } = await client
     .from("chat_messages")
     .insert({
       room_id: roomId,
-      sender_id: await getEffectiveUserId(user.id),
+      sender_id: effectiveUserId,
       content: content || null,
       image_url: imageUrl || null,
       reply_to_id: replyToId || null,
@@ -220,14 +224,13 @@ export async function POST(
     .from("chat_room_members")
     .select("user_id")
     .eq("room_id", roomId)
-    .neq("user_id", await getEffectiveUserId(user.id));
+    .neq("user_id", effectiveUserId);
 
   if (members?.length) {
-    const effectiveId = await getEffectiveUserId(user.id);
     const { data: sender } = await admin
       .from("users")
       .select("display_name")
-      .eq("id", effectiveId)
+      .eq("id", effectiveUserId)
       .single();
 
     const senderName = sender?.display_name || "Someone";

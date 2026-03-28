@@ -249,6 +249,108 @@ export async function POST(request: NextRequest) {
 /**
  * @swagger
  * /api/admin/announcements:
+ *   put:
+ *     summary: Send a pending scheduled announcement immediately
+ *     tags: [Admin, Notifications]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [id]
+ *             properties:
+ *               id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Announcement sent
+ *       401:
+ *         description: Unauthorized
+ */
+export async function PUT(request: NextRequest) {
+  const admin = await checkIsAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const { id } = await request.json();
+
+    if (!id) {
+      return NextResponse.json({ error: "id is required" }, { status: 400 });
+    }
+
+    const adminClient = createAdminClient();
+
+    // Fetch the pending announcement
+    const { data: announcement, error: fetchError } = await adminClient
+      .from("scheduled_announcements")
+      .select("*")
+      .eq("id", id)
+      .eq("status", "pending")
+      .single();
+
+    if (fetchError || !announcement) {
+      return NextResponse.json({ error: "Announcement not found or already sent" }, { status: 404 });
+    }
+
+    // Resolve audience and send
+    let userIds: string[] = [];
+
+    if (announcement.audience_type === "everyone") {
+      const { data: users } = await adminClient
+        .from("users")
+        .select("id")
+        .eq("is_active", true);
+      userIds = (users || []).map((u) => u.id);
+    } else if (announcement.audience_type === "event") {
+      const tripId = announcement.trip_id;
+      if (tripId) {
+        const { data: participants } = await adminClient
+          .from("event_participants")
+          .select("user_id")
+          .eq("trip_id", tripId);
+        userIds = (participants || []).map((p) => p.user_id);
+      }
+    } else if (announcement.audience_type === "custom") {
+      userIds = (announcement.audience_user_ids as string[]) || [];
+    }
+
+    const notifPayload = {
+      type: "announcement",
+      title: announcement.title,
+      body: announcement.body || undefined,
+      data: { announcement_id: announcement.id },
+    };
+
+    if (announcement.audience_type === "everyone") {
+      await sendAnnouncement({
+        title: announcement.title,
+        body: announcement.body || undefined,
+        data: { announcement_id: announcement.id },
+      });
+    } else if (userIds.length > 0) {
+      await sendBulkNotifications(userIds, notifPayload);
+    }
+
+    // Mark as sent
+    const now = new Date().toISOString();
+    await adminClient
+      .from("scheduled_announcements")
+      .update({ status: "sent", sent_at: now })
+      .eq("id", id);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Send now error:", error);
+    return NextResponse.json({ error: "Failed to send announcement" }, { status: 500 });
+  }
+}
+
+/**
+ * @swagger
+ * /api/admin/announcements:
  *   delete:
  *     summary: Cancel a pending scheduled announcement
  *     tags: [Admin, Notifications]

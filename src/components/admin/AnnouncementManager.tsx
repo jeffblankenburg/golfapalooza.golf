@@ -106,6 +106,7 @@ export function AnnouncementManager() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [sendingNowId, setSendingNowId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [recipientListOpen, setRecipientListOpen] = useState(false);
 
@@ -263,6 +264,18 @@ export function AnnouncementManager() {
     });
     if (res.ok) {
       showToastMsg("Scheduled announcement cancelled");
+      fetchData();
+    }
+  };
+
+  const handleSendNow = async (id: string) => {
+    const res = await fetch("/api/admin/announcements", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    if (res.ok) {
+      showToastMsg("Announcement sent!");
       fetchData();
     }
   };
@@ -690,6 +703,21 @@ export function AnnouncementManager() {
         onCancel={() => setShowConfirm(false)}
       />
 
+      {/* Confirm Send Now Modal */}
+      <ConfirmModal
+        open={sendingNowId !== null}
+        title="Send Now"
+        message="Send this announcement immediately?"
+        confirmLabel="Send Now"
+        onConfirm={async () => {
+          if (sendingNowId) {
+            await handleSendNow(sendingNowId);
+            setSendingNowId(null);
+          }
+        }}
+        onCancel={() => setSendingNowId(null)}
+      />
+
       {/* Confirm Cancel Modal */}
       <ConfirmModal
         open={cancellingId !== null}
@@ -837,12 +865,20 @@ export function AnnouncementManager() {
                     )}
                     <AudienceLabel announcement={a} />
                   </div>
-                  <button
-                    onClick={() => setCancellingId(a.id)}
-                    className="text-xs text-red-600 font-medium px-2 py-1 rounded-lg hover:bg-red-50 flex-shrink-0"
-                  >
-                    Cancel
-                  </button>
+                  <div className="flex flex-col justify-between items-end gap-2 flex-shrink-0 self-stretch">
+                    <button
+                      onClick={() => setSendingNowId(a.id)}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700"
+                    >
+                      Send Now
+                    </button>
+                    <button
+                      onClick={() => setCancellingId(a.id)}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-100 text-red-700 hover:bg-red-200"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

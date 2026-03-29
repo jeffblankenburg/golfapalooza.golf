@@ -50,20 +50,31 @@ export async function GET(request: NextRequest) {
   const tripId = searchParams.get("trip_id"); // optional filter
   const limit = parseInt(searchParams.get("limit") || "20", 10);
   const cursor = searchParams.get("cursor");
-  const taggedUserId = searchParams.get("tagged_user_id");
+  const taggedUserIds = searchParams.get("tagged_user_ids"); // comma-separated
+  const year = searchParams.get("year"); // filter by calendar year of sort_date
   const sortBy = searchParams.get("sort_by") === "uploaded" ? "created_at" : "sort_date";
 
   const effectiveUserId = await getEffectiveUserId(user.id);
 
-  // If filtering by tagged user, get those item IDs first
-  if (taggedUserId) {
-    let tagQuery = supabase
-      .from("gallery_tags")
-      .select("item_id")
-      .eq("tagged_user_id", taggedUserId);
+  // If filtering by tagged users, get those item IDs first
+  if (taggedUserIds) {
+    const userIdList = taggedUserIds.split(",").filter(Boolean);
 
-    const { data: taggedItemRows } = await tagQuery;
-    const taggedItemIds = (taggedItemRows || []).map((t) => t.item_id);
+    // Find items tagged with ALL selected users (intersection)
+    const tagResults = await Promise.all(
+      userIdList.map((uid) =>
+        supabase.from("gallery_tags").select("item_id").eq("tagged_user_id", uid)
+      )
+    );
+
+    // Intersect: only items that appear in every user's tag set
+    const idSets = tagResults.map(
+      (r) => new Set((r.data || []).map((t) => t.item_id))
+    );
+    const intersection = idSets.reduce((acc, set) =>
+      new Set([...acc].filter((id) => set.has(id)))
+    );
+    const taggedItemIds = [...intersection];
 
     if (taggedItemIds.length === 0) {
       return NextResponse.json({ items: [], hasMore: false });
@@ -85,6 +96,9 @@ export async function GET(request: NextRequest) {
 
     if (tripId) {
       query = query.eq("trip_id", tripId);
+    }
+    if (year) {
+      query = query.gte("sort_date", `${year}-01-01T00:00:00Z`).lt("sort_date", `${parseInt(year) + 1}-01-01T00:00:00Z`);
     }
     if (cursor) {
       query = query.lt(sortBy, cursor);
@@ -118,6 +132,9 @@ export async function GET(request: NextRequest) {
 
   if (tripId) {
     query = query.eq("trip_id", tripId);
+  }
+  if (year) {
+    query = query.gte("sort_date", `${year}-01-01T00:00:00Z`).lt("sort_date", `${parseInt(year) + 1}-01-01T00:00:00Z`);
   }
   if (cursor) {
     query = query.lt(sortBy, cursor);

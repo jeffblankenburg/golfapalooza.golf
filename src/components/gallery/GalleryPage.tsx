@@ -31,25 +31,22 @@ interface GalleryUser {
   avatar_url: string | null;
 }
 
-interface TripOption {
-  id: string;
-  trip_year: number;
-}
-
 export function GalleryPage({
   activeTripId,
-  allTrips,
   userId,
   userName,
   isAdmin,
   allUsers,
+  taggedUsers,
+  availableYears,
 }: {
   activeTripId: string | null;
-  allTrips: TripOption[];
   userId: string;
   userName: string;
   isAdmin: boolean;
   allUsers: GalleryUser[];
+  taggedUsers: GalleryUser[];
+  availableYears: number[];
 }) {
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,8 +54,10 @@ export function GalleryPage({
   const [hasMore, setHasMore] = useState(true);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
-  // const [filterTripId, setFilterTripId] = useState<string | "all">("all");
   const [sortBy, setSortBy] = useState<"taken" | "uploaded">("taken");
+  const [filterUserIds, setFilterUserIds] = useState<Set<string>>(new Set());
+  const [filterYear, setFilterYear] = useState<string>("all");
+  const [showFilterUsers, setShowFilterUsers] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const cursorRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -66,10 +65,9 @@ export function GalleryPage({
   const fetchItems = useCallback(
     async (cursor?: string): Promise<{ items: GalleryItem[]; hasMore: boolean }> => {
       const params = new URLSearchParams({ limit: "24" });
-      // if (filterTripId !== "all") {
-      //   params.set("trip_id", filterTripId);
-      // }
       if (sortBy === "uploaded") params.set("sort_by", "uploaded");
+      if (filterUserIds.size > 0) params.set("tagged_user_ids", [...filterUserIds].join(","));
+      if (filterYear !== "all") params.set("year", filterYear);
       if (cursor) params.set("cursor", cursor);
 
       const res = await fetch(`/api/gallery?${params}`);
@@ -83,7 +81,7 @@ export function GalleryPage({
         hasMore: data.hasMore ?? false,
       };
     },
-    [sortBy]
+    [sortBy, filterUserIds, filterYear]
   );
 
   // Initial load + re-fetch when filter changes
@@ -192,37 +190,99 @@ export function GalleryPage({
 
   return (
     <>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Photos</h1>
-        <span className="text-sm text-gray-500">
-          {items.length} {items.length === 1 ? "item" : "items"}
-        </span>
+      {/* Header + Filters */}
+      <div className="flex items-start justify-between gap-2 mb-4">
+        <h1 className="text-2xl font-bold text-gray-900 flex-shrink-0">Photos</h1>
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+        {/* Sort toggle — single button, tap to swap */}
+        <button
+          onClick={() => setSortBy(sortBy === "taken" ? "uploaded" : "taken")}
+          className="px-3 py-1.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600 transition-colors flex items-center gap-1"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+          </svg>
+          {sortBy === "taken" ? "Date Taken" : "Date Uploaded"}
+        </button>
+
+        {/* Year filter */}
+        {availableYears.length > 0 && (
+          <select
+            value={filterYear}
+            onChange={(e) => setFilterYear(e.target.value)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-full border-0 outline-none transition-colors appearance-none cursor-pointer ${
+              filterYear !== "all"
+                ? "bg-green-600 text-white"
+                : "bg-gray-100 text-gray-600"
+            }`}
+          >
+            <option value="all">All Years</option>
+            {availableYears.map((y) => (
+              <option key={y} value={String(y)}>{y}</option>
+            ))}
+          </select>
+        )}
+
+        {/* Loozer filter */}
+        {taggedUsers.length > 0 && (
+          <button
+            onClick={() => setShowFilterUsers(!showFilterUsers)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors flex items-center gap-1 ${
+              filterUserIds.size > 0
+                ? "bg-green-600 text-white"
+                : "bg-gray-100 text-gray-600"
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            {filterUserIds.size > 0 ? `${filterUserIds.size} Loozer${filterUserIds.size !== 1 ? "s" : ""}` : "Loozers"}
+          </button>
+        )}
+
+        {/* Clear filters */}
+        {(filterUserIds.size > 0 || filterYear !== "all") && (
+          <button
+            onClick={() => {
+              setFilterUserIds(new Set());
+              setFilterYear("all");
+              setShowFilterUsers(false);
+            }}
+            className="px-2 py-1.5 text-xs text-red-500 font-medium"
+          >
+            Clear
+          </button>
+        )}
+        </div>
       </div>
 
-      {/* Sort toggle */}
-      <div className="flex items-center gap-1 mb-4">
-        <button
-          onClick={() => setSortBy("taken")}
-          className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-            sortBy === "taken"
-              ? "bg-green-600 text-white"
-              : "bg-gray-100 text-gray-600"
-          }`}
-        >
-          Date Taken
-        </button>
-        <button
-          onClick={() => setSortBy("uploaded")}
-          className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-            sortBy === "uploaded"
-              ? "bg-green-600 text-white"
-              : "bg-gray-100 text-gray-600"
-          }`}
-        >
-          Date Uploaded
-        </button>
-      </div>
+      {/* Loozer filter picker */}
+      {showFilterUsers && (
+        <div className="mb-4 bg-gray-50 rounded-xl p-3">
+          <div className="flex flex-wrap gap-1.5">
+            {taggedUsers.map((u) => (
+              <button
+                key={u.id}
+                onClick={() => {
+                  setFilterUserIds((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(u.id)) next.delete(u.id);
+                    else next.add(u.id);
+                    return next;
+                  });
+                }}
+                className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                  filterUserIds.has(u.id)
+                    ? "bg-green-600 text-white"
+                    : "bg-white text-gray-700 border border-gray-200"
+                }`}
+              >
+                {u.display_name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Loading state */}
       {loading && (

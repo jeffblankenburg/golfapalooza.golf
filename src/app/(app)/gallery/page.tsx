@@ -21,12 +21,6 @@ export default async function GalleryServerPage() {
     .eq("status", "active")
     .single();
 
-  // Get all trips (for filter dropdown)
-  const { data: allTrips } = await queryClient
-    .from("trip_settings")
-    .select("id, trip_year")
-    .order("trip_year", { ascending: false });
-
   // Get current user info
   const { data: profile } = await queryClient
     .from("users")
@@ -34,21 +28,41 @@ export default async function GalleryServerPage() {
     .eq("id", effectiveUserId)
     .single();
 
-  // Get all active users (for tag picker)
+  // Get all users (for tag picker on upload)
   const { data: users } = await queryClient
     .from("users")
     .select("id, display_name, avatar_url")
     .order("display_name");
 
+  // Get distinct tagged user IDs (for filter)
+  const { data: taggedRows } = await queryClient
+    .from("gallery_tags")
+    .select("tagged_user_id");
+  const taggedUserIds = [...new Set((taggedRows || []).map((r) => r.tagged_user_id))];
+  const taggedUsers = (users || []).filter((u) => taggedUserIds.includes(u.id));
+
+  // Get distinct years from gallery items sort_date
+  const { data: yearRows } = await queryClient
+    .from("gallery_items")
+    .select("taken_at")
+    .not("taken_at", "is", null);
+  const availableYears = [
+    ...new Set(
+      (yearRows || [])
+        .map((r) => new Date(r.taken_at).getFullYear())
+    ),
+  ].sort((a, b) => b - a);
+
   return (
     <div className="px-4 pt-4 pb-8">
       <GalleryPage
         activeTripId={trip?.id || null}
-        allTrips={allTrips || []}
         userId={effectiveUserId}
         userName={profile?.display_name || "Unknown"}
         isAdmin={profile?.is_admin || false}
         allUsers={users || []}
+        taggedUsers={taggedUsers}
+        availableYears={availableYears}
       />
     </div>
   );

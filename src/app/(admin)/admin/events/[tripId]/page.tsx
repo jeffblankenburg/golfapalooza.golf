@@ -13,10 +13,12 @@ import { ItineraryManager } from "@/components/admin/ItineraryManager";
 import { RoomManager } from "@/components/admin/RoomManager";
 import { ActionItemsManager } from "@/components/admin/ActionItemsManager";
 import { AccoladesManager } from "@/components/admin/AccoladesManager";
-import { ScrambleManager } from "@/components/admin/ScrambleManager";
+import { CornholeDoublesManager } from "@/components/admin/CornholeDoublesManager";
 import { RyderCupManager } from "@/components/admin/RyderCupManager";
 import { TeeTimeManager } from "@/components/admin/TeeTimeManager";
 import { VisibilityToggles } from "@/components/admin/VisibilityToggles";
+import { HundredFeetManager } from "@/components/admin/HundredFeetManager";
+import { DailyWinnersManager } from "@/components/admin/DailyWinnersManager";
 
 interface EventSummary {
   trip: {
@@ -163,17 +165,77 @@ export default function EventDetailPage() {
         <RyderCupManager tripId={tripId} />
       </CollapsibleSection>
 
-      <CollapsibleSection
-        title="Scramble Teams"
-        summary="Manage teams"
-        icon={
+      <Link
+        href={`/admin/events/${tripId}/scrambles`}
+        className="flex items-center gap-3 bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-4 active:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-50 text-green-700 flex-shrink-0">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
           </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-900">Scrambles</p>
+          <p className="text-xs text-gray-500">Teams, scoring &amp; BSPITW</p>
+        </div>
+        <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </Link>
+
+      <CollapsibleSection
+        title="Cornhole Doubles"
+        summary="Manage partner pairs"
+        icon={
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
         }
       >
-        <ScrambleManager tripId={tripId} />
+        <CornholeDoublesManager tripId={tripId} />
       </CollapsibleSection>
+
+      <CollapsibleSection
+        title="100 Feet!"
+        summary="Distance from pin on #18"
+        icon={
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+          </svg>
+        }
+      >
+        <HundredFeetManager tripId={tripId} />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="Daily Winners"
+        summary="CTP &amp; Long Putt"
+        icon={
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+          </svg>
+        }
+      >
+        <DailyWinnersManager tripId={tripId} />
+      </CollapsibleSection>
+
+      <Link
+        href={`/admin/events/${tripId}/calcutta`}
+        className="flex items-center gap-3 bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-4 active:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-50 text-purple-700 flex-shrink-0">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-900">Calcutta Auction</p>
+          <p className="text-xs text-gray-500">Auction order, prizes &amp; bids</p>
+        </div>
+        <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </Link>
 
       <CollapsibleSection
         title="Tee Times"

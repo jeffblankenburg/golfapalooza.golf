@@ -7,7 +7,7 @@ interface Accolade {
   id: string;
   title: string;
   user_id: string;
-  user: { id: string; display_name: string } | null;
+  user: { id: string; display_name: string; avatar_url: string | null } | null;
 }
 
 interface User {
@@ -126,11 +126,20 @@ export function AccoladesManager({ tripId }: { tripId: string }) {
 
         {accolades.map((a) => (
           <div key={a.id} className="px-4 py-3 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-gray-900">{a.title}</p>
-              <p className="text-xs text-gray-500">
-                {a.user?.display_name || "Unknown"}
-              </p>
+            <div className="flex items-center gap-2">
+              {a.user?.avatar_url ? (
+                <img src={a.user.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-xs font-bold">
+                  {(a.user?.display_name || "?")[0].toUpperCase()}
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-semibold text-gray-900">{a.title}</p>
+                <p className="text-xs text-gray-500">
+                  {a.user?.display_name || "Unknown"}
+                </p>
+              </div>
             </div>
             <button
               onClick={() => handleDelete(a.id)}

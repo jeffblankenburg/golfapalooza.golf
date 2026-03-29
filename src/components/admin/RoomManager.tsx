@@ -278,8 +278,7 @@ export function RoomManager({ tripId: propTripId }: { tripId?: string } = {}) {
                 <div className="px-4 py-3 text-xs text-gray-400">No rooms in this facility</div>
               ) : (
                 facilityRooms.map((room) => {
-                  const occupants = room.room_assignments || [];
-                  const names = occupants.map((a) => a.user?.display_name).filter(Boolean);
+                  const occupants = (room.room_assignments || []).map((a) => a.user).filter(Boolean);
 
                   return (
                     <button
@@ -291,8 +290,21 @@ export function RoomManager({ tripId: propTripId }: { tripId?: string } = {}) {
                         <div className="text-sm font-medium text-gray-900">
                           Room {room.room_number}
                         </div>
-                        {names.length > 0 ? (
-                          <div className="text-xs text-gray-500">{names.join(", ")}</div>
+                        {occupants.length > 0 ? (
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {occupants.map((occ) => (
+                              <span key={occ!.id} className="inline-flex items-center gap-1 pl-0.5 pr-2 py-0.5 bg-gray-100 rounded-full text-xs text-gray-500">
+                                {occ!.avatar_url ? (
+                                  <img src={occ!.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                                ) : (
+                                  <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                                    {(occ!.display_name || "?")[0].toUpperCase()}
+                                  </span>
+                                )}
+                                {occ!.display_name}
+                              </span>
+                            ))}
+                          </div>
                         ) : (
                           <div className="text-xs text-gray-400 italic">Empty</div>
                         )}

@@ -55,18 +55,24 @@ export async function GET(request: Request) {
     );
   }
 
-  const adminClient = createAdminClient();
+  try {
+    const adminClient = createAdminClient();
 
-  const { data: participants, error } = await adminClient
-    .from("contest_participants")
-    .select("user_id, user:users(id, display_name, full_name, avatar_url)")
-    .eq("contest_id", contestId);
+    const { data: participants, error } = await adminClient
+      .from("contest_participants")
+      .select("user_id, user:users!contest_participants_user_id_fkey(id, display_name, full_name, avatar_url)")
+      .eq("contest_id", contestId);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      console.error("Contest participants GET error:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ participants });
+  } catch (error) {
+    console.error("Contest participants GET uncaught error:", error);
+    return NextResponse.json({ error: "Failed to fetch participants" }, { status: 500 });
   }
-
-  return NextResponse.json({ participants });
 }
 
 /**

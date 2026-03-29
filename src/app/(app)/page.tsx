@@ -78,7 +78,7 @@ export default async function HomePage() {
         .maybeSingle(),
       queryClient
         .from("event_participants")
-        .select("likelihood, user:users(display_name)")
+        .select("likelihood, user:users(display_name, avatar_url)")
         .eq("trip_id", trip.id)
         .not("likelihood", "is", null),
     ]);
@@ -93,9 +93,11 @@ export default async function HomePage() {
 
     participants = (participantsResult.data || []).map((p) => {
       const u = Array.isArray(p.user) ? p.user[0] : p.user;
+      const typed = u as { display_name: string; avatar_url: string | null } | null;
       return {
         likelihood: p.likelihood as number,
-        displayName: (u as { display_name: string })?.display_name || "Unknown",
+        displayName: typed?.display_name || "Unknown",
+        avatarUrl: typed?.avatar_url || null,
       };
     });
 

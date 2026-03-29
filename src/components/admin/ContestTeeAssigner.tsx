@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { getTeeColorClasses } from "@/lib/tee-colors";
 
 // ── Types ──
@@ -24,12 +24,6 @@ interface HoleData {
   yards: number | null;
 }
 
-interface Assignment {
-  id?: string;
-  hole_number: number;
-  tee_id: string;
-}
-
 interface ContestInfo {
   id: string;
   trip_id: string;
@@ -46,8 +40,16 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
   const [assignments, setAssignments] = useState<Map<number, string>>(new Map());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
-  const [dirty, setDirty] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const contestRef = useRef<ContestInfo | null>(null);
+  const assignmentsRef = useRef<Map<number, string>>(new Map());
+
+  // Keep refs in sync
+  useEffect(() => { contestRef.current = contest; }, [contest]);
+  useEffect(() => { assignmentsRef.current = assignments; }, [assignments]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -67,7 +69,6 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
         }
       }
       setAssignments(map);
-      setDirty(false);
     } catch {
       setErrorMessage("Failed to load tee data");
     } finally {
@@ -79,6 +80,34 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
     fetchData();
   }, [fetchData]);
 
+  // Flush pending save on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      // Fire-and-forget save of latest state
+      const c = contestRef.current;
+      const a = assignmentsRef.current;
+      if (c && a.size > 0) {
+        const isRC = c.contest_type === "ryder_cup";
+        const body: Record<string, unknown> = { contest_id: c.id };
+        if (isRC) {
+          const allSame = a.size === 18 && new Set(a.values()).size === 1;
+          body.tee_id = allSame ? a.get(1) : a.get(1);
+        } else {
+          body.assignments = Array.from(a.entries()).map(
+            ([hole_number, tee_id]) => ({ hole_number, tee_id })
+          );
+        }
+        fetch("/api/admin/contest-tees", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+      }
+    };
+  }, []);
+
   const isRyderCup = contest?.contest_type === "ryder_cup";
 
   // Get the single tee_id if all 18 holes share the same tee
@@ -88,11 +117,56 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
       ? assignments.get(1) || null
       : null;
 
+  // Auto-save with debounce
+  const scheduleSave = useCallback(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    setSaveState("saving");
+
+    saveTimerRef.current = setTimeout(async () => {
+      const c = contestRef.current;
+      const a = assignmentsRef.current;
+      if (!c || a.size === 0) {
+        setSaveState("idle");
+        return;
+      }
+
+      const body: Record<string, unknown> = { contest_id: c.id };
+      const isRC = c.contest_type === "ryder_cup";
+
+      if (isRC) {
+        const allSame = a.size === 18 && new Set(a.values()).size === 1;
+        body.tee_id = allSame ? a.get(1) : a.get(1);
+      } else {
+        body.assignments = Array.from(a.entries()).map(
+          ([hole_number, tee_id]) => ({ hole_number, tee_id })
+        );
+      }
+
+      try {
+        const res = await fetch("/api/admin/contest-tees", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+
+        if (res.ok) {
+          setSaveState("saved");
+          savedTimerRef.current = setTimeout(() => setSaveState("idle"), 1500);
+        } else {
+          setSaveState("error");
+        }
+      } catch {
+        setSaveState("error");
+      }
+    }, 500);
+  }, []);
+
   function setAllHolesToTee(teeId: string) {
     const map = new Map<number, string>();
     for (let h = 1; h <= 18; h++) map.set(h, teeId);
     setAssignments(map);
-    setDirty(true);
+    scheduleSave();
   }
 
   function setHoleTee(hole: number, teeId: string) {
@@ -101,49 +175,7 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
       next.set(hole, teeId);
       return next;
     });
-    setDirty(true);
-  }
-
-  async function save() {
-    if (!contest) return;
-    setSaveState("saving");
-
-    const body: Record<string, unknown> = { contest_id: contest.id };
-
-    if (isRyderCup && singleTeeId) {
-      body.tee_id = singleTeeId;
-    } else if (isRyderCup) {
-      // Ryder Cup but no tee selected
-      const firstTee = assignments.get(1);
-      if (firstTee) {
-        body.tee_id = firstTee;
-      } else {
-        setSaveState("idle");
-        return;
-      }
-    } else {
-      body.assignments = Array.from(assignments.entries()).map(
-        ([hole_number, tee_id]) => ({ hole_number, tee_id })
-      );
-    }
-
-    try {
-      const res = await fetch("/api/admin/contest-tees", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (res.ok) {
-        setSaveState("saved");
-        setDirty(false);
-        setTimeout(() => setSaveState("idle"), 2000);
-      } else {
-        setSaveState("idle");
-      }
-    } catch {
-      setSaveState("idle");
-    }
+    scheduleSave();
   }
 
   // Compute mixed par summary
@@ -191,6 +223,38 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
 
   return (
     <div className="space-y-4">
+      {/* Auto-save status */}
+      {saveState !== "idle" && (
+        <div className={`flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-lg ${
+          saveState === "saving" ? "bg-blue-50 text-blue-600" :
+          saveState === "saved" ? "bg-green-50 text-green-600" :
+          "bg-red-50 text-red-600"
+        }`}>
+          {saveState === "saving" && (
+            <>
+              <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+              Saving...
+            </>
+          )}
+          {saveState === "saved" && (
+            <>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Saved
+            </>
+          )}
+          {saveState === "error" && (
+            <>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              Save failed
+            </>
+          )}
+        </div>
+      )}
+
       {/* Quick-fill row (shown for both modes — for Ryder Cup it IS the picker) */}
         <div>
           {!isRyderCup && (
@@ -308,27 +372,6 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
               — Mixed Par: {summary.totalPar}
             </p>
           </div>
-        )}
-
-        {/* Save button */}
-        {assignments.size > 0 && (
-          <button
-            onClick={save}
-            disabled={saveState === "saving" || !dirty}
-            className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors ${
-              saveState === "saved"
-                ? "bg-green-100 text-green-700"
-                : dirty
-                ? "bg-green-600 text-white hover:bg-green-700 active:bg-green-800"
-                : "bg-gray-100 text-gray-400 cursor-not-allowed"
-            }`}
-          >
-            {saveState === "saving"
-              ? "Saving..."
-              : saveState === "saved"
-              ? "Saved!"
-              : "Save Tee Assignments"}
-          </button>
         )}
     </div>
   );

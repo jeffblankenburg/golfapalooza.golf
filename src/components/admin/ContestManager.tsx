@@ -41,6 +41,8 @@ export function ContestManager({ tripId }: { tripId: string }) {
     onConfirm: () => void;
   } | null>(null);
 
+  const [showRealNames, setShowRealNames] = useState(false);
+
   // New contest form
   const [showNewContest, setShowNewContest] = useState(false);
   const [newContestName, setNewContestName] = useState("");
@@ -228,8 +230,6 @@ export function ContestManager({ tripId }: { tripId: string }) {
       </div>
     );
   }
-
-  const [showRealNames, setShowRealNames] = useState(false);
 
   const getName = (player: { display_name: string; full_name: string | null }) =>
     showRealNames && player.full_name ? player.full_name : player.display_name;

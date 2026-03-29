@@ -39,25 +39,57 @@ function getCountdown(startDate: string, simulatedDate: string | null) {
   return diffDays;
 }
 
+function SvgIcon({ src, className = "w-8 h-8" }: { src: string; className?: string }) {
+  return (
+    <div
+      className={`${className} bg-current`}
+      style={{
+        WebkitMaskImage: `url(${src})`,
+        WebkitMaskSize: "contain",
+        WebkitMaskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+        maskImage: `url(${src})`,
+        maskSize: "contain",
+        maskRepeat: "no-repeat",
+        maskPosition: "center",
+      }}
+    />
+  );
+}
+
 const quickLinks = [
   {
-    href: "/contests",
-    label: "Contests",
-    color: "bg-yellow-50 text-yellow-700",
+    href: "/scorecards",
+    label: "Scorecards",
+    color: "bg-blue-50 text-blue-700",
     icon: (
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 21h8m-4-4v4m-4.5-8.5c-1.5-.5-3-1.5-3.5-4 0 0-1.5-.5-1.5-2.5S3 4 4.5 4H8m8.5 8.5c1.5-.5 3-1.5 3.5-4 0 0 1.5-.5 1.5-2.5S21 4 19.5 4H16M8 4h8v8c0 2.21-1.79 4-4 4s-4-1.79-4-4V4z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
       </svg>
     ),
   },
   {
-    href: "/schedule",
-    label: "Schedule",
-    color: "bg-green-50 text-green-700",
+    href: "/skins",
+    label: "Skins",
+    color: "bg-amber-50 text-amber-700",
     icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
+      <SvgIcon src="/noun-dollar-8198053.svg" />
+    ),
+  },
+  {
+    href: "/bspitw",
+    label: "BSPITW",
+    color: "bg-amber-50 text-amber-700",
+    icon: (
+      <SvgIcon src="/noun-trophy-8286316.svg" />
+    ),
+  },
+  {
+    href: "/hundred-feet",
+    label: "100 Feet",
+    color: "bg-red-50 text-red-700",
+    icon: (
+      <SvgIcon src="/noun-measure-tape-8065234.svg" />
     ),
   },
   {
@@ -65,10 +97,7 @@ const quickLinks = [
     label: "Course",
     color: "bg-emerald-50 text-emerald-700",
     icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 21V3l7 4 4-4 7 4v18l-7-4-4 4-7-4z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 3v18M14 3v18" />
-      </svg>
+      <SvgIcon src="/noun-golf-flag-5010192.svg" />
     ),
   },
   {
@@ -76,8 +105,18 @@ const quickLinks = [
     label: "Calcutta",
     color: "bg-purple-50 text-purple-700",
     icon: (
+      <SvgIcon src="/noun-gavel-auction.svg" />
+    ),
+  },
+  {
+    href: "/daily-games",
+    label: "Daily Games",
+    color: "bg-teal-50 text-teal-700",
+    icon: (
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <circle cx="12" cy="12" r="9" strokeWidth={1.5} />
+        <circle cx="12" cy="12" r="5.5" strokeWidth={1.5} />
+        <circle cx="12" cy="12" r="2" fill="currentColor" />
       </svg>
     ),
   },
@@ -88,16 +127,6 @@ const quickLinks = [
     icon: (
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-      </svg>
-    ),
-  },
-  {
-    href: "/info",
-    label: "Trip Info",
-    color: "bg-purple-50 text-purple-700",
-    icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
   },
@@ -133,7 +162,7 @@ export function HomeContent({
   myTeammates?: string[];
   teeTimeDay?: string | null;
   simulatedDate?: string | null;
-  participants?: { likelihood: number; displayName: string }[];
+  participants?: { likelihood: number; displayName: string; avatarUrl?: string | null }[];
   nextScheduleItem?: { title: string; location: string | null; time: string | null; dayLabel: string } | null;
   timezone?: string;
   courseName?: string | null;
@@ -321,9 +350,20 @@ export function HomeContent({
                     <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
                       {option.label} ({group.length})
                     </p>
-                    <p className="text-sm text-gray-700">
-                      {group.map(p => p.displayName).join(", ")}
-                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {group.map((p, i) => (
+                        <span key={i} className="inline-flex items-center gap-1.5 pl-0.5 pr-2.5 py-0.5 bg-gray-100 rounded-full text-sm text-gray-700">
+                          {p.avatarUrl ? (
+                            <img src={p.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                          ) : (
+                            <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[9px] font-bold">
+                              {(p.displayName || "?")[0].toUpperCase()}
+                            </span>
+                          )}
+                          {p.displayName}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 );
               })}
@@ -529,7 +569,7 @@ export function HomeContent({
               >
                 {link.icon}
               </div>
-              <span className="text-sm font-semibold text-gray-900">
+              <span className="text-xs font-semibold text-gray-900 text-center">
                 {link.label}
               </span>
             </Link>

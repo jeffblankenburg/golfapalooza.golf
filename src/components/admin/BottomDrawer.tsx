@@ -49,8 +49,8 @@ export function BottomDrawer({ open, onClose, title, subtitle, children }: Botto
           </div>
         </div>
 
-        {/* Scrollable content */}
-        <div className="overflow-y-auto flex-1">
+        {/* Scrollable content — pb-20 keeps content above the bottom nav */}
+        <div className="overflow-y-auto flex-1 pb-20">
           {children}
         </div>
       </div>

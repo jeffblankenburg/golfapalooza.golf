@@ -64,7 +64,7 @@ export async function GET(request: Request) {
     // Fetch all contest participants (the pool of available players)
     const { data: participants } = await adminClient
       .from("contest_participants")
-      .select("user_id, user:users(id, display_name, full_name, avatar_url)")
+      .select("user_id, user:users!contest_participants_user_id_fkey(id, display_name, full_name, avatar_url)")
       .eq("contest_id", contestId);
 
     // Build set of assigned user IDs

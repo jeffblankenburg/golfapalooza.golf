@@ -47,7 +47,7 @@ export async function GET() {
     .select(`
       id, type, name, created_at,
       members:chat_room_members(
-        user:users!chat_room_members_public_user_fk(id, display_name)
+        user:users!chat_room_members_public_user_fk(id, display_name, avatar_url)
       )
     `)
     .in("id", roomIds);

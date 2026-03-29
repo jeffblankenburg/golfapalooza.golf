@@ -10,7 +10,7 @@ export default async function ChatPage() {
   // Get all users for the DM picker
   const { data: allUsers } = await supabase
     .from("users")
-    .select("id, display_name")
+    .select("id, display_name, avatar_url")
     .eq("is_active", true)
     .neq("id", effectiveUserId)
     .order("display_name");

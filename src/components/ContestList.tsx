@@ -176,13 +176,17 @@ function ScrambleContent({
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap gap-x-1.5 gap-y-0.5">
+                  <div className="flex flex-wrap gap-1 items-center">
                     {team.members.map((m, i) => (
-                      <span key={i} className="text-sm text-gray-900">
-                        {m.display_name}
-                        {i < team.members.length - 1 && (
-                          <span className="text-gray-300 ml-1">&middot;</span>
+                      <span key={i} className="inline-flex items-center gap-1 pl-0.5 pr-2 py-0.5 bg-gray-100 rounded-full text-xs text-gray-900">
+                        {m.avatar_url ? (
+                          <img src={m.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                        ) : (
+                          <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                            {(m.display_name || "?")[0].toUpperCase()}
+                          </span>
                         )}
+                        {m.display_name}
                       </span>
                     ))}
                   </div>
@@ -245,13 +249,17 @@ function ScrambleContent({
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap gap-x-1.5 gap-y-0.5">
+                <div className="flex flex-wrap gap-1 items-center">
                   {group.members.map((m, i) => (
-                    <span key={i} className="text-sm text-gray-900">
-                      {m.display_name}
-                      {i < group.members.length - 1 && (
-                        <span className="text-gray-300 ml-1">&middot;</span>
+                    <span key={i} className="inline-flex items-center gap-1 pl-0.5 pr-2 py-0.5 bg-gray-100 rounded-full text-xs text-gray-900">
+                      {m.avatar_url ? (
+                        <img src={m.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                      ) : (
+                        <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                          {(m.display_name || "?")[0].toUpperCase()}
+                        </span>
                       )}
+                      {m.display_name}
                     </span>
                   ))}
                 </div>
@@ -272,13 +280,17 @@ function ScrambleContent({
         </p>
         {teams.map((team) => (
           <div key={team.id} className="bg-gray-50 rounded-xl px-3 py-2.5">
-            <div className="flex flex-wrap gap-x-1.5 gap-y-0.5">
+            <div className="flex flex-wrap gap-1 items-center">
               {team.members.map((m, i) => (
-                <span key={i} className="text-sm text-gray-900">
-                  {m.display_name}
-                  {i < team.members.length - 1 && (
-                    <span className="text-gray-300 ml-1">&middot;</span>
+                <span key={i} className="inline-flex items-center gap-1 pl-0.5 pr-2 py-0.5 bg-gray-100 rounded-full text-xs text-gray-900">
+                  {m.avatar_url ? (
+                    <img src={m.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                  ) : (
+                    <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                      {(m.display_name || "?")[0].toUpperCase()}
+                    </span>
                   )}
+                  {m.display_name}
                 </span>
               ))}
             </div>
@@ -384,8 +396,15 @@ function ParticipantListContent({ detail }: { detail: ContestDetailData }) {
         {participants.map((p, i) => (
           <span
             key={i}
-            className="text-sm bg-gray-50 text-gray-700 px-2.5 py-1 rounded-lg"
+            className="inline-flex items-center gap-1.5 pl-0.5 pr-2.5 py-0.5 bg-gray-100 text-gray-700 rounded-full text-sm"
           >
+            {p.avatar_url ? (
+              <img src={p.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+            ) : (
+              <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[9px] font-bold">
+                {(p.display_name || "?")[0].toUpperCase()}
+              </span>
+            )}
             {p.display_name}
           </span>
         ))}

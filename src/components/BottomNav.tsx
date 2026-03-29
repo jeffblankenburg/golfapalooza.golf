@@ -3,6 +3,24 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+function SvgIcon({ src, className = "w-6 h-6" }: { src: string; className?: string }) {
+  return (
+    <div
+      className={`${className} bg-current`}
+      style={{
+        WebkitMaskImage: `url(${src})`,
+        WebkitMaskSize: "contain",
+        WebkitMaskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+        maskImage: `url(${src})`,
+        maskSize: "contain",
+        maskRepeat: "no-repeat",
+        maskPosition: "center",
+      }}
+    />
+  );
+}
+
 const navItems = [
   {
     href: "/",
@@ -36,14 +54,7 @@ const navItems = [
     href: "/contests",
     label: "Contests",
     icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M5 3l3.057-1.764A1 1 0 019 2h6a1 1 0 01.943.684L19 3m-7 14v4m-4 0h8m-4-8a4 4 0 100-8 4 4 0 000 8zm-7-4h1m12 0h1M6.343 6.343l.707.707m9.9 9.9l.707.707M6.343 17.657l.707-.707m9.9-9.9l.707-.707"
-        />
-      </svg>
+      <SvgIcon src="/noun-trophy-8286316.svg" />
     ),
   },
   {
@@ -102,7 +113,7 @@ export function BottomNav({ isAdmin }: { isAdmin: boolean }) {
               className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] w-full h-full ${
                 isActive
                   ? "text-green-700"
-                  : "text-gray-400 active:text-gray-600"
+                  : "text-gray-500 active:text-gray-600"
               }`}
             >
               {item.icon}

@@ -99,6 +99,28 @@ textarea::placeholder {
   animation: fade-in 0.2s ease-out;
 }
 
+/* Calcutta display entrance animation */
+@keyframes bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.6s ease-out;
+}
+
 /* iOS-style safe area padding */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);

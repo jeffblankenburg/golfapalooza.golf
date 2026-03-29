@@ -36,7 +36,7 @@ export async function GET(request: Request) {
   const adminClient = createAdminClient();
   const { data: accolades, error } = await adminClient
     .from("accolades")
-    .select("*, user:users(id, display_name)")
+    .select("*, user:users(id, display_name, avatar_url)")
     .eq("trip_id", tripId)
     .order("sort_order", { ascending: true });
 
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     const { data, error } = await adminClient
       .from("accolades")
       .insert({ trip_id, title, user_id, sort_order: sort_order || 0 })
-      .select("*, user:users(id, display_name)")
+      .select("*, user:users(id, display_name, avatar_url)")
       .single();
 
     if (error) {

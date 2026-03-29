@@ -170,6 +170,7 @@ export async function PUT(req: NextRequest) {
 
   const body = await req.json();
   const { contest_id, tee_id, assignments } = body;
+  console.log("[contest-tees PUT] contest_id:", contest_id, "tee_id:", tee_id, "assignments count:", assignments?.length);
 
   if (!contest_id) {
     return NextResponse.json(
@@ -208,28 +209,42 @@ export async function PUT(req: NextRequest) {
     );
   }
 
-  // Delete existing assignments for this contest
-  const { error: deleteError } = await supabase
-    .from("contest_hole_tees")
-    .delete()
-    .eq("contest_id", contest_id);
-
-  if (deleteError) {
-    return NextResponse.json(
-      { error: "Failed to clear existing assignments" },
-      { status: 500 }
-    );
-  }
-
-  // Insert new assignments
+  // Upsert assignments (safer than delete + insert)
   if (rows.length > 0) {
-    const { error: insertError } = await supabase
+    // Delete holes that are no longer in the assignment set
+    const assignedHoles = rows.map((r) => r.hole_number);
+    const { error: cleanupError } = await supabase
       .from("contest_hole_tees")
-      .insert(rows);
+      .delete()
+      .eq("contest_id", contest_id)
+      .not("hole_number", "in", `(${assignedHoles.join(",")})`);
 
-    if (insertError) {
+    if (cleanupError) {
+      console.error("contest-tees cleanup error:", cleanupError);
+    }
+
+    const { error: upsertError } = await supabase
+      .from("contest_hole_tees")
+      .upsert(rows, { onConflict: "contest_id,hole_number" });
+
+    if (upsertError) {
+      console.error("contest-tees upsert error:", upsertError);
       return NextResponse.json(
-        { error: "Failed to save assignments", details: insertError.message },
+        { error: "Failed to save assignments", details: upsertError.message },
+        { status: 500 }
+      );
+    }
+  } else {
+    // No rows — clear all assignments
+    const { error: deleteError } = await supabase
+      .from("contest_hole_tees")
+      .delete()
+      .eq("contest_id", contest_id);
+
+    if (deleteError) {
+      console.error("contest-tees delete error:", deleteError);
+      return NextResponse.json(
+        { error: "Failed to clear assignments", details: deleteError.message },
         { status: 500 }
       );
     }

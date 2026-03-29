@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 
 interface RoomMember {
-  user: { id: string; display_name: string } | null;
+  user: { id: string; display_name: string; avatar_url: string | null } | null;
 }
 
 interface ChatRoom {
@@ -24,6 +24,7 @@ interface ChatRoom {
 interface User {
   id: string;
   display_name: string;
+  avatar_url: string | null;
 }
 
 function timeAgo(date: string): string {
@@ -229,19 +230,28 @@ export function ChatRoomList({
               className="flex items-center gap-3 w-full px-4 py-3 text-left active:bg-gray-50 border-b border-gray-50"
             >
               {/* Avatar */}
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-                room.type === "group" ? "bg-green-100" : "bg-gray-200"
-              }`}>
-                {room.type === "group" ? (
+              {room.type === "dm" ? (() => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const otherMember = (room.members as any[])?.find(
+                  (m) => m.user?.id !== currentUserId
+                );
+                const avatarUrl = otherMember?.user?.avatar_url;
+                return avatarUrl ? (
+                  <img src={avatarUrl} alt="" className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                    <span className="text-lg font-semibold text-gray-500">
+                      {room.name?.[0]?.toUpperCase() || "?"}
+                    </span>
+                  </div>
+                );
+              })() : (
+                <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
                   <svg className="w-6 h-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
-                ) : (
-                  <span className="text-lg font-semibold text-gray-500">
-                    {room.name?.[0]?.toUpperCase() || "?"}
-                  </span>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Content */}
               <div className="flex-1 min-w-0">
@@ -397,11 +407,15 @@ export function ChatRoomList({
                   onClick={() => toggleUser(u)}
                   className="flex items-center gap-3 w-full px-4 py-3 text-left active:bg-gray-50 border-b border-gray-50"
                 >
-                  <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm font-semibold text-gray-500">
-                      {u.display_name?.[0]?.toUpperCase() || "?"}
-                    </span>
-                  </div>
+                  {u.avatar_url ? (
+                    <img src={u.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm font-semibold text-gray-500">
+                        {u.display_name?.[0]?.toUpperCase() || "?"}
+                      </span>
+                    </div>
+                  )}
                   <span className="flex-1 text-[15px] font-medium text-gray-900">{u.display_name}</span>
                 </button>
               ))}

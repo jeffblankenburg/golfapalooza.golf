@@ -1,13 +1,12 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { ScorecardsContent } from "@/components/ScorecardsContent";
 
 export default async function ScorecardsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
 
   if (!user) return null;
+
+  const supabase = await createClient();
 
   // Get active trip
   const { data: trip } = await supabase

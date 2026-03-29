@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -27,3 +28,14 @@ export async function createClient() {
     }
   );
 }
+
+/**
+ * Cached auth user lookup. Deduplicates auth.getUser() calls within
+ * a single server request (layout + page + nested components).
+ * React's cache() scopes to the current request lifecycle.
+ */
+export const getAuthUser = cache(async () => {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
+});

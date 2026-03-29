@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { ChatRoom } from "@/components/chat/ChatRoom";
 import { getEffectiveUserId } from "@/lib/simulator";
@@ -9,13 +9,13 @@ export default async function ChatRoomPage({
   params: Promise<{ roomId: string }>;
 }) {
   const { roomId } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthUser();
 
   if (!user) {
     redirect("/login");
   }
 
+  const supabase = await createClient();
   const effectiveUserId = await getEffectiveUserId(user.id);
 
   // Get room info with members

@@ -1,13 +1,11 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { HomeContent } from "@/components/HomeContent";
 import { getEffectiveUserId, getEffectiveDate, getSimDate, isSimulating } from "@/lib/simulator";
 
 export default async function HomePage() {
+  const user = await getAuthUser();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   // Simulator support
   const simulating = await isSimulating();
@@ -51,8 +49,9 @@ export default async function HomePage() {
   let myStartingHole: number | null = null;
   let myTeammates: string[] = [];
   let teeTimeDay: string | null = null;
-  let participants: { likelihood: number; displayName: string }[] = [];
+  let participants: { userId: string; likelihood: number; displayName: string }[] = [];
   let nextScheduleItem: { title: string; location: string | null; time: string | null; dayLabel: string } | null = null;
+  let myCalcuttaRoster: { userId: string; displayName: string; avatarUrl: string | null }[] | null = null;
 
   if (trip) {
     const [itemsResult, completionsResult, rsvpResult, roomResult, participantsResult] = await Promise.all([
@@ -78,7 +77,7 @@ export default async function HomePage() {
         .maybeSingle(),
       queryClient
         .from("event_participants")
-        .select("likelihood, user:users(display_name, avatar_url)")
+        .select("user_id, likelihood, user:users(display_name, avatar_url)")
         .eq("trip_id", trip.id)
         .not("likelihood", "is", null),
     ]);
@@ -95,6 +94,7 @@ export default async function HomePage() {
       const u = Array.isArray(p.user) ? p.user[0] : p.user;
       const typed = u as { display_name: string; avatar_url: string | null } | null;
       return {
+        userId: p.user_id as string,
         likelihood: p.likelihood as number,
         displayName: typed?.display_name || "Unknown",
         avatarUrl: typed?.avatar_url || null,
@@ -125,13 +125,20 @@ export default async function HomePage() {
 
     const allMatches: TeeTimeMatch[] = [];
 
-    // Source 1: Direct tee_time_players entries
-    const { data: myTeeTimePlayers } = await queryClient
-      .from("tee_time_players")
-      .select("tee_time_id, tee_time:tee_times(id, trip_id, day_number, tee_time, starting_hole)")
-      .eq("user_id", effectiveUserId);
+    // Fetch both tee time sources in parallel
+    const [teeTimePlayersResult, scrambleMembershipsResult] = await Promise.all([
+      queryClient
+        .from("tee_time_players")
+        .select("tee_time_id, tee_time:tee_times(id, trip_id, day_number, tee_time, starting_hole)")
+        .eq("user_id", effectiveUserId),
+      queryClient
+        .from("scramble_team_members")
+        .select("team_id")
+        .eq("user_id", effectiveUserId),
+    ]);
 
-    for (const ttp of myTeeTimePlayers || []) {
+    // Source 1: Direct tee_time_players entries
+    for (const ttp of teeTimePlayersResult.data || []) {
       const tt = Array.isArray(ttp.tee_time) ? ttp.tee_time[0] : ttp.tee_time;
       if (tt && tt.trip_id === trip.id && tt.tee_time) {
         allMatches.push({
@@ -145,11 +152,7 @@ export default async function HomePage() {
     }
 
     // Source 2: Scramble teams linked to tee times
-    const { data: myScrambleMemberships } = await queryClient
-      .from("scramble_team_members")
-      .select("team_id")
-      .eq("user_id", effectiveUserId);
-
+    const myScrambleMemberships = scrambleMembershipsResult.data;
     if (myScrambleMemberships && myScrambleMemberships.length > 0) {
       const teamIds = myScrambleMemberships.map((m) => m.team_id);
       const { data: teamTeeTimesData } = await queryClient
@@ -225,6 +228,42 @@ export default async function HomePage() {
               const u = Array.isArray(m.user) ? m.user[0] : m.user;
               return u?.display_name || "Unknown";
             });
+        }
+      }
+    }
+
+    // Fetch Calcutta roster (if auction is closed and user owns golfers)
+    const { data: calcuttaContest } = await queryClient
+      .from("contests")
+      .select("id, calcutta_active_order")
+      .eq("trip_id", trip.id)
+      .eq("contest_type", "calcutta")
+      .maybeSingle();
+
+    if (calcuttaContest && calcuttaContest.calcutta_active_order === null) {
+      // Check if at least one participant was sold (auction actually happened)
+      const { count: soldCount } = await queryClient
+        .from("contest_participants")
+        .select("id", { count: "exact", head: true })
+        .eq("contest_id", calcuttaContest.id)
+        .not("sold_at", "is", null);
+
+      if (soldCount && soldCount > 0) {
+        const { data: myGolfers } = await queryClient
+          .from("contest_participants")
+          .select("user_id, user:users!contest_participants_user_id_fkey(display_name, avatar_url)")
+          .eq("contest_id", calcuttaContest.id)
+          .eq("owner_id", effectiveUserId);
+
+        if (myGolfers && myGolfers.length > 0) {
+          myCalcuttaRoster = myGolfers.map((g) => {
+            const u = Array.isArray(g.user) ? g.user[0] : g.user;
+            return {
+              userId: g.user_id as string,
+              displayName: (u as { display_name: string; avatar_url: string | null })?.display_name || "Unknown",
+              avatarUrl: (u as { display_name: string; avatar_url: string | null })?.avatar_url || null,
+            };
+          });
         }
       }
     }
@@ -332,6 +371,7 @@ export default async function HomePage() {
       nextScheduleItem={nextScheduleItem}
       timezone={trip?.timezone}
       courseName={courseVenue}
+      myCalcuttaRoster={myCalcuttaRoster}
     />
   );
 }

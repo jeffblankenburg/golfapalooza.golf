@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Link from "next/link";
 import { TapbackMenu } from "./TapbackMenu";
 import { ReactionBadge } from "./ReactionBadge";
 
@@ -153,7 +154,9 @@ export function MessageBubble({
         {/* Sender name for group chats */}
         {showSender && message.sender && (
           <p className="text-[11px] text-gray-500 font-medium ml-3 mb-0.5">
-            {message.sender.display_name}
+            <Link href={`/loozers/${message.sender.id}`} className="hover:underline">
+              {message.sender.display_name}
+            </Link>
           </p>
         )}
 

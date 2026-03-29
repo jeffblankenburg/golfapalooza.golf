@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { BottomNav } from "@/components/BottomNav";
 import { HeaderBar } from "@/components/HeaderBar";
@@ -11,12 +11,13 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthUser();
 
   if (!user) {
     redirect("/login");
   }
+
+  const supabase = await createClient();
 
   // Check if real user is admin (needed to allow simulation)
   const { data: realProfile } = await supabase

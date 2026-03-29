@@ -110,7 +110,26 @@ export function HeaderBar({
       )
       .subscribe();
 
-    // Chat badge: listen for new messages and read receipt updates
+    // Chat badge: refetch unread count on new messages and read receipt updates
+    const refetchChatCount = () => {
+      fetch("/api/chat/rooms")
+        .then((res) => res.json())
+        .then((data) => {
+          const total = (data.rooms || []).reduce(
+            (sum: number, r: { unreadCount?: number }) => sum + (r.unreadCount || 0),
+            0
+          );
+          setChatUnreadCount(total);
+        })
+        .catch(() => {});
+    };
+
+    let chatRefetchTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedRefetchChat = () => {
+      if (chatRefetchTimer) clearTimeout(chatRefetchTimer);
+      chatRefetchTimer = setTimeout(refetchChatCount, 500);
+    };
+
     const chatChannel = supabase
       .channel("chat-badge")
       .on(
@@ -123,7 +142,7 @@ export function HeaderBar({
         (payload) => {
           const msg = payload.new as { sender_id?: string };
           if (msg.sender_id !== userId) {
-            setChatUnreadCount((prev) => prev + 1);
+            debouncedRefetchChat();
           }
         }
       )
@@ -136,21 +155,13 @@ export function HeaderBar({
           filter: `user_id=eq.${userId}`,
         },
         () => {
-          // User read messages — refetch total unread from API
-          fetch("/api/chat/rooms")
-            .then((res) => res.json())
-            .then((data) => {
-              const total = (data.rooms || []).reduce(
-                (sum: number, r: { unreadCount?: number }) => sum + (r.unreadCount || 0),
-                0
-              );
-              setChatUnreadCount(total);
-            });
+          debouncedRefetchChat();
         }
       )
       .subscribe();
 
     return () => {
+      if (chatRefetchTimer) clearTimeout(chatRefetchTimer);
       supabase.removeChannel(channel);
       supabase.removeChannel(chatChannel);
     };
@@ -175,30 +186,50 @@ export function HeaderBar({
             </Link>
           </div>
 
-          {/* Left: Chat icon */}
-          <Link
-            href="/chat"
-            className="relative flex items-center justify-center w-10 h-10 -ml-1"
-          >
-            <svg
-              className="w-6 h-6 text-gray-700"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          {/* Left: Chat + Gallery icons */}
+          <div className="flex items-center -ml-1">
+            <Link
+              href="/chat"
+              className="relative flex items-center justify-center w-10 h-10"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-              />
-            </svg>
-            {chatUnreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
-                {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
-              </span>
-            )}
-          </Link>
+              <svg
+                className="w-6 h-6 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                />
+              </svg>
+              {chatUnreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                  {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                </span>
+              )}
+            </Link>
+            <Link
+              href="/gallery"
+              className="relative flex items-center justify-center w-10 h-10"
+            >
+              <svg
+                className="w-6 h-6 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+            </Link>
+          </div>
 
           {/* Right: Bell + Profile */}
           <div className="flex items-center gap-1 -mr-1">
@@ -251,8 +282,12 @@ export function HeaderBar({
       {showNotifications && (
         <NotificationDrawer
           userId={userId}
-          onClose={() => setShowNotifications(false)}
+          onClose={() => {
+            setShowNotifications(false);
+            refetchCount();
+          }}
           onMarkAllRead={() => setUnreadCount(0)}
+          onCountChange={refetchCount}
         />
       )}
     </>

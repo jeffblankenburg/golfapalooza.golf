@@ -148,6 +148,22 @@ export async function POST(request: Request) {
           .from("contest_participants")
           .upsert(entries, { onConflict: "contest_id,user_id" });
       }
+
+      // Auto-add to event chat room
+      const { data: eventRoom } = await adminClient
+        .from("chat_rooms")
+        .select("id")
+        .eq("trip_id", trip.id)
+        .single();
+
+      if (eventRoom) {
+        await adminClient
+          .from("chat_room_members")
+          .upsert(
+            { room_id: eventRoom.id, user_id: effectiveUserId },
+            { onConflict: "room_id,user_id" }
+          );
+      }
     }
 
     return NextResponse.json({ success: true, likelihood });

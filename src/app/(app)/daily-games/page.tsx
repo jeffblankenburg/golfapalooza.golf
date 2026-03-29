@@ -1,13 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
-import { HundredFeetContent } from "@/components/HundredFeetContent";
+
 
 export default async function DailyGamesPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
 
   if (!user) redirect("/login");
 
@@ -105,10 +102,6 @@ export default async function DailyGamesPage() {
         );
       })}
 
-      {/* 100 Feet Leaderboard */}
-      <div className="-mx-4">
-        <HundredFeetContent tripId={trip.id} startDate={trip.start_date} />
-      </div>
     </div>
   );
 }

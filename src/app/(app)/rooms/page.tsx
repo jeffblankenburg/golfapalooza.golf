@@ -1,12 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { RoomList } from "@/components/RoomList";
 import { getEffectiveUserId } from "@/lib/simulator";
 
 export default async function RoomsPage() {
+  const user = await getAuthUser();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   const effectiveUserId = await getEffectiveUserId(user!.id);
 

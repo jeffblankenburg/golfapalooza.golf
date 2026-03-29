@@ -126,12 +126,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Auto-add to Loozers group chat
+    // Auto-add to All Loozers group chat
     const { data: loozersRoom } = await adminClient
       .from("chat_rooms")
       .select("id")
       .eq("type", "group")
-      .eq("name", "Loozers")
+      .eq("name", "All Loozers")
       .single();
 
     if (loozersRoom) {

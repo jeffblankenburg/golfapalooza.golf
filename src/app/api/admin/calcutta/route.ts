@@ -65,14 +65,17 @@ export async function GET(request: Request) {
     let maxOrder = withOrder.length > 0 ? Math.max(...withOrder.map((p) => p.auction_order!)) : 0;
 
     if (withoutOrder.length > 0) {
-      for (const p of withoutOrder) {
-        maxOrder++;
-        p.auction_order = maxOrder;
-        await adminClient
-          .from("contest_participants")
-          .update({ auction_order: maxOrder })
-          .eq("id", p.id);
-      }
+      await Promise.all(
+        withoutOrder.map((p, i) => {
+          const order = maxOrder + i + 1;
+          p.auction_order = order;
+          return adminClient
+            .from("contest_participants")
+            .update({ auction_order: order })
+            .eq("id", p.id);
+        })
+      );
+      maxOrder += withoutOrder.length;
     }
 
     // Sort by auction_order
@@ -182,14 +185,17 @@ export async function PUT(request: Request) {
     // Action: reorder
     if (body.action === "reorder") {
       // order is an array of { id, auction_order }
-      for (const item of body.order) {
-        const { error } = await adminClient
-          .from("contest_participants")
-          .update({ auction_order: item.auction_order })
-          .eq("id", item.id);
-        if (error) {
-          return NextResponse.json({ error: error.message }, { status: 500 });
-        }
+      const results = await Promise.all(
+        body.order.map((item: { id: string; auction_order: number }) =>
+          adminClient
+            .from("contest_participants")
+            .update({ auction_order: item.auction_order })
+            .eq("id", item.id)
+        )
+      );
+      const failed = results.find((r) => r.error);
+      if (failed?.error) {
+        return NextResponse.json({ error: failed.error.message }, { status: 500 });
       }
       return NextResponse.json({ success: true });
     }

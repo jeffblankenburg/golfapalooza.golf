@@ -1,10 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { ChatRoomList } from "@/components/chat/ChatRoomList";
 import { getEffectiveUserId } from "@/lib/simulator";
 
 export default async function ChatPage() {
+  const user = await getAuthUser();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
   const effectiveUserId = await getEffectiveUserId(user!.id);
 
   // Get all users for the DM picker

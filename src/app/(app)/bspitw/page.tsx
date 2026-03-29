@@ -1,13 +1,12 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { BspitwContent } from "@/components/BspitwContent";
 
 export default async function BspitwPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
 
   if (!user) return null;
+
+  const supabase = await createClient();
 
   // Get active trip
   const { data: trip } = await supabase

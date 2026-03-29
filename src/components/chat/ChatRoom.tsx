@@ -66,6 +66,9 @@ export function ChatRoom({
         setTimeout(() => {
           messagesEndRef.current?.scrollIntoView();
         }, 50);
+      })
+      .catch(() => {
+        setLoading(false);
       });
   }, [roomId]);
 

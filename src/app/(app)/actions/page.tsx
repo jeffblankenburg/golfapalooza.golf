@@ -1,19 +1,17 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { ActionItemsList } from "@/components/ActionItemsList";
 import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
 
 export default async function ActionsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
 
   if (!user) {
     redirect("/login");
   }
 
+  const supabase = await createClient();
   const simulating = await isSimulating();
   const effectiveUserId = await getEffectiveUserId(user.id);
   const queryClient = simulating ? createAdminClient() : supabase;

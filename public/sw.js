@@ -29,11 +29,23 @@ self.addEventListener("push", (event) => {
     data: payload.data || {},
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    self.registration.showNotification(title, options).then(() => {
+      // Update PWA app icon badge
+      if (navigator.setAppBadge) {
+        navigator.setAppBadge();
+      }
+    })
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+
+  // Clear PWA app icon badge
+  if (navigator.clearAppBadge) {
+    navigator.clearAppBadge();
+  }
 
   if (event.action === "dismiss") {
     return;

@@ -59,10 +59,12 @@ export function NotificationDrawer({
   userId,
   onClose,
   onMarkAllRead,
+  onCountChange,
 }: {
   userId: string;
   onClose: () => void;
   onMarkAllRead: () => void;
+  onCountChange?: () => void;
 }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,10 +73,24 @@ export function NotificationDrawer({
     const res = await fetch("/api/notifications?limit=30");
     if (res.ok) {
       const data = await res.json();
-      setNotifications(data.notifications || []);
+      const notifs = data.notifications || [];
+      setNotifications(notifs);
+
+      // Auto-mark all as read when drawer opens
+      const hasUnread = notifs.some((n: Notification) => !n.read);
+      if (hasUnread) {
+        fetch("/api/notifications", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ markAll: true }),
+        }).then(() => {
+          setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+          onMarkAllRead();
+        });
+      }
     }
     setLoading(false);
-  }, []);
+  }, [onMarkAllRead]);
 
   useEffect(() => {
     fetchNotifications();
@@ -124,6 +140,7 @@ export function NotificationDrawer({
       body: JSON.stringify({ id }),
     });
     setNotifications((prev) => prev.filter((n) => n.id !== id));
+    onCountChange?.();
   };
 
   const hasUnread = notifications.some((n) => !n.read);

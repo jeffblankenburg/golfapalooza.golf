@@ -1,0 +1,265 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import Link from "next/link";
+
+interface ProfileData {
+  id: string;
+  display_name: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  city: string | null;
+  state: string | null;
+  playing_since: number | null;
+  swings: string | null;
+  typical_shot: string | null;
+  fun_fact: string | null;
+  best_shot: string | null;
+  occupation: string | null;
+}
+
+interface AccoladeData {
+  id: string;
+  title: string;
+  trip: { trip_year: number }[] | { trip_year: number } | null;
+}
+
+interface TaggedPhoto {
+  id: string;
+  media_url: string;
+  thumbnail_url: string | null;
+  media_type: string;
+  created_at: string;
+}
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return (name[0] || "?").toUpperCase();
+}
+
+export function LoozerProfile({
+  userId,
+  isOwnProfile,
+}: {
+  userId: string;
+  isOwnProfile: boolean;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [accolades, setAccolades] = useState<AccoladeData[]>([]);
+  const [taggedPhotos, setTaggedPhotos] = useState<TaggedPhoto[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/loozers/${userId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setProfile(data.profile);
+        setAccolades(data.accolades || []);
+        setTaggedPhotos(data.taggedPhotos || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [userId]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-20">
+        <div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="text-center py-20 text-gray-500">
+        <p className="text-lg font-medium">Loozer not found</p>
+      </div>
+    );
+  }
+
+  const location = [profile.city, profile.state].filter(Boolean).join(", ");
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex flex-col items-center">
+        <div className="w-24 h-24 rounded-full overflow-hidden bg-green-700 text-white flex items-center justify-center">
+          {profile.avatar_url ? (
+            <img
+              src={profile.avatar_url}
+              alt={profile.display_name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <span className="text-3xl font-bold">
+              {getInitials(profile.display_name)}
+            </span>
+          )}
+        </div>
+        <h1 className="mt-3 text-2xl font-bold text-gray-900">
+          {profile.display_name}
+        </h1>
+        {profile.full_name && profile.full_name !== profile.display_name && (
+          <p className="text-sm text-gray-500">{profile.full_name}</p>
+        )}
+        {location && (
+          <p className="text-sm text-gray-500 mt-0.5">{location}</p>
+        )}
+        {isOwnProfile && (
+          <Link
+            href="/profile"
+            className="mt-2 text-sm font-medium text-green-600"
+          >
+            Edit Profile
+          </Link>
+        )}
+      </div>
+
+      {/* Accolades */}
+      {accolades.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Accolades
+          </h3>
+          <div className="space-y-2">
+            {accolades.map((a) => {
+              const trip = Array.isArray(a.trip) ? a.trip[0] : a.trip;
+              return (
+                <div key={a.id} className="flex items-center gap-2">
+                  <span className="text-amber-500">&#127942;</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {a.title}
+                  </span>
+                  {trip?.trip_year && (
+                    <span className="text-xs text-gray-400">
+                      ({trip.trip_year})
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* About */}
+      {(profile.occupation ||
+        profile.fun_fact ||
+        profile.best_shot ||
+        profile.playing_since ||
+        profile.swings ||
+        profile.typical_shot) && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            About
+          </h3>
+          <div className="space-y-3">
+            {profile.occupation && (
+              <InfoRow label="Occupation" value={profile.occupation} />
+            )}
+            {profile.playing_since && (
+              <InfoRow
+                label="Playing Since"
+                value={String(profile.playing_since)}
+              />
+            )}
+            {profile.swings && (
+              <InfoRow
+                label="Swings"
+                value={
+                  profile.swings.charAt(0).toUpperCase() +
+                  profile.swings.slice(1)
+                }
+              />
+            )}
+            {profile.typical_shot && (
+              <InfoRow
+                label="Typical Shot"
+                value={
+                  profile.typical_shot.charAt(0).toUpperCase() +
+                  profile.typical_shot.slice(1)
+                }
+              />
+            )}
+            {profile.fun_fact && (
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-0.5">
+                  Fun Fact
+                </p>
+                <p className="text-sm text-gray-900">{profile.fun_fact}</p>
+              </div>
+            )}
+            {profile.best_shot && (
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-0.5">
+                  Best Shot
+                </p>
+                <p className="text-sm text-gray-900">{profile.best_shot}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tagged Photos */}
+      {taggedPhotos.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+              Tagged Photos
+            </h3>
+            <Link
+              href={`/gallery?tagged=${userId}`}
+              className="text-xs font-medium text-green-600"
+            >
+              See All
+            </Link>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            {taggedPhotos.map((photo) => (
+              <div
+                key={photo.id}
+                className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-gray-100"
+              >
+                <img
+                  src={photo.thumbnail_url || photo.media_url}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Standings - Coming Soon */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          Current Standings
+        </h3>
+        <p className="text-sm text-gray-400 italic">Coming soon</p>
+      </div>
+
+      {/* Scorecards - Coming Soon */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          Scorecards
+        </h3>
+        <p className="text-sm text-gray-400 italic">Coming soon</p>
+      </div>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-xs font-medium text-gray-500">{label}</span>
+      <span className="text-sm text-gray-900">{value}</span>
+    </div>
+  );
+}

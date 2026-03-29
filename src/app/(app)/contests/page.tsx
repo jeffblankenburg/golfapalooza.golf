@@ -1,12 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/simulator";
 import { ContestList } from "@/components/ContestList";
 
 export default async function ContestsPage() {
+  const user = await getAuthUser();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   const effectiveUserId = await getEffectiveUserId(user!.id);
 

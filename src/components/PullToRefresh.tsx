@@ -20,6 +20,10 @@ export function PullToRefresh() {
     }
 
     function onTouchStart(e: TouchEvent) {
+      // Don't pull-to-refresh when a modal/viewer overlay is open
+      const target = e.target as HTMLElement;
+      if (target.closest(".fixed.z-50, .fixed.z-40")) return;
+
       const scrollTop = getScrollTop();
       if (scrollTop <= 1) {
         startY = e.touches[0].clientY;

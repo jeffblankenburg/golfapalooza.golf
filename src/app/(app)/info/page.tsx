@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TripInfo } from "@/components/TripInfo";
 import { PastEvents } from "@/components/PastEvents";
@@ -6,11 +6,8 @@ import { RsvpStatus } from "@/components/RsvpStatus";
 import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
 
 export default async function InfoPage() {
+  const user = await getAuthUser();
   const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   const simulating = await isSimulating();
   const effectiveUserId = await getEffectiveUserId(user!.id);

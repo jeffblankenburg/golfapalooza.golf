@@ -1,13 +1,11 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ScheduleView } from "@/components/ScheduleView";
 import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
 
 export default async function SchedulePage() {
+  const user = await getAuthUser();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   const simulating = await isSimulating();
   const effectiveUserId = await getEffectiveUserId(user!.id);
@@ -53,13 +51,20 @@ export default async function SchedulePage() {
 
     const teeTimeEntries: TeeTimeInfo[] = [];
 
-    // Source 1: Direct tee_time_players
-    const { data: directEntries } = await queryClient
-      .from("tee_time_players")
-      .select("tee_time:tee_times(id, trip_id, day_number, tee_time, starting_hole)")
-      .eq("user_id", effectiveUserId);
+    // Fetch both tee time sources in parallel
+    const [directEntriesResult, myTeamsResult] = await Promise.all([
+      queryClient
+        .from("tee_time_players")
+        .select("tee_time:tee_times(id, trip_id, day_number, tee_time, starting_hole)")
+        .eq("user_id", effectiveUserId),
+      queryClient
+        .from("scramble_team_members")
+        .select("team_id")
+        .eq("user_id", effectiveUserId),
+    ]);
 
-    for (const entry of directEntries || []) {
+    // Source 1: Direct tee_time_players
+    for (const entry of directEntriesResult.data || []) {
       const tt = Array.isArray(entry.tee_time) ? entry.tee_time[0] : entry.tee_time;
       if (tt && tt.trip_id === trip.id && tt.tee_time) {
         teeTimeEntries.push({
@@ -73,11 +78,7 @@ export default async function SchedulePage() {
     }
 
     // Source 2: Scramble teams linked to tee times
-    const { data: myTeams } = await queryClient
-      .from("scramble_team_members")
-      .select("team_id")
-      .eq("user_id", effectiveUserId);
-
+    const myTeams = myTeamsResult.data;
     if (myTeams && myTeams.length > 0) {
       const teamIds = myTeams.map((m) => m.team_id);
       const { data: teamTeeTimesData } = await queryClient
@@ -100,42 +101,38 @@ export default async function SchedulePage() {
       }
     }
 
-    // Fetch teammates for each tee time
-    for (const entry of teeTimeEntries) {
-      let teammates: string[] = [];
+    // Fetch teammates for all tee times in parallel
+    const teammateResults = await Promise.all(
+      teeTimeEntries.map((entry) => {
+        if (entry.source === "scramble" && entry.scrambleTeamId) {
+          return queryClient
+            .from("scramble_team_members")
+            .select("user_id, user:users(display_name)")
+            .eq("team_id", entry.scrambleTeamId);
+        } else {
+          return queryClient
+            .from("tee_time_players")
+            .select("user_id, user:users(display_name)")
+            .eq("tee_time_id", entry.teeTimeId);
+        }
+      })
+    );
 
-      if (entry.source === "scramble" && entry.scrambleTeamId) {
-        const { data: members } = await queryClient
-          .from("scramble_team_members")
-          .select("user_id, user:users(display_name)")
-          .eq("team_id", entry.scrambleTeamId);
-
-        teammates = (members || [])
-          .filter((m) => m.user_id !== effectiveUserId)
-          .map((m) => {
-            const u = Array.isArray(m.user) ? m.user[0] : m.user;
-            return u?.display_name || "Unknown";
-          });
-      } else {
-        const { data: members } = await queryClient
-          .from("tee_time_players")
-          .select("user_id, user:users(display_name)")
-          .eq("tee_time_id", entry.teeTimeId);
-
-        teammates = (members || [])
-          .filter((m) => m.user_id !== effectiveUserId)
-          .map((m) => {
-            const u = Array.isArray(m.user) ? m.user[0] : m.user;
-            return u?.display_name || "Unknown";
-          });
-      }
+    teeTimeEntries.forEach((entry, i) => {
+      const members = teammateResults[i].data || [];
+      const teammates = members
+        .filter((m) => m.user_id !== effectiveUserId)
+        .map((m) => {
+          const u = Array.isArray(m.user) ? m.user[0] : m.user;
+          return u?.display_name || "Unknown";
+        });
 
       myTeeTimesByDay[entry.dayNumber] = {
         tee_time: entry.teeTime,
         starting_hole: entry.startingHole,
         teammates,
       };
-    }
+    });
   }
 
   return <ScheduleView items={items || []} startDate={trip.start_date} teeTimesByDay={trip.show_tee_times ? myTeeTimesByDay : {}} timezone={trip.timezone} />;

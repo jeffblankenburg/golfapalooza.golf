@@ -149,6 +149,7 @@ export function HomeContent({
   nextScheduleItem = null,
   timezone,
   courseName = null,
+  myCalcuttaRoster = null,
 }: {
   displayName: string;
   trip: TripData | null;
@@ -162,10 +163,11 @@ export function HomeContent({
   myTeammates?: string[];
   teeTimeDay?: string | null;
   simulatedDate?: string | null;
-  participants?: { likelihood: number; displayName: string; avatarUrl?: string | null }[];
+  participants?: { userId: string; likelihood: number; displayName: string; avatarUrl?: string | null }[];
   nextScheduleItem?: { title: string; location: string | null; time: string | null; dayLabel: string } | null;
   timezone?: string;
   courseName?: string | null;
+  myCalcuttaRoster?: { userId: string; displayName: string; avatarUrl: string | null }[] | null;
 }) {
   const router = useRouter();
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
@@ -352,7 +354,7 @@ export function HomeContent({
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {group.map((p, i) => (
-                        <span key={i} className="inline-flex items-center gap-1.5 pl-0.5 pr-2.5 py-0.5 bg-gray-100 rounded-full text-sm text-gray-700">
+                        <Link key={i} href={`/loozers/${p.userId}`} className="inline-flex items-center gap-1.5 pl-0.5 pr-2.5 py-0.5 bg-gray-100 rounded-full text-sm text-gray-700">
                           {p.avatarUrl ? (
                             <img src={p.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
                           ) : (
@@ -361,7 +363,7 @@ export function HomeContent({
                             </span>
                           )}
                           {p.displayName}
-                        </span>
+                        </Link>
                       ))}
                     </div>
                   </div>
@@ -452,6 +454,40 @@ export function HomeContent({
             <p className="text-xs text-gray-400 mt-0.5">{nextScheduleItem.dayLabel}</p>
           </div>
           <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+      )}
+
+      {/* My Calcutta Roster Card */}
+      {myCalcuttaRoster && myCalcuttaRoster.length > 0 && (
+        <Link
+          href="/calcutta"
+          className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-200 shadow-sm active:scale-95 transition-transform"
+        >
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-purple-50 text-purple-600">
+            <SvgIcon src="/noun-gavel-auction.svg" className="w-6 h-6" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-gray-900">
+              My Calcutta Roster
+            </p>
+            <div className="flex flex-wrap gap-1.5 mt-1">
+              {myCalcuttaRoster.map((g, i) => (
+                <span key={i} className="inline-flex items-center gap-1.5 pl-0.5 pr-2.5 py-0.5 bg-gray-100 rounded-full text-sm text-gray-700" onClick={(e) => { e.preventDefault(); window.location.href = `/loozers/${g.userId}`; }}>
+                  {g.avatarUrl ? (
+                    <img src={g.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                  ) : (
+                    <span className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 text-[9px] font-bold">
+                      {(g.displayName || "?")[0].toUpperCase()}
+                    </span>
+                  )}
+                  {g.displayName}
+                </span>
+              ))}
+            </div>
+          </div>
+          <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </Link>

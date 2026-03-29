@@ -144,6 +144,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
+    // Auto-add to event chat room
+    const { data: eventRoom } = await adminClient
+      .from("chat_rooms")
+      .select("id")
+      .eq("trip_id", trip_id)
+      .single();
+
+    if (eventRoom) {
+      await adminClient
+        .from("chat_room_members")
+        .upsert(
+          { room_id: eventRoom.id, user_id },
+          { onConflict: "room_id,user_id" }
+        );
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Add participant error:", error);
@@ -196,6 +212,21 @@ export async function DELETE(request: Request) {
         .from("contest_participants")
         .delete()
         .in("contest_id", contestIds)
+        .eq("user_id", user_id);
+    }
+
+    // Remove from event chat room
+    const { data: eventRoom } = await adminClient
+      .from("chat_rooms")
+      .select("id")
+      .eq("trip_id", trip_id)
+      .single();
+
+    if (eventRoom) {
+      await adminClient
+        .from("chat_room_members")
+        .delete()
+        .eq("room_id", eventRoom.id)
         .eq("user_id", user_id);
     }
 

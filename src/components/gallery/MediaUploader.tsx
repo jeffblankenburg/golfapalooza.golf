@@ -58,9 +58,14 @@ export function MediaUploader({
         return;
       }
     }
-    const url = URL.createObjectURL(initialFile);
-    setPreview(url);
-    return () => URL.revokeObjectURL(url);
+    try {
+      const url = URL.createObjectURL(initialFile);
+      setPreview(url);
+      return () => URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to create preview:", err);
+      setError("Could not load file preview. Please try selecting the file again.");
+    }
   }, [initialFile]);
 
   const handleUpload = async () => {

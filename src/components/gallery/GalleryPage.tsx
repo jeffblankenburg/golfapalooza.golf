@@ -61,6 +61,7 @@ export function GalleryPage({
   const sentinelRef = useRef<HTMLDivElement>(null);
   const cursorRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const justUploadedRef = useRef(false);
 
   const fetchItems = useCallback(
     async (cursor?: string): Promise<{ items: GalleryItem[]; hasMore: boolean }> => {
@@ -145,7 +146,12 @@ export function GalleryPage({
           table: "gallery_items",
         },
         () => {
-          // Refetch latest items to get full enriched data
+          // Skip if we just uploaded — handleUploadComplete already refetched
+          if (justUploadedRef.current) {
+            justUploadedRef.current = false;
+            return;
+          }
+          // Another user uploaded — refetch
           fetchItems().then((data) => {
             setItems(data.items);
             setHasMore(data.hasMore);
@@ -176,8 +182,17 @@ export function GalleryPage({
     };
   }, [fetchItems]);
 
-  const handleUploadComplete = (newItem: GalleryItem) => {
-    setItems((prev) => [newItem, ...prev]);
+  const handleUploadComplete = () => {
+    // Mark that we just uploaded, so realtime skips its refetch
+    justUploadedRef.current = true;
+    // Refetch to show the new item immediately
+    fetchItems().then((data) => {
+      setItems(data.items);
+      setHasMore(data.hasMore);
+      if (data.items.length > 0) {
+        cursorRef.current = sortBy === "uploaded" ? data.items[data.items.length - 1].created_at : data.items[data.items.length - 1].sort_date;
+      }
+    });
   };
 
   const handleDelete = async (itemId: string) => {
@@ -398,8 +413,6 @@ export function GalleryPage({
         onChange={(e) => {
           const f = e.target.files?.[0];
           if (f) setSelectedFile(f);
-          // Reset so the same file can be re-selected
-          e.target.value = "";
         }}
       />
 
@@ -411,7 +424,11 @@ export function GalleryPage({
           allUsers={allUsers}
           initialFile={selectedFile}
           onUploadComplete={handleUploadComplete}
-          onClose={() => setSelectedFile(null)}
+          onClose={() => {
+            setSelectedFile(null);
+            // Reset file input so the same file can be re-selected next time
+            if (fileInputRef.current) fileInputRef.current.value = "";
+          }}
         />
       )}
 

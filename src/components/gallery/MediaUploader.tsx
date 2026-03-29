@@ -116,13 +116,25 @@ export function MediaUploader({
         const xhr = new XMLHttpRequest();
         xhr.open("POST", "/api/gallery");
 
-        xhr.upload.onprogress = (e) => {
+        let gotProgress = false;
+        xhr.upload.addEventListener("progress", (e) => {
           if (e.lengthComputable) {
+            gotProgress = true;
             setUploadPct(Math.round((e.loaded / e.total) * 100));
+          } else if (e.loaded > 0) {
+            // iOS Safari may not set lengthComputable — show indeterminate
+            gotProgress = true;
+            setUploadPct(null);
           }
-        };
+        });
+
+        // Fallback: if no progress events after 3s, go indeterminate
+        const fallbackTimer = setTimeout(() => {
+          if (!gotProgress) setUploadPct(null);
+        }, 3000);
 
         xhr.onload = () => {
+          clearTimeout(fallbackTimer);
           try {
             const json = JSON.parse(xhr.responseText);
             if (xhr.status >= 200 && xhr.status < 300) {
@@ -135,7 +147,10 @@ export function MediaUploader({
           }
         };
 
-        xhr.onerror = () => reject(new Error("Network error during upload"));
+        xhr.onerror = () => {
+          clearTimeout(fallbackTimer);
+          reject(new Error("Network error during upload"));
+        };
         xhr.send(formData);
       });
 
@@ -362,14 +377,16 @@ export function MediaUploader({
                   <span className="font-medium tabular-nums">{uploadPct}%</span>
                 )}
               </div>
-              {uploadPct != null && (
-                <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+                {uploadPct != null ? (
                   <div
                     className="h-full bg-green-600 rounded-full transition-all duration-200"
                     style={{ width: `${uploadPct}%` }}
                   />
-                </div>
-              )}
+                ) : uploading && progress === "Uploading..." ? (
+                  <div className="h-full w-1/3 bg-green-600 rounded-full animate-[indeterminate_1.5s_ease-in-out_infinite]" />
+                ) : null}
+              </div>
             </div>
           )}
 

@@ -6,6 +6,7 @@ interface CollapsibleSectionProps {
   title: string;
   summary: string;
   icon: React.ReactNode;
+  iconColor?: string;
   defaultOpen?: boolean;
   children: React.ReactNode;
 }
@@ -14,10 +15,24 @@ export function CollapsibleSection({
   title,
   summary,
   icon,
+  iconColor,
   defaultOpen = false,
   children,
 }: CollapsibleSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
+
+  const bgMap: Record<string, string> = {
+    "text-green-700": "bg-green-50",
+    "text-red-700": "bg-red-50",
+    "text-teal-700": "bg-teal-50",
+    "text-blue-700": "bg-blue-50",
+    "text-orange-700": "bg-orange-50",
+    "text-purple-700": "bg-purple-50",
+    "text-amber-700": "bg-amber-50",
+    "text-indigo-700": "bg-indigo-50",
+  };
+  const iconText = iconColor || "text-green-700";
+  const iconBg = bgMap[iconText] || "bg-green-50";
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -25,7 +40,7 @@ export function CollapsibleSection({
         onClick={() => setOpen(!open)}
         className="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50 transition-colors"
       >
-        <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-green-50 text-green-700 flex items-center justify-center">
+        <div className={`flex-shrink-0 w-8 h-8 rounded-lg ${iconBg} ${iconText} flex items-center justify-center`}>
           {icon}
         </div>
         <div className="flex-1 min-w-0">

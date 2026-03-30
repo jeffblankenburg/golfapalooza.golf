@@ -1,0 +1,260 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+async function checkIsAdmin() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("users")
+    .select("is_admin")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile?.is_admin) return null;
+  return user;
+}
+
+interface BracketMatchRow {
+  id: string;
+  slot1_participant_id: string | null;
+  slot2_participant_id: string | null;
+  winner_participant_id: string | null;
+  is_bye: boolean;
+  next_winner_match_id: string | null;
+  next_winner_slot: number | null;
+  next_loser_match_id: string | null;
+  next_loser_slot: number | null;
+}
+
+/**
+ * Recursively un-advance a match and all downstream matches that depended on it.
+ * Depth-limited to 20 as a safety valve.
+ */
+async function cascadeUnadvance(
+  adminClient: ReturnType<typeof createAdminClient>,
+  match: BracketMatchRow,
+  depth: number = 0
+): Promise<void> {
+  if (depth > 20) return;
+
+  // If the next winner match already has a winner, cascade into it first
+  if (match.next_winner_match_id) {
+    const { data: nextWinnerMatch } = await adminClient
+      .from("cornhole_bracket_matches")
+      .select("*")
+      .eq("id", match.next_winner_match_id)
+      .single();
+
+    if (nextWinnerMatch?.winner_participant_id) {
+      await cascadeUnadvance(adminClient, nextWinnerMatch, depth + 1);
+    }
+  }
+
+  // If the next loser match already has a winner, cascade into it first
+  if (match.next_loser_match_id) {
+    const { data: nextLoserMatch } = await adminClient
+      .from("cornhole_bracket_matches")
+      .select("*")
+      .eq("id", match.next_loser_match_id)
+      .single();
+
+    if (nextLoserMatch?.winner_participant_id) {
+      await cascadeUnadvance(adminClient, nextLoserMatch, depth + 1);
+    }
+  }
+
+  // Clear winner on this match
+  await adminClient
+    .from("cornhole_bracket_matches")
+    .update({ winner_participant_id: null })
+    .eq("id", match.id);
+
+  // Remove winner from the next winner match slot
+  if (match.next_winner_match_id && match.next_winner_slot) {
+    const slotField =
+      match.next_winner_slot === 1
+        ? "slot1_participant_id"
+        : "slot2_participant_id";
+    await adminClient
+      .from("cornhole_bracket_matches")
+      .update({ [slotField]: null })
+      .eq("id", match.next_winner_match_id);
+  }
+
+  // Remove loser from the next loser match slot
+  if (match.next_loser_match_id && match.next_loser_slot) {
+    const slotField =
+      match.next_loser_slot === 1
+        ? "slot1_participant_id"
+        : "slot2_participant_id";
+    await adminClient
+      .from("cornhole_bracket_matches")
+      .update({ [slotField]: null })
+      .eq("id", match.next_loser_match_id);
+  }
+
+  // Championship → reset special case: next_loser_match_id exists but next_loser_slot is null
+  // Clear both slots of the reset match
+  if (match.next_loser_match_id && !match.next_loser_slot) {
+    const { data: resetMatch } = await adminClient
+      .from("cornhole_bracket_matches")
+      .select("*")
+      .eq("id", match.next_loser_match_id)
+      .single();
+
+    if (resetMatch) {
+      if (resetMatch.winner_participant_id) {
+        await cascadeUnadvance(adminClient, resetMatch, depth + 1);
+      }
+      await adminClient
+        .from("cornhole_bracket_matches")
+        .update({
+          slot1_participant_id: null,
+          slot2_participant_id: null,
+          winner_participant_id: null,
+        })
+        .eq("id", match.next_loser_match_id);
+    }
+  }
+}
+
+/**
+ * PUT — advance or un-advance a match winner (toggle behavior)
+ */
+export async function PUT(request: Request) {
+  const admin = await checkIsAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const { match_id, participant_id } = await request.json();
+
+    if (!match_id || !participant_id) {
+      return NextResponse.json(
+        { error: "match_id and participant_id are required" },
+        { status: 400 }
+      );
+    }
+
+    const adminClient = createAdminClient();
+
+    // Fetch the match
+    const { data: match, error: matchError } = await adminClient
+      .from("cornhole_bracket_matches")
+      .select("*")
+      .eq("id", match_id)
+      .single();
+
+    if (matchError || !match) {
+      return NextResponse.json({ error: "Match not found" }, { status: 404 });
+    }
+
+    // Validation
+    if (match.is_bye) {
+      return NextResponse.json(
+        { error: "Cannot advance a bye match" },
+        { status: 400 }
+      );
+    }
+
+    if (!match.slot1_participant_id || !match.slot2_participant_id) {
+      return NextResponse.json(
+        { error: "Both slots must be filled before advancing" },
+        { status: 400 }
+      );
+    }
+
+    if (
+      participant_id !== match.slot1_participant_id &&
+      participant_id !== match.slot2_participant_id
+    ) {
+      return NextResponse.json(
+        { error: "Participant is not in this match" },
+        { status: 400 }
+      );
+    }
+
+    // Toggle: if already the winner, un-advance
+    if (match.winner_participant_id === participant_id) {
+      await cascadeUnadvance(adminClient, match);
+      return NextResponse.json({ success: true, action: "unadvanced" });
+    }
+
+    // If a different winner was set, un-advance first (cascade)
+    if (match.winner_participant_id) {
+      await cascadeUnadvance(adminClient, match);
+    }
+
+    // Advance: set winner
+    const winnerId = participant_id;
+    const loserId =
+      match.slot1_participant_id === winnerId
+        ? match.slot2_participant_id
+        : match.slot1_participant_id;
+
+    await adminClient
+      .from("cornhole_bracket_matches")
+      .update({ winner_participant_id: winnerId })
+      .eq("id", match_id);
+
+    // Place winner in next winner match
+    if (match.next_winner_match_id && match.next_winner_slot) {
+      const slotField =
+        match.next_winner_slot === 1
+          ? "slot1_participant_id"
+          : "slot2_participant_id";
+      await adminClient
+        .from("cornhole_bracket_matches")
+        .update({ [slotField]: winnerId })
+        .eq("id", match.next_winner_match_id);
+    }
+
+    // Place loser in next loser match (double elimination)
+    if (match.next_loser_match_id && match.next_loser_slot) {
+      const slotField =
+        match.next_loser_slot === 1
+          ? "slot1_participant_id"
+          : "slot2_participant_id";
+      await adminClient
+        .from("cornhole_bracket_matches")
+        .update({ [slotField]: loserId })
+        .eq("id", match.next_loser_match_id);
+    }
+
+    // Championship special case: next_loser_match_id with null slot means championship→reset link
+    // If LB champion (slot2) wins, populate reset match with both players
+    // If WB champion (slot1) wins, tournament is over — do nothing extra
+    if (
+      match.bracket_type === "championship" &&
+      match.round_number === 1 &&
+      match.next_loser_match_id &&
+      !match.next_loser_slot
+    ) {
+      if (winnerId === match.slot2_participant_id) {
+        // LB champion won — send both to the reset match
+        await adminClient
+          .from("cornhole_bracket_matches")
+          .update({
+            slot1_participant_id: match.slot1_participant_id,
+            slot2_participant_id: match.slot2_participant_id,
+          })
+          .eq("id", match.next_loser_match_id);
+      }
+    }
+
+    return NextResponse.json({ success: true, action: "advanced" });
+  } catch (error) {
+    console.error("Advance bracket error:", error);
+    return NextResponse.json(
+      { error: "Failed to advance match" },
+      { status: 500 }
+    );
+  }
+}

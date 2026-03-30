@@ -19,10 +19,10 @@ export default async function AppLayout({
 
   const supabase = await createClient();
 
-  // Check if real user is admin (needed to allow simulation)
+  // Single users query (replaces two separate queries)
   const { data: realProfile } = await supabase
     .from("users")
-    .select("is_admin")
+    .select("is_admin, display_name, avatar_url")
     .eq("id", user.id)
     .single();
 
@@ -37,34 +37,33 @@ export default async function AppLayout({
   // Use admin client when simulating to bypass RLS
   const queryClient = simulating ? createAdminClient() : supabase;
 
-  const { data: profile } = await queryClient
-    .from("users")
-    .select("is_admin, display_name, avatar_url")
-    .eq("id", effectiveUserId)
-    .single();
+  // Run profile (if simulating), notifications, and chat memberships in parallel
+  const [profileResult, notifResult, membershipsResult] = await Promise.all([
+    simulating
+      ? queryClient.from("users").select("is_admin, display_name, avatar_url").eq("id", effectiveUserId).single()
+      : Promise.resolve({ data: realProfile }),
+    queryClient
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", effectiveUserId)
+      .eq("read", false)
+      .neq("type", "chat_message"),
+    queryClient
+      .from("chat_room_members")
+      .select("room_id")
+      .eq("user_id", effectiveUserId),
+  ]);
 
-  // Show admin nav if the simulated user is also an admin
+  const profile = profileResult.data;
   const isAdmin = profile?.is_admin ?? false;
+  const unreadCount = (notifResult as { count: number | null }).count || 0;
+  const memberships = membershipsResult.data;
 
-  // Get unread notification count for effective user
-  const { count: unreadCount } = await queryClient
-    .from("notifications")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", effectiveUserId)
-    .eq("read", false)
-    .neq("type", "chat_message");
-
-  // Get unread chat count: messages after last read receipt, across all rooms
+  // Get unread chat count
   let chatUnreadCount = 0;
-  const { data: memberships } = await queryClient
-    .from("chat_room_members")
-    .select("room_id")
-    .eq("user_id", effectiveUserId);
-
   if (memberships?.length) {
     const roomIds = memberships.map((m) => m.room_id);
 
-    // Get all read receipts for this user
     const { data: receipts } = await queryClient
       .from("chat_read_receipts")
       .select("room_id, last_read_at")
@@ -75,7 +74,6 @@ export default async function AppLayout({
       (receipts || []).map((r) => [r.room_id, r.last_read_at])
     );
 
-    // Count unread messages per room in parallel
     const counts = await Promise.all(
       roomIds.map(async (roomId) => {
         const lastReadAt = receiptMap.get(roomId) || "1970-01-01T00:00:00Z";

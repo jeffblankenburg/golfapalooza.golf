@@ -25,12 +25,13 @@ export default async function AdminLayout({
     redirect("/");
   }
 
-  // Get unread notification count
+  // Get unread notification count (exclude chat_message, same as app layout)
   const { count: unreadCount } = await supabase
     .from("notifications")
     .select("id", { count: "exact", head: true })
     .eq("user_id", user.id)
-    .eq("read", false);
+    .eq("read", false)
+    .neq("type", "chat_message");
 
   return (
     <div className="min-h-screen pb-20">

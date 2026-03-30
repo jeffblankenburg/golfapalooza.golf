@@ -59,13 +59,29 @@ function SvgIcon({ src, className = "w-8 h-8" }: { src: string; className?: stri
 
 const quickLinks = [
   {
+    href: "/bspitw",
+    label: "BSPITW",
+    color: "bg-amber-50 text-amber-700",
+    icon: (
+      <SvgIcon src="/noun-trophy-8286316.svg" />
+    ),
+  },
+  {
     href: "/scorecards",
-    label: "Scorecards",
+    label: "Scrambles",
     color: "bg-blue-50 text-blue-700",
     icon: (
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
       </svg>
+    ),
+  },
+  {
+    href: "/cornhole",
+    label: "Cornhole",
+    color: "bg-orange-50 text-orange-700",
+    icon: (
+      <SvgIcon src="/noun-cornhole-6941307.svg" />
     ),
   },
   {
@@ -77,35 +93,11 @@ const quickLinks = [
     ),
   },
   {
-    href: "/bspitw",
-    label: "BSPITW",
-    color: "bg-amber-50 text-amber-700",
-    icon: (
-      <SvgIcon src="/noun-trophy-8286316.svg" />
-    ),
-  },
-  {
     href: "/hundred-feet",
     label: "100 Feet",
     color: "bg-red-50 text-red-700",
     icon: (
       <SvgIcon src="/noun-measure-tape-8065234.svg" />
-    ),
-  },
-  {
-    href: "/course",
-    label: "Course",
-    color: "bg-emerald-50 text-emerald-700",
-    icon: (
-      <SvgIcon src="/noun-golf-flag-5010192.svg" />
-    ),
-  },
-  {
-    href: "/calcutta",
-    label: "Calcutta",
-    color: "bg-purple-50 text-purple-700",
-    icon: (
-      <SvgIcon src="/noun-gavel-auction.svg" />
     ),
   },
   {
@@ -118,6 +110,22 @@ const quickLinks = [
         <circle cx="12" cy="12" r="5.5" strokeWidth={1.5} />
         <circle cx="12" cy="12" r="2" fill="currentColor" />
       </svg>
+    ),
+  },
+  {
+    href: "/calcutta",
+    label: "Calcutta",
+    color: "bg-purple-50 text-purple-700",
+    icon: (
+      <SvgIcon src="/noun-gavel-auction.svg" />
+    ),
+  },
+  {
+    href: "/course",
+    label: "Course",
+    color: "bg-emerald-50 text-emerald-700",
+    icon: (
+      <SvgIcon src="/noun-golf-flag-5010192.svg" />
     ),
   },
   {
@@ -138,8 +146,6 @@ export function HomeContent({
   incompleteActionCount = 0,
   totalActionCount = 0,
   rsvpLikelihood,
-  myRoomNumber,
-  myFacilityName,
   myTeeTime,
   myStartingHole,
   myTeammates,
@@ -156,8 +162,6 @@ export function HomeContent({
   incompleteActionCount: number;
   totalActionCount: number;
   rsvpLikelihood: number | null;
-  myRoomNumber?: string | null;
-  myFacilityName?: string | null;
   myTeeTime?: string | null;
   myStartingHole?: number | null;
   myTeammates?: string[];
@@ -489,41 +493,6 @@ export function HomeContent({
           </div>
           <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </Link>
-      )}
-
-      {/* My Room Card */}
-      {myRoomNumber && (
-        <Link
-          href="/rooms"
-          className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-200 shadow-sm active:scale-95 transition-transform"
-        >
-          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-indigo-50 text-indigo-600">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-          </div>
-          <div className="flex-1">
-            <p className="font-semibold text-gray-900">
-              Room {myRoomNumber}
-            </p>
-            {myFacilityName && (
-              <p className="text-sm text-gray-500">{myFacilityName}</p>
-            )}
-          </div>
-          <svg
-            className="w-5 h-5 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5l7 7-7 7"
-            />
           </svg>
         </Link>
       )}

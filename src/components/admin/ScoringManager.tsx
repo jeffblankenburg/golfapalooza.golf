@@ -334,7 +334,7 @@ export function ScoringManager({ tripId }: { tripId: string }) {
   // Helpers
   const getDayLabel = (dayNumber: number | null): string => {
     if (!dayNumber) return "?";
-    const labels: Record<number, string> = { 2: "Day 2", 3: "Day 3", 4: "Day 4" };
+    const labels: Record<number, string> = { 2: "Thursday", 3: "Friday", 4: "Saturday" };
     return labels[dayNumber] || `Day ${dayNumber}`;
   };
 

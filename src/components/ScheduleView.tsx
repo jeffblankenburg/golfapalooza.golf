@@ -52,14 +52,16 @@ export function ScheduleView({
   startDate,
   teeTimesByDay = {},
   timezone,
+  eventDays = [],
 }: {
   items: ItineraryItem[];
   startDate: string;
   teeTimesByDay?: Record<number, TeeTimeInfo>;
   timezone?: string;
+  eventDays?: { day_number: number; name: string }[];
 }) {
   const preEvent = items.filter((i) => i.day_number === null);
-  const days = [1, 2, 3, 4];
+  const days = eventDays.length > 0 ? eventDays.map((d) => d.day_number) : [1, 2, 3, 4];
   const dayItems = days.map((d) => items.filter((i) => i.day_number === d));
 
   return (

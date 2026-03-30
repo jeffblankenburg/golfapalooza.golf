@@ -179,6 +179,100 @@ export async function GET(request: Request) {
   }
 }
 
+// DELETE - Clear scores (and bonus points) for a contest or all contests in a trip
+export async function DELETE(request: Request) {
+  const admin = await checkIsAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const contestId = searchParams.get("contest_id");
+  const tripId = searchParams.get("trip_id");
+  const mode = searchParams.get("mode"); // "today" or "all"
+
+  if (!mode || (mode !== "today" && mode !== "all")) {
+    return NextResponse.json({ error: "mode must be 'today' or 'all'" }, { status: 400 });
+  }
+
+  if (mode === "today" && !contestId) {
+    return NextResponse.json({ error: "contest_id is required for mode=today" }, { status: 400 });
+  }
+
+  if (mode === "all" && !tripId) {
+    return NextResponse.json({ error: "trip_id is required for mode=all" }, { status: 400 });
+  }
+
+  try {
+    const adminClient = createAdminClient();
+
+    // Determine which contest IDs to clear
+    let contestIds: string[] = [];
+
+    if (mode === "today" && contestId) {
+      contestIds = [contestId];
+    } else if (mode === "all" && tripId) {
+      const { data: contests } = await adminClient
+        .from("contests")
+        .select("id")
+        .eq("trip_id", tripId)
+        .eq("contest_type", "scramble");
+      contestIds = (contests || []).map((c) => c.id);
+    }
+
+    if (contestIds.length === 0) {
+      return NextResponse.json({ success: true, cleared: 0 });
+    }
+
+    // Get all team IDs for these contests
+    const { data: teams } = await adminClient
+      .from("scramble_teams")
+      .select("id")
+      .in("contest_id", contestIds);
+
+    const teamIds = (teams || []).map((t) => t.id);
+
+    if (teamIds.length === 0) {
+      return NextResponse.json({ success: true, cleared: 0 });
+    }
+
+    // Delete hole scores
+    const { error: scoresError } = await adminClient
+      .from("scramble_hole_scores")
+      .delete()
+      .in("team_id", teamIds);
+
+    if (scoresError) {
+      return NextResponse.json({ error: scoresError.message }, { status: 500 });
+    }
+
+    // Delete bonus points
+    const { error: bonusError } = await adminClient
+      .from("bspitw_bonus_points")
+      .delete()
+      .in("team_id", teamIds);
+
+    if (bonusError) {
+      return NextResponse.json({ error: bonusError.message }, { status: 500 });
+    }
+
+    // Reset gross_score to null on all affected teams
+    const { error: teamError } = await adminClient
+      .from("scramble_teams")
+      .update({ gross_score: null })
+      .in("id", teamIds);
+
+    if (teamError) {
+      return NextResponse.json({ error: teamError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, cleared: teamIds.length });
+  } catch (error) {
+    console.error("Clear scramble scores error:", error);
+    return NextResponse.json({ error: "Failed to clear scores" }, { status: 500 });
+  }
+}
+
 // PUT - Batch upsert hole scores
 export async function PUT(request: Request) {
   const admin = await checkIsAdmin();

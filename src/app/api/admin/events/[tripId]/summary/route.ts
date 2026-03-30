@@ -43,6 +43,8 @@ export async function GET(
     facilitiesResult,
     actionItemsResult,
     accoladesResult,
+    contestTypesResult,
+    eventDaysResult,
   ] = await Promise.all([
     adminClient
       .from("trip_settings")
@@ -78,6 +80,15 @@ export async function GET(
       .from("accolades")
       .select("id", { count: "exact", head: true })
       .eq("trip_id", tripId),
+    adminClient
+      .from("contests")
+      .select("contest_type")
+      .eq("trip_id", tripId),
+    adminClient
+      .from("event_days")
+      .select("*")
+      .eq("trip_id", tripId)
+      .order("day_number"),
   ]);
 
   if (tripResult.error) {
@@ -88,6 +99,30 @@ export async function GET(
   const courseName = trip.course
     ? (Array.isArray(trip.course) ? trip.course[0]?.name : trip.course.name)
     : null;
+
+  // Deduplicate contest types
+  const contestTypes = [
+    ...new Set(
+      contestTypesResult.data?.map((c: { contest_type: string }) => c.contest_type) || []
+    ),
+  ];
+
+  // Compute dates for event days
+  const startDate = trip.start_date;
+  const eventDays = (eventDaysResult.data || []).map(
+    (d: { id: string; day_number: number; name: string }) => ({
+      id: d.id,
+      day_number: d.day_number,
+      name: d.name,
+      date: startDate
+        ? (() => {
+            const dt = new Date(startDate + "T00:00:00");
+            dt.setDate(dt.getDate() + d.day_number - 1);
+            return dt.toISOString().split("T")[0];
+          })()
+        : null,
+    })
+  );
 
   return NextResponse.json({
     trip: {
@@ -108,5 +143,7 @@ export async function GET(
       accolades: accoladesResult.count ?? 0,
     },
     course_name: courseName,
+    contest_types: contestTypes,
+    event_days: eventDays,
   });
 }

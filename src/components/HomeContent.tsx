@@ -57,11 +57,14 @@ function SvgIcon({ src, className = "w-8 h-8" }: { src: string; className?: stri
   );
 }
 
-const quickLinks = [
+// Each quick link specifies which contest types must exist for it to show.
+// null = always show.
+const allQuickLinks = [
   {
     href: "/bspitw",
     label: "BSPITW",
     color: "bg-amber-50 text-amber-700",
+    requiresContest: "scramble" as const,
     icon: (
       <SvgIcon src="/noun-trophy-8286316.svg" />
     ),
@@ -70,6 +73,7 @@ const quickLinks = [
     href: "/scorecards",
     label: "Scrambles",
     color: "bg-blue-50 text-blue-700",
+    requiresContest: "scramble" as const,
     icon: (
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -80,6 +84,7 @@ const quickLinks = [
     href: "/cornhole",
     label: "Cornhole",
     color: "bg-orange-50 text-orange-700",
+    requiresContest: ["cornhole_singles", "cornhole_doubles"] as string[],
     icon: (
       <SvgIcon src="/noun-cornhole-6941307.svg" />
     ),
@@ -88,6 +93,7 @@ const quickLinks = [
     href: "/skins",
     label: "Skins",
     color: "bg-amber-50 text-amber-700",
+    requiresContest: "scramble" as const,
     icon: (
       <SvgIcon src="/noun-dollar-8198053.svg" />
     ),
@@ -96,6 +102,7 @@ const quickLinks = [
     href: "/hundred-feet",
     label: "100 Feet",
     color: "bg-red-50 text-red-700",
+    requiresContest: "scramble" as const,
     icon: (
       <SvgIcon src="/noun-measure-tape-8065234.svg" />
     ),
@@ -104,6 +111,7 @@ const quickLinks = [
     href: "/daily-games",
     label: "Daily Games",
     color: "bg-teal-50 text-teal-700",
+    requiresContest: "scramble" as const,
     icon: (
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <circle cx="12" cy="12" r="9" strokeWidth={1.5} />
@@ -116,6 +124,7 @@ const quickLinks = [
     href: "/calcutta",
     label: "Calcutta",
     color: "bg-purple-50 text-purple-700",
+    requiresContest: "calcutta" as const,
     icon: (
       <SvgIcon src="/noun-gavel-auction.svg" />
     ),
@@ -124,6 +133,7 @@ const quickLinks = [
     href: "/course",
     label: "Course",
     color: "bg-emerald-50 text-emerald-700",
+    requiresContest: null,
     icon: (
       <SvgIcon src="/noun-golf-flag-5010192.svg" />
     ),
@@ -132,6 +142,7 @@ const quickLinks = [
     href: "/rooms",
     label: "Rooms",
     color: "bg-indigo-50 text-indigo-700",
+    requiresContest: null,
     icon: (
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -156,6 +167,7 @@ export function HomeContent({
   timezone,
   courseName = null,
   myCalcuttaRoster = null,
+  contestTypes = [],
 }: {
   displayName: string;
   trip: TripData | null;
@@ -172,8 +184,20 @@ export function HomeContent({
   timezone?: string;
   courseName?: string | null;
   myCalcuttaRoster?: { userId: string; displayName: string; avatarUrl: string | null }[] | null;
+  contestTypes?: string[];
 }) {
   const router = useRouter();
+
+  // Filter quick links based on which contest types exist
+  const quickLinks = allQuickLinks.filter((link) => {
+    if (link.requiresContest === null) return true;
+    if (!contestTypes || contestTypes.length === 0) return true; // show all if no data yet
+    if (Array.isArray(link.requiresContest)) {
+      return link.requiresContest.some((ct) => contestTypes.includes(ct));
+    }
+    return contestTypes.includes(link.requiresContest);
+  });
+
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [selectedLikelihood, setSelectedLikelihood] = useState<number | null>(

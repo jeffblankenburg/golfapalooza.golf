@@ -23,7 +23,20 @@ export default async function BspitwPage() {
     );
   }
 
+  // Get scramble day numbers from contests
+  const { data: scrambleContests } = await supabase
+    .from("contests")
+    .select("day_number")
+    .eq("trip_id", trip.id)
+    .eq("contest_type", "scramble")
+    .not("day_number", "is", null)
+    .order("day_number");
+
+  const scrambleDays = [...new Set(
+    (scrambleContests || []).map((c) => c.day_number as number)
+  )];
+
   return (
-    <BspitwContent tripId={trip.id} startDate={trip.start_date} />
+    <BspitwContent tripId={trip.id} startDate={trip.start_date} scrambleDays={scrambleDays} />
   );
 }

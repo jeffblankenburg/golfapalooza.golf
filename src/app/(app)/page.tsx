@@ -54,6 +54,8 @@ export default async function HomePage() {
     scrambleMembershipsResult,
     calcuttaResult,
     scheduleResult,
+    contestTypesResult,
+    eventDaysResult,
   ] = await Promise.all([
     // Course info
     trip.course_id
@@ -75,6 +77,10 @@ export default async function HomePage() {
     queryClient.from("contests").select("id, calcutta_active_order").eq("trip_id", trip.id).eq("contest_type", "calcutta").maybeSingle(),
     // Schedule items
     supabase.from("itinerary_items").select("title, location, day_number, start_date, end_date, start_time, end_time").eq("trip_id", trip.id).order("day_number", { ascending: true, nullsFirst: true }).order("start_date", { ascending: true, nullsFirst: true }).order("start_time", { ascending: true, nullsFirst: false }).order("sort_order", { ascending: true }),
+    // Contest types for quick links
+    supabase.from("contests").select("contest_type").eq("trip_id", trip.id),
+    // Event days for day name lookups
+    supabase.from("event_days").select("day_number, name").eq("trip_id", trip.id).order("day_number"),
   ]);
 
   // ── Process Phase 2 results ──
@@ -199,14 +205,23 @@ export default async function HomePage() {
   let myTeammates: string[] = [];
   let teeTimeDay: string | null = null;
 
+  // Build contest types set and event days lookup
+  const contestTypes = [...new Set(
+    (contestTypesResult.data || []).map((c: { contest_type: string }) => c.contest_type)
+  )];
+  const eventDaysData = (eventDaysResult.data || []) as { day_number: number; name: string }[];
+  const eventDayNames: Record<number, string> = {};
+  for (const ed of eventDaysData) {
+    eventDayNames[ed.day_number] = ed.name;
+  }
+
   if (bestMatch) {
     myTeeTime = bestMatch.teeTime;
     myStartingHole = bestMatch.startingHole;
 
-    const dayNames: Record<number, string> = {
-      1: "Day 1 (Wed)", 2: "Day 2 (Thu)", 3: "Day 3 (Fri)", 4: "Day 4 (Sat)",
-    };
-    teeTimeDay = dayNames[bestMatch.dayNumber] || `Day ${bestMatch.dayNumber}`;
+    teeTimeDay = eventDayNames[bestMatch.dayNumber]
+      ? `Day ${bestMatch.dayNumber} — ${eventDayNames[bestMatch.dayNumber]}`
+      : `Day ${bestMatch.dayNumber}`;
 
     myTeammates = (teammatesResult.data || [])
       .filter((m) => m.user_id !== effectiveUserId)
@@ -238,10 +253,6 @@ export default async function HomePage() {
     const diffDays = Math.floor((today.getTime() - tripStart.getTime()) / (1000 * 60 * 60 * 24));
     const todayDayNumber = diffDays + 1;
     const todayStr = today.toISOString().split("T")[0];
-
-    const dayNames: Record<number, string> = {
-      1: "Day 1 (Wed)", 2: "Day 2 (Thu)", 3: "Day 3 (Fri)", 4: "Day 4 (Sat)",
-    };
 
     const nowHours = today.getHours().toString().padStart(2, "0");
     const nowMinutes = today.getMinutes().toString().padStart(2, "0");
@@ -281,7 +292,9 @@ export default async function HomePage() {
     if (found) {
       let dayLabel: string;
       if (found.day_number) {
-        dayLabel = dayNames[found.day_number] || `Day ${found.day_number}`;
+        dayLabel = eventDayNames[found.day_number]
+          ? `Day ${found.day_number} — ${eventDayNames[found.day_number]}`
+          : `Day ${found.day_number}`;
       } else if (found.start_date) {
         const [, m, d] = found.start_date.split("-").map(Number);
         dayLabel = `${MONTH_SHORT[m - 1]} ${d}`;
@@ -319,6 +332,7 @@ export default async function HomePage() {
       timezone={trip?.timezone}
       courseName={courseVenue}
       myCalcuttaRoster={myCalcuttaRoster}
+      contestTypes={contestTypes}
     />
   );
 }

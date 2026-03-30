@@ -17,11 +17,10 @@ interface Winner {
   user_id: string;
 }
 
-const DAYS = [
-  { day: 2, label: "Thursday" },
-  { day: 3, label: "Friday" },
-  { day: 4, label: "Saturday" },
-];
+interface EventDay {
+  day_number: number;
+  name: string;
+}
 
 const CONTEST_TYPES = [
   { type: "ctp", label: "Closest to Pin" },
@@ -31,6 +30,8 @@ const CONTEST_TYPES = [
 export function DailyWinnersManager({ tripId }: { tripId: string }) {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [winners, setWinners] = useState<Record<string, string>>({});
+  const [eventDays, setEventDays] = useState<EventDay[]>([]);
+  const [scrambleDayNumbers, setScrambleDayNumbers] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [showRealNames, setShowRealNames] = useState(false);
@@ -40,7 +41,34 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
     onConfirm: () => void;
   } | null>(null);
 
+  // Scramble days derived from contests, with names from event_days
+  const DAYS = scrambleDayNumbers.map((dayNum) => {
+    const ed = eventDays.find((d) => d.day_number === dayNum);
+    return { day: dayNum, label: ed?.name || `Day ${dayNum}` };
+  });
+
   const winnerKey = (day: number, type: string) => `${day}-${type}`;
+
+  const fetchEventDays = useCallback(async () => {
+    const res = await fetch(`/api/admin/event-days?trip_id=${tripId}`);
+    const data = await res.json();
+    if (data.days) setEventDays(data.days);
+  }, [tripId]);
+
+  const fetchScrambleDays = useCallback(async () => {
+    const res = await fetch(`/api/admin/contests?trip_id=${tripId}`);
+    const data = await res.json();
+    const contests = data.contests || [];
+    const dayNums = [
+      ...new Set(
+        contests
+          .filter((c: { contest_type: string; day_number: number | null }) => c.contest_type === "scramble" && c.day_number != null)
+          .map((c: { day_number: number }) => c.day_number)
+      ),
+    ] as number[];
+    dayNums.sort((a, b) => a - b);
+    setScrambleDayNumbers(dayNums);
+  }, [tripId]);
 
   const fetchData = useCallback(async () => {
     const res = await fetch(`/api/admin/daily-winners?trip_id=${tripId}`);
@@ -57,8 +85,22 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
   }, [tripId]);
 
   useEffect(() => {
+    fetchEventDays();
+    fetchScrambleDays();
     fetchData();
-  }, [fetchData]);
+  }, [fetchEventDays, fetchScrambleDays, fetchData]);
+
+  // Listen for event days changes and contests changes
+  useEffect(() => {
+    const handleDays = () => fetchEventDays();
+    const handleContests = () => fetchScrambleDays();
+    window.addEventListener("event-days-changed", handleDays);
+    window.addEventListener("contests-changed", handleContests);
+    return () => {
+      window.removeEventListener("event-days-changed", handleDays);
+      window.removeEventListener("contests-changed", handleContests);
+    };
+  }, [fetchEventDays, fetchScrambleDays]);
 
   const setWinner = async (day: number, contestType: string, userId: string) => {
     const key = winnerKey(day, contestType);

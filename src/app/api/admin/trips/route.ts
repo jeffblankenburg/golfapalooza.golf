@@ -111,15 +111,16 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { trip_name, trip_year, start_date, status: requestedStatus } = body;
+    const { trip_name, start_date, end_date, status: requestedStatus } = body;
 
-    if (!trip_name || !trip_year || !start_date) {
+    if (!trip_name || !start_date) {
       return NextResponse.json(
-        { error: "Trip name, year, and start date are required" },
+        { error: "Trip name and start date are required" },
         { status: 400 }
       );
     }
 
+    const trip_year = body.trip_year || new Date(start_date).getFullYear();
     const adminClient = createAdminClient();
     const insertStatus = requestedStatus === "archived" ? "archived" : "active";
 
@@ -146,6 +147,27 @@ export async function POST(request: Request) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    // Auto-seed event days based on date range with weekday names
+    const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const startDt = new Date(start_date + "T00:00:00");
+    const endDt = end_date ? new Date(end_date + "T00:00:00") : null;
+
+    const dayCount = endDt
+      ? Math.floor((endDt.getTime() - startDt.getTime()) / (1000 * 60 * 60 * 24)) + 1
+      : 4; // fallback for API calls without end_date
+
+    const eventDaysToInsert = [];
+    for (let i = 0; i < dayCount; i++) {
+      const dt = new Date(startDt);
+      dt.setDate(dt.getDate() + i);
+      eventDaysToInsert.push({
+        trip_id: data.id,
+        day_number: i + 1,
+        name: WEEKDAY_NAMES[dt.getDay()],
+      });
+    }
+    await adminClient.from("event_days").insert(eventDaysToInsert);
 
     return NextResponse.json({ trip: data });
   } catch (error) {

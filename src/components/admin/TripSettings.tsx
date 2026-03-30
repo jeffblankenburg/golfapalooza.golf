@@ -32,7 +32,7 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [allEvents, setAllEvents] = useState<TripSummary[]>([]);
   const [showCreate, setShowCreate] = useState(false);
-  const [newTrip, setNewTrip] = useState({ trip_name: "", trip_year: "", start_date: "", status: "active", timezone: "America/New_York" });
+  const [newTrip, setNewTrip] = useState({ trip_name: "", start_date: "", end_date: "", status: "active", timezone: "America/New_York" });
   const [creating, setCreating] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
@@ -131,7 +131,7 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
   }
 
   async function handleCreate() {
-    if (!newTrip.trip_name || !newTrip.trip_year || !newTrip.start_date) return;
+    if (!newTrip.trip_name || !newTrip.start_date || !newTrip.end_date) return;
     setCreating(true);
     setError("");
 
@@ -141,8 +141,8 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           trip_name: newTrip.trip_name,
-          trip_year: parseInt(newTrip.trip_year),
           start_date: newTrip.start_date,
+          end_date: newTrip.end_date,
           status: newTrip.status,
           timezone: newTrip.timezone,
         }),
@@ -153,7 +153,7 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
         throw new Error(data.error || "Failed to create");
       }
 
-      setNewTrip({ trip_name: "", trip_year: "", start_date: "", status: "active", timezone: "America/New_York" });
+      setNewTrip({ trip_name: "", start_date: "", end_date: "", status: "active", timezone: "America/New_York" });
       setShowCreate(false);
       await fetchTrip();
       await fetchAllEvents();
@@ -418,8 +418,8 @@ function AllEventsList({
   onArchive?: () => void;
   showCreate: boolean;
   setShowCreate: (v: boolean) => void;
-  newTrip: { trip_name: string; trip_year: string; start_date: string; status: string; timezone: string };
-  setNewTrip: (v: { trip_name: string; trip_year: string; start_date: string; status: string; timezone: string }) => void;
+  newTrip: { trip_name: string; start_date: string; end_date: string; status: string; timezone: string };
+  setNewTrip: (v: { trip_name: string; start_date: string; end_date: string; status: string; timezone: string }) => void;
   creating: boolean;
   handleCreate: () => void;
 }) {
@@ -492,37 +492,43 @@ function AllEventsList({
           />
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Year</label>
+              <label className="block text-xs text-gray-500 mb-1">Start Date</label>
               <input
-                type="number"
-                placeholder="2025"
-                value={newTrip.trip_year}
-                onChange={(e) => setNewTrip({ ...newTrip, trip_year: e.target.value })}
+                type="date"
+                value={newTrip.start_date}
+                onChange={(e) => setNewTrip({ ...newTrip, start_date: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
+                style={{ backgroundColor: "white" }}
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Status</label>
-              <select
-                value={newTrip.status}
-                onChange={(e) => setNewTrip({ ...newTrip, status: e.target.value })}
+              <label className="block text-xs text-gray-500 mb-1">End Date</label>
+              <input
+                type="date"
+                value={newTrip.end_date}
+                onChange={(e) => setNewTrip({ ...newTrip, end_date: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
                 style={{ backgroundColor: "white" }}
-              >
-                <option value="active">Active</option>
-                <option value="archived">Archived (historical)</option>
-              </select>
+              />
             </div>
           </div>
+          {newTrip.start_date && newTrip.end_date && (() => {
+            const days = Math.floor((new Date(newTrip.end_date + "T00:00:00").getTime() - new Date(newTrip.start_date + "T00:00:00").getTime()) / (1000 * 60 * 60 * 24)) + 1;
+            return days > 0 ? (
+              <p className="text-xs text-gray-500">{days} day{days !== 1 ? "s" : ""}</p>
+            ) : null;
+          })()}
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Start Date</label>
-            <input
-              type="date"
-              value={newTrip.start_date}
-              onChange={(e) => setNewTrip({ ...newTrip, start_date: e.target.value })}
+            <label className="block text-xs text-gray-500 mb-1">Status</label>
+            <select
+              value={newTrip.status}
+              onChange={(e) => setNewTrip({ ...newTrip, status: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
               style={{ backgroundColor: "white" }}
-            />
+            >
+              <option value="active">Active</option>
+              <option value="archived">Archived (historical)</option>
+            </select>
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">Timezone</label>
@@ -540,7 +546,7 @@ function AllEventsList({
           <div className="flex gap-2">
             <button
               onClick={handleCreate}
-              disabled={creating || !newTrip.trip_name || !newTrip.trip_year || !newTrip.start_date}
+              disabled={creating || !newTrip.trip_name || !newTrip.start_date || !newTrip.end_date}
               className="px-4 py-2 bg-green-700 text-white rounded-lg font-medium text-sm disabled:opacity-50"
             >
               {creating ? "Creating..." : "Create"}

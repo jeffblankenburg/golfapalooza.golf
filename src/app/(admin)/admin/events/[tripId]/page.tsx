@@ -18,6 +18,7 @@ import { TeeTimeManager } from "@/components/admin/TeeTimeManager";
 import { VisibilityToggles } from "@/components/admin/VisibilityToggles";
 import { HundredFeetManager } from "@/components/admin/HundredFeetManager";
 import { DailyWinnersManager } from "@/components/admin/DailyWinnersManager";
+import { EventDaysManager } from "@/components/admin/EventDaysManager";
 
 function SvgIcon({ src, className = "w-5 h-5" }: { src: string; className?: string }) {
   return (
@@ -56,6 +57,13 @@ interface EventSummary {
     accolades: number;
   };
   course_name: string | null;
+  contest_types: string[];
+  event_days: {
+    id: string;
+    day_number: number;
+    name: string;
+    date: string | null;
+  }[];
 }
 
 export default function EventDetailPage() {
@@ -75,6 +83,13 @@ export default function EventDetailPage() {
     fetchSummary();
   }, [fetchSummary]);
 
+  // Re-fetch summary when contests change (to update which sections are shown)
+  useEffect(() => {
+    const handler = () => fetchSummary();
+    window.addEventListener("contests-changed", handler);
+    return () => window.removeEventListener("contests-changed", handler);
+  }, [fetchSummary]);
+
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -91,7 +106,10 @@ export default function EventDetailPage() {
     );
   }
 
-  const { trip, counts, course_name } = summary;
+  const { trip, counts, contest_types = [], event_days = [] } = summary;
+  const hasContestType = (type: string) => contest_types.includes(type);
+  const hasCornhole = hasContestType("cornhole_singles") || hasContestType("cornhole_doubles");
+  const hasScramble = hasContestType("scramble");
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-3">
@@ -147,6 +165,18 @@ export default function EventDetailPage() {
       <EventFacilityLinker tripId={tripId} />
 
       <CollapsibleSection
+        title="Event Days"
+        summary={`${event_days.length} day${event_days.length !== 1 ? "s" : ""}`}
+        icon={
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        }
+      >
+        <EventDaysManager tripId={tripId} />
+      </CollapsibleSection>
+
+      <CollapsibleSection
         title="Roster"
         summary={`${counts.participants} participant${counts.participants !== 1 ? "s" : ""}`}
         icon={
@@ -170,97 +200,109 @@ export default function EventDetailPage() {
         <ContestManager tripId={tripId} />
       </CollapsibleSection>
 
-      <CollapsibleSection
-        title="Ryder Cup Teams"
-        summary="Manage teams &amp; pairings"
-        icon={
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+      {hasContestType("ryder_cup") && (
+        <CollapsibleSection
+          title="Ryder Cup Teams"
+          summary="Manage teams &amp; pairings"
+          icon={
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+            </svg>
+          }
+        >
+          <RyderCupManager tripId={tripId} />
+        </CollapsibleSection>
+      )}
+
+      {hasScramble && (
+        <Link
+          href={`/admin/events/${tripId}/scrambles`}
+          className="flex items-center gap-3 bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-4 active:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-50 text-blue-700 flex-shrink-0">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-900">Scrambles</p>
+            <p className="text-xs text-gray-500">Teams, scoring &amp; BSPITW</p>
+          </div>
+          <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-        }
-      >
-        <RyderCupManager tripId={tripId} />
-      </CollapsibleSection>
+        </Link>
+      )}
 
-      <Link
-        href={`/admin/events/${tripId}/scrambles`}
-        className="flex items-center gap-3 bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-4 active:bg-gray-50 transition-colors"
-      >
-        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-50 text-blue-700 flex-shrink-0">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+      {hasCornhole && (
+        <Link
+          href={`/admin/events/${tripId}/cornhole`}
+          className="flex items-center gap-3 bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-4 active:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-orange-50 text-orange-700 flex-shrink-0">
+            <SvgIcon src="/noun-cornhole-6941307.svg" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-900">Cornhole</p>
+            <p className="text-xs text-gray-500">Teams &amp; brackets</p>
+          </div>
+          <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900">Scrambles</p>
-          <p className="text-xs text-gray-500">Teams, scoring &amp; BSPITW</p>
-        </div>
-        <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-      </Link>
+        </Link>
+      )}
 
-      <Link
-        href={`/admin/events/${tripId}/cornhole`}
-        className="flex items-center gap-3 bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-4 active:bg-gray-50 transition-colors"
-      >
-        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-orange-50 text-orange-700 flex-shrink-0">
-          <SvgIcon src="/noun-cornhole-6941307.svg" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900">Cornhole</p>
-          <p className="text-xs text-gray-500">Teams &amp; brackets</p>
-        </div>
-        <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-      </Link>
+      {hasScramble && (
+        <CollapsibleSection
+          title="100 Feet!"
+          summary="Distance from pin on #18"
+          iconColor="text-red-700"
+          icon={
+            <SvgIcon src="/noun-measure-tape-8065234.svg" />
+          }
+        >
+          <HundredFeetManager tripId={tripId} />
+        </CollapsibleSection>
+      )}
 
-      <CollapsibleSection
-        title="100 Feet!"
-        summary="Distance from pin on #18"
-        iconColor="text-red-700"
-        icon={
-          <SvgIcon src="/noun-measure-tape-8065234.svg" />
-        }
-      >
-        <HundredFeetManager tripId={tripId} />
-      </CollapsibleSection>
+      {hasScramble && (
+        <CollapsibleSection
+          title="Daily Winners"
+          summary="CTP &amp; Long Putt"
+          iconColor="text-teal-700"
+          icon={
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9" strokeWidth={1.5} />
+              <circle cx="12" cy="12" r="5.5" strokeWidth={1.5} />
+              <circle cx="12" cy="12" r="2" fill="currentColor" />
+            </svg>
+          }
+        >
+          <DailyWinnersManager tripId={tripId} />
+        </CollapsibleSection>
+      )}
 
-      <CollapsibleSection
-        title="Daily Winners"
-        summary="CTP &amp; Long Putt"
-        iconColor="text-teal-700"
-        icon={
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="9" strokeWidth={1.5} />
-            <circle cx="12" cy="12" r="5.5" strokeWidth={1.5} />
-            <circle cx="12" cy="12" r="2" fill="currentColor" />
+      {hasContestType("calcutta") && (
+        <Link
+          href={`/admin/events/${tripId}/calcutta`}
+          className="flex items-center gap-3 bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-4 active:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-50 text-purple-700 flex-shrink-0">
+            <SvgIcon src="/noun-gavel-auction.svg" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-900">Calcutta Auction</p>
+            <p className="text-xs text-gray-500">Auction order, prizes &amp; bids</p>
+          </div>
+          <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-        }
-      >
-        <DailyWinnersManager tripId={tripId} />
-      </CollapsibleSection>
-
-      <Link
-        href={`/admin/events/${tripId}/calcutta`}
-        className="flex items-center gap-3 bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-4 active:bg-gray-50 transition-colors"
-      >
-        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-50 text-purple-700 flex-shrink-0">
-          <SvgIcon src="/noun-gavel-auction.svg" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900">Calcutta Auction</p>
-          <p className="text-xs text-gray-500">Auction order, prizes &amp; bids</p>
-        </div>
-        <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-      </Link>
+        </Link>
+      )}
 
       <CollapsibleSection
         title="Tee Times"
-        summary="Days 1–4"
+        summary={`${event_days.length} day${event_days.length !== 1 ? "s" : ""}`}
         icon={
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />

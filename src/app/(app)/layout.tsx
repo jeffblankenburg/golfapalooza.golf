@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { BottomNav } from "@/components/BottomNav";
 import { HeaderBar } from "@/components/HeaderBar";
 import { SimulatorBanner } from "@/components/SimulatorBanner";
+import { MusicPlayerProvider } from "@/components/MusicPlayerProvider";
+import { AppShell } from "@/components/AppShell";
 import { getSimDate, getSimUserId, getEffectiveUserId, isSimulating } from "@/lib/simulator";
 
 export default async function AppLayout({
@@ -97,22 +99,24 @@ export default async function AppLayout({
   const showBanner = realIsAdmin && (simDate || simUserId);
 
   return (
-    <div className="min-h-screen pb-20">
-      {showBanner && (
-        <SimulatorBanner
-          simDate={simDate}
-          simUserName={simUserName}
+    <MusicPlayerProvider>
+      <AppShell>
+        {showBanner && (
+          <SimulatorBanner
+            simDate={simDate}
+            simUserName={simUserName}
+          />
+        )}
+        <HeaderBar
+          initialUnreadCount={unreadCount || 0}
+          initialChatUnreadCount={chatUnreadCount}
+          userId={effectiveUserId}
+          displayName={profile?.display_name || ""}
+          avatarUrl={profile?.avatar_url || null}
         />
-      )}
-      <HeaderBar
-        initialUnreadCount={unreadCount || 0}
-        initialChatUnreadCount={chatUnreadCount}
-        userId={effectiveUserId}
-        displayName={profile?.display_name || ""}
-        avatarUrl={profile?.avatar_url || null}
-      />
-      <main>{children}</main>
-      <BottomNav isAdmin={isAdmin} />
-    </div>
+        <main>{children}</main>
+        <BottomNav isAdmin={isAdmin} />
+      </AppShell>
+    </MusicPlayerProvider>
   );
 }

@@ -66,6 +66,7 @@ export function ItineraryManager({ tripId: propTripId }: { tripId?: string } = {
   const [items, setItems] = useState<ItineraryItem[]>([]);
   const [tripId, setTripId] = useState<string>("");
   const [startDate, setStartDate] = useState<string>("");
+  const [eventDays, setEventDays] = useState<{ day_number: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -99,10 +100,28 @@ export function ItineraryManager({ tripId: propTripId }: { tripId?: string } = {
     }
   }
 
+  async function fetchEventDays(tid: string) {
+    try {
+      const res = await fetch(`/api/admin/event-days?trip_id=${tid}`);
+      const data = await res.json();
+      if (data.days) setEventDays(data.days);
+    } catch { /* ignore */ }
+  }
+
   useEffect(() => {
     fetchItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [propTripId]);
+
+  useEffect(() => {
+    if (tripId) fetchEventDays(tripId);
+  }, [tripId]);
+
+  useEffect(() => {
+    const handler = () => { if (tripId) fetchEventDays(tripId); };
+    window.addEventListener("event-days-changed", handler);
+    return () => window.removeEventListener("event-days-changed", handler);
+  }, [tripId]);
 
   function startAdd(dayNumber: number | null) {
     setEditingId(null);
@@ -207,7 +226,7 @@ export function ItineraryManager({ tripId: propTripId }: { tripId?: string } = {
 
   // Group items by day_number
   const preEvent = items.filter((i) => i.day_number === null);
-  const days = [1, 2, 3, 4];
+  const days = eventDays.length > 0 ? eventDays.map((d) => d.day_number) : [1, 2, 3, 4];
   const dayItems = days.map((d) => items.filter((i) => i.day_number === d));
 
   const isPreEvent = form.day_number === null;

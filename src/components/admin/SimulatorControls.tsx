@@ -28,11 +28,13 @@ export function SimulatorControls({
   tripStartDate,
   currentSimDate,
   currentSimUserId,
+  eventDays = [],
 }: {
   users: User[];
   tripStartDate: string | null;
   currentSimDate: string | null;
   currentSimUserId: string | null;
+  eventDays?: { day_number: number; name: string }[];
 }) {
   const router = useRouter();
   // Parse existing sim date cookie into date and time parts
@@ -138,7 +140,7 @@ export function SimulatorControls({
 
           {tripStartDate && (
             <div className="flex gap-2">
-              {[1, 2, 3, 4].map((dayNum) => (
+              {(eventDays.length > 0 ? eventDays.map((d) => d.day_number) : [1, 2, 3, 4]).map((dayNum) => (
                 <button
                   key={dayNum}
                   onClick={() => setSimDate(getDayDate(tripStartDate, dayNum))}

@@ -24,12 +24,23 @@ export default async function DailyGamesPage() {
     );
   }
 
-  const { data: winners } = await adminClient
-    .from("daily_contest_winners")
-    .select("id, day_number, contest_type, user_id, user:users!daily_contest_winners_user_id_fkey(display_name, avatar_url)")
-    .eq("trip_id", trip.id)
-    .order("day_number")
-    .order("contest_type");
+  const [winnersResult, eventDaysResult] = await Promise.all([
+    adminClient
+      .from("daily_contest_winners")
+      .select("id, day_number, contest_type, user_id, user:users!daily_contest_winners_user_id_fkey(display_name, avatar_url)")
+      .eq("trip_id", trip.id)
+      .order("day_number")
+      .order("contest_type"),
+    adminClient
+      .from("contests")
+      .select("day_number")
+      .eq("trip_id", trip.id)
+      .eq("contest_type", "scramble")
+      .not("day_number", "is", null)
+      .order("day_number"),
+  ]);
+
+  const winners = winnersResult.data;
 
   const startDate = new Date(trip.start_date + "T00:00:00");
   const dayLabels = (dayNum: number) => {
@@ -43,7 +54,9 @@ export default async function DailyGamesPage() {
     long_putt: "Long Putt",
   };
 
-  const days = [2, 3, 4];
+  const days = [...new Set(
+    (eventDaysResult.data || []).map((d) => d.day_number as number)
+  )];
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-6">

@@ -30,9 +30,11 @@ function getDayLabel(startDate: string, dayNumber: number): string {
 export function BspitwContent({
   tripId,
   startDate,
+  scrambleDays = [],
 }: {
   tripId: string;
   startDate: string;
+  scrambleDays?: number[];
 }) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,8 +50,8 @@ export function BspitwContent({
     fetchData();
   }, [fetchData]);
 
-  const DAYS = [2, 3, 4];
-  const gridCols = { gridTemplateColumns: "2rem 1fr repeat(3, 3rem) 3.5rem" };
+  const DAYS = scrambleDays.length > 0 ? scrambleDays : [2, 3, 4];
+  const gridCols = { gridTemplateColumns: `2rem 1fr repeat(${DAYS.length}, 3rem) 3.5rem` };
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">

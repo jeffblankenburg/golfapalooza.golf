@@ -11,11 +11,23 @@ export default async function SimulatorPage() {
     .eq("status", "active")
     .single();
 
-  const { data: users } = await supabase
-    .from("users")
-    .select("id, display_name")
-    .eq("is_active", true)
-    .order("display_name");
+  const [usersResult, eventDaysResult] = await Promise.all([
+    supabase
+      .from("users")
+      .select("id, display_name")
+      .eq("is_active", true)
+      .order("display_name"),
+    trip
+      ? supabase
+          .from("event_days")
+          .select("day_number, name")
+          .eq("trip_id", trip.id)
+          .order("day_number")
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const users = usersResult.data;
+  const eventDays = (eventDaysResult.data || []) as { day_number: number; name: string }[];
 
   const simDate = await getSimDate();
   const simUserId = await getSimUserId();
@@ -28,6 +40,7 @@ export default async function SimulatorPage() {
         tripStartDate={trip?.start_date || null}
         currentSimDate={simDate}
         currentSimUserId={simUserId}
+        eventDays={eventDays}
       />
     </div>
   );

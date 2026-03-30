@@ -68,7 +68,7 @@ export function PastEvents({ events }: { events: PastEvent[] }) {
       {events.map((event) => {
         const isExpanded = expandedId === event.id;
         const preEvent = event.itinerary.filter((i) => i.day_number === null);
-        const days = [1, 2, 3, 4];
+        const days = [...new Set(event.itinerary.filter((i) => i.day_number !== null).map((i) => i.day_number!))].sort((a, b) => a - b);
 
         return (
           <div

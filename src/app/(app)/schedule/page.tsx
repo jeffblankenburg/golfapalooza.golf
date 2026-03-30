@@ -28,13 +28,23 @@ export default async function SchedulePage() {
     );
   }
 
-  const { data: items } = await supabase
-    .from("itinerary_items")
-    .select("id, title, location, day_number, start_date, start_time, end_date, end_time")
-    .eq("trip_id", trip.id)
-    .order("day_number", { ascending: true, nullsFirst: true })
-    .order("sort_order", { ascending: true })
-    .order("start_time", { ascending: true });
+  const [itemsResult, eventDaysResult] = await Promise.all([
+    supabase
+      .from("itinerary_items")
+      .select("id, title, location, day_number, start_date, start_time, end_date, end_time")
+      .eq("trip_id", trip.id)
+      .order("day_number", { ascending: true, nullsFirst: true })
+      .order("sort_order", { ascending: true })
+      .order("start_time", { ascending: true }),
+    supabase
+      .from("event_days")
+      .select("day_number, name")
+      .eq("trip_id", trip.id)
+      .order("day_number"),
+  ]);
+
+  const items = itemsResult.data;
+  const eventDays = (eventDaysResult.data || []) as { day_number: number; name: string }[];
 
   // Fetch user's tee times for this trip
   const myTeeTimesByDay: Record<number, { tee_time: string; starting_hole: number | null; teammates: string[] }> = {};
@@ -135,5 +145,5 @@ export default async function SchedulePage() {
     });
   }
 
-  return <ScheduleView items={items || []} startDate={trip.start_date} teeTimesByDay={trip.show_tee_times ? myTeeTimesByDay : {}} timezone={trip.timezone} />;
+  return <ScheduleView items={items || []} startDate={trip.start_date} teeTimesByDay={trip.show_tee_times ? myTeeTimesByDay : {}} timezone={trip.timezone} eventDays={eventDays} />;
 }

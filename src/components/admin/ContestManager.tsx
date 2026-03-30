@@ -27,9 +27,16 @@ interface ContestParticipant {
   user_id: string;
 }
 
+interface EventDay {
+  id: string;
+  day_number: number;
+  name: string;
+}
+
 export function ContestManager({ tripId }: { tripId: string }) {
   const [users, setUsers] = useState<UserWithStatus[]>([]);
   const [contests, setContests] = useState<Contest[]>([]);
+  const [eventDays, setEventDays] = useState<EventDay[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedContest, setSelectedContest] = useState<Contest | null>(null);
   const [contestParticipantIds, setContestParticipantIds] = useState<Set<string>>(new Set());
@@ -61,6 +68,12 @@ export function ContestManager({ tripId }: { tripId: string }) {
     if (data.contests) setContests(data.contests);
   }, [tripId]);
 
+  const fetchEventDays = useCallback(async () => {
+    const res = await fetch(`/api/admin/event-days?trip_id=${tripId}`);
+    const data = await res.json();
+    if (data.days) setEventDays(data.days);
+  }, [tripId]);
+
   const fetchContestParticipants = useCallback(async (contestId: string) => {
     const res = await fetch(`/api/admin/contests/participants?contest_id=${contestId}`);
     const data = await res.json();
@@ -73,11 +86,18 @@ export function ContestManager({ tripId }: { tripId: string }) {
   useEffect(() => {
     async function init() {
       setLoading(true);
-      await Promise.all([fetchUsers(), fetchContests()]);
+      await Promise.all([fetchUsers(), fetchContests(), fetchEventDays()]);
       setLoading(false);
     }
     init();
-  }, [fetchUsers, fetchContests]);
+  }, [fetchUsers, fetchContests, fetchEventDays]);
+
+  // Listen for event days changes from EventDaysManager
+  useEffect(() => {
+    const handler = () => fetchEventDays();
+    window.addEventListener("event-days-changed", handler);
+    return () => window.removeEventListener("event-days-changed", handler);
+  }, [fetchEventDays]);
 
   const toggleContestParticipant = async (userId: string, inContest: boolean) => {
     if (!selectedContest) return;
@@ -185,6 +205,7 @@ export function ContestManager({ tripId }: { tripId: string }) {
     setNewContestDay("");
     setShowNewContest(false);
     setSaving(null);
+    window.dispatchEvent(new CustomEvent("contests-changed"));
   };
 
   const updateContest = async (contest: Contest, updates: Partial<Pick<Contest, "name" | "contest_type" | "day_number">>) => {
@@ -205,6 +226,11 @@ export function ContestManager({ tripId }: { tripId: string }) {
         sort_order: updated.sort_order,
       }),
     });
+
+    // Notify parent if contest type changed (affects which sections are shown)
+    if (updates.contest_type && updates.contest_type !== contest.contest_type) {
+      window.dispatchEvent(new CustomEvent("contests-changed"));
+    }
   };
 
   const deleteContest = (contestId: string) => {
@@ -219,6 +245,7 @@ export function ContestManager({ tripId }: { tripId: string }) {
           body: JSON.stringify({ id: contestId }),
         });
         await fetchContests();
+        window.dispatchEvent(new CustomEvent("contests-changed"));
       },
     });
   };
@@ -280,14 +307,15 @@ export function ContestManager({ tripId }: { tripId: string }) {
             <select
               value={newContestDay}
               onChange={(e) => setNewContestDay(e.target.value)}
-              className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+              className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
               style={{ backgroundColor: "transparent" }}
             >
               <option value="">No day</option>
-              <option value="1">Day 1</option>
-              <option value="2">Day 2</option>
-              <option value="3">Day 3</option>
-              <option value="4">Day 4</option>
+              {eventDays.map((day) => (
+                <option key={day.day_number} value={day.day_number}>
+                  Day {day.day_number} - {day.name}
+                </option>
+              ))}
             </select>
           </div>
           <div className="flex gap-2">
@@ -382,14 +410,15 @@ export function ContestManager({ tripId }: { tripId: string }) {
                 <select
                   value={selectedContest.day_number ?? ""}
                   onChange={(e) => updateContest(selectedContest, { day_number: e.target.value ? parseInt(e.target.value) : null })}
-                  className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+                  className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
                   style={{ backgroundColor: "transparent" }}
                 >
                   <option value="">No day</option>
-                  <option value="1">Day 1</option>
-                  <option value="2">Day 2</option>
-                  <option value="3">Day 3</option>
-                  <option value="4">Day 4</option>
+                  {eventDays.map((day) => (
+                    <option key={day.day_number} value={day.day_number}>
+                      Day {day.day_number} - {day.name}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>

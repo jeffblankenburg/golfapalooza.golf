@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { US_TIMEZONE_OPTIONS } from "@/lib/utils/timezone";
 
 interface TripSummary {
   id: string;
@@ -73,6 +74,16 @@ const dataActions = [
     ),
   },
   {
+    href: "/admin/music",
+    label: "Music",
+    description: "Songs & audio files",
+    icon: (
+      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/simulator",
     label: "Simulator",
     description: "Time & user simulation",
@@ -91,8 +102,9 @@ export default function AdminPage() {
   const [pushTest, setPushTest] = useState<{ loading: boolean; result: null | { success: boolean; error?: string; diagnostics?: Record<string, unknown> } }>({ loading: false, result: null });
   const [newTrip, setNewTrip] = useState({
     trip_name: "",
-    trip_year: "",
     start_date: "",
+    end_date: "",
+    timezone: "America/New_York",
   });
   const [creating, setCreating] = useState(false);
 
@@ -108,7 +120,7 @@ export default function AdminPage() {
   }, [fetchEvents]);
 
   const handleCreate = async () => {
-    if (!newTrip.trip_name || !newTrip.start_date) return;
+    if (!newTrip.trip_name || !newTrip.start_date || !newTrip.end_date) return;
     setCreating(true);
 
     await fetch("/api/admin/trips", {
@@ -116,21 +128,82 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         trip_name: newTrip.trip_name,
-        trip_year:
-          newTrip.trip_year || new Date(newTrip.start_date).getFullYear(),
         start_date: newTrip.start_date,
+        end_date: newTrip.end_date,
+        timezone: newTrip.timezone,
       }),
     });
 
     await fetchEvents();
-    setNewTrip({ trip_name: "", trip_year: "", start_date: "" });
+    setNewTrip({ trip_name: "", start_date: "", end_date: "", timezone: "America/New_York" });
     setShowCreate(false);
     setCreating(false);
   };
 
+  const activeEvent = events.find((e) => e.status === "active");
+  const pastEvents = events.filter((e) => e.status !== "active");
+
+  const renderEventCard = (event: TripSummary) => (
+    <Link
+      key={event.id}
+      href={`/admin/events/${event.id}`}
+      className={`block bg-white rounded-2xl border shadow-sm p-4 active:scale-[0.98] transition-transform ${
+        event.status === "active"
+          ? "border-green-600 border-2"
+          : "border-gray-200"
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-sm font-semibold text-gray-900">
+            {event.trip_name} {event.trip_year}
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <span
+              className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${
+                event.status === "active"
+                  ? "bg-green-100 text-green-700"
+                  : "bg-gray-100 text-gray-500"
+              }`}
+            >
+              {event.status === "active" ? "Active" : "Archived"}
+            </span>
+          </div>
+        </div>
+        <svg
+          className="w-5 h-5 text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 5l7 7-7 7"
+          />
+        </svg>
+      </div>
+    </Link>
+  );
+
   return (
     <div className="px-4 pt-6 pb-8 space-y-8">
       <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+
+      {/* Active Event (top) */}
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : activeEvent ? (
+        <div>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Active Event
+          </h2>
+          {renderEventCard(activeEvent)}
+        </div>
+      ) : null}
 
       {/* Data Management */}
       <div>
@@ -157,6 +230,106 @@ export default function AdminPage() {
           ))}
         </div>
       </div>
+
+      {/* Past Events */}
+      {!loading && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              {activeEvent ? "Past Events" : "Events"}
+            </h2>
+            <button
+              onClick={() => setShowCreate(!showCreate)}
+              className="text-xs text-green-700 font-medium px-2 py-1 rounded-lg hover:bg-green-50"
+            >
+              + New Event
+            </button>
+          </div>
+
+          {showCreate && (
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 mb-3 space-y-2">
+              <input
+                type="text"
+                placeholder="Event name (e.g. Golfapalooza)"
+                autoFocus
+                value={newTrip.trip_name}
+                onChange={(e) =>
+                  setNewTrip({ ...newTrip, trip_name: e.target.value })
+                }
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    value={newTrip.start_date}
+                    onChange={(e) =>
+                      setNewTrip({ ...newTrip, start_date: e.target.value })
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">End Date</label>
+                  <input
+                    type="date"
+                    value={newTrip.end_date}
+                    onChange={(e) =>
+                      setNewTrip({ ...newTrip, end_date: e.target.value })
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+                  />
+                </div>
+              </div>
+              {newTrip.start_date && newTrip.end_date && (() => {
+                const days = Math.floor((new Date(newTrip.end_date + "T00:00:00").getTime() - new Date(newTrip.start_date + "T00:00:00").getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                return days > 0 ? (
+                  <p className="text-xs text-gray-500">{days} day{days !== 1 ? "s" : ""}</p>
+                ) : null;
+              })()}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Timezone</label>
+                <select
+                  value={newTrip.timezone}
+                  onChange={(e) =>
+                    setNewTrip({ ...newTrip, timezone: e.target.value })
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+                >
+                  {US_TIMEZONE_OPTIONS.map((tz) => (
+                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCreate}
+                  disabled={!newTrip.trip_name || !newTrip.start_date || !newTrip.end_date || creating}
+                  className="flex-1 bg-green-600 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-50"
+                >
+                  {creating ? "Creating..." : "Create Event"}
+                </button>
+                <button
+                  onClick={() => setShowCreate(false)}
+                  className="px-4 text-sm text-gray-500"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {pastEvents.map(renderEventCard)}
+            {pastEvents.length === 0 && !activeEvent && (
+              <div className="text-center text-sm text-gray-400 py-8">
+                No events yet. Create one to get started.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Diagnostics */}
       <div>
@@ -197,127 +370,6 @@ export default function AdminPage() {
             </div>
           )}
         </div>
-      </div>
-
-      {/* Events */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            Events
-          </h2>
-          <button
-            onClick={() => setShowCreate(!showCreate)}
-            className="text-xs text-green-700 font-medium px-2 py-1 rounded-lg hover:bg-green-50"
-          >
-            + New Event
-          </button>
-        </div>
-
-        {showCreate && (
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 mb-3 space-y-2">
-            <input
-              type="text"
-              placeholder="Event name (e.g. Golfapalooza)"
-              autoFocus
-              value={newTrip.trip_name}
-              onChange={(e) =>
-                setNewTrip({ ...newTrip, trip_name: e.target.value })
-              }
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
-            />
-            <div className="flex gap-2">
-              <input
-                type="number"
-                placeholder="Year"
-                value={newTrip.trip_year}
-                onChange={(e) =>
-                  setNewTrip({ ...newTrip, trip_year: e.target.value })
-                }
-                className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
-              />
-              <input
-                type="date"
-                value={newTrip.start_date}
-                onChange={(e) =>
-                  setNewTrip({ ...newTrip, start_date: e.target.value })
-                }
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
-              />
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleCreate}
-                disabled={!newTrip.trip_name || !newTrip.start_date || creating}
-                className="flex-1 bg-green-600 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-50"
-              >
-                {creating ? "Creating..." : "Create Event"}
-              </button>
-              <button
-                onClick={() => setShowCreate(false)}
-                className="px-4 text-sm text-gray-500"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {events.map((event) => (
-              <Link
-                key={event.id}
-                href={`/admin/events/${event.id}`}
-                className={`block bg-white rounded-2xl border shadow-sm p-4 active:scale-[0.98] transition-transform ${
-                  event.status === "active"
-                    ? "border-green-600 border-2"
-                    : "border-gray-200"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-semibold text-gray-900">
-                      {event.trip_name} {event.trip_year}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span
-                        className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${
-                          event.status === "active"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {event.status === "active" ? "Active" : "Archived"}
-                      </span>
-                    </div>
-                  </div>
-                  <svg
-                    className="w-5 h-5 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </div>
-              </Link>
-            ))}
-            {events.length === 0 && (
-              <div className="text-center text-sm text-gray-400 py-8">
-                No events yet. Create one to get started.
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

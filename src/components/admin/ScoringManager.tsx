@@ -65,6 +65,9 @@ export function ScoringManager({ tripId }: { tripId: string }) {
   const [loading, setLoading] = useState(true);
   const [selectedBonusTeamId, setSelectedBonusTeamId] = useState<string | null>(null);
 
+  const [clearing, setClearing] = useState<"today" | "all" | null>(null);
+  const [confirmClear, setConfirmClear] = useState<"today" | "all" | null>(null);
+
   const dirtyScoresRef = useRef<Map<string, { team_id: string; hole_number: number; strokes: number }>>(new Map());
   const dirtyBonusesRef = useRef<Map<string, BonusPoint>>(new Map());
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -340,6 +343,35 @@ export function ScoringManager({ tripId }: { tripId: string }) {
     setLoading(false);
   };
 
+  // Clear scores
+  const handleClear = async (mode: "today" | "all") => {
+    setClearing(mode);
+    try {
+      const params = mode === "today"
+        ? `mode=today&contest_id=${selectedContestId}`
+        : `mode=all&trip_id=${tripId}`;
+      const res = await fetch(`/api/admin/scramble/scores?${params}`, { method: "DELETE" });
+      if (res.ok) {
+        // Reset local state
+        if (mode === "today" && selectedContestId) {
+          setHoleScores({});
+          setBonusPoints([]);
+          setTeams((prev) => prev.map((t) => ({ ...t, gross_score: null })));
+        } else {
+          // Reload current contest data
+          if (selectedContestId) {
+            await fetchScoringData(selectedContestId);
+          }
+        }
+      }
+    } catch {
+      // silent
+    } finally {
+      setClearing(null);
+      setConfirmClear(null);
+    }
+  };
+
   // Helpers
   const getDayLabel = (dayNumber: number | null): string => {
     if (!dayNumber) return "?";
@@ -528,6 +560,53 @@ export function ScoringManager({ tripId }: { tripId: string }) {
             />
           )}
         </>
+      )}
+
+      {/* Clear Buttons */}
+      {contests.length > 0 && (
+        <div className="border-t border-gray-200 pt-4 mt-6 space-y-3">
+          {confirmClear ? (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-3">
+              <p className="text-sm text-red-800 font-medium">
+                {confirmClear === "today"
+                  ? "Clear all scores and bonus points for the current day?"
+                  : "Clear all scores and bonus points for ALL days?"}
+              </p>
+              <p className="text-xs text-red-600">This cannot be undone.</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleClear(confirmClear)}
+                  disabled={clearing !== null}
+                  className="flex-1 py-2 px-3 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50"
+                >
+                  {clearing ? "Clearing..." : "Yes, Clear"}
+                </button>
+                <button
+                  onClick={() => setConfirmClear(null)}
+                  disabled={clearing !== null}
+                  className="flex-1 py-2 px-3 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmClear("today")}
+                className="flex-1 py-2.5 px-3 bg-white text-red-600 text-sm font-medium rounded-xl border border-red-200 hover:bg-red-50 transition-colors"
+              >
+                Clear Today
+              </button>
+              <button
+                onClick={() => setConfirmClear("all")}
+                className="flex-1 py-2.5 px-3 bg-white text-red-600 text-sm font-medium rounded-xl border border-red-200 hover:bg-red-50 transition-colors"
+              >
+                Clear All Days
+              </button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

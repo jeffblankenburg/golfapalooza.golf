@@ -19,15 +19,16 @@ interface Score {
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
-const DAYS = [
-  { day: 2, label: "Thu" },
-  { day: 3, label: "Fri" },
-  { day: 4, label: "Sat" },
-];
+interface EventDay {
+  day_number: number;
+  name: string;
+}
 
 export function HundredFeetManager({ tripId }: { tripId: string }) {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [scores, setScores] = useState<Record<string, Score>>({});
+  const [eventDays, setEventDays] = useState<EventDay[]>([]);
+  const [scrambleDayNumbers, setScrambleDayNumbers] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [showRealNames, setShowRealNames] = useState(false);
@@ -42,6 +43,37 @@ export function HundredFeetManager({ tripId }: { tripId: string }) {
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scoreKey = (userId: string, day: number) => `${userId}-${day}`;
+
+  // Scramble days derived from contests, with names from event_days
+  const DAYS = scrambleDayNumbers.map((dayNum) => {
+    const ed = eventDays.find((d) => d.day_number === dayNum);
+    const name = ed?.name || `Day ${dayNum}`;
+    return {
+      day: dayNum,
+      label: name.length > 6 ? `Day ${dayNum}` : name,
+    };
+  });
+
+  const fetchEventDays = useCallback(async () => {
+    const res = await fetch(`/api/admin/event-days?trip_id=${tripId}`);
+    const data = await res.json();
+    if (data.days) setEventDays(data.days);
+  }, [tripId]);
+
+  const fetchScrambleDays = useCallback(async () => {
+    const res = await fetch(`/api/admin/contests?trip_id=${tripId}`);
+    const data = await res.json();
+    const contests = data.contests || [];
+    const dayNums = [
+      ...new Set(
+        contests
+          .filter((c: { contest_type: string; day_number: number | null }) => c.contest_type === "scramble" && c.day_number != null)
+          .map((c: { day_number: number }) => c.day_number)
+      ),
+    ] as number[];
+    dayNums.sort((a, b) => a - b);
+    setScrambleDayNumbers(dayNums);
+  }, [tripId]);
 
   const fetchData = useCallback(async () => {
     const res = await fetch(`/api/admin/hundred-feet?trip_id=${tripId}`);
@@ -63,8 +95,22 @@ export function HundredFeetManager({ tripId }: { tripId: string }) {
   }, [tripId]);
 
   useEffect(() => {
+    fetchEventDays();
+    fetchScrambleDays();
     fetchData();
-  }, [fetchData]);
+  }, [fetchEventDays, fetchScrambleDays, fetchData]);
+
+  // Listen for event days changes and contests changes
+  useEffect(() => {
+    const handleDays = () => fetchEventDays();
+    const handleContests = () => fetchScrambleDays();
+    window.addEventListener("event-days-changed", handleDays);
+    window.addEventListener("contests-changed", handleContests);
+    return () => {
+      window.removeEventListener("event-days-changed", handleDays);
+      window.removeEventListener("contests-changed", handleContests);
+    };
+  }, [fetchEventDays, fetchScrambleDays]);
 
   const flush = useCallback(async () => {
     const dirty = Array.from(dirtyRef.current.values());
@@ -187,7 +233,7 @@ export function HundredFeetManager({ tripId }: { tripId: string }) {
       </div>
 
       {/* Header */}
-      <div className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] gap-1 text-xs font-semibold text-gray-500 uppercase px-1">
+      <div style={{ gridTemplateColumns: `1fr repeat(${DAYS.length}, minmax(0, 1fr))` }} className="grid gap-1 text-xs font-semibold text-gray-500 uppercase px-1">
         <div>Player</div>
         {DAYS.map((d) => {
           const filled = isDayFilled(d.day);
@@ -213,7 +259,7 @@ export function HundredFeetManager({ tripId }: { tripId: string }) {
       {participants.map((p) => (
         <div
           key={p.id}
-          className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] gap-1 items-center bg-white rounded-xl border border-gray-200 px-2 py-2"
+          style={{ gridTemplateColumns: `1fr repeat(${DAYS.length}, minmax(0, 1fr))` }} className="grid gap-1 items-center bg-white rounded-xl border border-gray-200 px-2 py-2"
         >
           <div className="flex items-center gap-1.5 min-w-0">
             {p.avatar_url ? (

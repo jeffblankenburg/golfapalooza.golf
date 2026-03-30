@@ -37,6 +37,13 @@ interface UnassignedPlayer {
   avatar_url: string | null;
 }
 
+interface EventDay {
+  id: string;
+  day_number: number;
+  name: string;
+  date: string | null;
+}
+
 interface Day {
   number: number;
   label: string;
@@ -45,14 +52,8 @@ interface Day {
 
 type View = "days" | "groups";
 
-const DAYS: Day[] = [
-  { number: 1, label: "Day 1", sublabel: "Wednesday" },
-  { number: 2, label: "Day 2", sublabel: "Thursday — Scramble" },
-  { number: 3, label: "Day 3", sublabel: "Friday — Scramble" },
-  { number: 4, label: "Day 4", sublabel: "Saturday — Scramble" },
-];
-
 export function TeeTimeManager({ tripId }: { tripId: string }) {
+  const [eventDays, setEventDays] = useState<EventDay[]>([]);
   const [selectedDay, setSelectedDay] = useState<Day | null>(null);
   const [groups, setGroups] = useState<TeeTimeGroup[]>([]);
   const [unassigned, setUnassigned] = useState<UnassignedPlayer[]>([]);
@@ -71,25 +72,51 @@ export function TeeTimeManager({ tripId }: { tripId: string }) {
 
   const isScrambleDay = scrambleTeams.length > 0;
 
+  // Build DAYS from event_days
+  const DAYS: Day[] = eventDays.map((ed) => ({
+    number: ed.day_number,
+    label: `Day ${ed.day_number}`,
+    sublabel: ed.name,
+  }));
+
+  // Fetch event days
+  const fetchEventDays = useCallback(async () => {
+    const res = await fetch(`/api/admin/event-days?trip_id=${tripId}`);
+    const data = await res.json();
+    if (data.days) setEventDays(data.days);
+  }, [tripId]);
+
   // Fetch tee time counts per day
   const fetchDayCounts = useCallback(async () => {
+    if (eventDays.length === 0) return;
     const counts: Record<number, number> = {};
     const results = await Promise.all(
-      DAYS.map((day) =>
-        fetch(`/api/admin/tee-times?trip_id=${tripId}&day_number=${day.number}`)
+      eventDays.map((day) =>
+        fetch(`/api/admin/tee-times?trip_id=${tripId}&day_number=${day.day_number}`)
           .then((res) => res.json())
-          .then((data) => ({ day: day.number, count: (data.groups || []).length }))
+          .then((data) => ({ day: day.day_number, count: (data.groups || []).length }))
       )
     );
     for (const r of results) {
       counts[r.day] = r.count;
     }
     setDayCounts(counts);
-  }, [tripId]);
+  }, [tripId, eventDays]);
+
+  useEffect(() => {
+    fetchEventDays();
+  }, [fetchEventDays]);
 
   useEffect(() => {
     fetchDayCounts();
   }, [fetchDayCounts]);
+
+  // Listen for event days changes
+  useEffect(() => {
+    const handler = () => fetchEventDays();
+    window.addEventListener("event-days-changed", handler);
+    return () => window.removeEventListener("event-days-changed", handler);
+  }, [fetchEventDays]);
 
   // Fetch tee time groups for a day
   const fetchGroups = useCallback(async (dayNumber: number) => {

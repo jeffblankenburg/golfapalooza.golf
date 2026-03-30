@@ -123,7 +123,7 @@ export async function GET(
  * @swagger
  * /api/gallery/{itemId}:
  *   patch:
- *     summary: Update a gallery item (admin only)
+ *     summary: Update a gallery item (owner or admin)
  *     tags: [Gallery]
  *     parameters:
  *       - in: path
@@ -138,6 +138,9 @@ export async function GET(
  *           schema:
  *             type: object
  *             properties:
+ *               caption:
+ *                 type: string
+ *                 nullable: true
  *               taken_at:
  *                 type: string
  *                 format: date-time
@@ -147,6 +150,8 @@ export async function GET(
  *         description: Item updated
  *       401:
  *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
  */
 export async function PATCH(
   request: NextRequest,
@@ -161,21 +166,42 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Admin only
+  const effectiveUserId = await getEffectiveUserId(user.id);
+
+  // Check ownership or admin
   const { data: profile } = await supabase
     .from("users")
     .select("is_admin")
     .eq("id", user.id)
     .single();
 
-  if (!profile?.is_admin) {
+  const admin = createAdminClient();
+  const { data: existingItem } = await admin
+    .from("gallery_items")
+    .select("uploader_id")
+    .eq("id", itemId)
+    .single();
+
+  if (!existingItem) {
+    return NextResponse.json({ error: "Item not found" }, { status: 404 });
+  }
+
+  const isOwner = existingItem.uploader_id === effectiveUserId;
+  const isAdmin = profile?.is_admin === true;
+
+  if (!isOwner && !isAdmin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = await request.json();
   const updates: Record<string, unknown> = {};
 
-  if ("taken_at" in body) {
+  if ("caption" in body) {
+    updates.caption = body.caption || null;
+  }
+
+  // taken_at is admin-only
+  if ("taken_at" in body && isAdmin) {
     updates.taken_at = body.taken_at ? new Date(body.taken_at).toISOString() : null;
   }
 
@@ -183,12 +209,11 @@ export async function PATCH(
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
   }
 
-  const admin = createAdminClient();
   const { data: item, error } = await admin
     .from("gallery_items")
     .update(updates)
     .eq("id", itemId)
-    .select("id, taken_at, sort_date")
+    .select("id, caption, taken_at, sort_date")
     .single();
 
   if (error) {

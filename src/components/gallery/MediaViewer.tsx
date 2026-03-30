@@ -228,6 +228,8 @@ export function MediaViewer({
   const [showReactions, setShowReactions] = useState(false);
   const [showTags, setShowTags] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [editingCaption, setEditingCaption] = useState(false);
+  const [captionDraft, setCaptionDraft] = useState("");
   const [isMuted, setIsMuted] = useState(true);
   const [showPlayPauseIcon, setShowPlayPauseIcon] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -430,6 +432,7 @@ export function MediaViewer({
         setCurrentIndex((prev) => prev - direction);
         setSwipeOffset(0);
         setIsSettling(false);
+        setEditingCaption(false);
       }, 300);
     } else {
       setIsSettling(true);
@@ -644,6 +647,18 @@ export function MediaViewer({
                     {canDelete && (
                       <button
                         onClick={() => {
+                          setCaptionDraft(item.caption || "");
+                          setEditingCaption(true);
+                          setShowMenu(false);
+                        }}
+                        className="w-full px-4 py-3 text-left text-sm font-medium text-gray-900 hover:bg-gray-50 border-t border-gray-100"
+                      >
+                        Edit Caption
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        onClick={() => {
                           if (confirm("Delete this item?")) {
                             onDelete(item.id);
                           }
@@ -676,7 +691,44 @@ export function MediaViewer({
               <span className="text-white/60 text-xs">{formatTime(item.taken_at || item.created_at)}</span>
             </div>
 
-            {item.caption && <p className="text-white text-sm mb-3">{item.caption}</p>}
+            {editingCaption ? (
+              <form
+                className="flex gap-2 mb-3"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const newCaption = captionDraft.trim() || null;
+                  items[currentIndex] = { ...item, caption: newCaption };
+                  setEditingCaption(false);
+                  forceRender((v) => v + 1);
+                  await fetch(`/api/gallery/${item.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ caption: newCaption }),
+                  });
+                }}
+              >
+                <input
+                  type="text"
+                  value={captionDraft}
+                  onChange={(e) => setCaptionDraft(e.target.value)}
+                  placeholder="Add a caption..."
+                  autoFocus
+                  className="flex-1 px-3 py-1.5 text-sm bg-white/20 text-white placeholder-white/50 rounded-lg border border-white/30 outline-none focus:border-white/60"
+                />
+                <button type="submit" className="px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg">
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingCaption(false)}
+                  className="px-3 py-1.5 bg-white/20 text-white text-sm font-medium rounded-lg"
+                >
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              item.caption && <p className="text-white text-sm mb-3">{item.caption}</p>
+            )}
 
             <div className="flex items-center gap-4">
               {item.media_type === "video" && (

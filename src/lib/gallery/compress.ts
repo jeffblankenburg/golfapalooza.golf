@@ -3,7 +3,7 @@
  * Runs in the browser using Canvas API.
  */
 
-const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
 const SKIP_COMPRESS_MAX_SIZE = 10 * 1024 * 1024; // 10MB — skip if already small
 
 interface CompressVideoOptions {
@@ -311,7 +311,7 @@ export async function extractVideoFrame(file: File): Promise<Blob> {
 export function validateVideo(file: File): string | null {
   if (file.size > MAX_VIDEO_SIZE) {
     const sizeMB = Math.round(file.size / 1024 / 1024);
-    return `Video is ${sizeMB}MB. Maximum is 50MB.`;
+    return `Video is ${sizeMB}MB. Maximum is 100MB.`;
   }
   return null;
 }

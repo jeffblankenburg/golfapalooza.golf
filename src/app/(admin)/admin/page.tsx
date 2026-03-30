@@ -36,9 +36,19 @@ const dataActions = [
     label: "Courses",
     description: "Golf courses & holes",
     icon: (
-      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 21V3l7 4 4-4 7 4v18l-7-4-4 4-7-4z" />
-      </svg>
+      <div
+        className="w-8 h-8 bg-current"
+        style={{
+          WebkitMaskImage: "url(/noun-golf-flag-5010192.svg)",
+          WebkitMaskSize: "contain",
+          WebkitMaskRepeat: "no-repeat",
+          WebkitMaskPosition: "center",
+          maskImage: "url(/noun-golf-flag-5010192.svg)",
+          maskSize: "contain",
+          maskRepeat: "no-repeat",
+          maskPosition: "center",
+        }}
+      />
     ),
   },
   {
@@ -54,10 +64,11 @@ const dataActions = [
   {
     href: "/admin/gallery",
     label: "Gallery",
-    description: "Reprocess videos",
+    description: "Manage images & videos",
     icon: (
       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
       </svg>
     ),
   },
@@ -77,6 +88,7 @@ export default function AdminPage() {
   const [events, setEvents] = useState<TripSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [pushTest, setPushTest] = useState<{ loading: boolean; result: null | { success: boolean; error?: string; diagnostics?: Record<string, unknown> } }>({ loading: false, result: null });
   const [newTrip, setNewTrip] = useState({
     trip_name: "",
     trip_year: "",
@@ -143,6 +155,47 @@ export default function AdminPage() {
               </span>
             </Link>
           ))}
+        </div>
+      </div>
+
+      {/* Diagnostics */}
+      <div>
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Diagnostics
+        </h2>
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Push Notifications</p>
+              <p className="text-xs text-gray-500 mt-0.5">Send a test push to your device</p>
+            </div>
+            <button
+              onClick={async () => {
+                setPushTest({ loading: true, result: null });
+                try {
+                  const res = await fetch("/api/notifications/test-push", { method: "POST" });
+                  const data = await res.json();
+                  setPushTest({ loading: false, result: data });
+                } catch {
+                  setPushTest({ loading: false, result: { success: false, error: "Request failed" } });
+                }
+              }}
+              disabled={pushTest.loading}
+              className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-xl disabled:opacity-50 active:scale-95 transition-transform"
+            >
+              {pushTest.loading ? "Sending..." : "Test Push"}
+            </button>
+          </div>
+          {pushTest.result && (
+            <div className={`mt-3 p-3 rounded-xl text-sm ${pushTest.result.success ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>
+              <p className="font-medium">{pushTest.result.success ? "Push sent successfully!" : pushTest.result.error}</p>
+              {pushTest.result.diagnostics && (
+                <pre className="mt-2 text-xs whitespace-pre-wrap opacity-75">
+                  {JSON.stringify(pushTest.result.diagnostics, null, 2)}
+                </pre>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

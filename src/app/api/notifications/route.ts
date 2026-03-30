@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
 
 /**
  * @swagger
@@ -31,14 +33,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const effectiveUserId = await getEffectiveUserId(user.id);
+  const simulating = await isSimulating();
+  const client = simulating ? createAdminClient() : supabase;
+
   const { searchParams } = new URL(request.url);
   const limit = parseInt(searchParams.get("limit") || "20", 10);
   const cursor = searchParams.get("cursor");
 
-  let query = supabase
+  let query = client
     .from("notifications")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", effectiveUserId)
     .neq("type", "chat_message")
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -87,23 +93,27 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const effectiveUserId = await getEffectiveUserId(user.id);
+  const simulating = await isSimulating();
+  const client = simulating ? createAdminClient() : supabase;
+
   const body = await request.json();
 
   if (body.markAll) {
-    const { error } = await supabase
+    const { error } = await client
       .from("notifications")
       .update({ read: true })
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .eq("read", false);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
   } else if (body.ids?.length) {
-    const { error } = await supabase
+    const { error } = await client
       .from("notifications")
       .update({ read: true })
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .in("id", body.ids);
 
     if (error) {
@@ -121,17 +131,21 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const effectiveUserId = await getEffectiveUserId(user.id);
+  const simulating = await isSimulating();
+  const client = simulating ? createAdminClient() : supabase;
+
   const { id } = await request.json();
 
   if (!id) {
     return NextResponse.json({ error: "id is required" }, { status: 400 });
   }
 
-  const { error } = await supabase
+  const { error } = await client
     .from("notifications")
     .delete()
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", effectiveUserId);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

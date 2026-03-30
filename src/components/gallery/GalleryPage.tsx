@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { MediaUploader } from "./MediaUploader";
 import { MediaViewer } from "./MediaViewer";
@@ -48,6 +49,7 @@ export function GalleryPage({
   taggedUsers: GalleryUser[];
   availableYears: number[];
 }) {
+  const searchParams = useSearchParams();
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -62,6 +64,7 @@ export function GalleryPage({
   const cursorRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const justUploadedRef = useRef(false);
+  const deepLinkHandled = useRef(false);
 
   const fetchItems = useCallback(
     async (cursor?: string): Promise<{ items: GalleryItem[]; hasMore: boolean }> => {
@@ -101,6 +104,33 @@ export function GalleryPage({
       setLoading(false);
     });
   }, [fetchItems]);
+
+  // Deep link: open viewer to a specific item via ?item=<id>
+  useEffect(() => {
+    if (deepLinkHandled.current || loading || items.length === 0) return;
+    const itemId = searchParams.get("item");
+    if (!itemId) return;
+
+    const index = items.findIndex((i) => i.id === itemId);
+    if (index >= 0) {
+      setViewerIndex(index);
+      deepLinkHandled.current = true;
+    } else {
+      // Item not in current page — fetch it directly and prepend
+      fetch(`/api/gallery/${itemId}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.item) {
+            setItems((prev) => [data.item, ...prev]);
+            setViewerIndex(0);
+          }
+          deepLinkHandled.current = true;
+        })
+        .catch(() => {
+          deepLinkHandled.current = true;
+        });
+    }
+  }, [loading, items, searchParams]);
 
   // Infinite scroll
   useEffect(() => {
@@ -222,27 +252,32 @@ export function GalleryPage({
 
         {/* Year filter */}
         {availableYears.length > 0 && (
-          <select
-            value={filterYear}
-            onChange={(e) => setFilterYear(e.target.value)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-full border-0 outline-none transition-colors appearance-none cursor-pointer ${
-              filterYear !== "all"
-                ? "bg-green-600 text-white"
-                : "bg-gray-100 text-gray-600"
-            }`}
-          >
-            <option value="all">All Years</option>
-            {availableYears.map((y) => (
-              <option key={y} value={String(y)}>{y}</option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              value={filterYear}
+              onChange={(e) => setFilterYear(e.target.value)}
+              className={`pl-7 pr-2 py-1.5 text-xs font-medium rounded-full border-0 outline-none transition-colors appearance-none cursor-pointer ${
+                filterYear !== "all"
+                  ? "bg-green-600 text-white"
+                  : "bg-gray-100 text-gray-600"
+              }`}
+            >
+              <option value="all">All</option>
+              {availableYears.map((y) => (
+                <option key={y} value={String(y)}>{y}</option>
+              ))}
+            </select>
+            <svg className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
         )}
 
         {/* Loozer filter */}
         {taggedUsers.length > 0 && (
           <button
             onClick={() => setShowFilterUsers(!showFilterUsers)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors flex items-center gap-1 ${
+            className={`px-2.5 py-1.5 text-xs font-medium rounded-full transition-colors flex items-center gap-1 ${
               filterUserIds.size > 0
                 ? "bg-green-600 text-white"
                 : "bg-gray-100 text-gray-600"
@@ -251,17 +286,17 @@ export function GalleryPage({
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
-            {filterUserIds.size > 0 ? `${filterUserIds.size} Loozer${filterUserIds.size !== 1 ? "s" : ""}` : "Loozers"}
+            {filterUserIds.size > 0 && (
+              <span>{filterUserIds.size}</span>
+            )}
           </button>
         )}
 
-        {/* Clear filters */}
-        {(filterUserIds.size > 0 || filterYear !== "all") && (
+        {/* Clear filters — only shown when Loozer filter picker is open */}
+        {showFilterUsers && filterUserIds.size > 0 && (
           <button
             onClick={() => {
               setFilterUserIds(new Set());
-              setFilterYear("all");
-              setShowFilterUsers(false);
             }}
             className="px-2 py-1.5 text-xs text-red-500 font-medium"
           >
@@ -367,7 +402,10 @@ export function GalleryPage({
               {(item.reactionCount > 0 || item.commentCount > 0) && (
                 <div className="absolute bottom-1 right-1 flex items-center gap-1">
                   {item.reactionCount > 0 && (
-                    <span className="bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                    <span className="bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                      <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                      </svg>
                       {item.reactionCount}
                     </span>
                   )}

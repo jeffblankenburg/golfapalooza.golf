@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 interface Notification {
@@ -36,6 +37,14 @@ function notificationIcon(type: string) {
           </svg>
         </div>
       );
+    case "gallery_tag":
+      return (
+        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+          <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+      );
     case "announcement":
       return (
         <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
@@ -55,6 +64,13 @@ function notificationIcon(type: string) {
   }
 }
 
+function getNotificationLink(notification: Notification): string | null {
+  if (notification.type === "gallery_tag" && notification.data?.itemId) {
+    return `/gallery?item=${notification.data.itemId}`;
+  }
+  return null;
+}
+
 export function NotificationDrawer({
   userId,
   onClose,
@@ -66,6 +82,7 @@ export function NotificationDrawer({
   onMarkAllRead: () => void;
   onCountChange?: () => void;
 }) {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -198,39 +215,43 @@ export function NotificationDrawer({
             </div>
           ) : (
             <div>
-              {notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`flex items-start gap-3 px-4 py-3 border-b border-gray-50 ${
-                    !notification.read ? "bg-green-50/50" : ""
-                  }`}
-                >
-                  {notificationIcon(notification.type)}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className={`text-sm ${!notification.read ? "font-semibold" : "font-medium"} text-gray-900 line-clamp-1`}>
-                        {notification.title}
-                      </p>
-                      <span className="text-[11px] text-gray-400 flex-shrink-0">
-                        {timeAgo(notification.created_at)}
-                      </span>
-                    </div>
-                    {notification.body && (
-                      <p className="text-sm text-gray-500 line-clamp-2 mt-0.5">
-                        {notification.body}
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => handleDelete(notification.id)}
-                    className="flex items-center justify-center w-5 h-5 text-gray-300 hover:text-gray-500 flex-shrink-0 mt-0.5"
+              {notifications.map((notification) => {
+                const link = getNotificationLink(notification);
+                return (
+                  <div
+                    key={notification.id}
+                    className={`flex items-start gap-3 px-4 py-3 border-b border-gray-50 ${
+                      !notification.read ? "bg-green-50/50" : ""
+                    } ${link ? "cursor-pointer active:bg-gray-50" : ""}`}
+                    onClick={link ? () => { onClose(); router.push(link); } : undefined}
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
+                    {notificationIcon(notification.type)}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={`text-sm ${!notification.read ? "font-semibold" : "font-medium"} text-gray-900 line-clamp-1`}>
+                          {notification.title}
+                        </p>
+                        <span className="text-[11px] text-gray-400 flex-shrink-0">
+                          {timeAgo(notification.created_at)}
+                        </span>
+                      </div>
+                      {notification.body && (
+                        <p className="text-sm text-gray-500 line-clamp-2 mt-0.5">
+                          {notification.body}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(notification.id); }}
+                      className="flex items-center justify-center w-5 h-5 text-gray-300 hover:text-gray-500 flex-shrink-0 mt-0.5"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

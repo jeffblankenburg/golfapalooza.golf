@@ -162,30 +162,55 @@ function readString(view: DataView, offset: number, count: number): string | nul
 }
 
 /**
- * Extract the creation date from an MP4/MOV video file.
- * Parses the `mvhd` atom inside the `moov` atom — no npm dependencies.
- * Reads the first 128KB which is enough for the moov header in most files.
- * For files where moov is at the end, reads the last 128KB as fallback.
+ * Extract the creation date from a video file.
+ *
+ * Uses two sources and picks the most reliable:
+ *   1. `mvhd` atom in the MP4/MOV container
+ *   2. `file.lastModified` (filesystem date — on iOS this is the recording date)
+ *
+ * The `mvhd` date is the container creation time, which resets when a video is
+ * re-encoded, saved from a messaging app, or downloaded. `file.lastModified`
+ * is often more stable. We pick the OLDER of the two (more likely to be the
+ * original recording date) and discard anything within the last 60 seconds
+ * (clear re-encoding artifact).
  */
 export async function extractVideoDate(file: File): Promise<Date | null> {
   try {
     if (!file.type.startsWith("video/")) return null;
 
-    // Try the start of the file first (moov before mdat)
-    let date = await extractMvhdDate(file, 0, Math.min(128 * 1024, file.size));
-    if (date) return date;
+    const now = Date.now();
+    const ONE_MINUTE = 60 * 1000;
 
-    // Fallback: try the end of the file (moov after mdat — common in iPhone videos)
-    if (file.size > 128 * 1024) {
-      date = await extractMvhdDate(
+    // Source 1: mvhd atom
+    let mvhdDate: Date | null = null;
+    mvhdDate = await extractMvhdDate(file, 0, Math.min(128 * 1024, file.size));
+    if (!mvhdDate && file.size > 128 * 1024) {
+      mvhdDate = await extractMvhdDate(
         file,
         Math.max(0, file.size - 256 * 1024),
         file.size
       );
-      if (date) return date;
     }
 
-    return null;
+    // Source 2: file.lastModified (filesystem date)
+    let fileDate: Date | null = null;
+    if (file.lastModified && Math.abs(now - file.lastModified) > ONE_MINUTE) {
+      const d = new Date(file.lastModified);
+      if (!isNaN(d.getTime()) && d.getFullYear() >= 1990) {
+        fileDate = d;
+      }
+    }
+
+    // Discard mvhd date if it's within the last 60 seconds (re-encoding artifact)
+    if (mvhdDate && Math.abs(now - mvhdDate.getTime()) < ONE_MINUTE) {
+      mvhdDate = null;
+    }
+
+    // Pick the older date (more likely to be the original recording)
+    if (mvhdDate && fileDate) {
+      return mvhdDate.getTime() < fileDate.getTime() ? mvhdDate : fileDate;
+    }
+    return mvhdDate || fileDate;
   } catch {
     return null;
   }

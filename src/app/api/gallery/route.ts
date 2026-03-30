@@ -302,9 +302,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 50MB limit for videos
-    if (mediaType === "video" && file.size > 50 * 1024 * 1024) {
+    if (mediaType === "video" && file.size > 100 * 1024 * 1024) {
       return NextResponse.json(
-        { error: "Video files must be under 50MB" },
+        { error: "Video files must be under 100MB" },
         { status: 400 }
       );
     }

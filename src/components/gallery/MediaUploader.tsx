@@ -140,12 +140,19 @@ export function MediaUploader({
         xhr.upload.addEventListener("progress", (e) => {
           if (e.lengthComputable) {
             gotProgress = true;
-            setUploadPct(Math.round((e.loaded / e.total) * 100));
+            // Cap at 95% — the last 5% is server processing time
+            setUploadPct(Math.min(95, Math.round((e.loaded / e.total) * 100)));
           } else if (e.loaded > 0) {
             // iOS Safari may not set lengthComputable — show indeterminate
             gotProgress = true;
             setUploadPct(null);
           }
+        });
+
+        // When upload bytes are fully sent, show "Saving..." while server processes
+        xhr.upload.addEventListener("load", () => {
+          setProgress("Saving...");
+          setUploadPct(null);
         });
 
         // Fallback: if no progress events after 3s, go indeterminate

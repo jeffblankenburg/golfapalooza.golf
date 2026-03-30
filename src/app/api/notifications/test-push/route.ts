@@ -3,6 +3,19 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import webpush from "web-push";
 
+// Ensure VAPID is configured in THIS serverless function
+if (
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY &&
+  process.env.VAPID_PRIVATE_KEY &&
+  process.env.VAPID_SUBJECT
+) {
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+}
+
 /**
  * @swagger
  * /api/notifications/test-push:
@@ -40,12 +53,18 @@ export async function POST() {
   const diagnostics: Record<string, unknown> = {};
 
   // Check VAPID configuration
+  const vapidPublic = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const hasVapid = !!(
-    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY &&
+    vapidPublic &&
     process.env.VAPID_PRIVATE_KEY &&
     process.env.VAPID_SUBJECT
   );
   diagnostics.vapidConfigured = hasVapid;
+  diagnostics.vapidSubject = process.env.VAPID_SUBJECT || "(not set)";
+  // Show first/last few chars of the public key so we can verify it matches client-side
+  diagnostics.vapidPublicKeyPrefix = vapidPublic
+    ? `${vapidPublic.slice(0, 10)}...${vapidPublic.slice(-10)}`
+    : "(not set)";
 
   if (!hasVapid) {
     return NextResponse.json({
@@ -59,7 +78,7 @@ export async function POST() {
   const admin = createAdminClient();
   const { data: subscriptions, error: subError } = await admin
     .from("push_subscriptions")
-    .select("endpoint, created_at")
+    .select("endpoint, p256dh, auth, created_at")
     .eq("user_id", user.id);
 
   diagnostics.subscriptionCount = subscriptions?.length || 0;
@@ -75,7 +94,8 @@ export async function POST() {
   if (!subscriptions?.length) {
     return NextResponse.json({
       success: false,
-      error: "No push subscriptions found for your account. Make sure you've enabled notifications in the app.",
+      error:
+        "No push subscriptions found for your account. Make sure you've enabled notifications in the app.",
       diagnostics,
     });
   }
@@ -88,35 +108,32 @@ export async function POST() {
   });
 
   const results = await Promise.allSettled(
-    subscriptions.map((sub) => {
-      // Fetch full subscription with keys
-      return admin
-        .from("push_subscriptions")
-        .select("endpoint, p256dh, auth")
-        .eq("user_id", user.id)
-        .eq("endpoint", sub.endpoint)
-        .single()
-        .then(({ data: fullSub }) => {
-          if (!fullSub) throw new Error("Subscription not found");
-          return webpush.sendNotification(
-            {
-              endpoint: fullSub.endpoint,
-              keys: { p256dh: fullSub.p256dh, auth: fullSub.auth },
-            },
-            payload
-          );
-        });
-    })
+    subscriptions.map((sub) =>
+      webpush.sendNotification(
+        {
+          endpoint: sub.endpoint,
+          keys: { p256dh: sub.p256dh, auth: sub.auth },
+        },
+        payload
+      )
+    )
   );
 
-  const pushResults = results.map((r, i) => ({
-    endpoint: subscriptions[i].endpoint.slice(0, 80) + "...",
-    status: r.status,
-    error:
-      r.status === "rejected"
-        ? `${(r.reason as { statusCode?: number })?.statusCode || ""} ${(r.reason as Error)?.message || r.reason}`.trim()
-        : undefined,
-  }));
+  const pushResults = results.map((r, i) => {
+    if (r.status === "rejected") {
+      const reason = r.reason as { statusCode?: number; body?: string; message?: string };
+      return {
+        endpoint: subscriptions[i].endpoint.slice(0, 80) + "...",
+        status: "rejected" as const,
+        error: `${reason.statusCode || ""} ${reason.message || ""}`.trim(),
+        body: reason.body || undefined,
+      };
+    }
+    return {
+      endpoint: subscriptions[i].endpoint.slice(0, 80) + "...",
+      status: "fulfilled" as const,
+    };
+  });
 
   diagnostics.pushResults = pushResults;
 
@@ -125,7 +142,8 @@ export async function POST() {
   // Clean up expired subscriptions (410)
   const expiredEndpoints = results
     .map((r, i) =>
-      r.status === "rejected" && (r.reason as { statusCode?: number })?.statusCode === 410
+      r.status === "rejected" &&
+      (r.reason as { statusCode?: number })?.statusCode === 410
         ? subscriptions[i].endpoint
         : null
     )
@@ -142,7 +160,9 @@ export async function POST() {
 
   return NextResponse.json({
     success: anySuccess,
-    error: anySuccess ? undefined : "All push deliveries failed — see diagnostics",
+    error: anySuccess
+      ? undefined
+      : "All push deliveries failed — see diagnostics",
     diagnostics,
   });
 }

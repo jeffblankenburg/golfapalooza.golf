@@ -153,6 +153,35 @@ export async function DELETE(request: Request) {
 
   if (contestId) {
     const adminClient = createAdminClient();
+
+    // Get team IDs before deleting, to clear bracket references
+    const { data: teamsToDelete } = await adminClient
+      .from("cornhole_teams")
+      .select("id")
+      .eq("contest_id", contestId);
+
+    if (teamsToDelete && teamsToDelete.length > 0) {
+      const teamIds = teamsToDelete.map((t) => t.id);
+      // Clear bracket slots that reference these teams
+      for (const tid of teamIds) {
+        await adminClient
+          .from("cornhole_bracket_matches")
+          .update({ slot1_participant_id: null })
+          .eq("contest_id", contestId)
+          .eq("slot1_participant_id", tid);
+        await adminClient
+          .from("cornhole_bracket_matches")
+          .update({ slot2_participant_id: null })
+          .eq("contest_id", contestId)
+          .eq("slot2_participant_id", tid);
+        await adminClient
+          .from("cornhole_bracket_matches")
+          .update({ winner_participant_id: null })
+          .eq("contest_id", contestId)
+          .eq("winner_participant_id", tid);
+      }
+    }
+
     const { error } = await adminClient
       .from("cornhole_teams")
       .delete()
@@ -174,6 +203,33 @@ export async function DELETE(request: Request) {
     }
 
     const adminClient = createAdminClient();
+
+    // Get the team's contest_id to find bracket matches
+    const { data: team } = await adminClient
+      .from("cornhole_teams")
+      .select("contest_id")
+      .eq("id", team_id)
+      .single();
+
+    if (team) {
+      // Clear bracket slots that reference this team
+      await adminClient
+        .from("cornhole_bracket_matches")
+        .update({ slot1_participant_id: null })
+        .eq("contest_id", team.contest_id)
+        .eq("slot1_participant_id", team_id);
+      await adminClient
+        .from("cornhole_bracket_matches")
+        .update({ slot2_participant_id: null })
+        .eq("contest_id", team.contest_id)
+        .eq("slot2_participant_id", team_id);
+      await adminClient
+        .from("cornhole_bracket_matches")
+        .update({ winner_participant_id: null })
+        .eq("contest_id", team.contest_id)
+        .eq("winner_participant_id", team_id);
+    }
+
     const { error } = await adminClient
       .from("cornhole_teams")
       .delete()

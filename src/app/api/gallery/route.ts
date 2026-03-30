@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
   const cursor = searchParams.get("cursor");
   const taggedUserIds = searchParams.get("tagged_user_ids"); // comma-separated
   const year = searchParams.get("year"); // filter by calendar year of sort_date
+  const mediaType = searchParams.get("media_type"); // "photo" or "video"
   const sortBy = searchParams.get("sort_by") === "uploaded" ? "created_at" : "sort_date";
 
   const effectiveUserId = await getEffectiveUserId(user.id);
@@ -97,6 +98,9 @@ export async function GET(request: NextRequest) {
     if (tripId) {
       query = query.eq("trip_id", tripId);
     }
+    if (mediaType) {
+      query = query.eq("media_type", mediaType);
+    }
     if (year) {
       query = query.gte("sort_date", `${year}-01-01T00:00:00Z`).lt("sort_date", `${parseInt(year) + 1}-01-01T00:00:00Z`);
     }
@@ -132,6 +136,9 @@ export async function GET(request: NextRequest) {
 
   if (tripId) {
     query = query.eq("trip_id", tripId);
+  }
+  if (mediaType) {
+    query = query.eq("media_type", mediaType);
   }
   if (year) {
     query = query.gte("sort_date", `${year}-01-01T00:00:00Z`).lt("sort_date", `${parseInt(year) + 1}-01-01T00:00:00Z`);

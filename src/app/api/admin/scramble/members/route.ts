@@ -20,7 +20,7 @@ async function checkIsAdmin() {
   return user;
 }
 
-// POST - Add a member to a team
+// POST - Add member(s) to a team (supports single user_id or batch user_ids)
 export async function POST(request: Request) {
   const admin = await checkIsAdmin();
   if (!admin) {
@@ -28,18 +28,20 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { team_id, user_id } = await request.json();
+    const body = await request.json();
+    const { team_id } = body;
+    const userIds: string[] = body.user_ids || (body.user_id ? [body.user_id] : []);
 
-    if (!team_id || !user_id) {
+    if (!team_id || userIds.length === 0) {
       return NextResponse.json(
-        { error: "team_id and user_id are required" },
+        { error: "team_id and user_id(s) are required" },
         { status: 400 }
       );
     }
 
     const adminClient = createAdminClient();
 
-    // Check user isn't already on another team in the same contest
+    // Look up this team's contest
     const { data: team } = await adminClient
       .from("scramble_teams")
       .select("contest_id")
@@ -50,6 +52,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Team not found" }, { status: 404 });
     }
 
+    // Check none of the users are already on another team in the same contest
     const { data: otherTeams } = await adminClient
       .from("scramble_teams")
       .select("id")
@@ -60,21 +63,24 @@ export async function POST(request: Request) {
       const otherTeamIds = otherTeams.map((t) => t.id);
       const { data: existing } = await adminClient
         .from("scramble_team_members")
-        .select("id")
+        .select("user_id")
         .in("team_id", otherTeamIds)
-        .eq("user_id", user_id);
+        .in("user_id", userIds);
 
       if (existing && existing.length > 0) {
+        const taken = existing.map((e) => e.user_id);
         return NextResponse.json(
-          { error: "Player is already on another team for this day" },
+          { error: `Player(s) already on another team for this day`, taken },
           { status: 400 }
         );
       }
     }
 
+    // Batch insert all members
+    const rows = userIds.map((user_id) => ({ team_id, user_id }));
     const { error } = await adminClient
       .from("scramble_team_members")
-      .insert({ team_id, user_id });
+      .insert(rows);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

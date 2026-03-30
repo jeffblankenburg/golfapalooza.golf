@@ -3,12 +3,14 @@
 import { useState, useEffect } from "react";
 import {
   compressImage,
+  compressVideo,
   generateThumbnail,
   extractVideoFrame,
   validateVideo,
   isVideoFile,
+  getExtFromMime,
 } from "@/lib/gallery/compress";
-import { extractExifDate } from "@/lib/gallery/exif";
+import { extractExifDate, extractVideoDate } from "@/lib/gallery/exif";
 
 interface GalleryUser {
   id: string;
@@ -88,7 +90,7 @@ export function MediaUploader({
         }
 
         setProgress("Compressing image...");
-        const { blob, width, height } = await compressImage(initialFile);
+        const { blob, width, height } = await compressImage(initialFile, 1280, 0.8);
         formData.set("file", blob, "photo.jpg");
         formData.set("width", String(width));
         formData.set("height", String(height));
@@ -97,12 +99,30 @@ export function MediaUploader({
         const thumbBlob = await generateThumbnail(initialFile);
         formData.set("thumbnailFile", thumbBlob, "thumb.jpg");
       } else {
-        setProgress("Generating thumbnail...");
-        formData.set("file", initialFile, initialFile.name);
+        // Video path — extract date from MP4/MOV header, then compress
+        setProgress("Reading video date...");
+        const videoDate = await extractVideoDate(initialFile);
+        if (videoDate) {
+          formData.set("takenAt", videoDate.toISOString());
+        }
 
+        setProgress("Compressing video...");
+        setUploadPct(0);
+        const compressed = await compressVideo(initialFile, {
+          maxHeight: 720,
+          bitrate: 2_500_000,
+          onProgress: (pct) => {
+            setUploadPct(Math.round(pct));
+          },
+        });
+        formData.set("file", compressed.blob, `video.${getExtFromMime(compressed.blob.type)}`);
+        formData.set("width", String(compressed.width));
+        formData.set("height", String(compressed.height));
+
+        setProgress("Generating thumbnail...");
+        setUploadPct(null);
         try {
           const frameBlob = await extractVideoFrame(initialFile);
-          console.log("Video thumbnail generated:", frameBlob.size, "bytes");
           formData.set("thumbnailFile", frameBlob, "thumb.jpg");
         } catch (err) {
           console.warn("Video thumbnail extraction failed:", err);

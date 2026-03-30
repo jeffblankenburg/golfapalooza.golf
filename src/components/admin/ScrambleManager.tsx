@@ -42,13 +42,18 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
   const [selectedContest, setSelectedContest] = useState<Contest | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [unassigned, setUnassigned] = useState<UnassignedPlayer[]>([]);
+  const [participantCount, setParticipantCount] = useState(0);
   const [coursePar, setCoursePar] = useState(72);
   const [view, setView] = useState<View>("days");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [drawerTeamId, setDrawerTeamId] = useState<string | null>(null);
   const [drawerSelections, setDrawerSelections] = useState<Set<string>>(new Set());
+  const [unassignedSelections, setUnassignedSelections] = useState<Set<string>>(new Set());
   const [showRealNames, setShowRealNames] = useState(false);
+  const [participantDrawerOpen, setParticipantDrawerOpen] = useState(false);
+  const [attendees, setAttendees] = useState<{ id: string; display_name: string; full_name: string | null; avatar_url: string | null; is_participating: boolean }[]>([]);
+  const [participantIds, setParticipantIds] = useState<Set<string>>(new Set());
 
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
@@ -72,6 +77,7 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
     const data = await res.json();
     setTeams(data.teams || []);
     setUnassigned(data.unassigned || []);
+    setParticipantCount(data.participant_count ?? 0);
     if (data.course_par) setCoursePar(data.course_par);
   }, []);
 
@@ -86,7 +92,7 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
 
   // ── Team CRUD ──
 
-  const createTeam = async () => {
+  const createTeam = async (preSelectedIds?: string[]) => {
     if (!selectedContest) return;
     setSaving("new-team");
 
@@ -97,7 +103,19 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
     });
 
     if (res.ok) {
+      const { team } = await res.json();
+
+      // If players were pre-selected, batch-add them to the new team
+      if (preSelectedIds && preSelectedIds.length > 0 && team?.id) {
+        await fetch("/api/admin/scramble/members", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ team_id: team.id, user_ids: preSelectedIds }),
+        });
+      }
+
       await Promise.all([fetchTeams(selectedContest.id), fetchContests()]);
+      window.dispatchEvent(new CustomEvent("scramble-teams-changed"));
     }
     setSaving(null);
   };
@@ -115,6 +133,7 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
         });
         if (selectedContest) {
           await Promise.all([fetchTeams(selectedContest.id), fetchContests()]);
+          window.dispatchEvent(new CustomEvent("scramble-teams-changed"));
         }
       },
     });
@@ -135,6 +154,7 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
     });
 
     setSaving(null);
+    window.dispatchEvent(new CustomEvent("scramble-teams-changed"));
   };
 
   // ── Member CRUD ──
@@ -199,6 +219,8 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
 
     if (!res.ok) {
       if (selectedContest) await fetchTeams(selectedContest.id);
+    } else {
+      window.dispatchEvent(new CustomEvent("scramble-teams-changed"));
     }
 
     setSaving(null);
@@ -221,13 +243,195 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
   };
 
   const closeDrawer = async () => {
-    if (drawerTeamId && drawerSelections.size > 0) {
-      for (const userId of drawerSelections) {
-        await addMember(drawerTeamId, userId);
-      }
-    }
+    const teamId = drawerTeamId;
+    const selectedIds = Array.from(drawerSelections);
     setDrawerTeamId(null);
     setDrawerSelections(new Set());
+
+    if (!teamId || selectedIds.length === 0) return;
+
+    // Optimistic: move all selected players to the team at once
+    const players = selectedIds
+      .map((uid) => unassigned.find((u) => u.user_id === uid))
+      .filter(Boolean) as typeof unassigned;
+
+    if (players.length > 0) {
+      setTeams((prev) =>
+        prev.map((t) =>
+          t.id === teamId
+            ? {
+                ...t,
+                members: [
+                  ...t.members,
+                  ...players.map((p) => ({
+                    id: `temp-${p.user_id}`,
+                    user_id: p.user_id,
+                    display_name: p.display_name,
+                    full_name: p.full_name,
+                    avatar_url: p.avatar_url,
+                  })),
+                ],
+              }
+            : t
+        )
+      );
+      setUnassigned((prev) => prev.filter((u) => !drawerSelections.has(u.user_id)));
+    }
+
+    // Single batch API call
+    const res = await fetch("/api/admin/scramble/members", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ team_id: teamId, user_ids: selectedIds }),
+    });
+
+    if (!res.ok) {
+      // Revert on failure
+      if (selectedContest) await fetchTeams(selectedContest.id);
+    } else {
+      window.dispatchEvent(new CustomEvent("scramble-teams-changed"));
+    }
+  };
+
+  // ── Participant drawer helpers ──
+
+  const openParticipantDrawer = async () => {
+    if (!selectedContest) return;
+    // Fetch attendees and current contest participants in parallel
+    const [attendeesRes, participantsRes] = await Promise.all([
+      fetch(`/api/admin/participants?trip_id=${tripId}`),
+      fetch(`/api/admin/contests/participants?contest_id=${selectedContest.id}`),
+    ]);
+    const attendeesData = await attendeesRes.json();
+    const participantsData = await participantsRes.json();
+
+    const allAttendees = (attendeesData.users || []).filter(
+      (u: { is_participating: boolean }) => u.is_participating
+    );
+    setAttendees(allAttendees);
+
+    const ids = new Set<string>(
+      (participantsData.participants || []).map((p: { user_id: string }) => p.user_id)
+    );
+    setParticipantIds(ids);
+    setParticipantDrawerOpen(true);
+  };
+
+  const toggleParticipant = async (userId: string) => {
+    if (!selectedContest) return;
+    const isIn = participantIds.has(userId);
+
+    // Optimistic
+    setParticipantIds((prev) => {
+      const next = new Set(prev);
+      if (isIn) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+
+    // If removing, also remove from any scramble team they're on
+    let teamId: string | null = null;
+    if (isIn) {
+      const team = teams.find((t) => t.members.some((m) => m.user_id === userId));
+      if (team) {
+        teamId = team.id;
+        // Optimistic: remove from team, add to unassigned
+        const member = team.members.find((m) => m.user_id === userId);
+        setTeams((prev) =>
+          prev.map((t) =>
+            t.id === teamId
+              ? { ...t, members: t.members.filter((m) => m.user_id !== userId) }
+              : t
+          )
+        );
+        if (member) {
+          setUnassigned((prev) => [
+            ...prev,
+            { user_id: member.user_id, display_name: member.display_name, full_name: member.full_name, avatar_url: member.avatar_url },
+          ]);
+        }
+      }
+    }
+
+    const promises: Promise<Response>[] = [
+      fetch("/api/admin/contests/participants", {
+        method: isIn ? "DELETE" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contest_id: selectedContest.id, user_id: userId }),
+      }),
+    ];
+
+    if (teamId) {
+      promises.push(
+        fetch("/api/admin/scramble/members", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ team_id: teamId, user_id: userId }),
+        })
+      );
+    }
+
+    const results = await Promise.all(promises);
+
+    if (!results[0].ok) {
+      // Revert participant toggle
+      setParticipantIds((prev) => {
+        const next = new Set(prev);
+        if (isIn) next.add(userId);
+        else next.delete(userId);
+        return next;
+      });
+      // Revert team removal by re-fetching
+      if (teamId && selectedContest) await fetchTeams(selectedContest.id);
+    } else if (teamId) {
+      window.dispatchEvent(new CustomEvent("scramble-teams-changed"));
+    }
+  };
+
+  const selectAllParticipants = async () => {
+    if (!selectedContest) return;
+    const allIds = attendees.map((u) => u.id);
+    setParticipantIds(new Set(allIds));
+    await fetch("/api/admin/contests/participants", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contest_id: selectedContest.id, user_ids: allIds }),
+    });
+  };
+
+  const deselectAllParticipants = async () => {
+    if (!selectedContest) return;
+    setParticipantIds(new Set());
+
+    // Remove all team members first
+    const removePromises = teams.flatMap((t) =>
+      t.members.map((m) =>
+        fetch("/api/admin/scramble/members", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ team_id: t.id, user_id: m.user_id }),
+        })
+      )
+    );
+    if (removePromises.length > 0) await Promise.all(removePromises);
+
+    await fetch("/api/admin/contests/participants", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contest_id: selectedContest.id, user_ids: [] }),
+    });
+
+    if (removePromises.length > 0) {
+      window.dispatchEvent(new CustomEvent("scramble-teams-changed"));
+    }
+  };
+
+  const closeParticipantDrawer = async () => {
+    setParticipantDrawerOpen(false);
+    // Refresh teams to reflect participant changes
+    if (selectedContest) {
+      await fetchTeams(selectedContest.id);
+    }
   };
 
   // ── Name helpers ──
@@ -240,9 +444,15 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
 
   // ── Helpers ──
 
-  function calcPoints(team: Team): number | null {
+  function calcNetScore(team: Team): number | null {
     if (team.gross_score === null || team.gross_score === undefined) return null;
-    return (team.course_par - team.gross_score) + team.team_handicap;
+    return team.gross_score - team.team_handicap;
+  }
+
+  function calcScoreVsPar(team: Team): number | null {
+    const net = calcNetScore(team);
+    if (net === null) return null;
+    return net - team.course_par;
   }
 
   function getDayLabel(dayNumber: number | null): string {
@@ -329,40 +539,107 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
         <h2 className="text-lg font-bold text-gray-900 mb-1">
           {selectedContest.name}
         </h2>
-        <p className="text-sm text-gray-500 mb-4">
-          {getDayLabel(selectedContest.day_number)} · Par {coursePar}
-        </p>
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-sm text-gray-500">
+            {getDayLabel(selectedContest.day_number)} · Par {coursePar}
+          </p>
+          {participantCount > 0 && (
+            <button
+              onClick={openParticipantDrawer}
+              className="text-xs text-green-700 font-medium"
+            >
+              Edit Participants ({participantCount})
+            </button>
+          )}
+        </div>
+
+        {/* No participants warning */}
+        {participantCount === 0 && teams.length === 0 && (
+          <div className="bg-amber-50 rounded-xl border border-amber-200 p-4 mb-4 text-center">
+            <p className="text-sm font-medium text-amber-800 mb-1">
+              No players are participating in this contest yet.
+            </p>
+            <p className="text-xs text-amber-600 mb-3">
+              Choose who&apos;s playing this day.
+            </p>
+            <button
+              onClick={openParticipantDrawer}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg active:bg-green-700"
+            >
+              Select Participants
+            </button>
+          </div>
+        )}
 
         {/* Unassigned Players */}
         {unassigned.length > 0 && (
-          <div className="bg-amber-50 rounded-xl border border-amber-200 p-3 mb-4">
+          <div className="bg-amber-50 rounded-xl border border-amber-200 p-3 mb-2">
             <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">
               Unassigned ({unassigned.length})
+              {unassignedSelections.size > 0 && (
+                <span className="text-green-700 ml-1">· {unassignedSelections.size} selected</span>
+              )}
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {unassigned.map((player) => (
-                <span
-                  key={player.user_id}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-full text-xs font-medium text-gray-700 border border-amber-200"
-                >
-                  {player.avatar_url ? (
-                    <img src={player.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
-                  ) : (
-                    <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
-                      {(player.display_name || "?")[0].toUpperCase()}
-                    </span>
-                  )}
-                  {player.display_name}
-                </span>
-              ))}
+              {sortByName(unassigned).map((player) => {
+                const selected = unassignedSelections.has(player.user_id);
+                return (
+                  <button
+                    key={player.user_id}
+                    onClick={() => {
+                      setUnassignedSelections((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(player.user_id)) next.delete(player.user_id);
+                        else next.add(player.user_id);
+                        return next;
+                      });
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                      selected
+                        ? "bg-green-100 text-green-800 border-green-400"
+                        : "bg-white text-gray-700 border-amber-200 active:bg-amber-100"
+                    }`}
+                  >
+                    {player.avatar_url ? (
+                      <img src={player.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                    ) : (
+                      <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                        {(player.display_name || "?")[0].toUpperCase()}
+                      </span>
+                    )}
+                    {getName(player)}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
 
+        {/* New Team Button */}
+        {unassigned.length > 0 && <button
+          onClick={() => {
+            const selected = Array.from(unassignedSelections);
+            setUnassignedSelections(new Set());
+            createTeam(selected.length > 0 ? selected : undefined);
+          }}
+          disabled={saving === "new-team"}
+          className={`w-full mb-4 py-3 border-2 border-dashed rounded-xl text-sm font-medium active:bg-gray-50 disabled:opacity-50 ${
+            unassignedSelections.size > 0
+              ? "border-green-400 text-green-700 bg-green-50"
+              : "border-gray-300 text-gray-500"
+          }`}
+        >
+          {saving === "new-team"
+            ? "Creating..."
+            : unassignedSelections.size > 0
+              ? `+ New Team with ${unassignedSelections.size} Player${unassignedSelections.size !== 1 ? "s" : ""}`
+              : "+ New Team"}
+        </button>}
+
         {/* Teams */}
         <div className="space-y-3">
           {teams.map((team, index) => {
-            const points = calcPoints(team);
+            const scoreVsPar = calcScoreVsPar(team);
             return (
               <div
                 key={team.id}
@@ -374,9 +651,9 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
                     Team {index + 1}
                   </span>
                   <div className="flex items-center gap-2">
-                    {points !== null && (
-                      <span className={`text-sm font-bold ${points >= 0 ? "text-green-700" : "text-red-600"}`}>
-                        {points > 0 ? "+" : ""}{points} pts
+                    {scoreVsPar !== null && (
+                      <span className={`text-sm font-bold ${scoreVsPar < 0 ? "text-green-700" : scoreVsPar > 0 ? "text-red-600" : "text-gray-700"}`}>
+                        {scoreVsPar < 0 ? scoreVsPar : scoreVsPar > 0 ? `+${scoreVsPar}` : "E"}
                       </span>
                     )}
                     <button
@@ -439,7 +716,7 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
                 <div className="px-4 py-2.5 border-t border-gray-100 flex items-center gap-3">
                   <div className="flex-1">
                     <label className="block text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">
-                      Handicap
+                      Hdcp
                     </label>
                     <input
                       type="number"
@@ -457,33 +734,28 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
                       className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-center"
                     />
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 text-center">
                     <label className="block text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">
-                      Gross Score
+                      Gross
                     </label>
-                    <input
-                      type="number"
-                      value={team.gross_score ?? ""}
-                      onChange={(e) => {
-                        const val = e.target.value === "" ? null : parseInt(e.target.value);
-                        setTeams((prev) =>
-                          prev.map((t) => (t.id === team.id ? { ...t, gross_score: val } : t))
-                        );
-                      }}
-                      onBlur={(e) => {
-                        const val = e.target.value === "" ? null : parseInt(e.target.value);
-                        updateTeam(team.id, "gross_score", val);
-                      }}
-                      placeholder="—"
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-center"
-                    />
+                    <div className="text-sm font-medium text-gray-700">
+                      {team.gross_score ?? "—"}
+                    </div>
                   </div>
                   <div className="flex-1 text-center">
                     <label className="block text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">
-                      Points
+                      Net
                     </label>
-                    <div className={`text-lg font-bold ${points !== null ? (points >= 0 ? "text-green-700" : "text-red-600") : "text-gray-300"}`}>
-                      {points !== null ? (points > 0 ? `+${points}` : points) : "—"}
+                    <div className="text-sm font-medium text-gray-700">
+                      {calcNetScore(team) ?? "—"}
+                    </div>
+                  </div>
+                  <div className="flex-1 text-center">
+                    <label className="block text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">
+                      vs Par
+                    </label>
+                    <div className={`text-lg font-bold ${scoreVsPar !== null ? (scoreVsPar < 0 ? "text-green-700" : scoreVsPar > 0 ? "text-red-600" : "text-gray-700") : "text-gray-300"}`}>
+                      {scoreVsPar !== null ? (scoreVsPar < 0 ? scoreVsPar : scoreVsPar > 0 ? `+${scoreVsPar}` : "E") : "—"}
                     </div>
                   </div>
                 </div>
@@ -491,15 +763,6 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
             );
           })}
         </div>
-
-        {/* New Team Button */}
-        <button
-          onClick={createTeam}
-          disabled={saving === "new-team"}
-          className="w-full mt-3 py-3 border-2 border-dashed border-gray-300 rounded-xl text-sm font-medium text-gray-500 active:bg-gray-50 disabled:opacity-50"
-        >
-          {saving === "new-team" ? "Creating..." : "+ New Team"}
-        </button>
 
         <ConfirmModal
           open={!!confirmModal}
@@ -555,6 +818,69 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
               </button>
             );
           })}
+        </BottomDrawer>
+
+        <BottomDrawer
+          open={participantDrawerOpen}
+          onClose={closeParticipantDrawer}
+          title="Participants"
+          subtitle={`${participantIds.size} of ${attendees.length} attendees`}
+        >
+          <div className="flex gap-2 px-4 py-2 items-center border-b border-gray-100">
+            <button
+              onClick={selectAllParticipants}
+              className="text-xs text-green-700 font-medium px-2 py-1 rounded-lg hover:bg-green-50"
+            >
+              All
+            </button>
+            <button
+              onClick={deselectAllParticipants}
+              className="text-xs text-red-600 font-medium px-2 py-1 rounded-lg hover:bg-red-50"
+            >
+              None
+            </button>
+            <div className="flex-1" />
+            <button
+              onClick={() => setShowRealNames(!showRealNames)}
+              className="text-xs text-green-700 font-medium"
+            >
+              Show {showRealNames ? "nicknames" : "real names"}
+            </button>
+          </div>
+          {[...attendees]
+            .sort((a, b) => getName(a).localeCompare(getName(b)))
+            .map((user) => {
+              const inContest = participantIds.has(user.id);
+              return (
+                <button
+                  key={user.id}
+                  onClick={() => toggleParticipant(user.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                    inContest ? "bg-green-50" : "active:bg-gray-50"
+                  }`}
+                >
+                  <div
+                    className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                      inContest ? "border-green-600 bg-green-600" : "border-gray-300"
+                    }`}
+                  >
+                    {inContest && (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                  {user.avatar_url ? (
+                    <img src={user.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                  ) : (
+                    <span className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-sm font-bold">
+                      {getName(user)[0].toUpperCase()}
+                    </span>
+                  )}
+                  <span className="text-sm font-medium text-gray-900">{getName(user)}</span>
+                </button>
+              );
+            })}
         </BottomDrawer>
       </div>
     );

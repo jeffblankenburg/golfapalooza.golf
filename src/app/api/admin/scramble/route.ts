@@ -135,7 +135,7 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({ teams: normalizedTeams, unassigned, course_par: coursePar });
+    return NextResponse.json({ teams: normalizedTeams, unassigned, course_par: coursePar, participant_count: (participants || []).length });
   } catch (error) {
     console.error("Get scramble teams error:", error);
     return NextResponse.json({ error: "Failed to load teams" }, { status: 500 });

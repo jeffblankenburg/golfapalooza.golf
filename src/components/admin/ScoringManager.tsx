@@ -120,6 +120,15 @@ export function ScoringManager({ tripId }: { tripId: string }) {
     init();
   }, [fetchContests, fetchScoringData]);
 
+  // Re-fetch when sibling ScrambleManager changes teams
+  useEffect(() => {
+    const handler = () => {
+      if (selectedContestId) fetchScoringData(selectedContestId);
+    };
+    window.addEventListener("scramble-teams-changed", handler);
+    return () => window.removeEventListener("scramble-teams-changed", handler);
+  }, [selectedContestId, fetchScoringData]);
+
   // Flush saves
   const flushSaves = useCallback(async () => {
     const scoresToSave = Array.from(dirtyScoresRef.current.values());

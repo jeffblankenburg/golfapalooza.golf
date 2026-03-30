@@ -161,6 +161,122 @@ function readString(view: DataView, offset: number, count: number): string | nul
   return str;
 }
 
+/**
+ * Extract the creation date from an MP4/MOV video file.
+ * Parses the `mvhd` atom inside the `moov` atom — no npm dependencies.
+ * Reads the first 128KB which is enough for the moov header in most files.
+ * For files where moov is at the end, reads the last 128KB as fallback.
+ */
+export async function extractVideoDate(file: File): Promise<Date | null> {
+  try {
+    if (!file.type.startsWith("video/")) return null;
+
+    // Try the start of the file first (moov before mdat)
+    let date = await extractMvhdDate(file, 0, Math.min(128 * 1024, file.size));
+    if (date) return date;
+
+    // Fallback: try the end of the file (moov after mdat — common in iPhone videos)
+    if (file.size > 128 * 1024) {
+      date = await extractMvhdDate(
+        file,
+        Math.max(0, file.size - 256 * 1024),
+        file.size
+      );
+      if (date) return date;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// Mac epoch: January 1, 1904
+const MAC_EPOCH = new Date("1904-01-01T00:00:00Z").getTime();
+
+async function extractMvhdDate(
+  file: File,
+  start: number,
+  end: number
+): Promise<Date | null> {
+  const slice = file.slice(start, end);
+  const buffer = await slice.arrayBuffer();
+  const view = new DataView(buffer);
+  const len = view.byteLength;
+
+  // Walk atoms looking for 'moov'
+  let offset = 0;
+  while (offset + 8 <= len) {
+    const size = view.getUint32(offset);
+    const type = String.fromCharCode(
+      view.getUint8(offset + 4),
+      view.getUint8(offset + 5),
+      view.getUint8(offset + 6),
+      view.getUint8(offset + 7)
+    );
+
+    if (size < 8) break; // invalid atom
+
+    if (type === "moov") {
+      // Search inside moov for mvhd
+      return findMvhd(view, offset + 8, offset + Math.min(size, len - offset));
+    }
+
+    offset += size;
+  }
+
+  return null;
+}
+
+function findMvhd(view: DataView, start: number, end: number): Date | null {
+  let offset = start;
+
+  while (offset + 8 <= end) {
+    const size = view.getUint32(offset);
+    const type = String.fromCharCode(
+      view.getUint8(offset + 4),
+      view.getUint8(offset + 5),
+      view.getUint8(offset + 6),
+      view.getUint8(offset + 7)
+    );
+
+    if (size < 8) break;
+
+    if (type === "mvhd") {
+      // mvhd atom found — parse creation time
+      const version = view.getUint8(offset + 8);
+      let creationTime: number;
+
+      if (version === 0) {
+        // 32-bit timestamps
+        creationTime = view.getUint32(offset + 12);
+      } else {
+        // version 1: 64-bit timestamps — read high and low 32-bit words
+        const high = view.getUint32(offset + 12);
+        const low = view.getUint32(offset + 16);
+        creationTime = high * 0x100000000 + low;
+      }
+
+      if (creationTime === 0) return null;
+
+      // Convert from Mac epoch (seconds since 1904-01-01) to JS Date
+      const ms = MAC_EPOCH + creationTime * 1000;
+      const date = new Date(ms);
+
+      // Sanity check
+      if (isNaN(date.getTime()) || date.getFullYear() < 1990 || date.getFullYear() > 2100) {
+        return null;
+      }
+
+      return date;
+    }
+
+    offset += size;
+  }
+
+  return null;
+}
+
 /** Parse EXIF date format "YYYY:MM:DD HH:MM:SS" into a Date */
 function parseExifDateString(s: string): Date | null {
   // Format: "2024:09:15 14:30:00"

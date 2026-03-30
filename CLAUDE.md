@@ -208,6 +208,24 @@ Use these tags to group related endpoints:
 - `Auth` - Authentication endpoints
 - `Admin` - Admin user management
 
+## Cross-Table State Consistency
+
+**IMPORTANT: Always think through cascading side effects when modifying data that is referenced across multiple tables or components.**
+
+Many entities in this app have logical dependencies that the database doesn't enforce with foreign keys. When adding, removing, or modifying a record, proactively ask: "What other data becomes invalid or inconsistent because of this change?"
+
+Examples of cross-table dependencies to watch for:
+- **Contest participants → scramble team members**: Removing a contest participant must also remove them from any scramble team in that contest
+- **Scramble teams → hole scores + bonus points**: Deleting a team cascades via DB foreign keys, but verify this for any new child tables
+- **Bracket matches → downstream matches**: Un-advancing a bracket match must cascade to clear all downstream winner/loser placements
+- **Sibling component state**: When one admin component mutates shared data (e.g., ScrambleManager changes teams), other open components (e.g., ScoringManager) must be notified to refresh — use `window.dispatchEvent(new CustomEvent(...))` for cross-component coordination
+
+When implementing any delete, remove, or reassign operation:
+1. Trace all tables/state that reference the affected entity
+2. Handle cleanup in the same operation (not as an afterthought)
+3. Use optimistic UI updates that can be reverted if the API fails
+4. Notify sibling components if they might be displaying stale data
+
 ## Feature Planning & Issue Tracking
 
 **GitHub Issues are the source of truth for feature planning and persistence.**

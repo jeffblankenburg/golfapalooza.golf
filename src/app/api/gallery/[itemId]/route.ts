@@ -122,6 +122,85 @@ export async function GET(
 /**
  * @swagger
  * /api/gallery/{itemId}:
+ *   patch:
+ *     summary: Update a gallery item (admin only)
+ *     tags: [Gallery]
+ *     parameters:
+ *       - in: path
+ *         name: itemId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               taken_at:
+ *                 type: string
+ *                 format: date-time
+ *                 nullable: true
+ *     responses:
+ *       200:
+ *         description: Item updated
+ *       401:
+ *         description: Unauthorized
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ itemId: string }> }
+) {
+  const { itemId } = await params;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Admin only
+  const { data: profile } = await supabase
+    .from("users")
+    .select("is_admin")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile?.is_admin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const body = await request.json();
+  const updates: Record<string, unknown> = {};
+
+  if ("taken_at" in body) {
+    updates.taken_at = body.taken_at ? new Date(body.taken_at).toISOString() : null;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+  }
+
+  const admin = createAdminClient();
+  const { data: item, error } = await admin
+    .from("gallery_items")
+    .update(updates)
+    .eq("id", itemId)
+    .select("id, taken_at, sort_date")
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ item });
+}
+
+/**
+ * @swagger
+ * /api/gallery/{itemId}:
  *   delete:
  *     summary: Delete a gallery item (uploader or admin only)
  *     tags: [Gallery]

@@ -41,6 +41,31 @@ export async function subscribeToPush(): Promise<boolean> {
     // Check for existing subscription
     let subscription = await registration.pushManager.getSubscription();
 
+    // If existing subscription uses a different VAPID key, unsubscribe and re-create
+    if (subscription) {
+      const currentKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+      const existingKey = subscription.options?.applicationServerKey
+        ? new Uint8Array(subscription.options.applicationServerKey)
+        : null;
+
+      const keysMatch =
+        existingKey &&
+        existingKey.length === currentKey.length &&
+        existingKey.every((b, i) => b === currentKey[i]);
+
+      if (!keysMatch) {
+        // VAPID key changed — unsubscribe old and remove from server
+        const oldEndpoint = subscription.endpoint;
+        await subscription.unsubscribe();
+        fetch("/api/notifications/push-subscription", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ endpoint: oldEndpoint }),
+        }).catch(() => {});
+        subscription = null;
+      }
+    }
+
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,

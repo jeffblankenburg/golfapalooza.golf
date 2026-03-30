@@ -191,12 +191,15 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
       if (preloadedIndexRef.current === targetIndex) {
         const buffer = getBuffer();
         if (buffer) {
-          const old = getActive();
-          if (old) old.pause();
+          // Grab ref to old element before swapping
+          const old = activeSlotRef.current === 0 ? audioARef.current : audioBRef.current;
 
+          // Swap slot FIRST so onPause from old element won't affect state
           activeSlotRef.current = activeSlotRef.current === 0 ? 1 : 0;
           setCurrentIndex(targetIndex);
           currentIndexRef.current = targetIndex;
+
+          if (old) old.pause();
           buffer.play().catch(() => {});
           setIsPlaying(true);
           preloadedIndexRef.current = -1;

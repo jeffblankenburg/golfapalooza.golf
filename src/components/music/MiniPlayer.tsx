@@ -38,6 +38,7 @@ export function MiniPlayer() {
         <Link href="/music" className="flex items-center gap-3 flex-1 min-w-0">
           {(currentSong.art_thumb_url || currentSong.art_url) ? (
             <img
+              key={currentSong.id}
               src={currentSong.art_thumb_url || currentSong.art_url!}
               alt=""
               className="w-8 h-8 rounded object-cover flex-shrink-0"

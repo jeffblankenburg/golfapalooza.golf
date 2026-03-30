@@ -34,7 +34,7 @@ export function MusicPage({ initialSongs }: { initialSongs: Song[] }) {
   const [search, setSearch] = useState("");
   const [showLyrics, setShowLyrics] = useState(false);
   const seekBarRef = useRef<HTMLDivElement>(null);
-  const activeRowRef = useRef<HTMLButtonElement>(null);
+  const activeRowRef = useRef<HTMLDivElement>(null);
 
   // Load songs on mount if not already loaded
   useEffect(() => {
@@ -83,6 +83,7 @@ export function MusicPage({ initialSongs }: { initialSongs: Song[] }) {
           <div className="flex justify-center mb-4">
             {currentSong.art_url ? (
               <img
+                key={currentSong.id}
                 src={currentSong.art_url}
                 alt={currentSong.title}
                 className="w-52 h-52 rounded-2xl object-cover shadow-lg"
@@ -226,11 +227,11 @@ export function MusicPage({ initialSongs }: { initialSongs: Song[] }) {
             const originalIndex = songs.findIndex((s) => s.id === song.id);
             const isActive = originalIndex === currentIndex;
             return (
-              <button
+              <div
                 key={song.id}
                 ref={isActive ? activeRowRef : undefined}
                 onClick={() => play(originalIndex)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors cursor-pointer ${
                   isActive
                     ? "bg-green-50 border-l-4 border-green-600"
                     : "active:bg-gray-50"
@@ -285,7 +286,7 @@ export function MusicPage({ initialSongs }: { initialSongs: Song[] }) {
                       d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
                 </button>
-              </button>
+              </div>
             );
           })}
 

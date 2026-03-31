@@ -134,7 +134,7 @@ export function SkinsContent({
             onClick={() => setSelectedDay(c.day_number)}
             className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
               selectedDay === c.day_number
-                ? "bg-green-600 text-white"
+                ? "bg-lime-600 text-white"
                 : "bg-gray-100 text-gray-600 active:bg-gray-200"
             }`}
           >
@@ -145,16 +145,16 @@ export function SkinsContent({
 
       {loading && (
         <div className="flex justify-center py-12">
-          <div className="w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-lime-600 border-t-transparent rounded-full animate-spin" />
         </div>
       )}
 
       {!loading && data && !data.complete && (
-        <div className="bg-amber-50 rounded-xl px-4 py-3 border border-amber-200 text-center">
-          <p className="text-sm text-amber-700 font-medium">
+        <div className="bg-lime-50 rounded-xl px-4 py-3 border border-lime-200 text-center">
+          <p className="text-sm text-lime-700 font-medium">
             {data.message || "Scores still being entered"}
           </p>
-          <p className="text-xs text-amber-600 mt-1">
+          <p className="text-xs text-lime-600 mt-1">
             Skins will be calculated once all teams have complete scores.
           </p>
         </div>
@@ -166,12 +166,12 @@ export function SkinsContent({
 
         return (
           <div className="space-y-3">
-            <div className="bg-green-50 rounded-xl px-4 py-2 border border-green-200 text-center">
-              <span className="text-sm text-green-700 font-semibold">
+            <div className="bg-lime-50 rounded-xl px-4 py-2 border border-lime-200 text-center">
+              <span className="text-sm text-lime-700 font-semibold">
                 {totalSkins} skin{totalSkins !== 1 ? "s" : ""} awarded
               </span>
               {pot > 0 && (
-                <span className="text-sm text-green-600 ml-2">
+                <span className="text-sm text-lime-600 ml-2">
                   &middot; ${pot} pot
                 </span>
               )}
@@ -204,7 +204,7 @@ export function SkinsContent({
                       ))}
                     </div>
                     <div className="flex-shrink-0 text-right ml-3">
-                      <span className={`text-2xl font-bold ${team.skins > 0 ? "text-amber-600" : "text-gray-300"}`}>
+                      <span className={`text-2xl font-bold ${team.skins > 0 ? "text-lime-600" : "text-gray-300"}`}>
                         {team.skins}
                       </span>
                       <span className="text-[10px] text-gray-400 uppercase ml-1">
@@ -218,9 +218,9 @@ export function SkinsContent({
                     <div className="flex items-end justify-between">
                       <div className="flex-1 min-w-0">
                         {team.winningHoles.length > 0 && (
-                          <div className="inline-grid gap-0 border border-amber-200 rounded-lg overflow-hidden" style={{ gridTemplateColumns: `repeat(${team.winningHoles.length}, minmax(28px, 1fr))` }}>
+                          <div className="inline-grid gap-0 border border-lime-200 rounded-lg overflow-hidden" style={{ gridTemplateColumns: `repeat(${team.winningHoles.length}, minmax(28px, 1fr))` }}>
                             {team.winningHoles.map((wh) => (
-                              <div key={wh.hole} className="text-center text-[10px] font-semibold text-amber-700 bg-amber-50 px-1 py-0.5 border-b border-amber-200">
+                              <div key={wh.hole} className="text-center text-[10px] font-semibold text-lime-700 bg-lime-50 px-1 py-0.5 border-b border-lime-200">
                                 {wh.hole}
                               </div>
                             ))}

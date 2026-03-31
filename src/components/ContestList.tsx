@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 
 interface ContestItem {
   id: string;
@@ -32,11 +33,24 @@ interface TeeTimeGroup {
   members: { display_name: string; avatar_url: string | null }[];
 }
 
+interface KgbCupScores {
+  team1Name: string;
+  team2Name: string;
+  team1Points: number;
+  team2Points: number;
+  completedSections: number;
+  totalSections: number;
+  team1Color?: string;
+  team2Color?: string;
+  verified?: boolean;
+}
+
 interface ContestDetailData {
   scrambleTeams?: ScrambleTeam[];
   ryderData?: RyderData;
   teeTimeGroups?: TeeTimeGroup[];
   participants?: { display_name: string; avatar_url: string | null }[];
+  kgbCupScores?: KgbCupScores;
 }
 
 const contestTypeLabels: Record<string, string> = {
@@ -50,9 +64,9 @@ const contestTypeLabels: Record<string, string> = {
 };
 
 const contestTypeColors: Record<string, string> = {
-  ryder_cup: "bg-red-50 text-red-700",
-  kgb_cup: "bg-red-50 text-red-700",
-  scramble: "bg-green-50 text-green-700",
+  ryder_cup: "bg-indigo-50 text-indigo-700",
+  kgb_cup: "bg-indigo-50 text-indigo-700",
+  scramble: "bg-sky-50 text-sky-700",
   cornhole_singles: "bg-orange-50 text-orange-700",
   cornhole_doubles: "bg-orange-50 text-orange-700",
   calcutta: "bg-purple-50 text-purple-700",
@@ -318,10 +332,72 @@ function ScrambleContent({
   return <p className="text-sm text-gray-400 py-3">Teams coming soon!</p>;
 }
 
+function KgbCupScoreBanner({ contestId, kgbData }: { contestId: string; kgbData: KgbCupScores }) {
+  const [scores, setScores] = useState<{ team1Points: number; team2Points: number; completedSections: number; totalSections: number } | null>(null);
+
+  useEffect(() => {
+    async function fetchScores() {
+      try {
+        const res = await fetch(`/api/kgb-cup/results?contest_id=${contestId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setScores({
+            team1Points: data.overall.team1Points,
+            team2Points: data.overall.team2Points,
+            completedSections: data.overall.completedSections,
+            totalSections: data.overall.totalSections,
+          });
+        }
+      } catch {
+        // Use server-provided fallback
+      }
+    }
+    fetchScores();
+  }, [contestId]);
+
+  const t1Points = scores?.team1Points ?? kgbData.team1Points;
+  const t2Points = scores?.team2Points ?? kgbData.team2Points;
+  const completed = scores?.completedSections ?? kgbData.completedSections;
+  const total = scores?.totalSections ?? kgbData.totalSections;
+  const t1Color = kgbData.team1Color || "#3b82f6";
+  const t2Color = kgbData.team2Color || "#ef4444";
+
+  return (
+    <Link href="/kgb-cup" className="block">
+      <div className="rounded-xl p-4 text-center active:opacity-80 transition-opacity" style={{ background: `linear-gradient(to right, ${t1Color}10, ${t2Color}10)` }}>
+        <div className="flex items-center justify-center gap-6">
+          <div>
+            <p className="text-xs font-bold" style={{ color: t1Color }}>{kgbData.team1Name}</p>
+            <p className="text-2xl font-black" style={{ color: t1Color }}>{t1Points}</p>
+          </div>
+          <div className="text-gray-300 text-sm">—</div>
+          <div>
+            <p className="text-xs font-bold" style={{ color: t2Color }}>{kgbData.team2Name}</p>
+            <p className="text-2xl font-black" style={{ color: t2Color }}>{t2Points}</p>
+          </div>
+        </div>
+        <p className="text-[10px] text-gray-400 mt-1">
+          {completed} of {total} sections · Tap for details
+          {kgbData.verified && (
+            <span className="inline-flex items-center gap-0.5 ml-1 text-green-600 font-semibold">
+              <svg className="w-2.5 h-2.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
+              Official
+            </span>
+          )}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
 function RyderCupContent({
+  contestId,
   detail,
   showTeams,
 }: {
+  contestId: string;
   detail: ContestDetailData;
   showTeams: boolean;
 }) {
@@ -336,9 +412,15 @@ function RyderCupContent({
 
   // Sort teams by team_number
   const sortedTeams = [...ryder.teams].sort((a, b) => a.team_number - b.team_number);
+  const kgb = detail.kgbCupScores;
 
   return (
     <div className="py-3 space-y-4">
+      {/* KGB Cup score summary */}
+      {kgb && kgb.completedSections > 0 && (
+        <KgbCupScoreBanner contestId={contestId} kgbData={kgb} />
+      )}
+
       {/* Teams side by side */}
       <div className="grid grid-cols-2 gap-3">
         {sortedTeams.map((team) => {
@@ -439,7 +521,7 @@ function ExpandedContent({
       return <ScrambleContent detail={detail} showTeams={showTeams} />;
     case "ryder_cup":
     case "kgb_cup":
-      return <RyderCupContent detail={detail} showTeams={showTeams} />;
+      return <RyderCupContent contestId={contest.id} detail={detail} showTeams={showTeams} />;
     case "cornhole_singles":
     case "cornhole_doubles":
     case "calcutta":

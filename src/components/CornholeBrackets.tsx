@@ -82,7 +82,7 @@ export function CornholeBrackets({
         <h1 className="text-lg font-bold text-gray-900">Cornhole</h1>
         <button
           onClick={() => setShowRealNames(!showRealNames)}
-          className="text-xs text-green-700 font-medium"
+          className="text-xs text-orange-700 font-medium"
         >
           Show {showRealNames ? "nicknames" : "real names"}
         </button>
@@ -199,7 +199,7 @@ function BracketAccordion({
         <div className="flex flex-col items-start">
           <span className="font-semibold text-gray-900">{label}</span>
           {resultText && (
-            <span className="text-xs text-amber-600 font-medium">{resultText}</span>
+            <span className="text-xs text-orange-600 font-medium">{resultText}</span>
           )}
         </div>
         <svg
@@ -223,7 +223,7 @@ function BracketAccordion({
         <div className="border-t border-gray-100 px-4 py-3">
           {loading ? (
             <div className="flex justify-center py-8">
-              <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+              <div className="w-6 h-6 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : matches.length === 0 ? (
             <p className="text-center py-6 text-gray-400 text-sm">

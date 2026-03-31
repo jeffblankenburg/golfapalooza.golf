@@ -96,6 +96,27 @@ export function TripInfo({
         </div>
       )}
 
+      {/* Rooms Link */}
+      <Link
+        href="/rooms"
+        className="flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-200 shadow-sm active:scale-95 transition-transform"
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-50 text-indigo-700">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">View Room Assignments</p>
+            <p className="text-xs text-gray-500">See who&apos;s staying where</p>
+          </div>
+        </div>
+        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </Link>
+
       {/* Notes */}
       {trip.notes && (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">

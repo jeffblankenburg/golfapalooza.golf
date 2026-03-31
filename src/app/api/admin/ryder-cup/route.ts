@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     // Fetch teams
     const { data: teams, error: teamsError } = await adminClient
       .from("ryder_cup_teams")
-      .select("id, contest_id, team_number, team_name")
+      .select("id, contest_id, team_number, team_name, team_color")
       .eq("contest_id", contestId)
       .order("team_number");
 
@@ -51,13 +51,13 @@ export async function GET(request: Request) {
     // If no teams exist yet, auto-seed them
     if (!teams || teams.length === 0) {
       const rows = [
-        { contest_id: contestId, team_number: 1, team_name: "Team 1" },
-        { contest_id: contestId, team_number: 2, team_name: "Team 2" },
+        { contest_id: contestId, team_number: 1, team_name: "Team 1", team_color: null },
+        { contest_id: contestId, team_number: 2, team_name: "Team 2", team_color: null },
       ];
       const { data: seeded, error: seedError } = await adminClient
         .from("ryder_cup_teams")
         .insert(rows)
-        .select("id, contest_id, team_number, team_name");
+        .select("id, contest_id, team_number, team_name, team_color");
 
       if (seedError) {
         return NextResponse.json({ error: seedError.message }, { status: 500 });
@@ -166,16 +166,20 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const { team_id, team_name } = await request.json();
+    const { team_id, team_name, team_color } = await request.json();
 
     if (!team_id) {
       return NextResponse.json({ error: "team_id is required" }, { status: 400 });
     }
 
     const adminClient = createAdminClient();
+    const updates: Record<string, unknown> = {};
+    if (team_name !== undefined) updates.team_name = team_name;
+    if (team_color !== undefined) updates.team_color = team_color;
+
     const { error } = await adminClient
       .from("ryder_cup_teams")
-      .update({ team_name })
+      .update(updates)
       .eq("id", team_id);
 
     if (error) {

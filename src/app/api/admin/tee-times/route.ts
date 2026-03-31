@@ -63,6 +63,15 @@ export async function GET(request: Request) {
       .eq("contest_type", "scramble")
       .maybeSingle();
 
+    // Check if this day has a ryder_cup contest (KGB Cup)
+    const { data: ryderCupContest } = await adminClient
+      .from("contests")
+      .select("id")
+      .eq("trip_id", tripId)
+      .eq("day_number", dayNum)
+      .eq("contest_type", "ryder_cup")
+      .maybeSingle();
+
     // If scramble day, fetch scramble teams with members
     let scrambleTeams: Array<{
       id: string;
@@ -89,6 +98,69 @@ export async function GET(request: Request) {
         });
         return { id: team.id, members };
       });
+    }
+
+    // If KGB Cup day, fetch foursomes with pairs and player names
+    let kgbFoursomes: Array<{
+      id: string;
+      sort_order: number;
+      members: Array<{ user_id: string; display_name: string; avatar_url: string | null; team_color: string | null }>;
+    }> = [];
+
+    if (ryderCupContest) {
+      const { data: foursomes } = await adminClient
+        .from("ryder_cup_foursomes")
+        .select("id, pair_team1_id, pair_team2_id, sort_order")
+        .eq("contest_id", ryderCupContest.id)
+        .order("sort_order");
+
+      if (foursomes && foursomes.length > 0) {
+        // Fetch teams for colors
+        const { data: rcTeams } = await adminClient
+          .from("ryder_cup_teams")
+          .select("id, team_color")
+          .eq("contest_id", ryderCupContest.id);
+
+        const teamColorMap = new Map<string, string | null>();
+        for (const t of rcTeams || []) {
+          teamColorMap.set(t.id, t.team_color);
+        }
+
+        // Fetch all pairs
+        const teamIds = (rcTeams || []).map((t) => t.id);
+        const { data: rcPairs } = teamIds.length > 0
+          ? await adminClient
+              .from("ryder_cup_pairs")
+              .select("id, team_id, player_a_id, player_b_id, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name, avatar_url), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name, avatar_url)")
+              .in("team_id", teamIds)
+          : { data: [] };
+
+        // Build pair lookup
+        const pairLookup = new Map<string, { team_id: string; players: Array<{ user_id: string; display_name: string; avatar_url: string | null }> }>();
+        for (const p of rcPairs || []) {
+          const playerA = Array.isArray(p.player_a) ? p.player_a[0] : p.player_a;
+          const playerB = Array.isArray(p.player_b) ? p.player_b[0] : p.player_b;
+          const players: Array<{ user_id: string; display_name: string; avatar_url: string | null }> = [];
+          if (playerA) players.push({ user_id: playerA.id, display_name: playerA.display_name, avatar_url: playerA.avatar_url });
+          if (playerB) players.push({ user_id: playerB.id, display_name: playerB.display_name, avatar_url: playerB.avatar_url });
+          pairLookup.set(p.id, { team_id: p.team_id, players });
+        }
+
+        kgbFoursomes = foursomes.map((f) => {
+          const pair1 = pairLookup.get(f.pair_team1_id);
+          const pair2 = pairLookup.get(f.pair_team2_id);
+          const members: Array<{ user_id: string; display_name: string; avatar_url: string | null; team_color: string | null }> = [];
+
+          for (const p of pair1?.players || []) {
+            members.push({ ...p, team_color: teamColorMap.get(pair1!.team_id) || null });
+          }
+          for (const p of pair2?.players || []) {
+            members.push({ ...p, team_color: teamColorMap.get(pair2!.team_id) || null });
+          }
+
+          return { id: f.id, sort_order: f.sort_order, members };
+        });
+      }
     }
 
     // Fetch all event participants (the pool of available players) — for non-scramble days
@@ -144,7 +216,7 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({ groups: normalizedGroups, unassigned, scramble_teams: scrambleTeams });
+    return NextResponse.json({ groups: normalizedGroups, unassigned, scramble_teams: scrambleTeams, kgb_foursomes: kgbFoursomes });
   } catch (error) {
     console.error("Get tee times error:", error);
     return NextResponse.json({ error: "Failed to load tee times" }, { status: 500 });
@@ -159,7 +231,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { trip_id, day_number } = await request.json();
+    const { trip_id, day_number, kgb_foursome_id } = await request.json();
 
     if (!trip_id || !day_number) {
       return NextResponse.json({ error: "trip_id and day_number are required" }, { status: 400 });
@@ -168,12 +240,42 @@ export async function POST(request: Request) {
     const adminClient = createAdminClient();
     const { data: group, error } = await adminClient
       .from("tee_times")
-      .insert({ trip_id, day_number })
+      .insert({ trip_id, day_number, starting_hole: 1 })
       .select()
       .single();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // If kgb_foursome_id provided, auto-populate tee_time_players from the foursome
+    if (kgb_foursome_id && group) {
+      // Fetch the foursome's pairs and their players
+      const { data: foursome } = await adminClient
+        .from("ryder_cup_foursomes")
+        .select("pair_team1_id, pair_team2_id")
+        .eq("id", kgb_foursome_id)
+        .single();
+
+      if (foursome) {
+        const pairIds = [foursome.pair_team1_id, foursome.pair_team2_id];
+        const { data: fPairs } = await adminClient
+          .from("ryder_cup_pairs")
+          .select("player_a_id, player_b_id")
+          .in("id", pairIds);
+
+        const playerIds: string[] = [];
+        for (const p of fPairs || []) {
+          if (p.player_a_id) playerIds.push(p.player_a_id);
+          if (p.player_b_id) playerIds.push(p.player_b_id);
+        }
+
+        if (playerIds.length > 0) {
+          await adminClient
+            .from("tee_time_players")
+            .insert(playerIds.map((uid) => ({ tee_time_id: group.id, user_id: uid })));
+        }
+      }
     }
 
     return NextResponse.json({ group });

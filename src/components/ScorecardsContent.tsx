@@ -18,6 +18,7 @@ interface Team {
   team_handicap: number;
   gross_score: number | null;
   course_par: number;
+  verified_at: string | null;
   members: TeamMember[];
 }
 
@@ -205,7 +206,7 @@ export function ScorecardsContent({
             onClick={() => setSelectedDay(c.day_number)}
             className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
               selectedDay === c.day_number
-                ? "bg-green-600 text-white"
+                ? "bg-sky-600 text-white"
                 : "bg-gray-100 text-gray-600 active:bg-gray-200"
             }`}
           >
@@ -216,7 +217,7 @@ export function ScorecardsContent({
 
       {loading && (
         <div className="flex justify-center py-12">
-          <div className="w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-sky-600 border-t-transparent rounded-full animate-spin" />
         </div>
       )}
 
@@ -263,13 +264,23 @@ export function ScorecardsContent({
                       )}
                     </p>
                   </div>
-                  {net !== null && (
-                    <div className="flex-shrink-0 ml-3">
+                  <div className="flex-shrink-0 ml-3 flex flex-col items-end gap-1">
+                    {net !== null && (
                       <span className={`text-2xl font-bold ${net <= totalPar ? "text-green-700" : "text-red-600"}`}>
                         {formatNetRelPar(net, totalPar)}
                       </span>
-                    </div>
-                  )}
+                    )}
+                    {team.verified_at ? (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-green-600">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Verified
+                      </span>
+                    ) : Object.keys(scoreMap[team.id] || {}).length > 0 ? (
+                      <span className="text-[10px] font-medium text-amber-600">Unofficial</span>
+                    ) : null}
+                  </div>
                 </div>
 
                 {/* Scorecard grid — fixed columns so front/back 9 align */}

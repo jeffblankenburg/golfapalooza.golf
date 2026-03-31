@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { team_id } = await request.json();
+    const { team_id, sort_order: requestedSortOrder } = await request.json();
 
     if (!team_id) {
       return NextResponse.json({ error: "team_id is required" }, { status: 400 });
@@ -36,15 +36,21 @@ export async function POST(request: Request) {
 
     const adminClient = createAdminClient();
 
-    // Get next sort_order
-    const { data: existing } = await adminClient
-      .from("ryder_cup_pairs")
-      .select("sort_order")
-      .eq("team_id", team_id)
-      .order("sort_order", { ascending: false })
-      .limit(1);
+    // Use provided sort_order or auto-increment (skipping pool pairs at sort_order=0)
+    let nextOrder: number;
+    if (requestedSortOrder !== undefined) {
+      nextOrder = requestedSortOrder;
+    } else {
+      const { data: existing } = await adminClient
+        .from("ryder_cup_pairs")
+        .select("sort_order")
+        .eq("team_id", team_id)
+        .gt("sort_order", 0)
+        .order("sort_order", { ascending: false })
+        .limit(1);
 
-    const nextOrder = (existing?.[0]?.sort_order ?? -1) + 1;
+      nextOrder = (existing?.[0]?.sort_order ?? 0) + 1;
+    }
 
     const { data: pair, error } = await adminClient
       .from("ryder_cup_pairs")

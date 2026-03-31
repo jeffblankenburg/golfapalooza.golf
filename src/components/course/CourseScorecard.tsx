@@ -42,7 +42,7 @@ function NineTable({
                 <th key={hole.number} className="py-2 px-0.5 min-w-[30px]">
                   <button
                     onClick={() => onHoleSelect(hole.number)}
-                    className="w-full py-1 px-1 rounded-lg bg-green-50 text-green-700 font-bold active:bg-green-100 transition-colors"
+                    className="w-full py-1 px-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold active:bg-emerald-100 transition-colors"
                   >
                     {hole.number}
                   </button>
@@ -190,7 +190,7 @@ export function CourseScorecard({ course }: { course: CourseData }) {
       />
 
       {/* Total */}
-      <div className="flex justify-between items-center px-4 py-3 bg-green-700 rounded-2xl text-white">
+      <div className="flex justify-between items-center px-4 py-3 bg-emerald-700 rounded-2xl text-white">
         <span className="font-semibold">Total</span>
         <div className="flex gap-6 text-sm">
           <span>Par {totalPar}</span>

@@ -21,6 +21,19 @@ interface ScrambleTeam {
   members: ScrambleTeamMember[];
 }
 
+interface KgbFoursomeMember {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  team_color: string | null;
+}
+
+interface KgbFoursome {
+  id: string;
+  sort_order: number;
+  members: KgbFoursomeMember[];
+}
+
 interface TeeTimeGroup {
   id: string;
   trip_id: string;
@@ -58,6 +71,7 @@ export function TeeTimeManager({ tripId }: { tripId: string }) {
   const [groups, setGroups] = useState<TeeTimeGroup[]>([]);
   const [unassigned, setUnassigned] = useState<UnassignedPlayer[]>([]);
   const [scrambleTeams, setScrambleTeams] = useState<ScrambleTeam[]>([]);
+  const [kgbFoursomes, setKgbFoursomes] = useState<KgbFoursome[]>([]);
   const [view, setView] = useState<View>("days");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
@@ -71,6 +85,7 @@ export function TeeTimeManager({ tripId }: { tripId: string }) {
   } | null>(null);
 
   const isScrambleDay = scrambleTeams.length > 0;
+  const isKgbDay = kgbFoursomes.length > 0;
 
   // Build DAYS from event_days
   const DAYS: Day[] = eventDays.map((ed) => ({
@@ -131,6 +146,7 @@ export function TeeTimeManager({ tripId }: { tripId: string }) {
     setGroups(sortedGroups);
     setUnassigned(data.unassigned || []);
     setScrambleTeams(data.scramble_teams || []);
+    setKgbFoursomes(data.kgb_foursomes || []);
   }, [tripId]);
 
   // ── Helpers ──
@@ -142,6 +158,19 @@ export function TeeTimeManager({ tripId }: { tripId: string }) {
   function getUnassignedTeams(): ScrambleTeam[] {
     const assignedTeamIds = new Set(groups.map((g) => g.scramble_team_id).filter(Boolean));
     return scrambleTeams.filter((t) => !assignedTeamIds.has(t.id));
+  }
+
+  function getUnassignedKgbFoursomes(): KgbFoursome[] {
+    // A foursome is "assigned" if all its members appear in some tee time group's players
+    const assignedUserIds = new Set<string>();
+    for (const g of groups) {
+      for (const p of g.players) {
+        assignedUserIds.add(p.user_id);
+      }
+    }
+    return kgbFoursomes.filter((f) =>
+      f.members.length > 0 && !f.members.every((m) => assignedUserIds.has(m.user_id))
+    );
   }
 
   function getTeamLabel(team: ScrambleTeam): string {
@@ -240,6 +269,30 @@ export function TeeTimeManager({ tripId }: { tripId: string }) {
       body: JSON.stringify({ tee_time_id: groupId, scramble_team_id: null }),
     });
 
+    setSaving(null);
+  };
+
+  // ── KGB Foursome assignment ──
+
+  const assignKgbFoursome = async (foursomeId: string) => {
+    if (!selectedDay) return;
+    setSaving(`assign-kgb-${foursomeId}`);
+
+    // Create a new tee time group with the foursome's players auto-populated
+    const res = await fetch("/api/admin/tee-times", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        trip_id: tripId,
+        day_number: selectedDay.number,
+        kgb_foursome_id: foursomeId,
+      }),
+    });
+
+    if (res.ok) {
+      await fetchGroups(selectedDay.number);
+    }
+    setAddingToGroup(null);
     setSaving(null);
   };
 
@@ -361,6 +414,17 @@ export function TeeTimeManager({ tripId }: { tripId: string }) {
   // ── Groups View ──
   if (view === "groups" && selectedDay) {
     const unassignedTeams = getUnassignedTeams();
+    const unassignedKgbFoursomes = getUnassignedKgbFoursomes();
+
+    // Build player-to-team-color map for KGB days
+    const kgbPlayerColors = new Map<string, string | null>();
+    if (isKgbDay) {
+      for (const f of kgbFoursomes) {
+        for (const m of f.members) {
+          kgbPlayerColors.set(m.user_id, m.team_color);
+        }
+      }
+    }
 
     return (
       <div>
@@ -418,7 +482,51 @@ export function TeeTimeManager({ tripId }: { tripId: string }) {
           </div>
         )}
 
-        {!isScrambleDay && unassigned.length > 0 && (
+        {/* Unassigned banner — KGB foursomes */}
+        {isKgbDay && !isScrambleDay && unassignedKgbFoursomes.length > 0 && (
+          <div className="bg-amber-50 rounded-xl border border-amber-200 p-3 mb-4">
+            <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">
+              Unassigned Foursomes ({unassignedKgbFoursomes.length})
+            </p>
+            <div className="space-y-1">
+              {unassignedKgbFoursomes.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => assignKgbFoursome(f.id)}
+                  disabled={saving !== null}
+                  className="w-full flex items-center justify-between px-2 py-1.5 bg-white rounded-lg border border-amber-200 active:bg-gray-50"
+                >
+                  <div className="flex flex-wrap gap-1.5">
+                    {f.members.map((m) => (
+                      <span
+                        key={m.user_id}
+                        className="inline-flex items-center gap-1 text-xs text-gray-700"
+                      >
+                        {m.team_color && (
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: m.team_color }}
+                          />
+                        )}
+                        {m.avatar_url ? (
+                          <img src={m.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                        ) : (
+                          <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                            {(m.display_name || "?")[0].toUpperCase()}
+                          </span>
+                        )}
+                        {m.display_name}
+                      </span>
+                    ))}
+                  </div>
+                  <span className="text-xs text-green-700 font-medium ml-2 flex-shrink-0">+ Add</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!isScrambleDay && !isKgbDay && unassigned.length > 0 && (
           <div className="bg-amber-50 rounded-xl border border-amber-200 p-3 mb-4">
             <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">
               Unassigned ({unassigned.length})
@@ -544,8 +652,41 @@ export function TeeTimeManager({ tripId }: { tripId: string }) {
                   </div>
                 )}
 
+                {/* KGB Cup day: foursome players with team colors */}
+                {isKgbDay && !isScrambleDay && (
+                  <div className="px-4 py-2">
+                    {group.players.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic py-1">No foursome assigned</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5 py-1">
+                        {group.players.map((player) => (
+                          <span
+                            key={player.user_id}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 rounded-full text-xs font-medium text-green-800"
+                          >
+                            {kgbPlayerColors.get(player.user_id) && (
+                              <span
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: kgbPlayerColors.get(player.user_id)! }}
+                              />
+                            )}
+                            {player.avatar_url ? (
+                              <img src={player.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                            ) : (
+                              <span className="w-4 h-4 rounded-full bg-green-200 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                                {(player.display_name || "?")[0].toUpperCase()}
+                              </span>
+                            )}
+                            {player.display_name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Non-scramble day: individual players */}
-                {!isScrambleDay && (
+                {!isScrambleDay && !isKgbDay && (
                   <div className="px-4 py-2">
                     {group.players.length === 0 ? (
                       <p className="text-xs text-gray-400 italic py-1">No players yet</p>

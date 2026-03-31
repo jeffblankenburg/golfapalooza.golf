@@ -13,7 +13,6 @@ import { ItineraryManager } from "@/components/admin/ItineraryManager";
 import { RoomManager } from "@/components/admin/RoomManager";
 import { ActionItemsManager } from "@/components/admin/ActionItemsManager";
 import { AccoladesManager } from "@/components/admin/AccoladesManager";
-import { RyderCupManager } from "@/components/admin/RyderCupManager";
 import { TeeTimeManager } from "@/components/admin/TeeTimeManager";
 import { VisibilityToggles } from "@/components/admin/VisibilityToggles";
 import { HundredFeetManager } from "@/components/admin/HundredFeetManager";
@@ -201,17 +200,23 @@ export default function EventDetailPage() {
       </CollapsibleSection>
 
       {hasContestType("ryder_cup") && (
-        <CollapsibleSection
-          title="Ryder Cup Teams"
-          summary="Manage teams &amp; pairings"
-          icon={
+        <Link
+          href={`/admin/events/${tripId}/kgb-cup`}
+          className="flex items-center gap-3 bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-4 active:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-50 text-red-700 flex-shrink-0">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
             </svg>
-          }
-        >
-          <RyderCupManager tripId={tripId} />
-        </CollapsibleSection>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-900">KGB Cup</p>
+            <p className="text-xs text-gray-500">Teams, handicaps &amp; scoring</p>
+          </div>
+          <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
       )}
 
       {hasScramble && (

@@ -233,7 +233,7 @@ export function HoleDetailModal({ holes, initialHole, onClose }: Props) {
               key={i}
               onClick={() => goToHole(i)}
               className={`w-2 h-2 rounded-full transition-colors ${
-                i === currentIndex ? "bg-green-600" : "bg-gray-300"
+                i === currentIndex ? "bg-emerald-600" : "bg-gray-300"
               }`}
             />
           ))}

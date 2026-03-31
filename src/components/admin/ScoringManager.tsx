@@ -19,6 +19,8 @@ interface Team {
   gross_score: number | null;
   course_par: number;
   members: TeamMember[];
+  verified_at?: string | null;
+  verified_by_name?: string | null;
 }
 
 interface HoleInfo {
@@ -48,6 +50,8 @@ interface Contest {
   name: string;
   day_number: number | null;
   contest_type: string;
+  scoring_closed_at?: string | null;
+  verified_at?: string | null;
 }
 
 type Tab = "scores" | "bonus";
@@ -67,6 +71,10 @@ export function ScoringManager({ tripId }: { tripId: string }) {
 
   const [clearing, setClearing] = useState<"today" | "all" | null>(null);
   const [confirmClear, setConfirmClear] = useState<"today" | "all" | null>(null);
+  const [verifying, setVerifying] = useState<string | null>(null);
+  const [scoringClosed, setScoringClosed] = useState(false);
+  const [contestVerified, setContestVerified] = useState(false);
+  const [lifecycleLoading, setLifecycleLoading] = useState(false);
 
   const dirtyScoresRef = useRef<Map<string, { team_id: string; hole_number: number; strokes: number }>>(new Map());
   const dirtyBonusesRef = useRef<Map<string, BonusPoint>>(new Map());
@@ -116,6 +124,8 @@ export function ScoringManager({ tripId }: { tripId: string }) {
       if (scrambles.length > 0) {
         const first = scrambles[0];
         setSelectedContestId(first.id);
+        setScoringClosed(!!first.scoring_closed_at);
+        setContestVerified(!!first.verified_at);
         await fetchScoringData(first.id);
       }
       setLoading(false);
@@ -338,6 +348,9 @@ export function ScoringManager({ tripId }: { tripId: string }) {
 
     setSelectedContestId(contestId);
     setSelectedBonusTeamId(null);
+    const selectedContest = contests.find((c) => c.id === contestId);
+    setScoringClosed(!!selectedContest?.scoring_closed_at);
+    setContestVerified(!!selectedContest?.verified_at);
     setLoading(true);
     await fetchScoringData(contestId);
     setLoading(false);
@@ -369,6 +382,60 @@ export function ScoringManager({ tripId }: { tripId: string }) {
     } finally {
       setClearing(null);
       setConfirmClear(null);
+    }
+  };
+
+  // Verify/unverify a team's scorecard
+  const handleVerify = async (teamId: string, action: "verify" | "unverify") => {
+    setVerifying(teamId);
+    try {
+      const res = await fetch("/api/admin/scramble/verify", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ team_id: teamId, action }),
+      });
+      if (res.ok && selectedContestId) {
+        await fetchScoringData(selectedContestId);
+      }
+    } catch {
+      // silent
+    } finally {
+      setVerifying(null);
+    }
+  };
+
+  // Close/open/verify/unverify contest scoring lifecycle
+  const handleLifecycle = async (action: "close" | "open" | "verify" | "unverify") => {
+    if (!selectedContestId) return;
+    setLifecycleLoading(true);
+    try {
+      const res = await fetch("/api/admin/scoring-lifecycle", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contest_id: selectedContestId, action }),
+      });
+      if (res.ok) {
+        if (action === "close") setScoringClosed(true);
+        else if (action === "open") setScoringClosed(false);
+        else if (action === "verify") setContestVerified(true);
+        else if (action === "unverify") setContestVerified(false);
+        // Update the contests array so switching back works
+        setContests((prev) =>
+          prev.map((c) =>
+            c.id === selectedContestId
+              ? {
+                  ...c,
+                  scoring_closed_at: action === "close" ? new Date().toISOString() : action === "open" ? null : c.scoring_closed_at,
+                  verified_at: action === "verify" ? new Date().toISOString() : action === "unverify" ? null : c.verified_at,
+                }
+              : c
+          )
+        );
+      }
+    } catch {
+      // silent
+    } finally {
+      setLifecycleLoading(false);
     }
   };
 
@@ -462,6 +529,68 @@ export function ScoringManager({ tripId }: { tripId: string }) {
         ))}
       </div>
 
+      {/* Scoring Lifecycle Controls */}
+      <div className="flex items-center gap-2 px-1">
+        <div className="flex items-center gap-1.5 flex-1">
+          {contestVerified ? (
+            <span className="flex items-center gap-1 text-xs font-medium text-green-700">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Verified
+            </span>
+          ) : scoringClosed ? (
+            <span className="flex items-center gap-1 text-xs font-medium text-amber-600">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              Scoring Closed
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-xs font-medium text-green-600">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              Live
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          {contestVerified ? (
+            <button
+              onClick={() => handleLifecycle("unverify")}
+              disabled={lifecycleLoading}
+              className="px-2.5 py-1 text-xs font-medium rounded-lg bg-gray-100 text-gray-600 active:bg-gray-200 disabled:opacity-50"
+            >
+              {lifecycleLoading ? "..." : "Unverify"}
+            </button>
+          ) : scoringClosed ? (
+            <>
+              <button
+                onClick={() => handleLifecycle("open")}
+                disabled={lifecycleLoading}
+                className="px-2.5 py-1 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 active:bg-amber-200 disabled:opacity-50"
+              >
+                {lifecycleLoading ? "..." : "Reopen Scoring"}
+              </button>
+              <button
+                onClick={() => handleLifecycle("verify")}
+                disabled={lifecycleLoading}
+                className="px-2.5 py-1 text-xs font-medium rounded-lg bg-green-600 text-white active:bg-green-700 disabled:opacity-50"
+              >
+                {lifecycleLoading ? "..." : "Verify Scores"}
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => handleLifecycle("close")}
+              disabled={lifecycleLoading}
+              className="px-2.5 py-1 text-xs font-medium rounded-lg bg-red-100 text-red-700 active:bg-red-200 disabled:opacity-50"
+            >
+              {lifecycleLoading ? "..." : "Close Live Scoring"}
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Save Status — always in DOM to avoid layout shift */}
       <div className={`flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-lg transition-opacity duration-300 ${
         saveStatus === "idle" ? "opacity-0" :
@@ -545,6 +674,8 @@ export function ScoringManager({ tripId }: { tripId: string }) {
               totalPar={totalPar}
               scoreColor={scoreColor}
               totalColor={totalColor}
+              onVerify={handleVerify}
+              verifying={verifying}
             />
           ) : (
             <BonusTab
@@ -626,6 +757,8 @@ function ScoresGrid({
   totalPar,
   scoreColor,
   totalColor,
+  onVerify,
+  verifying,
 }: {
   teams: Team[];
   holes: HoleInfo[];
@@ -638,6 +771,8 @@ function ScoresGrid({
   totalPar: () => number;
   scoreColor: (strokes: number | undefined, par: number) => string;
   totalColor: (total: number | null, par: number) => string;
+  onVerify: (teamId: string, action: "verify" | "unverify") => void;
+  verifying: string | null;
 }) {
   const frontNine = holes.filter((h) => h.hole_number <= 9).sort((a, b) => a.hole_number - b.hole_number);
   const backNine = holes.filter((h) => h.hole_number > 9).sort((a, b) => a.hole_number - b.hole_number);
@@ -713,8 +848,9 @@ function ScoresGrid({
             const nineTotal = calcNine(team.id, start, end);
             const ninePar = parForNine(start, end);
             const teamSkinHoles = skinWins.get(team.id);
+            const isLocked = !!team.verified_at;
             return (
-              <tr key={team.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"}>
+              <tr key={team.id} className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"} ${isLocked ? "opacity-60" : ""}`}>
                 <td className={`sticky left-0 z-10 px-2 py-1.5 font-medium text-gray-700 truncate max-w-[112px] ${idx % 2 === 0 ? "bg-white" : "bg-gray-50"}`}>
                   {getTeamLabel(team, idx)}
                 </td>
@@ -732,9 +868,10 @@ function ScoresGrid({
                         onChange={(e) => onScoreChange(team.id, h.hole_number, e.target.value)}
                         onKeyDown={handleKeyDown}
                         onFocus={(e) => e.target.select()}
+                        disabled={isLocked}
                         className={`w-8 h-7 text-center border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] ${
                           wonSkin ? "ring-2 ring-green-500" : ""
-                        } ${scoreColor(teamScores[h.hole_number], h.par)}`}
+                        } ${scoreColor(teamScores[h.hole_number], h.par)} ${isLocked ? "bg-gray-100 cursor-not-allowed" : ""}`}
                       />
                     </td>
                   );
@@ -750,8 +887,70 @@ function ScoresGrid({
     </div>
   );
 
+  const verifiedCount = teams.filter((t) => t.verified_at).length;
+
   return (
     <div className="space-y-4">
+      {/* Verification Summary */}
+      <div className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-xl text-xs">
+        <span className="font-medium text-gray-600">
+          {verifiedCount} of {teams.length} teams verified
+        </span>
+        {verifiedCount === teams.length && teams.length > 0 && (
+          <span className="text-green-600 font-semibold">All Verified</span>
+        )}
+      </div>
+
+      {/* Per-team verification controls */}
+      <div className="space-y-2">
+        {teams.map((team, idx) => {
+          const isTeamVerified = !!team.verified_at;
+          const allHolesScored = calcTotal(team.id) !== null;
+          return (
+            <div key={team.id} className="flex items-center justify-between px-3 py-2 bg-white rounded-xl border border-gray-200">
+              <div className="flex-1 min-w-0">
+                <span className="text-xs font-medium text-gray-700 truncate block">
+                  {getTeamLabel(team, idx)}
+                </span>
+                {isTeamVerified && team.verified_by_name && (
+                  <span className="text-[10px] text-gray-400">
+                    by {team.verified_by_name}
+                  </span>
+                )}
+              </div>
+              {isTeamVerified ? (
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-600">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Verified
+                  </span>
+                  <button
+                    onClick={() => onVerify(team.id, "unverify")}
+                    disabled={verifying === team.id}
+                    className="px-2 py-1 text-[10px] font-medium text-gray-500 bg-gray-100 rounded-lg active:bg-gray-200 disabled:opacity-50"
+                  >
+                    {verifying === team.id ? "..." : "Unverify"}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-amber-600 font-medium">Unofficial</span>
+                  <button
+                    onClick={() => onVerify(team.id, "verify")}
+                    disabled={verifying === team.id || !allHolesScored}
+                    className="px-2 py-1 text-[10px] font-medium text-white bg-green-600 rounded-lg active:bg-green-700 disabled:opacity-50"
+                  >
+                    {verifying === team.id ? "..." : "Verify"}
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
       {frontNine.length > 0 && renderHalf(frontNine, "OUT", 1, 9)}
       {backNine.length > 0 && renderHalf(backNine, "IN", 10, 18)}
 

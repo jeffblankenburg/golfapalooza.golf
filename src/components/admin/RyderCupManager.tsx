@@ -26,6 +26,7 @@ interface Team {
   contest_id: string;
   team_number: number;
   team_name: string | null;
+  team_color: string | null;
   pairs: Pair[];
 }
 
@@ -116,6 +117,18 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
     });
   };
 
+  const updateTeamColor = async (teamId: string, color: string | null) => {
+    setTeams((prev) =>
+      prev.map((t) => (t.id === teamId ? { ...t, team_color: color } : t))
+    );
+
+    await fetch("/api/admin/ryder-cup", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ team_id: teamId, team_color: color }),
+    });
+  };
+
   // ── Pair CRUD ──
 
   const createPair = async (teamId: string) => {
@@ -150,12 +163,49 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
   };
 
   const deletePair = (pairId: string) => {
+    // Find the pair to check if it has players that need to be returned to pool
+    const pair = teams.flatMap((t) => t.pairs).find((p) => p.id === pairId);
+    const hasPlayers = pair && (pair.player_a || pair.player_b);
+
     setConfirmModal({
       title: "Delete Pair",
-      message: "Delete this pair? This cannot be undone.",
+      message: hasPlayers
+        ? "Players in this pair will be returned to the unplaced pool."
+        : "Delete this empty pair?",
       onConfirm: async () => {
         setConfirmModal(null);
         setErrorMsg(null);
+
+        if (pair) {
+          // Return players to pool before deleting
+          for (const [player, slot] of [
+            [pair.player_a, "player_a_id"] as const,
+            [pair.player_b, "player_b_id"] as const,
+          ]) {
+            if (!player) continue;
+            // Clear slot first
+            await fetch("/api/admin/ryder-cup/pairs", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ pair_id: pairId, [slot]: null }),
+            });
+            // Create pool pair for the player
+            const res = await fetch("/api/admin/ryder-cup/pairs", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ team_id: pair.team_id, sort_order: 0 }),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              await fetch("/api/admin/ryder-cup/pairs", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pair_id: data.pair.id, player_a_id: player.id }),
+              });
+            }
+          }
+        }
+
         const res = await fetch("/api/admin/ryder-cup/pairs", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
@@ -165,51 +215,6 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
           const data = await res.json();
           setErrorMsg(data.error || "Failed to delete pair");
         }
-        await refresh();
-      },
-    });
-  };
-
-  // ── Foursome CRUD ──
-
-  const [newFoursomePair1, setNewFoursomePair1] = useState<string>("");
-  const [newFoursomePair2, setNewFoursomePair2] = useState<string>("");
-
-  const createFoursome = async () => {
-    if (!contest || !newFoursomePair1 || !newFoursomePair2) return;
-    setSaving("new-foursome");
-    setErrorMsg(null);
-    const res = await fetch("/api/admin/ryder-cup/foursomes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contest_id: contest.id,
-        pair_team1_id: newFoursomePair1,
-        pair_team2_id: newFoursomePair2,
-      }),
-    });
-    if (!res.ok) {
-      const data = await res.json();
-      setErrorMsg(data.error || "Failed to create foursome");
-    } else {
-      setNewFoursomePair1("");
-      setNewFoursomePair2("");
-    }
-    await refresh();
-    setSaving(null);
-  };
-
-  const deleteFoursome = (foursomeId: string) => {
-    setConfirmModal({
-      title: "Delete Foursome",
-      message: "Remove this foursome matchup?",
-      onConfirm: async () => {
-        setConfirmModal(null);
-        await fetch("/api/admin/ryder-cup/foursomes", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ foursome_id: foursomeId }),
-        });
         await refresh();
       },
     });
@@ -286,6 +291,177 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
     });
   };
 
+  // ── Quick-assign: multi-select chips then assign to a team ──
+
+  const [chipSelections, setChipSelections] = useState<Set<string>>(new Set());
+
+  const toggleChipSelection = (userId: string) => {
+    setChipSelections((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
+
+  const batchAssignToTeam = async (team: Team) => {
+    const userIds = Array.from(chipSelections);
+    if (userIds.length === 0) return;
+
+    setSaving("batch-chip-assign");
+
+    // Create a pool pair (sort_order=0) for each player — tracks team membership
+    for (const userId of userIds) {
+      const res = await fetch("/api/admin/ryder-cup/pairs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ team_id: team.id, sort_order: 0 }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        await fetch("/api/admin/ryder-cup/pairs", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pair_id: data.pair.id, player_a_id: userId }),
+        });
+      }
+    }
+
+    // Pre-create empty pair cards (sort_order auto-incremented from 1)
+    const existingRealPairs = team.pairs.filter((p) => p.sort_order > 0).length;
+    const totalPlayers = getPlayersOnTeam(team).length + userIds.length;
+    const neededPairCards = Math.ceil(totalPlayers / 2);
+    const toCreate = Math.max(0, neededPairCards - existingRealPairs);
+
+    for (let i = 0; i < toCreate; i++) {
+      await fetch("/api/admin/ryder-cup/pairs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ team_id: team.id }),
+      });
+    }
+
+    setChipSelections(new Set());
+    await refresh();
+    setSaving(null);
+  };
+
+  // ── Step 2: Tap slot → pick from list ──
+
+  const [openSlot, setOpenSlot] = useState<{
+    pairId: string;
+    slot: "player_a_id" | "player_b_id";
+    teamId: string;
+  } | null>(null);
+
+  const placePlayerIntoPair = async (
+    poolPairId: string,
+    targetPairId: string,
+    slot: "player_a_id" | "player_b_id",
+    userId: string
+  ) => {
+    setErrorMsg(null);
+    setOpenSlot(null);
+
+    // Find the player info from pool pair for optimistic update
+    const poolPair = teams.flatMap((t) => t.pairs).find((p) => p.id === poolPairId);
+    const playerInfo = poolPair?.player_a || null;
+
+    // Optimistic UI: remove pool pair, fill target slot
+    if (playerInfo) {
+      setTeams((prev) =>
+        prev.map((t) => ({
+          ...t,
+          pairs: t.pairs
+            .filter((p) => p.id !== poolPairId)
+            .map((p) =>
+              p.id === targetPairId
+                ? { ...p, [slot === "player_a_id" ? "player_a" : "player_b"]: playerInfo }
+                : p
+            ),
+        }))
+      );
+    }
+
+    // DELETE must finish first (PUT validates player isn't in another pair)
+    await fetch("/api/admin/ryder-cup/pairs", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pair_id: poolPairId }),
+    });
+
+    const putRes = await fetch("/api/admin/ryder-cup/pairs", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pair_id: targetPairId, [slot]: userId }),
+    });
+
+    if (!putRes.ok) {
+      const data = await putRes.json();
+      setErrorMsg(data.error || "Failed to place player");
+      await refresh(); // Revert on failure
+    }
+  };
+
+  const removePlayerFromPair = async (
+    pairId: string,
+    slot: "player_a_id" | "player_b_id",
+    userId: string,
+    teamId: string
+  ) => {
+    setErrorMsg(null);
+
+    // Find player info for optimistic update
+    const pair = teams.flatMap((t) => t.pairs).find((p) => p.id === pairId);
+    const playerInfo = slot === "player_a_id" ? pair?.player_a : pair?.player_b;
+
+    // Optimistic UI: clear slot, add a temporary pool pair
+    if (playerInfo) {
+      const tempPoolId = `temp-${Date.now()}`;
+      setTeams((prev) =>
+        prev.map((t) => {
+          if (t.id !== teamId) return t;
+          return {
+            ...t,
+            pairs: [
+              ...t.pairs.map((p) =>
+                p.id === pairId
+                  ? { ...p, [slot === "player_a_id" ? "player_a" : "player_b"]: null }
+                  : p
+              ),
+              { id: tempPoolId, team_id: teamId, sort_order: 0, player_a: playerInfo, player_b: null },
+            ],
+          };
+        })
+      );
+    }
+
+    // 1. Clear the slot
+    await fetch("/api/admin/ryder-cup/pairs", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pair_id: pairId, [slot]: null }),
+    });
+
+    // 2. Create pool pair + assign player
+    const res = await fetch("/api/admin/ryder-cup/pairs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ team_id: teamId, sort_order: 0 }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      await fetch("/api/admin/ryder-cup/pairs", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pair_id: data.pair.id, player_a_id: userId }),
+      });
+    }
+
+    // Sync with server to replace temp pool pair with real one
+    await refresh();
+  };
+
   // ── Name toggle ──
 
   const [showRealNames, setShowRealNames] = useState(false);
@@ -354,25 +530,21 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
     return available;
   }
 
+  // Pool pairs (sort_order=0, has player_a) = team membership holders shown as chips
+  function getPoolPairs(team: Team): Pair[] {
+    return team.pairs.filter((p) => p.sort_order === 0 && p.player_a);
+  }
+
+  // Real pairs (sort_order > 0) = pair cards for the admin to fill
+  function getRealPairs(team: Team): Pair[] {
+    return team.pairs.filter((p) => p.sort_order > 0);
+  }
+
   function getPairLabel(pair: Pair): string {
     const a = pair.player_a?.display_name || "—";
     const b = pair.player_b?.display_name || "—";
     return `${a} & ${b}`;
   }
-
-  // Available pairs for foursomes (not already in one)
-  const usedPairIds = new Set(
-    foursomes.flatMap((f) => [f.pair_team1_id, f.pair_team2_id])
-  );
-
-  function getAvailablePairs(team: Team | undefined): Pair[] {
-    if (!team) return [];
-    return team.pairs.filter((p) => !usedPairIds.has(p.id));
-  }
-
-  // Unmatched pairs for the banner
-  const unmatchedPairsTeam1 = getAvailablePairs(team1);
-  const unmatchedPairsTeam2 = getAvailablePairs(team2);
 
   // ── Player avatar helper ──
 
@@ -411,7 +583,6 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
   const steps = [
     { num: 1, label: "Teams" },
     { num: 2, label: "Pairs" },
-    { num: 3, label: "Foursomes" },
   ];
 
   return (
@@ -459,19 +630,55 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
           {unassigned.length > 0 && (
             <div className="bg-amber-50 rounded-xl border border-amber-200 p-3 mb-4">
               <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">
-                Unassigned ({unassigned.length})
+                Unassigned ({unassigned.length}) — select players, then assign
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {unassigned.map((player) => (
-                  <span
-                    key={player.user_id}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-full text-xs font-medium text-gray-700 border border-amber-200"
-                  >
-                    <Avatar player={player} size="xs" />
-                    {player.display_name}
-                  </span>
-                ))}
+                {unassigned.map((player) => {
+                  const isSelected = chipSelections.has(player.user_id);
+                  return (
+                    <button
+                      key={player.user_id}
+                      onClick={() => toggleChipSelection(player.user_id)}
+                      disabled={saving === "batch-chip-assign"}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        isSelected
+                          ? "bg-green-100 text-green-800 border-green-400 ring-1 ring-green-400"
+                          : "bg-white text-gray-700 border-amber-200 active:bg-green-50"
+                      }`}
+                    >
+                      <Avatar player={player} size="xs" />
+                      {player.display_name}
+                    </button>
+                  );
+                })}
               </div>
+
+              {/* Assign-to-team buttons (visible when any chips selected) */}
+              {chipSelections.size > 0 && team1 && team2 && (
+                <div className="flex gap-2 mt-3">
+                  {saving === "batch-chip-assign" ? (
+                    <div className="flex-1 flex items-center justify-center py-2">
+                      <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+                      <span className="ml-2 text-xs text-gray-500">Assigning {chipSelections.size}...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => batchAssignToTeam(team1)}
+                        className="flex-1 py-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg active:bg-blue-100 transition-colors"
+                      >
+                        Add {chipSelections.size} → {team1.team_name || "Team 1"}
+                      </button>
+                      <button
+                        onClick={() => batchAssignToTeam(team2)}
+                        className="flex-1 py-2 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg active:bg-red-100 transition-colors"
+                      >
+                        Add {chipSelections.size} → {team2.team_name || "Team 2"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -483,8 +690,8 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
 
               return (
                 <div key={team.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                  {/* Team name */}
-                  <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
+                  {/* Team name + color */}
+                  <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 space-y-1.5">
                     <input
                       type="text"
                       value={team.team_name || ""}
@@ -497,6 +704,18 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
                       className="w-full text-sm font-semibold text-gray-700 bg-transparent border-none outline-none p-0"
                       placeholder={`Team ${team.team_number}`}
                     />
+                    <div className="flex items-center gap-1">
+                      {["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"].map((hex) => (
+                        <button
+                          key={hex}
+                          onClick={() => updateTeamColor(team.id, hex)}
+                          className={`w-5 h-5 rounded-full border-2 transition-all ${
+                            team.team_color === hex ? "border-gray-700 scale-110" : "border-transparent"
+                          }`}
+                          style={{ backgroundColor: hex }}
+                        />
+                      ))}
+                    </div>
                   </div>
 
                   {/* Players */}
@@ -555,17 +774,17 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
       {/* Step 2: Pairs */}
       {step === 2 && (
         <div>
-          {/* Unpaired players banner */}
+          {/* Unassigned players banner (not on any team yet) */}
           {unassigned.length > 0 && (
             <div className="bg-amber-50 rounded-xl border border-amber-200 p-3 mb-4">
-              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">
-                Unpaired Players ({unassigned.length})
+              <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wide mb-1.5">
+                Not on a team ({unassigned.length}) — assign in Step 1 first
               </p>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1">
                 {unassigned.map((player) => (
                   <span
                     key={player.user_id}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-full text-xs font-medium text-gray-700 border border-amber-200"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-gray-500 border border-amber-200 bg-white"
                   >
                     <Avatar player={player} size="xs" />
                     {player.display_name}
@@ -578,201 +797,99 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
           <div className="grid grid-cols-2 gap-3">
             {[team1, team2].map((team) => {
               if (!team) return null;
+              const poolPairs = getPoolPairs(team);
+              const realPairs = getRealPairs(team);
 
               return (
                 <div key={team.id}>
                   <h3 className="text-sm font-semibold text-gray-700 mb-2">
                     {team.team_name || `Team ${team.team_number}`}
+                    {poolPairs.length > 0 && (
+                      <span className="text-[10px] font-normal text-gray-400 ml-1">
+                        ({poolPairs.length} unplaced)
+                      </span>
+                    )}
                   </h3>
 
+                  {/* Pair cards */}
                   <div className="space-y-2">
-                    {team.pairs.map((pair) => {
-                      const availableA = getAvailableForSlot(pair.id, pair.player_a?.id || null, team);
-                      const availableB = getAvailableForSlot(pair.id, pair.player_b?.id || null, team);
+                    {realPairs.map((pair, idx) => {
+                      const isSlotAOpen = openSlot?.pairId === pair.id && openSlot?.slot === "player_a_id";
+                      const isSlotBOpen = openSlot?.pairId === pair.id && openSlot?.slot === "player_b_id";
 
                       return (
-                      <div
-                        key={pair.id}
-                        className="bg-white rounded-xl border border-gray-200 shadow-sm p-3"
-                      >
-                        {/* Player A */}
-                        <PlayerSlot
-                          label="A"
-                          player={pair.player_a}
-                          pairId={pair.id}
-                          slot="player_a_id"
-                          unassigned={availableA}
-                          saving={saving}
-                          onAssign={assignPlayer}
-                        />
-                        {/* Player B */}
-                        <PlayerSlot
-                          label="B"
-                          player={pair.player_b}
-                          pairId={pair.id}
-                          slot="player_b_id"
-                          unassigned={availableB}
-                          saving={saving}
-                          onAssign={assignPlayer}
-                        />
-                        {/* Delete pair */}
-                        <button
-                          onClick={() => deletePair(pair.id)}
-                          className="text-xs text-gray-300 hover:text-red-500 mt-1"
+                        <div
+                          key={pair.id}
+                          className="bg-white rounded-xl border border-gray-200 shadow-sm p-3"
                         >
-                          Delete pair
-                        </button>
-                      </div>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase">
+                              Pair {idx + 1}
+                            </span>
+                            <button
+                              onClick={() => deletePair(pair.id)}
+                              className="text-gray-300 hover:text-red-500"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+
+                          {/* Slot A */}
+                          <PairSlot
+                            label="A"
+                            player={pair.player_a}
+                            pairId={pair.id}
+                            slot="player_a_id"
+                            teamId={team.id}
+                            isOpen={isSlotAOpen}
+                            availablePlayers={poolPairs}
+                            saving={saving}
+                            onTapEmpty={() => setOpenSlot({ pairId: pair.id, slot: "player_a_id", teamId: team.id })}
+                            onCancel={() => setOpenSlot(null)}
+                            onPickPlayer={(poolPair) => placePlayerIntoPair(poolPair.id, pair.id, "player_a_id", poolPair.player_a!.id)}
+                            onRemove={() => removePlayerFromPair(pair.id, "player_a_id", pair.player_a!.id, team.id)}
+                          />
+
+                          {/* Slot B */}
+                          <PairSlot
+                            label="B"
+                            player={pair.player_b}
+                            pairId={pair.id}
+                            slot="player_b_id"
+                            teamId={team.id}
+                            isOpen={isSlotBOpen}
+                            availablePlayers={poolPairs}
+                            saving={saving}
+                            onTapEmpty={() => setOpenSlot({ pairId: pair.id, slot: "player_b_id", teamId: team.id })}
+                            onCancel={() => setOpenSlot(null)}
+                            onPickPlayer={(poolPair) => placePlayerIntoPair(poolPair.id, pair.id, "player_b_id", poolPair.player_a!.id)}
+                            onRemove={() => removePlayerFromPair(pair.id, "player_b_id", pair.player_b!.id, team.id)}
+                          />
+                        </div>
                       );
                     })}
 
-                    {/* New Pair button */}
-                    <button
-                      onClick={() => createPair(team.id)}
-                      disabled={saving !== null}
-                      className="w-full py-2 border-2 border-dashed border-gray-300 rounded-xl text-xs font-medium text-gray-500 active:bg-gray-50 disabled:opacity-50"
-                    >
-                      {saving === `new-pair-${team.id}` ? "Creating..." : "+ New Pair"}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Step 3: Foursomes */}
-      {step === 3 && (
-        <div>
-          {/* Unmatched pairs banner */}
-          {(unmatchedPairsTeam1.length > 0 || unmatchedPairsTeam2.length > 0) && (
-            <div className="bg-amber-50 rounded-xl border border-amber-200 p-3 mb-4">
-              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">
-                Unmatched Pairs
-              </p>
-              <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
-                <div>
-                  <span className="font-medium">{team1?.team_name || "Team 1"}:</span>{" "}
-                  {unmatchedPairsTeam1.length > 0
-                    ? unmatchedPairsTeam1.map((p) => getPairLabel(p)).join(", ")
-                    : "All matched"}
-                </div>
-                <div>
-                  <span className="font-medium">{team2?.team_name || "Team 2"}:</span>{" "}
-                  {unmatchedPairsTeam2.length > 0
-                    ? unmatchedPairsTeam2.map((p) => getPairLabel(p)).join(", ")
-                    : "All matched"}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Existing foursomes */}
-          <div className="space-y-3">
-            {foursomes.map((foursome, i) => {
-              const p1 = team1?.pairs.find((p) => p.id === foursome.pair_team1_id);
-              const p2 = team2?.pairs.find((p) => p.id === foursome.pair_team2_id);
-
-              return (
-                <div
-                  key={foursome.id}
-                  className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
-                >
-                  <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                    <span className="text-sm font-semibold text-gray-700">
-                      Foursome {i + 1}
-                    </span>
-                    <button
-                      onClick={() => deleteFoursome(foursome.id)}
-                      className="text-gray-300 hover:text-red-500 p-0.5"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                  <div className="px-4 py-3 flex items-center gap-3">
-                    <div className="flex-1 text-center">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">
-                        {team1?.team_name || "Team 1"}
-                      </p>
-                      <p className="text-sm font-medium text-gray-800">
-                        {p1 ? getPairLabel(p1) : "—"}
-                      </p>
-                    </div>
-                    <span className="text-xs font-bold text-gray-300">vs</span>
-                    <div className="flex-1 text-center">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">
-                        {team2?.team_name || "Team 2"}
-                      </p>
-                      <p className="text-sm font-medium text-gray-800">
-                        {p2 ? getPairLabel(p2) : "—"}
-                      </p>
-                    </div>
+                    {/* New Pair button — only if unplaced players outnumber empty slots */}
+                    {(() => {
+                      const emptySlots = realPairs.reduce((n, p) => n + (p.player_a ? 0 : 1) + (p.player_b ? 0 : 1), 0);
+                      return poolPairs.length > emptySlots;
+                    })() && (
+                      <button
+                        onClick={() => createPair(team.id)}
+                        disabled={saving !== null}
+                        className="w-full py-2 border-2 border-dashed border-gray-300 rounded-xl text-xs font-medium text-gray-500 active:bg-gray-50 disabled:opacity-50"
+                      >
+                        {saving === `new-pair-${team.id}` ? "Creating..." : "+ New Pair"}
+                      </button>
+                    )}
                   </div>
                 </div>
               );
             })}
           </div>
 
-          {/* New foursome */}
-          {unmatchedPairsTeam1.length > 0 && unmatchedPairsTeam2.length > 0 && (
-            <div className="mt-3 bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-              <p className="text-sm font-semibold text-gray-700 mb-3">New Foursome</p>
-              <div className="flex gap-2 mb-3">
-                <div className="flex-1">
-                  <label className="block text-[10px] text-gray-400 uppercase tracking-wide mb-1">
-                    {team1?.team_name || "Team 1"} Pair
-                  </label>
-                  <select
-                    value={newFoursomePair1}
-                    onChange={(e) => setNewFoursomePair1(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
-                    style={{ backgroundColor: "transparent" }}
-                  >
-                    <option value="">Select...</option>
-                    {unmatchedPairsTeam1.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {getPairLabel(p)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex-1">
-                  <label className="block text-[10px] text-gray-400 uppercase tracking-wide mb-1">
-                    {team2?.team_name || "Team 2"} Pair
-                  </label>
-                  <select
-                    value={newFoursomePair2}
-                    onChange={(e) => setNewFoursomePair2(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
-                    style={{ backgroundColor: "transparent" }}
-                  >
-                    <option value="">Select...</option>
-                    {unmatchedPairsTeam2.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {getPairLabel(p)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <button
-                onClick={createFoursome}
-                disabled={!newFoursomePair1 || !newFoursomePair2 || saving === "new-foursome"}
-                className="w-full py-2 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
-              >
-                {saving === "new-foursome" ? "Creating..." : "Create Foursome"}
-              </button>
-            </div>
-          )}
-
-          {foursomes.length === 0 && unmatchedPairsTeam1.length === 0 && unmatchedPairsTeam2.length === 0 && (
-            <div className="text-center py-8 text-gray-400 text-sm">
-              Create pairs first in Step 2.
-            </div>
-          )}
         </div>
       )}
 
@@ -855,29 +972,34 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
 
 // ── Sub-components ──
 
-function PlayerSlot({
+function PairSlot({
   label,
   player,
-  pairId,
-  slot,
-  unassigned,
+  isOpen,
+  availablePlayers,
   saving,
-  onAssign,
+  onTapEmpty,
+  onCancel,
+  onPickPlayer,
+  onRemove,
 }: {
   label: string;
-  player: { id: string; display_name: string; avatar_url: string | null } | null;
+  player: PlayerInfo | null;
   pairId: string;
   slot: "player_a_id" | "player_b_id";
-  unassigned: UnassignedPlayer[];
+  teamId: string;
+  isOpen: boolean;
+  availablePlayers: Pair[];
   saving: string | null;
-  onAssign: (pairId: string, slot: "player_a_id" | "player_b_id", userId: string | null) => void;
+  onTapEmpty: () => void;
+  onCancel: () => void;
+  onPickPlayer: (poolPair: Pair) => void;
+  onRemove: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="flex items-center gap-2 py-1">
-      <span className="text-[10px] font-bold text-gray-400 w-3">{label}</span>
-      {player ? (
+  if (player) {
+    return (
+      <div className="flex items-center gap-2 py-1">
+        <span className="text-[10px] font-bold text-gray-400 w-3">{label}</span>
         <div className="flex items-center gap-1.5 flex-1">
           {player.avatar_url ? (
             <img src={player.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
@@ -888,7 +1010,8 @@ function PlayerSlot({
           )}
           <span className="text-xs text-gray-700 flex-1 truncate">{player.display_name}</span>
           <button
-            onClick={() => onAssign(pairId, slot, null)}
+            onClick={onRemove}
+            disabled={saving !== null}
             className="text-gray-300 hover:text-red-500"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -896,44 +1019,61 @@ function PlayerSlot({
             </svg>
           </button>
         </div>
-      ) : open ? (
-        <div className="flex-1 space-y-0.5">
-          {unassigned.length === 0 ? (
-            <p className="text-[10px] text-gray-400 italic">No available players</p>
-          ) : (
-            unassigned.map((p) => (
-              <button
-                key={p.user_id}
-                onClick={() => {
-                  onAssign(pairId, slot, p.user_id);
-                  setOpen(false);
-                }}
-                disabled={saving !== null}
-                className="w-full flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-gray-50 text-left text-xs"
-              >
-                {p.avatar_url ? (
-                  <img src={p.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
-                ) : (
-                  <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
-                    {(p.display_name || "?")[0].toUpperCase()}
-                  </span>
-                )}
-                <span className="text-gray-700">{p.display_name}</span>
-              </button>
-            ))
-          )}
-          <button onClick={() => setOpen(false)} className="text-[10px] text-gray-400">
+      </div>
+    );
+  }
+
+  if (isOpen) {
+    return (
+      <div className="py-1">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-[10px] font-bold text-gray-400 w-3">{label}</span>
+          <span className="text-[10px] text-green-600 font-medium flex-1">Select a player:</span>
+          <button onClick={onCancel} className="text-[10px] text-gray-400">
             Cancel
           </button>
         </div>
-      ) : (
-        <button
-          onClick={() => setOpen(true)}
-          className="text-xs text-gray-400 hover:text-green-700 italic"
-        >
-          Tap to assign
-        </button>
-      )}
+        <div className="space-y-0.5 ml-5">
+          {availablePlayers.length === 0 ? (
+            <p className="text-[10px] text-gray-400 italic">No available players</p>
+          ) : (
+            [...availablePlayers].sort((a, b) => (a.player_a?.display_name || "").localeCompare(b.player_a?.display_name || "")).map((pp) => {
+              const p = pp.player_a!;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => onPickPlayer(pp)}
+                  disabled={saving !== null}
+                  className="w-full flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-gray-50 active:bg-green-50 text-left text-xs"
+                >
+                  {p.avatar_url ? (
+                    <img src={p.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                  ) : (
+                    <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                      {(p.display_name || "?")[0].toUpperCase()}
+                    </span>
+                  )}
+                  <span className="text-gray-700">{p.display_name}</span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <span className="text-[10px] font-bold text-gray-400 w-3">{label}</span>
+      <button
+        onClick={onTapEmpty}
+        disabled={saving !== null}
+        className="text-xs text-gray-400 hover:text-green-700 italic"
+      >
+        Tap to assign
+      </button>
     </div>
   );
 }
+

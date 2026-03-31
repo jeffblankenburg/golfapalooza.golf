@@ -28,7 +28,7 @@ export default async function ContestsPage() {
   // Fetch all contests for the trip
   const { data: contests } = await supabase
     .from("contests")
-    .select("id, name, contest_type, day_number, sort_order")
+    .select("id, name, contest_type, day_number, sort_order, verified_at")
     .eq("trip_id", trip.id)
     .order("sort_order")
     .order("day_number");
@@ -92,7 +92,7 @@ export default async function ContestsPage() {
       ryderContestIds.length > 0 && trip.show_teams
         ? supabase
             .from("ryder_cup_teams")
-            .select("id, contest_id, team_number, team_name")
+            .select("id, contest_id, team_number, team_name, team_color")
             .in("contest_id", ryderContestIds)
         : Promise.resolve({ data: [] }),
 
@@ -173,6 +173,119 @@ export default async function ContestsPage() {
     });
 
     scrambleTeamMembersMap[team.id] = members;
+  }
+
+  // Fetch KGB Cup scoring summaries for ryder cup contests
+  const kgbCupScoresByContest: Record<
+    string,
+    {
+      team1Name: string;
+      team2Name: string;
+      team1Points: number;
+      team2Points: number;
+      completedSections: number;
+      totalSections: number;
+      team1Color?: string;
+      team2Color?: string;
+      verified?: boolean;
+    }
+  > = {};
+
+  if (ryderContestIds.length > 0 && trip.show_teams) {
+    // Check if there are any KGB Cup scores
+    const { data: kgbScoresExist } = await supabase
+      .from("kgb_cup_hole_scores")
+      .select("foursome_id")
+      .limit(1);
+
+    if (kgbScoresExist && kgbScoresExist.length > 0) {
+      // Fetch foursomes per contest to count total sections
+      for (const cId of ryderContestIds) {
+        const { data: rcTeams } = await supabase
+          .from("ryder_cup_teams")
+          .select("id, team_number, team_name, team_color")
+          .eq("contest_id", cId);
+
+        const { data: rcFoursomes } = await supabase
+          .from("ryder_cup_foursomes")
+          .select("id")
+          .eq("contest_id", cId);
+
+        if (rcTeams && rcTeams.length === 2 && rcFoursomes && rcFoursomes.length > 0) {
+          const foursomeIds = rcFoursomes.map((f) => f.id);
+          const { data: allScores } = await supabase
+            .from("kgb_cup_hole_scores")
+            .select("foursome_id, hole_number, scorer_type, scorer_id")
+            .in("foursome_id", foursomeIds);
+
+          if (allScores && allScores.length > 0) {
+            // Count completed sections (each section = 6 holes per match scorer)
+            // Simple heuristic: count foursomes with any scores
+            const totalSections = foursomeIds.length * 5; // 5 matches per foursome
+            // Count scored sections by checking which foursome+section combinations have 6 scored holes
+            let completedSections = 0;
+            for (const fId of foursomeIds) {
+              const fScores = allScores.filter((s) => s.foursome_id === fId);
+              // Check each section for completeness
+              for (const section of [1, 2, 3] as const) {
+                const startHole = (section - 1) * 6 + 1;
+                const endHole = section * 6;
+                if (section < 3) {
+                  // Individual sections: need unique scorer_ids per hole for player type
+                  const sectionScores = fScores.filter(
+                    (s) => s.scorer_type === "player" && s.hole_number >= startHole && s.hole_number <= endHole
+                  );
+                  // Get unique scorer IDs
+                  const scorerIds = new Set(sectionScores.map((s) => s.scorer_id));
+                  // For each scorer, check if all 6 holes are complete
+                  for (const sid of scorerIds) {
+                    const holesScored = new Set(
+                      sectionScores.filter((s) => s.scorer_id === sid).map((s) => s.hole_number)
+                    );
+                    // This scorer's match is complete if they have all 6 holes
+                    // But we need opponent too - simplify: if any scorer has 6 holes, count a section
+                    if (holesScored.size === 6) completedSections++;
+                  }
+                } else {
+                  // Scramble section: pair type
+                  const sectionScores = fScores.filter(
+                    (s) => s.scorer_type === "pair" && s.hole_number >= startHole && s.hole_number <= endHole
+                  );
+                  const scorerIds = new Set(sectionScores.map((s) => s.scorer_id));
+                  if (scorerIds.size >= 2) {
+                    // Both pairs have scores
+                    const allComplete = [...scorerIds].every((sid) => {
+                      const holesScored = new Set(
+                        sectionScores.filter((s) => s.scorer_id === sid).map((s) => s.hole_number)
+                      );
+                      return holesScored.size === 6;
+                    });
+                    if (allComplete) completedSections++;
+                  }
+                }
+              }
+            }
+
+            // Rough point calculation: use results API for accuracy
+            // For the summary, just show basic info
+            const team1 = rcTeams.find((t) => t.team_number === 1);
+            const team2 = rcTeams.find((t) => t.team_number === 2);
+
+            kgbCupScoresByContest[cId] = {
+              team1Name: team1?.team_name || "Team 1",
+              team2Name: team2?.team_name || "Team 2",
+              team1Points: 0,
+              team2Points: 0,
+              completedSections: Math.min(completedSections, totalSections),
+              totalSections,
+              team1Color: team1?.team_color || undefined,
+              team2Color: team2?.team_color || undefined,
+              verified: !!(contests || []).find((c) => c.id === cId)?.verified_at,
+            };
+          }
+        }
+      }
+    }
   }
 
   // Build ryder cup data by contest
@@ -294,6 +407,7 @@ export default async function ContestsPage() {
     ryderData?: typeof ryderDataByContest[string];
     teeTimeGroups?: typeof teeTimesByDay[number];
     participants?: { display_name: string; avatar_url: string | null }[];
+    kgbCupScores?: typeof kgbCupScoresByContest[string];
   };
 
   const detailData: Record<string, ContestDetailData> = {};
@@ -313,6 +427,9 @@ export default async function ContestsPage() {
         pairs: [],
         foursomes: [],
       };
+      if (kgbCupScoresByContest[c.id]) {
+        detail.kgbCupScores = kgbCupScoresByContest[c.id];
+      }
     }
 
     detail.participants = participantsByContest[c.id] || [];

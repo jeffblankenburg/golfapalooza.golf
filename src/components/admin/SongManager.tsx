@@ -74,6 +74,12 @@ export function SongManager() {
     init();
   }, [fetchSongs, fetchUsers]);
 
+  useEffect(() => {
+    const handler = () => setShowAdd((v) => !v);
+    window.addEventListener("toggle-add-song", handler);
+    return () => window.removeEventListener("toggle-add-song", handler);
+  }, []);
+
   // Extract duration from MP3 file
   const handleMp3Change = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -210,15 +216,7 @@ export function SongManager() {
 
   return (
     <div>
-      <div className="flex justify-end mb-3">
-        <button
-          onClick={() => setShowAdd(!showAdd)}
-          className="text-xs text-green-700 font-medium px-2 py-1 rounded-lg hover:bg-green-50"
-        >
-          + Add Song
-        </button>
-      </div>
-
+      <p className="text-xs text-gray-400 mb-2">{songs.length} {songs.length === 1 ? "song" : "songs"}</p>
       {showAdd && (
         <div className="px-4 py-3 mb-4 rounded-xl bg-gray-50 border border-gray-200 space-y-2">
           <input
@@ -311,9 +309,9 @@ export function SongManager() {
       )}
 
       {/* Song list */}
-      <div className="divide-y divide-gray-50 -mx-4">
+      <div className="divide-y divide-gray-100 -mx-4">
         {songs.map((song) => (
-          <div key={song.id} className="px-4 py-3">
+          <div key={song.id} className="px-4 py-1.5">
             {editingId === song.id ? (
               /* Edit mode */
               <div className="space-y-2">
@@ -392,38 +390,41 @@ export function SongManager() {
               </div>
             ) : (
               /* Display mode */
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 {(song.art_thumb_url || song.art_url) ? (
-                  <img src={song.art_thumb_url || song.art_url!} alt="" className="w-10 h-10 rounded object-cover flex-shrink-0" />
+                  <img src={song.art_thumb_url || song.art_url!} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
                 ) : (
-                  <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
-                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                         d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                     </svg>
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-gray-900 truncate">{song.title}</div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-sm font-medium text-gray-900 truncate leading-tight">{song.title}</div>
+                  <div className="text-xs text-gray-400 flex items-center gap-1.5">
                     {song.duration_seconds ? formatDuration(song.duration_seconds) : ""}
                     {song.duration_seconds && song.tagged_user ? " · " : ""}
                     {song.tagged_user?.display_name || ""}
-                  </div>
-                  <div className="text-xs text-gray-400 flex items-center gap-2 mt-0.5">
-                    <span className="flex items-center gap-0.5">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      {song.play_count}
-                    </span>
-                    <span className="flex items-center gap-0.5">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                      </svg>
-                      {song.like_count}
-                    </span>
+                    {(song.duration_seconds || song.tagged_user) && (song.play_count > 0 || song.like_count > 0) ? " · " : ""}
+                    {song.play_count > 0 && (
+                      <span className="inline-flex items-center gap-0.5">
+                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {song.play_count}
+                      </span>
+                    )}
+                    {song.like_count > 0 && (
+                      <span className="inline-flex items-center gap-0.5">
+                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                        </svg>
+                        {song.like_count}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <button

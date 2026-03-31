@@ -26,6 +26,7 @@ export async function GET(request: Request) {
       team_handicap,
       gross_score,
       course_par,
+      verified_at,
       members:scramble_team_members(
         user_id,
         user:users(display_name, avatar_url)
@@ -91,6 +92,7 @@ export async function GET(request: Request) {
     team_handicap: t.team_handicap,
     gross_score: t.gross_score,
     course_par: t.course_par,
+    verified_at: t.verified_at || null,
     members: (t.members || []).map((m: { user_id: string; user: { display_name: string; avatar_url: string | null } | { display_name: string; avatar_url: string | null }[] }) => {
       const u = Array.isArray(m.user) ? m.user[0] : m.user;
       return {

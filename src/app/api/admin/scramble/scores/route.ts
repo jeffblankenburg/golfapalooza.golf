@@ -41,7 +41,7 @@ export async function GET(request: Request) {
     const { data: teams, error: teamsError } = await adminClient
       .from("scramble_teams")
       .select(
-        "id, contest_id, team_handicap, gross_score, course_par, created_at, scramble_team_members(id, user_id, user:users(id, display_name, full_name, avatar_url))"
+        "id, contest_id, team_handicap, gross_score, course_par, created_at, verified_at, verified_by, scramble_team_members(id, user_id, user:users(id, display_name, full_name, avatar_url))"
       )
       .eq("contest_id", contestId)
       .order("created_at");
@@ -140,6 +140,19 @@ export async function GET(request: Request) {
       bonusPoints = bonusData || [];
     }
 
+    // Look up verifier names
+    const verifierIds = [...new Set((teams || []).map((t) => t.verified_by).filter(Boolean))];
+    const verifierNames: Record<string, string> = {};
+    if (verifierIds.length > 0) {
+      const { data: verifiers } = await adminClient
+        .from("users")
+        .select("id, display_name")
+        .in("id", verifierIds);
+      for (const v of verifiers || []) {
+        verifierNames[v.id] = v.display_name;
+      }
+    }
+
     // Normalize teams
     const normalizedTeams = (teams || []).map((team) => {
       const members = ((team as Record<string, unknown>).scramble_team_members as Array<{
@@ -163,6 +176,8 @@ export async function GET(request: Request) {
         team_handicap: team.team_handicap,
         gross_score: team.gross_score,
         course_par: team.course_par,
+        verified_at: team.verified_at || null,
+        verified_by_name: team.verified_by ? (verifierNames[team.verified_by] || null) : null,
         members,
       };
     });

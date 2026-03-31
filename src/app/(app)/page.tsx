@@ -166,6 +166,51 @@ export default async function HomePage() {
     }
   }
 
+  // Derive activeRound: user's scramble tee time for today
+  const todayForActiveRound = await getEffectiveDate();
+  const startForActiveRound = new Date(trip.start_date + "T00:00:00");
+  const diffForActiveRound = Math.floor((todayForActiveRound.getTime() - startForActiveRound.getTime()) / (1000 * 60 * 60 * 24));
+  const todayDayNumber = diffForActiveRound + 1;
+
+  const todayTeamTeeTime = (teamTeeTimesResult.data || [])
+    .find(tt => tt.day_number === todayDayNumber && tt.scramble_team_id);
+
+  let activeRound: { teamId: string; teeTime: string; startingHole: number | null } | null = null;
+  if (todayTeamTeeTime?.tee_time && todayTeamTeeTime.scramble_team_id) {
+    activeRound = {
+      teamId: todayTeamTeeTime.scramble_team_id as string,
+      teeTime: todayTeamTeeTime.tee_time as string,
+      startingHole: todayTeamTeeTime.starting_hole as number | null,
+    };
+  }
+
+  // Derive KGB Cup active round: user's direct tee time on a ryder_cup day
+  let kgbCupActiveRound: { teeTime: string; startingHole: number | null } | null = null;
+  const hasRyderCup = (contestTypesResult.data || []).some(
+    (c: { contest_type: string }) => c.contest_type === "ryder_cup"
+  );
+  if (hasRyderCup) {
+    const todayDirectTeeTime = allMatches.find(
+      (tt) => tt.dayNumber === todayDayNumber && tt.source === "player"
+    );
+    if (todayDirectTeeTime?.teeTime) {
+      // Verify this day actually has a ryder_cup contest
+      const { data: rcContest } = await queryClient
+        .from("contests")
+        .select("id")
+        .eq("trip_id", trip.id)
+        .eq("contest_type", "ryder_cup")
+        .eq("day_number", todayDayNumber)
+        .maybeSingle();
+      if (rcContest) {
+        kgbCupActiveRound = {
+          teeTime: todayDirectTeeTime.teeTime,
+          startingHole: todayDirectTeeTime.startingHole,
+        };
+      }
+    }
+  }
+
   // Determine best tee time match
   let bestMatch: TeeTimeMatch | undefined;
   if (allMatches.length > 0) {
@@ -333,6 +378,8 @@ export default async function HomePage() {
       courseName={courseVenue}
       myCalcuttaRoster={myCalcuttaRoster}
       contestTypes={contestTypes}
+      activeRound={activeRound}
+      kgbCupActiveRound={kgbCupActiveRound}
     />
   );
 }

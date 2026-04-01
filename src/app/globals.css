@@ -132,6 +132,19 @@ textarea::placeholder {
   }
 }
 
+/* Venmo button shimmer */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(300%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
 /* iOS-style safe area padding */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);

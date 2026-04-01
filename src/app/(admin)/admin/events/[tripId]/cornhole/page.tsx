@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { CollapsibleSection } from "@/components/admin/CollapsibleSection";
+import { ContestParticipants } from "@/components/admin/ContestParticipants";
 import { CornholeDoublesManager } from "@/components/admin/CornholeDoublesManager";
 import { CornholeBracketManager } from "@/components/admin/CornholeBracketManager";
 
@@ -12,6 +13,8 @@ export default function CornholeAdminPage() {
   const tripId = params.tripId as string;
   const router = useRouter();
   const [allowed, setAllowed] = useState<boolean | null>(null);
+  const [singlesContestId, setSinglesContestId] = useState<string | null>(null);
+  const [doublesContestId, setDoublesContestId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -25,6 +28,20 @@ export default function CornholeAdminPage() {
       })
       .catch(() => router.replace("/admin"));
   }, [router, tripId]);
+
+  const fetchContests = useCallback(async () => {
+    const res = await fetch(`/api/admin/contests?trip_id=${tripId}`);
+    const data = await res.json();
+    const contests = data.contests || [];
+    const singles = contests.find((c: { contest_type: string }) => c.contest_type === "cornhole_singles");
+    const doubles = contests.find((c: { contest_type: string }) => c.contest_type === "cornhole_doubles");
+    if (singles) setSinglesContestId(singles.id);
+    if (doubles) setDoublesContestId(doubles.id);
+  }, [tripId]);
+
+  useEffect(() => {
+    fetchContests();
+  }, [fetchContests]);
 
   if (!allowed) {
     return (
@@ -47,6 +64,34 @@ export default function CornholeAdminPage() {
       </Link>
 
       <h1 className="text-2xl font-bold text-gray-900">Cornhole</h1>
+
+      {singlesContestId && (
+        <CollapsibleSection
+          title="Singles Participants"
+          summary="Who's playing singles"
+          icon={
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          }
+        >
+          <ContestParticipants contestId={singlesContestId} tripId={tripId} />
+        </CollapsibleSection>
+      )}
+
+      {doublesContestId && (
+        <CollapsibleSection
+          title="Doubles Participants"
+          summary="Who's playing doubles"
+          icon={
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          }
+        >
+          <ContestParticipants contestId={doublesContestId} tripId={tripId} />
+        </CollapsibleSection>
+      )}
 
       <CollapsibleSection
         title="Doubles Teams"

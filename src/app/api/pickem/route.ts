@@ -200,12 +200,21 @@ export async function GET(request: Request) {
       (leaderboard[i] as Record<string, unknown>).rank = rank;
     }
 
+    // Check if current user has paid
+    const { data: myPayment } = await adminClient
+      .from("pickem_payments")
+      .select("paid")
+      .eq("contest_id", contestId)
+      .eq("user_id", effectiveUserId)
+      .single();
+
     return NextResponse.json({
       games: gamesWithStatus,
       my_picks: myPicks,
       leaderboard,
       settings: settingsRes.data || null,
       effective_user_id: effectiveUserId,
+      has_paid: myPayment?.paid || false,
     });
   } catch (error) {
     console.error("Get pickem data error:", error);

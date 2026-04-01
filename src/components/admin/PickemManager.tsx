@@ -5,6 +5,24 @@ import { CollapsibleSection } from "@/components/admin/CollapsibleSection";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { FBS_TEAMS, getTeamLogoUrl, type FBSTeam } from "@/lib/data/fbs-teams";
 
+function SvgIcon({ src, className = "w-5 h-5" }: { src: string; className?: string }) {
+  return (
+    <div
+      className={`${className} bg-current`}
+      style={{
+        WebkitMaskImage: `url(${src})`,
+        WebkitMaskSize: "contain",
+        WebkitMaskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+        maskImage: `url(${src})`,
+        maskSize: "contain",
+        maskRepeat: "no-repeat",
+        maskPosition: "center",
+      }}
+    />
+  );
+}
+
 interface Game {
   id: string;
   contest_id: string;
@@ -35,7 +53,7 @@ interface Participant {
 interface Settings {
   contest_id: string;
   entry_fee: number;
-  payout_json: Array<{ place: number; amount: number }>;
+  payout_json: Array<{ place: number; percentage: number }>;
   is_open: boolean;
 }
 
@@ -183,6 +201,34 @@ function TeamSelector({
   );
 }
 
+// Compute payouts from percentages, rounded to nearest $5, higher places benefit
+function computePayouts(
+  totalPot: number,
+  percentages: Array<{ place: number; percentage: number }>
+): Array<{ place: number; percentage: number; amount: number }> {
+  if (totalPot <= 0 || percentages.length === 0) return [];
+
+  // Calculate raw amounts and round each down to nearest $5
+  const results = percentages.map((p) => ({
+    place: p.place,
+    percentage: p.percentage,
+    rawAmount: (totalPot * p.percentage) / 100,
+    amount: Math.floor((totalPot * p.percentage) / 100 / 5) * 5,
+  }));
+
+  // Distribute remaining $5 increments starting from 1st place
+  const allocated = results.reduce((sum, r) => sum + r.amount, 0);
+  let remaining = totalPot - allocated;
+  for (const r of results) {
+    if (remaining >= 5) {
+      r.amount += 5;
+      remaining -= 5;
+    }
+  }
+
+  return results.map((r) => ({ place: r.place, percentage: r.percentage, amount: r.amount }));
+}
+
 // ============================================================
 // Main PickemManager
 // ============================================================
@@ -216,7 +262,7 @@ export function PickemManager({ tripId }: { tripId: string }) {
 
   // Settings form state
   const [entryFee, setEntryFee] = useState("");
-  const [payouts, setPayouts] = useState<Array<{ place: number; amount: string }>>([]);
+  const [payouts, setPayouts] = useState<Array<{ place: number; percentage: string }>>([]);
   const [isOpen, setIsOpen] = useState(false);
 
   // Helper: combine Saturday date + time into ISO string
@@ -253,9 +299,13 @@ export function PickemManager({ tripId }: { tripId: string }) {
         const pickem = (contestData.contests || []).find(
           (c: { contest_type: string }) => c.contest_type === "pickem"
         );
-        if (pickem) setContestId(pickem.id);
+        if (pickem) {
+          setContestId(pickem.id);
+          // Don't clear loading yet — wait for fetchData below
+          return;
+        }
       }
-      setLoading(false);
+      setLoading(false); // No contest found, stop loading
     }
     findContest();
   }, [tripId]);
@@ -277,12 +327,13 @@ export function PickemManager({ tripId }: { tripId: string }) {
       setEntryFee(String(data.settings.entry_fee || ""));
       setIsOpen(data.settings.is_open || false);
       setPayouts(
-        (data.settings.payout_json || []).map((p: { place: number; amount: number }) => ({
+        (data.settings.payout_json || []).map((p: { place: number; percentage: number }) => ({
           place: p.place,
-          amount: String(p.amount),
+          percentage: String(p.percentage),
         }))
       );
     }
+    setLoading(false);
   }, [contestId]);
 
   const fetchStandings = useCallback(async () => {
@@ -392,7 +443,7 @@ export function PickemManager({ tripId }: { tripId: string }) {
         entry_fee: parseFloat(entryFee) || 0,
         payout_json: payouts.map((p) => ({
           place: p.place,
-          amount: parseFloat(p.amount) || 0,
+          percentage: parseFloat(p.percentage) || 0,
         })),
         is_open: isOpen,
       }),
@@ -414,7 +465,7 @@ export function PickemManager({ tripId }: { tripId: string }) {
         entry_fee: parseFloat(entryFee) || 0,
         payout_json: payouts.map((p) => ({
           place: p.place,
-          amount: parseFloat(p.amount) || 0,
+          percentage: parseFloat(p.percentage) || 0,
         })),
         is_open: newValue,
       }),
@@ -547,9 +598,7 @@ export function PickemManager({ tripId }: { tripId: string }) {
         summary={`${games.length} game${games.length !== 1 ? "s" : ""}`}
         defaultOpen
         icon={
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+          <SvgIcon src="/noun-american-football-2591628.svg" />
         }
       >
         {/* Quick-add toggle */}
@@ -775,10 +824,10 @@ export function PickemManager({ tripId }: { tripId: string }) {
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs text-gray-500">Payouts</label>
+              <label className="text-xs text-gray-500">Payouts (% of pot)</label>
               <button
                 onClick={() =>
-                  setPayouts([...payouts, { place: payouts.length + 1, amount: "" }])
+                  setPayouts([...payouts, { place: payouts.length + 1, percentage: "" }])
                 }
                 className="text-xs text-green-700 font-medium"
               >
@@ -790,18 +839,21 @@ export function PickemManager({ tripId }: { tripId: string }) {
                 <span className="text-xs text-gray-500 w-10">
                   {p.place === 1 ? "1st" : p.place === 2 ? "2nd" : p.place === 3 ? "3rd" : `${p.place}th`}
                 </span>
-                <input
-                  type="number"
-                  step="1"
-                  value={p.amount}
-                  onChange={(e) => {
-                    const updated = [...payouts];
-                    updated[i].amount = e.target.value;
-                    setPayouts(updated);
-                  }}
-                  className="w-24 border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
-                  placeholder="$0"
-                />
+                <div className="relative w-20">
+                  <input
+                    type="number"
+                    step="5"
+                    value={p.percentage}
+                    onChange={(e) => {
+                      const updated = [...payouts];
+                      updated[i].percentage = e.target.value;
+                      setPayouts(updated);
+                    }}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm pr-7"
+                    placeholder="0"
+                  />
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
+                </div>
                 <button
                   onClick={() => setPayouts(payouts.filter((_, j) => j !== i))}
                   className="text-xs text-red-500"
@@ -810,6 +862,46 @@ export function PickemManager({ tripId }: { tripId: string }) {
                 </button>
               </div>
             ))}
+
+            {/* Computed payout preview */}
+            {(() => {
+              const paidCount = payments.filter((pay) => pay.paid).length;
+              const fee = parseFloat(entryFee) || 0;
+              const pot = fee * paidCount;
+              const parsed = payouts.map((p) => ({
+                place: p.place,
+                percentage: parseFloat(p.percentage) || 0,
+              }));
+              const totalPct = parsed.reduce((s, p) => s + p.percentage, 0);
+              const computed = computePayouts(pot, parsed);
+              const totalPaid = computed.reduce((s, c) => s + c.amount, 0);
+
+              if (parsed.length === 0 || pot === 0) return null;
+
+              return (
+                <div className="mt-3 bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-2">
+                    Pot: ${fee} x {paidCount} paid = <span className="font-semibold text-gray-700">${pot}</span>
+                    {totalPct !== 100 && (
+                      <span className="text-amber-600 ml-2">({totalPct}% allocated)</span>
+                    )}
+                  </p>
+                  {computed.map((c) => (
+                    <div key={c.place} className="flex justify-between text-sm">
+                      <span className="text-gray-600">
+                        {c.place === 1 ? "1st" : c.place === 2 ? "2nd" : c.place === 3 ? "3rd" : `${c.place}th`} ({c.percentage}%)
+                      </span>
+                      <span className="font-semibold text-gray-900">${c.amount}</span>
+                    </div>
+                  ))}
+                  {totalPaid !== pot && totalPct === 100 && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      ${pot - totalPaid} unallocated from rounding
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           <button
@@ -877,6 +969,32 @@ export function PickemManager({ tripId }: { tripId: string }) {
           </div>
         )}
       </CollapsibleSection>
+
+      {/* ====== RESET ====== */}
+      <button
+        onClick={() =>
+          setConfirmModal({
+            title: "Reset Pick'em",
+            message: "This will delete all games, picks, and payment records. This cannot be undone. Are you sure?",
+            onConfirm: async () => {
+              setConfirmModal(null);
+              setSaving("reset");
+              await fetch("/api/admin/pickem/reset", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ contest_id: contestId }),
+              });
+              await fetchData();
+              await fetchStandings();
+              setSaving(null);
+            },
+          })
+        }
+        disabled={saving === "reset"}
+        className="w-full py-3 text-sm font-medium text-red-600 border border-red-200 rounded-2xl active:bg-red-50 transition-colors"
+      >
+        {saving === "reset" ? "Resetting..." : "Reset Pick'em"}
+      </button>
 
       <ConfirmModal
         open={!!confirmModal}

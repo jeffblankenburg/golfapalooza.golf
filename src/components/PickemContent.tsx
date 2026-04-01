@@ -52,6 +52,9 @@ export function PickemContent({
   const [myPicks, setMyPicks] = useState<Pick[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [effectiveUserId, setEffectiveUserId] = useState<string | null>(null);
+  const [entryFee, setEntryFee] = useState<number>(0);
+  const [payoutPcts, setPayoutPcts] = useState<Array<{ place: number; percentage: number }>>([]);
+  const [hasPaid, setHasPaid] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [tab, setTab] = useState<"picks" | "leaderboard">("picks");
@@ -65,6 +68,9 @@ export function PickemContent({
     setMyPicks(data.my_picks || []);
     setLeaderboard(data.leaderboard || []);
     setEffectiveUserId(data.effective_user_id || null);
+    setEntryFee(data.settings?.entry_fee || 0);
+    setPayoutPcts(data.settings?.payout_json || []);
+    setHasPaid(data.has_paid || false);
   }, [contestId]);
 
   useEffect(() => {
@@ -186,7 +192,29 @@ export function PickemContent({
             {correctCount}/{decidedCount} correct
           </span>
         )}
+        {hasPaid && (
+          <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">Paid</span>
+        )}
       </div>
+
+      {/* Venmo payment prompt */}
+      {!hasPaid && pickedCount > 0 && entryFee > 0 && (() => {
+        const venmoDeepLink = `venmo://paycharge?txn=pay&recipients=aaronlwhite&amount=${entryFee}&note=${encodeURIComponent("Whitey's Pick'em")}`;
+        const venmoWebLink = `https://venmo.com/aaronlwhite?txn=pay&amount=${entryFee}&note=${encodeURIComponent("Whitey's Pick'em")}`;
+        return (
+          <a
+            href={venmoDeepLink}
+            onClick={() => {
+              setTimeout(() => { window.open(venmoWebLink, "_blank"); }, 500);
+            }}
+            className="relative flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-[#008CFF] text-white font-bold tracking-wide active:bg-[#0074D4] transition-colors mb-4 overflow-hidden"
+          >
+            <div className="absolute top-0 bottom-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/25 to-transparent" style={{ animation: "shimmer 2.5s ease-in-out infinite" }} />
+            <img src="/Venmo.png" alt="Venmo" className="w-8 h-8 object-contain relative" />
+            <span className="relative">Pay Whitey ${entryFee}</span>
+          </a>
+        );
+      })()}
 
       {/* Tabs */}
       <div className="flex rounded-xl bg-gray-100 p-1 mb-4">
@@ -264,25 +292,34 @@ export function PickemContent({
                   </div>
                 )}
 
-                {/* Pick buttons - the main interaction */}
+                {/* Pick buttons - underdog on left, favorite on right */}
                 <div className="flex">
-                  <PickButton
-                    side="away"
-                    game={game}
-                    pick={pick}
-                    result={result}
-                    isSaving={isSaving}
-                    onPick={() => !game.is_locked && submitPick(game.id, "away")}
-                  />
-
-                  <PickButton
-                    side="home"
-                    game={game}
-                    pick={pick}
-                    result={result}
-                    isSaving={isSaving}
-                    onPick={() => !game.is_locked && submitPick(game.id, "home")}
-                  />
+                  {(() => {
+                    const underdogSide = game.favorite === "home" ? "away" : "home";
+                    const favoriteSide = game.favorite as "away" | "home";
+                    return (
+                      <>
+                        <PickButton
+                          side={underdogSide}
+                          position="left"
+                          game={game}
+                          pick={pick}
+                          result={result}
+                          isSaving={isSaving}
+                          onPick={() => !game.is_locked && submitPick(game.id, underdogSide)}
+                        />
+                        <PickButton
+                          side={favoriteSide}
+                          position="right"
+                          game={game}
+                          pick={pick}
+                          result={result}
+                          isSaving={isSaving}
+                          onPick={() => !game.is_locked && submitPick(game.id, favoriteSide)}
+                        />
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {/* Tiebreaker input */}
@@ -305,6 +342,39 @@ export function PickemContent({
       ) : (
         /* Leaderboard tab */
         <div>
+          {/* Prize display */}
+          {(() => {
+            const paidCount = leaderboard.length;
+            const pot = entryFee * paidCount;
+            if (pot <= 0 || payoutPcts.length === 0) return null;
+
+            const computed = payoutPcts
+              .map((p) => ({
+                place: p.place,
+                rawAmount: (pot * p.percentage) / 100,
+                amount: Math.floor((pot * p.percentage) / 100 / 5) * 5,
+              }));
+            // Distribute remaining $5 increments from 1st place down
+            let remaining = pot - computed.reduce((s, c) => s + c.amount, 0);
+            for (const c of computed) {
+              if (remaining >= 5) { c.amount += 5; remaining -= 5; }
+            }
+
+            const placeLabel = (n: number) =>
+              n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`;
+
+            return (
+              <div className="flex items-center justify-center gap-4 mb-4">
+                {computed.map((c) => (
+                  <div key={c.place} className="text-center">
+                    <p className="text-lg font-bold text-green-700">${c.amount}</p>
+                    <p className="text-xs text-gray-400">{placeLabel(c.place)} place</p>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
           {leaderboard.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-8">No participants yet.</p>
           ) : (
@@ -337,12 +407,7 @@ export function PickemContent({
                           {entry.tiebreaker_total !== null && ` · TB: ${entry.tiebreaker_total}`}
                         </p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-green-700">{entry.correct}</p>
-                        {entry.decided > 0 && (
-                          <p className="text-xs text-gray-400">/{entry.decided}</p>
-                        )}
-                      </div>
+                      <span className="text-2xl font-bold text-green-700">{entry.correct}</span>
                     </div>
                   );
                 })}
@@ -395,9 +460,10 @@ function TiebreakerInput({
   );
 }
 
-// Pick button with team color highlight
+// Pick button — underdog (left) or favorite (right)
 function PickButton({
   side,
+  position,
   game,
   pick,
   result,
@@ -405,6 +471,7 @@ function PickButton({
   onPick,
 }: {
   side: "away" | "home";
+  position: "left" | "right";
   game: Game;
   pick: Pick | undefined;
   result: boolean | null;
@@ -414,19 +481,17 @@ function PickButton({
   const isSelected = pick?.picked_team === side;
   const teamName = side === "away" ? game.away_team : game.home_team;
   const logoUrl = side === "away" ? game.away_logo_url : game.home_logo_url;
-  const teamColor = side === "away" ? game.away_color : game.home_color;
+  const isFavorite = game.favorite === side;
 
-  const spreadLabel = game.favorite === side
-    ? ` (${game.spread})`
-    : ` (+${Math.abs(game.spread)})`;
+  const spreadLabel = isFavorite
+    ? `(${game.spread})`
+    : `(+${Math.abs(game.spread)})`;
 
-  const selectedStyle: React.CSSProperties = {};
-
-  let borderClass = side === "away" ? "border-t border-r border-gray-100" : "border-t border-gray-100";
+  let borderClass = position === "left" ? "border-t border-r border-gray-100" : "border-t border-gray-100";
   if (isSelected) {
-    if (result === true) borderClass = side === "away" ? "border-t border-r border-green-200" : "border-t border-green-200";
-    else if (result === false) borderClass = side === "away" ? "border-t border-r border-red-200" : "border-t border-red-200";
-    else borderClass = side === "away" ? "border-t border-r border-gray-200" : "border-t border-gray-200";
+    if (result === true) borderClass = position === "left" ? "border-t border-r border-green-200" : "border-t border-green-200";
+    else if (result === false) borderClass = position === "left" ? "border-t border-r border-red-200" : "border-t border-red-200";
+    else borderClass = position === "left" ? "border-t border-r border-gray-200" : "border-t border-gray-200";
   }
 
   return (
@@ -437,11 +502,14 @@ function PickButton({
         game.is_locked ? "opacity-70" : "active:bg-gray-50"
       } ${isSelected ? (result === false ? "bg-red-50" : "bg-green-50") : ""}`}
     >
+      <span className={`text-[10px] uppercase tracking-wider ${side === "home" ? "font-bold text-gray-500" : "text-gray-400"}`}>
+        {side === "home" ? "Home" : "Away"}
+      </span>
       {logoUrl && (
-        <img src={logoUrl} alt="" className="w-10 h-10 mx-auto mb-1 object-contain" />
+        <img src={logoUrl} alt="" className="w-10 h-10 mx-auto my-1 object-contain" />
       )}
       <p
-        className={`text-sm font-semibold ${isSelected ? "text-green-800" : "text-gray-900"}`}
+        className={`text-sm ${side === "home" ? "font-bold" : "font-semibold"} ${isSelected ? "text-green-800" : "text-gray-900"}`}
       >
         {teamName}
       </p>

@@ -2,16 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
-import { ContestTeeAssigner } from "@/components/admin/ContestTeeAssigner";
 import { BottomDrawer } from "@/components/admin/BottomDrawer";
-
-interface UserWithStatus {
-  id: string;
-  display_name: string;
-  full_name: string | null;
-  avatar_url: string | null;
-  is_participating: boolean;
-}
 
 interface Contest {
   id: string;
@@ -23,10 +14,6 @@ interface Contest {
   participant_count: number;
 }
 
-interface ContestParticipant {
-  user_id: string;
-}
-
 interface EventDay {
   id: string;
   day_number: number;
@@ -34,12 +21,10 @@ interface EventDay {
 }
 
 export function ContestManager({ tripId }: { tripId: string }) {
-  const [users, setUsers] = useState<UserWithStatus[]>([]);
   const [contests, setContests] = useState<Contest[]>([]);
   const [eventDays, setEventDays] = useState<EventDay[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedContest, setSelectedContest] = useState<Contest | null>(null);
-  const [contestParticipantIds, setContestParticipantIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
@@ -48,24 +33,16 @@ export function ContestManager({ tripId }: { tripId: string }) {
     onConfirm: () => void;
   } | null>(null);
 
-  const [showRealNames, setShowRealNames] = useState(false);
-
   // New contest form
   const [showNewContest, setShowNewContest] = useState(false);
   const [newContestName, setNewContestName] = useState("");
   const [newContestType, setNewContestType] = useState("other");
   const [newContestDay, setNewContestDay] = useState("");
 
-  const fetchUsers = useCallback(async () => {
-    const res = await fetch(`/api/admin/participants?trip_id=${tripId}`);
-    const data = await res.json();
-    if (data.users) setUsers(data.users);
-  }, [tripId]);
-
   const fetchContests = useCallback(async () => {
     const res = await fetch(`/api/admin/contests?trip_id=${tripId}`);
     const data = await res.json();
-    if (data.contests) setContests(data.contests);
+    if (data.contests) setContests(data.contests.filter((c: Contest) => c.contest_type !== "pickem"));
   }, [tripId]);
 
   const fetchEventDays = useCallback(async () => {
@@ -74,23 +51,14 @@ export function ContestManager({ tripId }: { tripId: string }) {
     if (data.days) setEventDays(data.days);
   }, [tripId]);
 
-  const fetchContestParticipants = useCallback(async (contestId: string) => {
-    const res = await fetch(`/api/admin/contests/participants?contest_id=${contestId}`);
-    const data = await res.json();
-    if (data.participants) {
-      const ids = new Set<string>(data.participants.map((p: ContestParticipant) => p.user_id));
-      setContestParticipantIds(ids);
-    }
-  }, []);
-
   useEffect(() => {
     async function init() {
       setLoading(true);
-      await Promise.all([fetchUsers(), fetchContests(), fetchEventDays()]);
+      await Promise.all([fetchContests(), fetchEventDays()]);
       setLoading(false);
     }
     init();
-  }, [fetchUsers, fetchContests, fetchEventDays]);
+  }, [fetchContests, fetchEventDays]);
 
   // Listen for event days changes from EventDaysManager
   useEffect(() => {
@@ -99,82 +67,8 @@ export function ContestManager({ tripId }: { tripId: string }) {
     return () => window.removeEventListener("event-days-changed", handler);
   }, [fetchEventDays]);
 
-  const toggleContestParticipant = async (userId: string, inContest: boolean) => {
-    if (!selectedContest) return;
-
-    // Optimistic update
-    setContestParticipantIds((prev) => {
-      const next = new Set(prev);
-      if (inContest) next.delete(userId);
-      else next.add(userId);
-      return next;
-    });
-    setContests((prev) =>
-      prev.map((c) =>
-        c.id === selectedContest.id
-          ? { ...c, participant_count: c.participant_count + (inContest ? -1 : 1) }
-          : c
-      )
-    );
-
-    const method = inContest ? "DELETE" : "POST";
-    const res = await fetch("/api/admin/contests/participants", {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contest_id: selectedContest.id, user_id: userId }),
-    });
-
-    if (!res.ok) {
-      // Revert
-      setContestParticipantIds((prev) => {
-        const next = new Set(prev);
-        if (inContest) next.add(userId);
-        else next.delete(userId);
-        return next;
-      });
-      setContests((prev) =>
-        prev.map((c) =>
-          c.id === selectedContest.id
-            ? { ...c, participant_count: c.participant_count + (inContest ? 1 : -1) }
-            : c
-        )
-      );
-    }
-  };
-
-  const selectAllContestParticipants = async () => {
-    if (!selectedContest) return;
-    setSaving("all");
-
-    const attendeeIds = users.filter((u) => u.is_participating).map((u) => u.id);
-
-    await fetch("/api/admin/contests/participants", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contest_id: selectedContest.id, user_ids: attendeeIds }),
-    });
-
-    await Promise.all([fetchContestParticipants(selectedContest.id), fetchContests()]);
-    setSaving(null);
-  };
-
-  const deselectAllContestParticipants = async () => {
-    if (!selectedContest) return;
-    setSaving("all");
-
-    await fetch("/api/admin/contests/participants", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contest_id: selectedContest.id, user_ids: [] }),
-    });
-
-    await Promise.all([fetchContestParticipants(selectedContest.id), fetchContests()]);
-    setSaving(null);
-  };
-
-  const openDrawer = async (contest: Contest) => {
+  const openDrawer = (contest: Contest) => {
     setSelectedContest(contest);
-    await fetchContestParticipants(contest.id);
     setDrawerOpen(true);
   };
 
@@ -257,17 +151,6 @@ export function ContestManager({ tripId }: { tripId: string }) {
       </div>
     );
   }
-
-  const getName = (player: { display_name: string; full_name: string | null }) =>
-    showRealNames && player.full_name ? player.full_name : player.display_name;
-
-  const attendees = [...users.filter((u) => u.is_participating)].sort((a, b) =>
-    getName(a).localeCompare(getName(b))
-  );
-
-  const drawerSubtitle = selectedContest
-    ? `${contestParticipantIds.size} of ${attendees.length} attendees${selectedContest.day_number ? ` · Day ${selectedContest.day_number}` : ""}`
-    : undefined;
 
   return (
     <div>
@@ -372,146 +255,38 @@ export function ContestManager({ tripId }: { tripId: string }) {
         open={drawerOpen}
         onClose={closeDrawer}
         title={selectedContest?.name || ""}
-        subtitle={drawerSubtitle}
+        subtitle="Edit contest"
       >
         {selectedContest && (
-          <div>
-            {/* Settings */}
-            <div className="px-4 py-2 bg-gray-50">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                Settings
-              </span>
-            </div>
-            <div className="px-4 py-3 space-y-2">
-              <input
-                type="text"
-                value={selectedContest.name}
-                onChange={(e) => {
-                  const name = e.target.value;
-                  setSelectedContest((prev) => prev ? { ...prev, name } : prev);
-                  setContests((prev) => prev.map((c) => c.id === selectedContest.id ? { ...c, name } : c));
-                }}
-                onBlur={() => updateContest(selectedContest, { name: selectedContest.name })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
-              />
-              <div className="flex gap-2">
-                <select
-                  value={selectedContest.contest_type}
-                  onChange={(e) => updateContest(selectedContest, { contest_type: e.target.value })}
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
-                  style={{ backgroundColor: "transparent" }}
-                >
-                  <option value="ryder_cup">Ryder Cup</option>
-                  <option value="scramble">Scramble</option>
-                  <option value="cornhole_singles">Cornhole Singles</option>
-                  <option value="cornhole_doubles">Cornhole Doubles</option>
-                  <option value="calcutta">Calcutta</option>
-                  <option value="pickem">Pick&apos;em</option>
-                  <option value="other">Other</option>
-                </select>
-                <select
-                  value={selectedContest.day_number ?? ""}
-                  onChange={(e) => updateContest(selectedContest, { day_number: e.target.value ? parseInt(e.target.value) : null })}
-                  className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
-                  style={{ backgroundColor: "transparent" }}
-                >
-                  <option value="">No day</option>
-                  {eventDays.map((day) => (
-                    <option key={day.day_number} value={day.day_number}>
-                      Day {day.day_number} - {day.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Participants */}
-            <div className="px-4 py-2 bg-gray-50">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                Participants
-              </span>
-            </div>
-            <div className="flex gap-2 px-4 py-2 items-center">
-              <button
-                onClick={selectAllContestParticipants}
-                disabled={saving !== null}
-                className="text-xs text-green-700 font-medium px-2 py-1 rounded-lg hover:bg-green-50"
-              >
-                All
-              </button>
-              <button
-                onClick={deselectAllContestParticipants}
-                disabled={saving !== null}
-                className="text-xs text-red-600 font-medium px-2 py-1 rounded-lg hover:bg-red-50"
-              >
-                None
-              </button>
-              <div className="flex-1" />
-              <button
-                onClick={() => setShowRealNames(!showRealNames)}
-                className="text-xs text-green-700 font-medium"
-              >
-                Show {showRealNames ? "nicknames" : "real names"}
-              </button>
-            </div>
-            <div className="divide-y divide-gray-50">
-              {attendees.map((user) => {
-                const inContest = contestParticipantIds.has(user.id);
-                return (
-                  <button
-                    key={user.id}
-                    onClick={() => toggleContestParticipant(user.id, inContest)}
-                    disabled={saving !== null}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-gray-50 transition-colors"
-                  >
-                    <div
-                      className={`w-6 h-6 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                        inContest ? "bg-green-600 border-green-600" : "border-gray-300"
-                      }`}
-                    >
-                      {inContest && (
-                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-                    {user.avatar_url ? (
-                      <img src={user.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-sm font-bold">
-                        {getName(user)[0].toUpperCase()}
-                      </div>
-                    )}
-                    <span className="text-sm font-medium text-gray-900 flex-1">
-                      {getName(user)}
-                    </span>
-                    {saving === user.id && (
-                      <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
-                    )}
-                  </button>
-                );
-              })}
-              {attendees.length === 0 && (
-                <div className="px-4 py-6 text-center text-sm text-gray-400">
-                  No attendees. Add participants to the event roster first.
-                </div>
-              )}
-            </div>
-
-            {/* Tee Assignments */}
-            {(selectedContest.contest_type === "ryder_cup" ||
-              selectedContest.contest_type === "scramble") && (
-              <>
-                <div className="px-4 py-2 bg-gray-50 mt-1">
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Tee Assignments
-                  </span>
-                </div>
-                <div className="px-4 py-3">
-                  <ContestTeeAssigner contestId={selectedContest.id} />
-                </div>
-              </>
-            )}
+          <div className="px-4 py-3 space-y-2">
+            <input
+              type="text"
+              value={selectedContest.name}
+              onChange={(e) => {
+                const name = e.target.value;
+                setSelectedContest((prev) => prev ? { ...prev, name } : prev);
+                setContests((prev) => prev.map((c) => c.id === selectedContest.id ? { ...c, name } : c));
+              }}
+              onBlur={() => updateContest(selectedContest, { name: selectedContest.name })}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+            />
+            <select
+              value={selectedContest.contest_type}
+              onChange={(e) => updateContest(selectedContest, { contest_type: e.target.value })}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+              style={{ backgroundColor: "transparent" }}
+            >
+              <option value="ryder_cup">Ryder Cup</option>
+              <option value="scramble">Scramble</option>
+              <option value="cornhole_singles">Cornhole Singles</option>
+              <option value="cornhole_doubles">Cornhole Doubles</option>
+              <option value="calcutta">Calcutta</option>
+              <option value="pickem">Pick&apos;em</option>
+              <option value="other">Other</option>
+            </select>
+            <p className="text-xs text-gray-400">
+              Day, participants, and tees are managed on each contest&apos;s dedicated page.
+            </p>
           </div>
         )}
       </BottomDrawer>

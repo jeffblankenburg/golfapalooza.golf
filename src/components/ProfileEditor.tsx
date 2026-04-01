@@ -49,9 +49,11 @@ interface AccoladeData {
 export function ProfileEditor({
   profile,
   accolades,
+  handicapIndex,
 }: {
   profile: ProfileData;
   accolades: AccoladeData[];
+  handicapIndex: number | null;
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -180,9 +182,9 @@ export function ProfileEditor({
 
   return (
     <div className="space-y-6">
-      {/* Avatar */}
-      <div className="flex flex-col items-center">
-        <div className="relative">
+      {/* Avatar + Handicap */}
+      <div className="flex items-center gap-4">
+        <div className="relative flex-shrink-0">
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
@@ -240,10 +242,18 @@ export function ProfileEditor({
           onChange={handleAvatarUpload}
           className="hidden"
         />
-        <h2 className="mt-3 text-xl font-bold text-gray-900">
-          {form.display_name}
-        </h2>
-        <p className="text-sm text-gray-500">Tap photo to change</p>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-xl font-bold text-gray-900 truncate">
+            {form.display_name}
+          </h2>
+          <p className="text-sm text-gray-500 mb-2">Tap photo to change</p>
+          <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-1.5">
+            <span className="text-xs font-medium text-blue-600 uppercase tracking-wide">Handicap</span>
+            <span className="text-sm font-bold text-blue-900">
+              {handicapIndex !== null ? handicapIndex : "N/A"}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Error */}

@@ -19,7 +19,7 @@ export default async function ProfilePage() {
   const { data: profile } = await queryClient
     .from("users")
     .select(
-      "id, display_name, full_name, email, phone, avatar_url, birthday, occupation, city, state, playing_since, swings, typical_shot, shirt_size, fun_fact, best_shot"
+      "id, display_name, full_name, email, phone, avatar_url, birthday, occupation, city, state, playing_since, swings, typical_shot, shirt_size, fun_fact, best_shot, player_handicaps(handicap_index)"
     )
     .eq("id", effectiveUserId)
     .single();
@@ -27,6 +27,10 @@ export default async function ProfilePage() {
   if (!profile) {
     redirect("/login");
   }
+
+  // Extract handicap_index from joined table
+  const ph = Array.isArray(profile.player_handicaps) ? profile.player_handicaps[0] : profile.player_handicaps;
+  const handicapIndex: number | null = ph?.handicap_index ?? null;
 
   // Fetch user's accolades across all events
   const { data: accolades } = await queryClient
@@ -37,7 +41,7 @@ export default async function ProfilePage() {
 
   return (
     <div className="px-4 pt-6 pb-8">
-      <ProfileEditor profile={profile} accolades={accolades || []} />
+      <ProfileEditor profile={profile} accolades={accolades || []} handicapIndex={handicapIndex} />
     </div>
   );
 }

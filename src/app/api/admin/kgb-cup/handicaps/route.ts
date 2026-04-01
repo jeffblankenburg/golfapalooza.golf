@@ -1,25 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { computeAdjustedHandicaps } from "@/lib/kgb-cup/match-logic";
-
-async function checkIsAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from("users")
-    .select("is_admin")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile?.is_admin) return null;
-  return user;
-}
+import { checkIsAdmin } from "@/lib/permissions-server";
 
 // GET - Fetch handicap data for a KGB Cup contest
 export async function GET(request: Request) {

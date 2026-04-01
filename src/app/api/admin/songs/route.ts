@@ -1,31 +1,9 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-async function checkMusicAccess() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from("users")
-    .select("is_admin, permissions")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) return null;
-
-  const perms = profile.permissions as Record<string, boolean> | null;
-  if (!profile.is_admin && !perms?.manage_music) return null;
-
-  return user;
-}
+import { checkPermissionAccess } from "@/lib/permissions-server";
 
 export async function GET() {
-  const admin = await checkMusicAccess();
+  const admin = await checkPermissionAccess("manage_music");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -71,7 +49,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const admin = await checkMusicAccess();
+  const admin = await checkPermissionAccess("manage_music");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -189,7 +167,7 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const admin = await checkMusicAccess();
+  const admin = await checkPermissionAccess("manage_music");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -230,7 +208,7 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const admin = await checkMusicAccess();
+  const admin = await checkPermissionAccess("manage_music");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

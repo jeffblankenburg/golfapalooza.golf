@@ -1,11 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
-import { hasAnyEventPermission } from "@/lib/permissions";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { hasAnyEventPermission, hasAnyPermission } from "@/lib/permissions";
+import { getSimUserId } from "@/lib/simulator";
 
 /**
- * Shared API route helper: checks if the current user is an admin OR has
- * the specified permission key. Returns the authenticated user or null.
+ * Get the effective user profile for permission checks.
+ * When an admin is simulating another user, returns the SIMULATED user's profile.
+ * This ensures that simulation accurately reflects the target user's experience.
  */
-export async function checkPermissionAccess(permissionKey: string) {
+async function getEffectiveProfile() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -13,44 +16,89 @@ export async function checkPermissionAccess(permissionKey: string) {
 
   if (!user) return null;
 
-  const { data: profile } = await supabase
+  // Get real user's profile to check if they're an admin who can simulate
+  const adminClient = createAdminClient();
+  const { data: realProfile } = await adminClient
     .from("users")
     .select("is_admin, permissions")
     .eq("id", user.id)
     .single();
 
-  if (!profile) return null;
+  if (!realProfile) return null;
 
-  const perms = profile.permissions as Record<string, boolean> | null;
-  if (!profile.is_admin && !perms?.[permissionKey]) return null;
+  // If real user is admin and simulating, use the simulated user's profile
+  if (realProfile.is_admin) {
+    const simUserId = await getSimUserId();
+    if (simUserId) {
+      const { data: simProfile } = await adminClient
+        .from("users")
+        .select("is_admin, permissions")
+        .eq("id", simUserId)
+        .single();
 
-  return user;
+      return {
+        authUser: user,
+        effectiveUserId: simUserId,
+        isAdmin: simProfile?.is_admin ?? false,
+        permissions: simProfile?.permissions as Record<string, boolean> | null,
+      };
+    }
+  }
+
+  return {
+    authUser: user,
+    effectiveUserId: user.id,
+    isAdmin: realProfile.is_admin ?? false,
+    permissions: realProfile.permissions as Record<string, boolean> | null,
+  };
 }
 
 /**
- * Shared API route helper: checks if the current user is an admin OR has
- * any event-level permission. Returns the authenticated user or null.
+ * Check if the effective user (real or simulated) is an admin.
+ * Returns the auth user object if authorized, null otherwise.
  */
-export async function checkAnyEventAccess() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function checkIsAdmin() {
+  const profile = await getEffectiveProfile();
+  if (!profile || !profile.isAdmin) return null;
+  return profile.authUser;
+}
 
-  if (!user) return null;
-
-  const { data: profile } = await supabase
-    .from("users")
-    .select("is_admin, permissions")
-    .eq("id", user.id)
-    .single();
-
+/**
+ * Check if the effective user is an admin OR has the specified permission.
+ */
+export async function checkPermissionAccess(permissionKey: string) {
+  const profile = await getEffectiveProfile();
   if (!profile) return null;
 
-  if (profile.is_admin) return user;
+  if (profile.isAdmin) return profile.authUser;
+  if (profile.permissions?.[permissionKey]) return profile.authUser;
 
-  const perms = profile.permissions as Record<string, boolean> | null;
-  if (hasAnyEventPermission(perms)) return user;
+  return null;
+}
+
+/**
+ * Check if the effective user is an admin OR has any event-level permission.
+ */
+export async function checkAnyEventAccess() {
+  const profile = await getEffectiveProfile();
+  if (!profile) return null;
+
+  if (profile.isAdmin) return profile.authUser;
+  if (hasAnyEventPermission(profile.permissions)) return profile.authUser;
+
+  return null;
+}
+
+/**
+ * Check if the effective user is an admin OR has any permission at all.
+ * Used for read-only endpoints like listing users.
+ */
+export async function checkAnyPermissionAccess() {
+  const profile = await getEffectiveProfile();
+  if (!profile) return null;
+
+  if (profile.isAdmin) return profile.authUser;
+  if (hasAnyPermission(profile.permissions)) return profile.authUser;
 
   return null;
 }

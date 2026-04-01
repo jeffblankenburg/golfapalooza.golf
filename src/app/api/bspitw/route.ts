@@ -99,12 +99,26 @@ export async function GET(request: Request) {
     }
   }
 
-  // 6. Calculate per-player points
+  // 6. Fetch player handicaps
+  const allUserIds = [...new Set((members || []).map((m) => m.user_id))];
+  const handicapMap: Record<string, number | null> = {};
+  if (allUserIds.length > 0) {
+    const { data: handicaps } = await supabase
+      .from("player_handicaps")
+      .select("user_id, handicap_index")
+      .in("user_id", allUserIds);
+    for (const h of handicaps || []) {
+      handicapMap[h.user_id] = h.handicap_index;
+    }
+  }
+
+  // 7. Calculate per-player points
   interface PlayerPoints {
     user_id: string;
     display_name: string;
     avatar_url: string | null;
     owner_name: string | null;
+    handicap_index: number | null;
     under_par_points: number;
     on_green_points: number;
     holed_out_points: number;
@@ -129,12 +143,23 @@ export async function GET(request: Request) {
         display_name: u?.display_name || "Unknown",
         avatar_url: u?.avatar_url || null,
         owner_name: ownerMap[m.user_id] || null,
+        handicap_index: handicapMap[m.user_id] ?? null,
         under_par_points: 0,
         on_green_points: 0,
         holed_out_points: 0,
         total_points: 0,
         days: {},
       };
+    }
+  }
+
+  // Initialize day entries for every team member (so 0-point days show as 0, not —)
+  for (const m of members || []) {
+    const p = playerMap[m.user_id];
+    if (!p) continue;
+    const dayNum = teamDayMap[m.team_id];
+    if (dayNum && !p.days[dayNum]) {
+      p.days[dayNum] = { under_par: 0, on_green: 0, holed_out: 0, total: 0 };
     }
   }
 

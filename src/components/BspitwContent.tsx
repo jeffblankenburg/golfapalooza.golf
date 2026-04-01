@@ -14,6 +14,7 @@ interface LeaderboardEntry {
   display_name: string;
   avatar_url: string | null;
   owner_name: string | null;
+  handicap_index: number | null;
   under_par_points: number;
   on_green_points: number;
   holed_out_points: number;
@@ -27,6 +28,57 @@ function getDayLabel(startDate: string, dayNumber: number): string {
   return date.toLocaleDateString("en-US", { weekday: "short" });
 }
 
+type ViewOption =
+  | "total"
+  | "score"
+  | "bonus"
+  | "holed_out"
+  | "on_green"
+  | "handicap";
+
+const VIEW_OPTIONS: { value: ViewOption; label: string }[] = [
+  { value: "total", label: "Total Points" },
+  { value: "score", label: "Score Points" },
+  { value: "bonus", label: "Bonus Points" },
+  { value: "holed_out", label: "Hole Out Points" },
+  { value: "on_green", label: "Green from Tee Points" },
+  { value: "handicap", label: "Highest Handicap" },
+];
+
+function getDayValue(dayPts: DayPoints | undefined, view: ViewOption): number | null {
+  if (!dayPts) return null;
+  switch (view) {
+    case "total": return dayPts.total;
+    case "score": return dayPts.under_par;
+    case "bonus": return dayPts.on_green + dayPts.holed_out;
+    case "holed_out": return dayPts.holed_out;
+    case "on_green": return dayPts.on_green;
+    case "handicap": return null;
+  }
+}
+
+function getTotalValue(entry: LeaderboardEntry, view: ViewOption): string {
+  switch (view) {
+    case "total": return String(entry.total_points);
+    case "score": return String(entry.under_par_points);
+    case "bonus": return String(entry.on_green_points + entry.holed_out_points);
+    case "holed_out": return String(entry.holed_out_points);
+    case "on_green": return String(entry.on_green_points);
+    case "handicap": return entry.handicap_index !== null ? String(entry.handicap_index) : "—";
+  }
+}
+
+function getSortValue(entry: LeaderboardEntry, view: ViewOption): number {
+  switch (view) {
+    case "total": return entry.total_points;
+    case "score": return entry.under_par_points;
+    case "bonus": return entry.on_green_points + entry.holed_out_points;
+    case "holed_out": return entry.holed_out_points;
+    case "on_green": return entry.on_green_points;
+    case "handicap": return entry.handicap_index ?? -1;
+  }
+}
+
 export function BspitwContent({
   tripId,
   startDate,
@@ -38,8 +90,7 @@ export function BspitwContent({
 }) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortKey, setSortKey] = useState<string>("total");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [view, setView] = useState<ViewOption>("total");
 
   const fetchData = useCallback(async () => {
     const res = await fetch(`/api/bspitw?trip_id=${tripId}`);
@@ -53,42 +104,21 @@ export function BspitwContent({
   }, [fetchData]);
 
   const DAYS = scrambleDays.length > 0 ? scrambleDays : [2, 3, 4];
-  const gridCols = { gridTemplateColumns: `2rem 1fr repeat(${DAYS.length}, 3rem) 3.5rem` };
+  const gridCols = view === "handicap"
+    ? { gridTemplateColumns: `2rem 1fr 3.5rem` }
+    : { gridTemplateColumns: `2rem 1fr repeat(${DAYS.length}, 3.5rem) 3.5rem` };
 
-  // Original rank map (always by total descending)
+  // Rank map (always by total descending)
   const rankMap = new Map<string, number>();
   [...leaderboard]
     .sort((a, b) => b.total_points - a.total_points)
     .forEach((e, i) => rankMap.set(e.user_id, i + 1));
 
-  const handleSort = (key: string) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
-    } else {
-      setSortKey(key);
-      setSortDir(key === "player" ? "asc" : "desc");
-    }
-  };
-
   const sorted = [...leaderboard].sort((a, b) => {
-    let cmp = 0;
-    if (sortKey === "player") {
-      cmp = a.display_name.localeCompare(b.display_name);
-    } else if (sortKey === "total") {
-      cmp = a.total_points - b.total_points;
-    } else if (sortKey.startsWith("day-")) {
-      const d = parseInt(sortKey.slice(4), 10);
-      const aVal = a.days[d]?.total ?? -1;
-      const bVal = b.days[d]?.total ?? -1;
-      cmp = aVal - bVal;
-    }
-    return sortDir === "desc" ? -cmp : cmp;
+    const cmp = getSortValue(b, view) - getSortValue(a, view);
+    if (cmp !== 0) return cmp;
+    return a.display_name.localeCompare(b.display_name);
   });
-
-  const SortArrow = ({ col }: { col: string }) => {
-    if (sortKey !== col) return null;
-    return <span className="ml-0.5">{sortDir === "desc" ? "↓" : "↑"}</span>;
-  };
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">
@@ -110,106 +140,131 @@ export function BspitwContent({
       )}
 
       {!loading && leaderboard.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          {/* Header */}
-          <div className="grid gap-0 bg-gray-50 text-xs font-semibold text-gray-500 uppercase select-none" style={gridCols}>
-            <div
-              className="px-1 py-2 text-center cursor-pointer active:bg-gray-100"
-              onClick={() => handleSort("total")}
+        <>
+          {/* View/sort dropdown */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-gray-500">Show</label>
+            <select
+              value={view}
+              onChange={(e) => setView(e.target.value as ViewOption)}
+              className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white font-medium"
             >
-              #<SortArrow col="total" />
-            </div>
-            <div
-              className="px-2 py-2 cursor-pointer active:bg-gray-100"
-              onClick={() => handleSort("player")}
-            >
-              Player<SortArrow col="player" />
-            </div>
-            {DAYS.map((d) => (
-              <div
-                key={d}
-                className="px-1 py-2 text-center cursor-pointer active:bg-gray-100"
-                onClick={() => handleSort(`day-${d}`)}
-              >
-                {getDayLabel(startDate, d)}<SortArrow col={`day-${d}`} />
-              </div>
-            ))}
-            <div
-              className="px-2 py-2 text-center cursor-pointer active:bg-gray-100"
-              onClick={() => handleSort("total")}
-            >
-              Total<SortArrow col="total" />
-            </div>
+              {VIEW_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </div>
 
-          {/* Rows */}
-          {sorted.map((entry) => {
-            const rank = rankMap.get(entry.user_id) || 0;
-            return (
-              <div
-                key={entry.user_id}
-                style={gridCols}
-                className={`grid gap-0 border-t border-gray-100 items-center ${
-                  rank <= 3 ? "bg-amber-50/50" : ""
-                }`}
-              >
-                <div className="px-1 py-2 text-center">
-                  <span className={`text-xs ${rank <= 3 ? "font-bold text-gray-700" : "text-gray-400"}`}>{rank}</span>
-                </div>
-                <div className="px-2 py-2 flex items-center gap-1.5 min-w-0">
-                  {entry.avatar_url ? (
-                    <img src={entry.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
-                  ) : (
-                    <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold flex-shrink-0">
-                      {(entry.display_name || "?")[0].toUpperCase()}
-                    </span>
-                  )}
-                  <div className="min-w-0">
-                    <span className="text-sm font-medium text-gray-900 truncate block">
-                      {entry.display_name}
-                    </span>
-                    {entry.owner_name && (
-                      <span className="text-[10px] text-gray-400 truncate block">
-                        Owner: {entry.owner_name}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            {/* Header */}
+            <div className="grid gap-0 bg-gray-50 text-xs font-semibold text-gray-500 uppercase" style={gridCols}>
+              <div className="px-1 py-2 text-center">#</div>
+              <div className="px-2 py-2">Player</div>
+              {view === "handicap" ? (
+                <div className="px-1 py-2 text-center">HDCP</div>
+              ) : (
+                <>
+                  {DAYS.map((d) => (
+                    <div key={d} className="px-1 py-2 text-center">{getDayLabel(startDate, d)}</div>
+                  ))}
+                  <div className="px-1 py-2 text-center">Total</div>
+                </>
+              )}
+            </div>
+
+            {/* Rows */}
+            {sorted.map((entry) => {
+              const rank = rankMap.get(entry.user_id) || 0;
+              return (
+                <div
+                  key={entry.user_id}
+                  style={gridCols}
+                  className={`grid gap-0 border-t border-gray-100 items-center ${
+                    rank <= 3 ? "bg-amber-50/50" : ""
+                  }`}
+                >
+                  <div className="px-1 py-2 text-center">
+                    <span className={`text-xs ${rank <= 3 ? "font-bold text-gray-700" : "text-gray-400"}`}>{rank}</span>
+                  </div>
+                  <div className="px-2 py-2 flex items-center gap-1.5 min-w-0">
+                    {entry.avatar_url ? (
+                      <img src={entry.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
+                    ) : (
+                      <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold flex-shrink-0">
+                        {(entry.display_name || "?")[0].toUpperCase()}
                       </span>
                     )}
-                  </div>
-                </div>
-                {DAYS.map((d) => {
-                  const dayPts = entry.days[d];
-                  const bonus = dayPts ? dayPts.on_green + dayPts.holed_out : 0;
-                  return (
-                    <div key={d} className="px-1 py-2 text-center text-xs text-gray-600">
-                      {dayPts ? (
-                        <>
-                          {dayPts.total}
-                          {bonus > 0 && (
-                            <sup className="ml-0.5 text-[9px] font-semibold text-amber-600">{bonus}</sup>
-                          )}
-                        </>
-                      ) : "—"}
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium text-gray-900 truncate block">
+                        {entry.display_name}
+                      </span>
+                      {entry.owner_name && (
+                        <span className="text-[10px] text-gray-400 truncate block">
+                          Owner: {entry.owner_name}
+                        </span>
+                      )}
                     </div>
-                  );
-                })}
-                <div className="px-2 py-2 text-center text-sm font-bold text-gray-900">
-                  {entry.total_points}
-                  {entry.on_green_points + entry.holed_out_points > 0 && (
-                    <sup className="ml-0.5 text-[9px] font-semibold text-amber-600">{entry.on_green_points + entry.holed_out_points}</sup>
+                  </div>
+
+                  {view === "handicap" ? (
+                    /* Handicap view: single HDCP column */
+                    <div className="px-1 py-2 text-center text-sm font-bold text-gray-900">
+                      {entry.handicap_index !== null ? entry.handicap_index : "—"}
+                    </div>
+                  ) : (
+                    <>
+                      {/* Day columns */}
+                      {DAYS.map((d) => {
+                        const dayPts = entry.days[d];
+
+                        if (view === "total") {
+                          if (!dayPts) {
+                            return <div key={d} className="px-1 py-2 text-center text-xs text-gray-300">—</div>;
+                          }
+                          return (
+                            <div key={d} className="px-1 py-2 text-center text-xs text-gray-600">
+                              <sup className="mr-0.5 text-[9px] font-semibold text-green-600">{dayPts.on_green}</sup>
+                              {dayPts.total}
+                              <sup className="ml-0.5 text-[9px] font-semibold text-amber-600">{dayPts.holed_out}</sup>
+                            </div>
+                          );
+                        }
+
+                        const val = getDayValue(dayPts, view);
+                        return (
+                          <div key={d} className="px-1 py-2 text-center text-xs text-gray-600">
+                            {val !== null ? val : "—"}
+                          </div>
+                        );
+                      })}
+
+                      {/* Total column */}
+                      <div className="px-1 py-2 text-center text-sm font-bold text-gray-900">
+                        {view === "total" ? (
+                          <>
+                            <sup className="mr-0.5 text-[9px] font-semibold text-green-600">{entry.on_green_points}</sup>
+                            {entry.total_points}
+                            <sup className="ml-0.5 text-[9px] font-semibold text-amber-600">{entry.holed_out_points}</sup>
+                          </>
+                        ) : (
+                          getTotalValue(entry, view)
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {/* Legend */}
       {!loading && leaderboard.length > 0 && (
         <div className="bg-gray-50 rounded-xl px-4 py-3 text-xs text-gray-500 space-y-1">
           <p><span className="font-semibold text-gray-700">Net Under Par:</span> 1 pt per stroke team is under par (net). Shared by all team members.</p>
-          <p><span className="font-semibold text-gray-700">On Green:</span> 1 pt per tee shot that lands on the green.</p>
-          <p><span className="font-semibold text-gray-700">Holed Out:</span> 1 pt per shot holed from outside flagstick length.</p>
-          <p>The <sup className="text-amber-600 font-semibold">superscript</sup> next to a daily score shows how many of those points came from bonuses (on green + holed out).</p>
+          <p><span className="font-semibold text-green-600">On Green</span> <sup className="text-green-600 font-semibold">G</sup>: 1 pt per tee shot that lands on the green. Shown as leading superscript.</p>
+          <p><span className="font-semibold text-amber-600">Holed Out</span> <sup className="text-amber-600 font-semibold">H</sup>: 1 pt per shot holed from outside flagstick length. Shown as trailing superscript.</p>
         </div>
       )}
     </div>

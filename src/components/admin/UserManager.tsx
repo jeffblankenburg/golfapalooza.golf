@@ -84,7 +84,10 @@ export function UserManager({ ref }: { ref?: Ref<{ openAdd: () => void }> }) {
             isAdmin: editIsAdmin,
             permissions: editIsAdmin ? {} : editPermissions,
           }
-        : formData;
+        : {
+            ...formData,
+            handicapIndex: formData.handicapIndex === "" ? null : formData.handicapIndex,
+          };
 
       const res = await fetch(url, {
         method,
@@ -321,7 +324,7 @@ export function UserManager({ ref }: { ref?: Ref<{ openAdd: () => void }> }) {
                   <input
                     type="number"
                     inputMode="decimal"
-                    step="0.1"
+                    step="0.01"
                     min="0"
                     max="54"
                     value={formData.handicapIndex}

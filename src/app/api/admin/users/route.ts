@@ -59,7 +59,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { phone, displayName, fullName } = await request.json();
+    const { phone, displayName, fullName, handicapIndex } = await request.json();
 
     if (!phone || !displayName) {
       return NextResponse.json(
@@ -112,6 +112,16 @@ export async function POST(request: Request) {
         { error: "Failed to create user profile" },
         { status: 500 }
       );
+    }
+
+    // Save handicap index if provided
+    if (handicapIndex && handicapIndex !== "") {
+      await adminClient
+        .from("player_handicaps")
+        .upsert(
+          { user_id: authUser.user.id, handicap_index: parseFloat(handicapIndex) },
+          { onConflict: "user_id" }
+        );
     }
 
     // Auto-add to All Loozers group chat

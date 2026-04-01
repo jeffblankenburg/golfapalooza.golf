@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
+import { cascadeRemoveFromRoster, addToContestsAndChat } from "@/lib/roster";
 
 /**
  * @swagger
@@ -99,19 +100,24 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if already participating
+    const attending = likelihood === 99;
+
+    // Check if already has an event_participants row
     const { data: existing } = await dbClient
       .from("event_participants")
-      .select("id")
+      .select("id, on_roster")
       .eq("trip_id", trip.id)
       .eq("user_id", effectiveUserId)
       .maybeSingle();
 
+    const wasOnRoster = existing?.on_roster ?? false;
+
+    // Upsert event_participants row (always keep for RSVP tracking)
+    const adminClient = createAdminClient();
     if (existing) {
-      // Update likelihood
-      const { error } = await dbClient
+      const { error } = await adminClient
         .from("event_participants")
-        .update({ likelihood })
+        .update({ likelihood, on_roster: attending })
         .eq("trip_id", trip.id)
         .eq("user_id", effectiveUserId);
 
@@ -119,51 +125,21 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
     } else {
-      // Insert new participation
-      const { error: insertError } = await dbClient
+      const { error: insertError } = await adminClient
         .from("event_participants")
-        .insert({ trip_id: trip.id, user_id: effectiveUserId, likelihood });
+        .insert({ trip_id: trip.id, user_id: effectiveUserId, likelihood, on_roster: attending });
 
       if (insertError) {
-        return NextResponse.json(
-          { error: insertError.message },
-          { status: 500 }
-        );
+        return NextResponse.json({ error: insertError.message }, { status: 500 });
       }
+    }
 
-      // Auto-add to all contests for this event
-      const adminClient = createAdminClient();
-      const { data: contests } = await adminClient
-        .from("contests")
-        .select("id")
-        .eq("trip_id", trip.id);
-
-      if (contests && contests.length > 0) {
-        const entries = contests.map((c) => ({
-          contest_id: c.id,
-          user_id: effectiveUserId,
-        }));
-
-        await adminClient
-          .from("contest_participants")
-          .upsert(entries, { onConflict: "contest_id,user_id" });
-      }
-
-      // Auto-add to event chat room
-      const { data: eventRoom } = await adminClient
-        .from("chat_rooms")
-        .select("id")
-        .eq("trip_id", trip.id)
-        .single();
-
-      if (eventRoom) {
-        await adminClient
-          .from("chat_room_members")
-          .upsert(
-            { room_id: eventRoom.id, user_id: effectiveUserId },
-            { onConflict: "room_id,user_id" }
-          );
-      }
+    if (attending && !wasOnRoster) {
+      // Joining the roster: add to all contests + chat
+      await addToContestsAndChat(trip.id, effectiveUserId);
+    } else if (!attending && wasOnRoster) {
+      // Leaving the roster: cascade remove from contests/teams/etc
+      await cascadeRemoveFromRoster(trip.id, effectiveUserId);
     }
 
     return NextResponse.json({ success: true, likelihood });

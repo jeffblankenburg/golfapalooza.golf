@@ -43,23 +43,54 @@ interface ScorecardData {
   holes: HoleInfo[];
 }
 
-function ScoreCell({ score, par }: { score: number | undefined; par: number }) {
+/** How many strokes a team receives on a given hole */
+function getStrokesReceived(teamHandicap: number, holeHandicapIndex: number): number {
+  if (teamHandicap <= 0) return 0;
+  const fullRounds = Math.floor(teamHandicap / 18);
+  const remainder = teamHandicap % 18;
+  return fullRounds + (holeHandicapIndex <= remainder ? 1 : 0);
+}
+
+type NetHighlight = "sole" | "tied" | null;
+
+function ScoreCell({
+  score,
+  par,
+  receivesStroke,
+  netHighlight,
+}: {
+  score: number | undefined;
+  par: number;
+  receivesStroke?: boolean;
+  netHighlight?: NetHighlight;
+}) {
+  const bgClass =
+    netHighlight === "sole"
+      ? "bg-sky-100"
+      : netHighlight === "tied"
+      ? "bg-amber-100"
+      : "";
+
   if (score === undefined) {
-    return <td className="px-0 py-1 text-center text-gray-300">—</td>;
+    return <td className={`px-0 py-1 text-center text-gray-300 ${bgClass}`}>—</td>;
   }
 
   const diff = score - par;
-  const num = <span className="relative z-10 text-[10px] leading-none font-bold">{score}</span>;
+
+  // Stroke indicator dot
+  const strokeDot = receivesStroke ? (
+    <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-red-500" />
+  ) : null;
 
   if (diff <= -2) {
-    // Eagle or better: double circle
     return (
-      <td className="px-0 py-1">
+      <td className={`px-0 py-1 ${bgClass}`}>
         <div className="flex items-center justify-center">
           <div className="relative flex items-center justify-center w-[22px] h-[22px]">
             <div className="absolute inset-0 rounded-full border-[1.5px] border-green-600" />
             <div className="absolute inset-[3px] rounded-full border-[1.5px] border-green-600" />
             <span className="relative z-10 text-[10px] leading-none font-bold text-green-700">{score}</span>
+            {strokeDot}
           </div>
         </div>
       </td>
@@ -67,13 +98,13 @@ function ScoreCell({ score, par }: { score: number | undefined; par: number }) {
   }
 
   if (diff === -1) {
-    // Birdie: single circle
     return (
-      <td className="px-0 py-1">
+      <td className={`px-0 py-1 ${bgClass}`}>
         <div className="flex items-center justify-center">
           <div className="relative flex items-center justify-center w-[18px] h-[18px]">
             <div className="absolute inset-0 rounded-full border-[1.5px] border-green-600" />
             <span className="relative z-10 text-[10px] leading-none font-bold text-green-700">{score}</span>
+            {strokeDot}
           </div>
         </div>
       </td>
@@ -81,13 +112,13 @@ function ScoreCell({ score, par }: { score: number | undefined; par: number }) {
   }
 
   if (diff === 1) {
-    // Bogey: single square
     return (
-      <td className="px-0 py-1">
+      <td className={`px-0 py-1 ${bgClass}`}>
         <div className="flex items-center justify-center">
           <div className="relative flex items-center justify-center w-[18px] h-[18px]">
             <div className="absolute inset-0 rounded-sm border-[1.5px] border-gray-900" />
             <span className="relative z-10 text-[10px] leading-none font-bold text-gray-900">{score}</span>
+            {strokeDot}
           </div>
         </div>
       </td>
@@ -95,24 +126,29 @@ function ScoreCell({ score, par }: { score: number | undefined; par: number }) {
   }
 
   if (diff >= 2) {
-    // Double bogey+: double square
     return (
-      <td className="px-0 py-1">
+      <td className={`px-0 py-1 ${bgClass}`}>
         <div className="flex items-center justify-center">
           <div className="relative flex items-center justify-center w-[22px] h-[22px]">
             <div className="absolute inset-0 rounded-sm border-[1.5px] border-gray-900" />
             <div className="absolute inset-[3px] rounded-sm border-[1.5px] border-gray-900" />
             <span className="relative z-10 text-[10px] leading-none font-bold text-gray-900">{score}</span>
+            {strokeDot}
           </div>
         </div>
       </td>
     );
   }
 
-  // Par: plain number
+  // Par
   return (
-    <td className="px-0 py-1 text-center text-[10px] font-medium text-gray-900">
-      {num}
+    <td className={`px-0 py-1 ${bgClass}`}>
+      <div className="flex items-center justify-center">
+        <div className="relative">
+          <span className="text-[10px] leading-none font-bold text-gray-900">{score}</span>
+          {strokeDot}
+        </div>
+      </div>
     </td>
   );
 }
@@ -190,8 +226,41 @@ export function ScorecardsContent({
     scoreMap[s.team_id][s.hole_number] = s.strokes;
   }
 
+  // Calculate lowest net score per hole across all teams for highlighting
+  const allTeams = data?.teams || [];
+  const lowestNetPerHole: Record<number, { min: number; count: number }> = {};
+  for (const hole of holes) {
+    let min = Infinity;
+    let count = 0;
+    for (const t of allTeams) {
+      const gross = scoreMap[t.id]?.[hole.hole_number];
+      if (gross === undefined) continue;
+      const strokes = getStrokesReceived(t.team_handicap, hole.handicap_index);
+      const net = gross - strokes;
+      if (net < min) {
+        min = net;
+        count = 1;
+      } else if (net === min) {
+        count++;
+      }
+    }
+    if (min < Infinity) {
+      lowestNetPerHole[hole.hole_number] = { min, count };
+    }
+  }
+
+  function getNetHighlight(teamId: string, teamHandicap: number, hole: HoleInfo): NetHighlight {
+    const gross = scoreMap[teamId]?.[hole.hole_number];
+    if (gross === undefined) return null;
+    const strokes = getStrokesReceived(teamHandicap, hole.handicap_index);
+    const net = gross - strokes;
+    const lowest = lowestNetPerHole[hole.hole_number];
+    if (!lowest || net !== lowest.min) return null;
+    return lowest.count === 1 ? "sole" : "tied";
+  }
+
   // Sort teams by net score ascending (lower is better)
-  const teams = [...(data?.teams || [])].sort((a, b) => {
+  const teams = [...allTeams].sort((a, b) => {
     const na = calcNet(a);
     const nb = calcNet(b);
     if (na !== null && nb !== null) return na - nb;
@@ -233,6 +302,22 @@ export function ScorecardsContent({
 
       {!loading && teams.length > 0 && (
         <div className="space-y-4">
+          {/* Legend */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-gray-500 px-1">
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded-sm bg-sky-100 border border-sky-200" />
+              Low net (sole)
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-3 h-3 rounded-sm bg-amber-100 border border-amber-200" />
+              Low net (tied)
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500" />
+              Stroke hole
+            </span>
+          </div>
+
           {teams.map((team) => {
             const teamScores = scoreMap[team.id] || {};
             const front9Total = front9.reduce((s, h) => s + (teamScores[h.hole_number] || 0), 0);
@@ -349,7 +434,13 @@ export function ScorecardsContent({
                             <tr className="border-t border-gray-100">
                               <td></td>
                               {front9.map((h) => (
-                                <ScoreCell key={h.hole_number} score={teamScores[h.hole_number]} par={h.par} />
+                                <ScoreCell
+                                  key={h.hole_number}
+                                  score={teamScores[h.hole_number]}
+                                  par={h.par}
+                                  receivesStroke={getStrokesReceived(team.team_handicap, h.handicap_index) > 0}
+                                  netHighlight={getNetHighlight(team.id, team.team_handicap, h)}
+                                />
                               ))}
                               <td className="px-0 py-1 text-center text-gray-900 font-semibold">
                                 {hasFront ? front9Total : "—"}
@@ -386,7 +477,13 @@ export function ScorecardsContent({
                             <tr className="border-t border-gray-100">
                               <td></td>
                               {back9.map((h) => (
-                                <ScoreCell key={h.hole_number} score={teamScores[h.hole_number]} par={h.par} />
+                                <ScoreCell
+                                  key={h.hole_number}
+                                  score={teamScores[h.hole_number]}
+                                  par={h.par}
+                                  receivesStroke={getStrokesReceived(team.team_handicap, h.handicap_index) > 0}
+                                  netHighlight={getNetHighlight(team.id, team.team_handicap, h)}
+                                />
                               ))}
                               <td className="px-0 py-1 text-center text-gray-900 font-semibold">
                                 {hasBack ? back9Total : "—"}

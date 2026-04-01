@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkIsAdmin } from "@/lib/permissions-server";
+import { cascadeRemoveFromRoster } from "@/lib/roster";
 
 /**
  * @swagger
@@ -46,35 +47,27 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: usersError.message }, { status: 500 });
     }
 
-    // Get participants for this event (try with likelihood, fall back without)
-    let participantMap = new Map<string, number | null>();
-
-    const { data: participants, error: partError } = await adminClient
+    // Get participants for this event
+    const { data: participants } = await adminClient
       .from("event_participants")
-      .select("user_id, likelihood")
+      .select("user_id, likelihood, on_roster")
       .eq("trip_id", tripId);
 
-    if (partError) {
-      // likelihood column may not exist yet — fall back to user_id only
-      const { data: fallback } = await adminClient
-        .from("event_participants")
-        .select("user_id")
-        .eq("trip_id", tripId);
+    const participantMap = new Map(
+      (participants || []).map((p) => [
+        p.user_id,
+        { likelihood: p.likelihood as number | null, on_roster: p.on_roster as boolean },
+      ])
+    );
 
-      participantMap = new Map(
-        fallback?.map((p) => [p.user_id, null]) || []
-      );
-    } else {
-      participantMap = new Map(
-        participants?.map((p) => [p.user_id, (p as Record<string, unknown>).likelihood as number | null]) || []
-      );
-    }
-
-    const usersWithStatus = users?.map((u) => ({
-      ...u,
-      is_participating: participantMap.has(u.id),
-      likelihood: participantMap.get(u.id) ?? null,
-    }));
+    const usersWithStatus = users?.map((u) => {
+      const ep = participantMap.get(u.id);
+      return {
+        ...u,
+        is_participating: ep?.on_roster ?? false,
+        likelihood: ep?.likelihood ?? null,
+      };
+    });
 
     return NextResponse.json({ users: usersWithStatus });
   } catch (error) {
@@ -116,10 +109,10 @@ export async function POST(request: Request) {
 
     const adminClient = createAdminClient();
 
-    // Add to event participants
+    // Add to event participants (set on_roster = true)
     const { error: insertError } = await adminClient
       .from("event_participants")
-      .upsert({ trip_id, user_id }, { onConflict: "trip_id,user_id" });
+      .upsert({ trip_id, user_id, on_roster: true }, { onConflict: "trip_id,user_id" });
 
     if (insertError) {
       return NextResponse.json({ error: insertError.message }, { status: 500 });
@@ -181,122 +174,13 @@ export async function DELETE(request: Request) {
 
     const adminClient = createAdminClient();
 
-    // Get all contest IDs for this trip
-    const { data: contests } = await adminClient
-      .from("contests")
-      .select("id")
-      .eq("trip_id", trip_id);
+    // Cascade remove from all contests, teams, tee times, rooms, chat
+    await cascadeRemoveFromRoster(trip_id, user_id);
 
-    const contestIds = (contests || []).map((c) => c.id);
-
-    if (contestIds.length > 0) {
-      // Remove from scramble teams in this trip's contests
-      const { data: scrambleTeams } = await adminClient
-        .from("scramble_teams")
-        .select("id")
-        .in("contest_id", contestIds);
-
-      if (scrambleTeams && scrambleTeams.length > 0) {
-        const scrambleTeamIds = scrambleTeams.map((t) => t.id);
-        await adminClient
-          .from("scramble_team_members")
-          .delete()
-          .in("team_id", scrambleTeamIds)
-          .eq("user_id", user_id);
-      }
-
-      // Remove from cornhole teams in this trip's contests
-      const { data: cornholeTeams } = await adminClient
-        .from("cornhole_teams")
-        .select("id")
-        .in("contest_id", contestIds);
-
-      if (cornholeTeams && cornholeTeams.length > 0) {
-        const cornholeTeamIds = cornholeTeams.map((t) => t.id);
-        await adminClient
-          .from("cornhole_team_members")
-          .delete()
-          .in("team_id", cornholeTeamIds)
-          .eq("user_id", user_id);
-      }
-
-      // Clear from ryder cup pairs (SET NULL, not delete — pair structure stays)
-      const { data: ryderTeams } = await adminClient
-        .from("ryder_cup_teams")
-        .select("id")
-        .in("contest_id", contestIds);
-
-      if (ryderTeams && ryderTeams.length > 0) {
-        const ryderTeamIds = ryderTeams.map((t) => t.id);
-        await adminClient
-          .from("ryder_cup_pairs")
-          .update({ player_a_id: null })
-          .in("team_id", ryderTeamIds)
-          .eq("player_a_id", user_id);
-        await adminClient
-          .from("ryder_cup_pairs")
-          .update({ player_b_id: null })
-          .in("team_id", ryderTeamIds)
-          .eq("player_b_id", user_id);
-      }
-
-      // Remove from contest participants
-      await adminClient
-        .from("contest_participants")
-        .delete()
-        .in("contest_id", contestIds)
-        .eq("user_id", user_id);
-    }
-
-    // Remove from tee times for this trip
-    const { data: teeTimes } = await adminClient
-      .from("tee_times")
-      .select("id")
-      .eq("trip_id", trip_id);
-
-    if (teeTimes && teeTimes.length > 0) {
-      const teeTimeIds = teeTimes.map((t) => t.id);
-      await adminClient
-        .from("tee_time_players")
-        .delete()
-        .in("tee_time_id", teeTimeIds)
-        .eq("user_id", user_id);
-    }
-
-    // Remove from room assignments for this trip
-    const { data: rooms } = await adminClient
-      .from("rooms")
-      .select("id")
-      .eq("trip_id", trip_id);
-
-    if (rooms && rooms.length > 0) {
-      const roomIds = rooms.map((r) => r.id);
-      await adminClient
-        .from("room_assignments")
-        .delete()
-        .in("room_id", roomIds)
-        .eq("user_id", user_id);
-    }
-
-    // Remove from event chat room
-    const { data: eventRoom } = await adminClient
-      .from("chat_rooms")
-      .select("id")
-      .eq("trip_id", trip_id)
-      .single();
-
-    if (eventRoom) {
-      await adminClient
-        .from("chat_room_members")
-        .delete()
-        .eq("room_id", eventRoom.id)
-        .eq("user_id", user_id);
-    }
-
-    // Remove from event participants
+    // Set on_roster = false (keep the row for RSVP tracking)
     const { error } = await adminClient
       .from("event_participants")
-      .delete()
+      .update({ on_roster: false })
       .eq("trip_id", trip_id)
       .eq("user_id", user_id);
 

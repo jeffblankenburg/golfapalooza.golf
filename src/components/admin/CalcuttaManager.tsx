@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { BottomDrawer } from "@/components/admin/BottomDrawer";
 
@@ -95,8 +95,11 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
     onConfirm: () => void;
   } | null>(null);
 
-  // Drag state
+  // Drag state (mouse + touch)
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const touchCurrentIndex = useRef<number | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Find the calcutta contest
   const fetchContest = useCallback(async () => {
@@ -372,7 +375,7 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
               No participants in the Calcutta contest yet. Add them via Contests.
             </p>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1" ref={listRef}>
               {participants.map((p, index) => (
                 <div
                   key={p.id}
@@ -385,11 +388,41 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
                       setDragIndex(null);
                     }
                   }}
+                  onTouchStart={(e) => {
+                    // Only start drag from the grip handle area (first 40px)
+                    const touch = e.touches[0];
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    if (touch.clientX - rect.left > 40) return;
+                    touchStartY.current = touch.clientY;
+                    touchCurrentIndex.current = index;
+                    setDragIndex(index);
+                  }}
+                  onTouchMove={(e) => {
+                    if (dragIndex === null || !listRef.current) return;
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const items = listRef.current.children;
+                    for (let i = 0; i < items.length; i++) {
+                      const rect = items[i].getBoundingClientRect();
+                      if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+                        touchCurrentIndex.current = i;
+                        break;
+                      }
+                    }
+                  }}
+                  onTouchEnd={() => {
+                    if (dragIndex !== null && touchCurrentIndex.current !== null) {
+                      handleDragEnd(dragIndex, touchCurrentIndex.current);
+                    }
+                    setDragIndex(null);
+                    touchStartY.current = null;
+                    touchCurrentIndex.current = null;
+                  }}
                   className={`flex items-center gap-2 bg-white border rounded-xl px-3 py-2.5 ${
                     dragIndex === index ? "opacity-50 border-purple-300" : "border-gray-200"
                   }`}
                 >
-                  <div className="flex flex-col gap-0.5 text-gray-300 cursor-grab active:cursor-grabbing flex-shrink-0">
+                  <div className="flex flex-col gap-0.5 text-gray-300 cursor-grab active:cursor-grabbing flex-shrink-0 touch-none">
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M8 6a2 2 0 112 0 2 2 0 01-2 0zm8 0a2 2 0 112 0 2 2 0 01-2 0zm-8 6a2 2 0 112 0 2 2 0 01-2 0zm8 0a2 2 0 112 0 2 2 0 01-2 0zm-8 6a2 2 0 112 0 2 2 0 01-2 0zm8 0a2 2 0 112 0 2 2 0 01-2 0z" />
                     </svg>

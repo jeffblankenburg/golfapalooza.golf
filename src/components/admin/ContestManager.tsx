@@ -302,6 +302,7 @@ export function ContestManager({ tripId }: { tripId: string }) {
               <option value="cornhole_singles">Cornhole Singles</option>
               <option value="cornhole_doubles">Cornhole Doubles</option>
               <option value="calcutta">Calcutta</option>
+              <option value="pickem">Pick&apos;em</option>
               <option value="other">Other</option>
             </select>
             <select
@@ -405,6 +406,7 @@ export function ContestManager({ tripId }: { tripId: string }) {
                   <option value="cornhole_singles">Cornhole Singles</option>
                   <option value="cornhole_doubles">Cornhole Doubles</option>
                   <option value="calcutta">Calcutta</option>
+                  <option value="pickem">Pick&apos;em</option>
                   <option value="other">Other</option>
                 </select>
                 <select

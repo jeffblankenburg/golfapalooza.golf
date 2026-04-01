@@ -84,9 +84,7 @@ const allQuickLinks = [
     color: "bg-sky-50 text-sky-700",
     requiresContest: "scramble" as const,
     icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-      </svg>
+      <SvgIcon src="/noun-golf-tee-3895707.svg" className="w-7 h-7" />
     ),
   },
   {
@@ -139,12 +137,14 @@ const allQuickLinks = [
     ),
   },
   {
-    href: "/course",
-    label: "Course",
-    color: "bg-emerald-50 text-emerald-700",
-    requiresContest: null,
+    href: "/pickem",
+    label: "Whitey's Pick'em",
+    color: "bg-amber-50 text-amber-700",
+    requiresContest: "pickem" as const,
     icon: (
-      <SvgIcon src="/noun-golf-flag-5010192.svg" />
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+      </svg>
     ),
   },
 ];

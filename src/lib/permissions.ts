@@ -28,6 +28,7 @@ export const EVENT_PERMISSIONS: PermissionDef[] = [
   { key: "manage_tee_times", label: "Tee Times", description: "Tee time assignments" },
   { key: "manage_schedule", label: "Schedule", description: "Itinerary & action items" },
   { key: "manage_accolades", label: "Accolades", description: "Awards & history" },
+  { key: "manage_pickem", label: "Pick'em", description: "Football pick'em games & results" },
 ];
 
 // Combined list for backwards compatibility

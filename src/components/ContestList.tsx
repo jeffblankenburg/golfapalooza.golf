@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 interface ContestItem {
@@ -60,6 +61,7 @@ const contestTypeLabels: Record<string, string> = {
   cornhole_singles: "Cornhole",
   cornhole_doubles: "Cornhole",
   calcutta: "Calcutta",
+  pickem: "Pick'em",
   other: "Contest",
 };
 
@@ -70,6 +72,7 @@ const contestTypeColors: Record<string, string> = {
   cornhole_singles: "bg-orange-50 text-orange-700",
   cornhole_doubles: "bg-orange-50 text-orange-700",
   calcutta: "bg-purple-50 text-purple-700",
+  pickem: "bg-amber-50 text-amber-700",
   other: "bg-gray-50 text-gray-700",
 };
 
@@ -92,6 +95,11 @@ const contestTypeIcons: Record<string, React.ReactNode> = {
   calcutta: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  pickem: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
   ),
 };
@@ -542,6 +550,7 @@ export function ContestList({
   detailData: Record<string, ContestDetailData>;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const router = useRouter();
 
   if (contests.length === 0) {
     return (
@@ -600,9 +609,13 @@ export function ContestList({
                   className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
                 >
                   <button
-                    onClick={() =>
-                      setExpandedId(isExpanded ? null : contest.id)
-                    }
+                    onClick={() => {
+                      if (contest.contestType === "pickem") {
+                        router.push("/pickem");
+                        return;
+                      }
+                      setExpandedId(isExpanded ? null : contest.id);
+                    }}
                     className="flex items-center gap-4 p-4 w-full text-left active:bg-gray-50 transition-colors"
                   >
                     <div

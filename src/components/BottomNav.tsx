@@ -51,10 +51,10 @@ const navItems = [
     ),
   },
   {
-    href: "/contests",
-    label: "Contests",
+    href: "/course",
+    label: "Course",
     icon: (
-      <SvgIcon src="/noun-trophy-8286316.svg" />
+      <SvgIcon src="/noun-golf-flag-5010192.svg" />
     ),
   },
   {

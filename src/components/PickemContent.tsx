@@ -1,0 +1,451 @@
+"use client";
+
+import { useState, useEffect, useCallback, useRef } from "react";
+
+interface Game {
+  id: string;
+  away_team: string;
+  home_team: string;
+  away_logo_url: string | null;
+  home_logo_url: string | null;
+  away_color: string | null;
+  home_color: string | null;
+  spread: number;
+  favorite: "away" | "home";
+  game_time: string;
+  tv_channel: string | null;
+  is_tiebreaker: boolean;
+  winning_team: "away" | "home" | null;
+  away_score: number | null;
+  home_score: number | null;
+  is_locked: boolean;
+}
+
+interface Pick {
+  game_id: string;
+  user_id: string;
+  picked_team: string;
+  tiebreaker_total: number | null;
+}
+
+interface LeaderboardEntry {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  picks_count: number;
+  correct: number;
+  decided: number;
+  tiebreaker_total: number | null;
+  tiebreaker_diff: number | null;
+  rank: number;
+  picks?: Array<{ game_id: string; picked_team: string }>;
+}
+
+export function PickemContent({
+  contestId,
+  contestName,
+}: {
+  contestId: string;
+  contestName: string;
+}) {
+  const [games, setGames] = useState<Game[]>([]);
+  const [myPicks, setMyPicks] = useState<Pick[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [effectiveUserId, setEffectiveUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [tab, setTab] = useState<"picks" | "leaderboard">("picks");
+  const [savedIndicator, setSavedIndicator] = useState<string | null>(null);
+  const savedTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const fetchData = useCallback(async () => {
+    const res = await fetch(`/api/pickem?contest_id=${contestId}`);
+    const data = await res.json();
+    setGames(data.games || []);
+    setMyPicks(data.my_picks || []);
+    setLeaderboard(data.leaderboard || []);
+    setEffectiveUserId(data.effective_user_id || null);
+  }, [contestId]);
+
+  useEffect(() => {
+    fetchData().then(() => setLoading(false));
+  }, [fetchData]);
+
+  const submitPick = async (gameId: string, pickedTeam: "away" | "home", tiebreakerTotal?: number) => {
+    setSaving(gameId);
+
+    // Optimistic update
+    setMyPicks((prev) => {
+      const existing = prev.find((p) => p.game_id === gameId);
+      if (existing) {
+        return prev.map((p) =>
+          p.game_id === gameId
+            ? { ...p, picked_team: pickedTeam, tiebreaker_total: tiebreakerTotal ?? p.tiebreaker_total }
+            : p
+        );
+      }
+      return [
+        ...prev,
+        {
+          game_id: gameId,
+          user_id: effectiveUserId || "",
+          picked_team: pickedTeam,
+          tiebreaker_total: tiebreakerTotal ?? null,
+        },
+      ];
+    });
+
+    const res = await fetch("/api/pickem", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        game_id: gameId,
+        picked_team: pickedTeam,
+        tiebreaker_total: tiebreakerTotal,
+      }),
+    });
+
+    if (res.ok) {
+      // Show saved indicator briefly
+      setSavedIndicator(gameId);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = setTimeout(() => setSavedIndicator(null), 1500);
+    } else {
+      // Revert on failure
+      await fetchData();
+    }
+    setSaving(null);
+  };
+
+  const submitTiebreaker = async (gameId: string, total: number) => {
+    const existingPick = myPicks.find((p) => p.game_id === gameId);
+    if (!existingPick) return;
+
+    setSaving(gameId);
+    await fetch("/api/pickem", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        game_id: gameId,
+        picked_team: existingPick.picked_team,
+        tiebreaker_total: total,
+      }),
+    });
+    await fetchData();
+    setSaving(null);
+  };
+
+  const getMyPick = (gameId: string) => myPicks.find((p) => p.game_id === gameId);
+
+  const isPickCorrect = (pick: Pick, game: Game): boolean | null => {
+    if (!game.winning_team || game.away_score === null || game.home_score === null) return null;
+    const margin = game.home_score - game.away_score;
+    const homeSpread = game.favorite === "home" ? game.spread : -game.spread;
+    const homeCovers = margin + homeSpread > 0;
+    return pick.picked_team === "home" ? homeCovers : !homeCovers;
+  };
+
+  const formatTime = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleString("en-US", {
+      weekday: "short",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const pickedCount = myPicks.length;
+  const totalGames = games.length;
+  const correctCount = myPicks.reduce((acc, pick) => {
+    const game = games.find((g) => g.id === pick.game_id);
+    if (!game) return acc;
+    const result = isPickCorrect(pick, game);
+    return result === true ? acc + 1 : acc;
+  }, 0);
+  const decidedCount = games.filter((g) => g.winning_team).length;
+
+  return (
+    <div className="px-4 pt-6 pb-24">
+      <h1 className="text-2xl font-bold text-gray-900">{contestName}</h1>
+
+      {/* Stats bar */}
+      <div className="flex items-center gap-3 mt-2 mb-4">
+        <span className="text-sm text-gray-500">
+          {pickedCount}/{totalGames} picked
+        </span>
+        {decidedCount > 0 && (
+          <span className="text-sm font-medium text-green-700">
+            {correctCount}/{decidedCount} correct
+          </span>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex rounded-xl bg-gray-100 p-1 mb-4">
+        <button
+          onClick={() => setTab("picks")}
+          className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+            tab === "picks" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+          }`}
+        >
+          My Picks
+        </button>
+        <button
+          onClick={() => setTab("leaderboard")}
+          className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+            tab === "leaderboard" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+          }`}
+        >
+          Leaderboard
+        </button>
+      </div>
+
+      {tab === "picks" ? (
+        <div className="space-y-3">
+          {games.map((game) => {
+            const pick = getMyPick(game.id);
+            const result = pick ? isPickCorrect(pick, game) : null;
+            const isSaving = saving === game.id;
+            const justSaved = savedIndicator === game.id;
+
+            return (
+              <div
+                key={game.id}
+                className={`rounded-2xl border overflow-hidden transition-all ${
+                  game.is_locked
+                    ? "border-gray-200 bg-gray-50"
+                    : "border-gray-200 bg-white shadow-sm"
+                }`}
+              >
+                {/* Game header */}
+                <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">{formatTime(game.game_time)}</span>
+                    {game.tv_channel && (
+                      <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+                        {game.tv_channel}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {game.is_tiebreaker && (
+                      <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+                        Tiebreaker
+                      </span>
+                    )}
+                    {game.is_locked && (
+                      <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    )}
+                    {justSaved && (
+                      <span className="text-xs text-green-600 font-medium animate-pulse">Saved</span>
+                    )}
+                    {result !== null && (
+                      <span className={`text-xs font-bold ${result ? "text-green-600" : "text-red-500"}`}>
+                        {result ? "✓" : "✗"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Score display for decided games */}
+                {game.winning_team && game.away_score !== null && game.home_score !== null && (
+                  <div className="text-center text-xs text-gray-500 pb-1">
+                    Final: {game.away_team} {game.away_score} - {game.home_team} {game.home_score}
+                  </div>
+                )}
+
+                {/* Pick buttons - the main interaction */}
+                <div className="flex">
+                  <PickButton
+                    side="away"
+                    game={game}
+                    pick={pick}
+                    result={result}
+                    isSaving={isSaving}
+                    onPick={() => !game.is_locked && submitPick(game.id, "away")}
+                  />
+
+                  <PickButton
+                    side="home"
+                    game={game}
+                    pick={pick}
+                    result={result}
+                    isSaving={isSaving}
+                    onPick={() => !game.is_locked && submitPick(game.id, "home")}
+                  />
+                </div>
+
+                {/* Tiebreaker input */}
+                {game.is_tiebreaker && pick && !game.is_locked && (
+                  <TiebreakerInput
+                    gameId={game.id}
+                    initialValue={pick.tiebreaker_total}
+                    onSubmit={(total) => submitTiebreaker(game.id, total)}
+                  />
+                )}
+                {game.is_tiebreaker && pick && game.is_locked && pick.tiebreaker_total !== null && (
+                  <div className="text-center py-2 border-t border-gray-100 bg-amber-50">
+                    <span className="text-xs text-amber-700">Your tiebreaker: {pick.tiebreaker_total} total points</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Leaderboard tab */
+        <div>
+          {leaderboard.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No participants yet.</p>
+          ) : (
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="divide-y divide-gray-100">
+                {leaderboard.map((entry) => {
+                  const isMe = entry.user_id === effectiveUserId;
+                  return (
+                    <div
+                      key={entry.user_id}
+                      className={`flex items-center gap-3 px-4 py-3 ${isMe ? "bg-green-50" : ""}`}
+                    >
+                      <span className="w-6 text-center text-sm font-bold text-gray-400">
+                        {entry.rank}
+                      </span>
+                      {entry.avatar_url ? (
+                        <img src={entry.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-500">
+                          {entry.display_name[0]?.toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium truncate ${isMe ? "text-green-800" : "text-gray-900"}`}>
+                          {entry.display_name}
+                          {isMe && <span className="text-xs text-green-600 ml-1">(you)</span>}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {entry.picks_count}/{totalGames} picked
+                          {entry.tiebreaker_total !== null && ` · TB: ${entry.tiebreaker_total}`}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-green-700">{entry.correct}</p>
+                        {entry.decided > 0 && (
+                          <p className="text-xs text-gray-400">/{entry.decided}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Tiebreaker input with debounced save
+function TiebreakerInput({
+  gameId,
+  initialValue,
+  onSubmit,
+}: {
+  gameId: string;
+  initialValue: number | null;
+  onSubmit: (total: number) => void;
+}) {
+  const [value, setValue] = useState(initialValue !== null ? String(initialValue) : "");
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleChange = (val: string) => {
+    setValue(val);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const num = parseInt(val);
+    if (!isNaN(num) && num >= 0) {
+      timerRef.current = setTimeout(() => onSubmit(num), 1000);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center gap-2 py-2 border-t border-gray-100 bg-amber-50">
+      <label className="text-xs text-amber-700 font-medium" htmlFor={`tb-${gameId}`}>
+        Total Points:
+      </label>
+      <input
+        id={`tb-${gameId}`}
+        type="number"
+        value={value}
+        onChange={(e) => handleChange(e.target.value)}
+        className="w-20 border border-amber-300 rounded-lg px-2 py-1 text-sm text-center bg-white"
+        placeholder="0"
+        min="0"
+      />
+    </div>
+  );
+}
+
+// Pick button with team color highlight
+function PickButton({
+  side,
+  game,
+  pick,
+  result,
+  isSaving,
+  onPick,
+}: {
+  side: "away" | "home";
+  game: Game;
+  pick: Pick | undefined;
+  result: boolean | null;
+  isSaving: boolean;
+  onPick: () => void;
+}) {
+  const isSelected = pick?.picked_team === side;
+  const teamName = side === "away" ? game.away_team : game.home_team;
+  const logoUrl = side === "away" ? game.away_logo_url : game.home_logo_url;
+  const teamColor = side === "away" ? game.away_color : game.home_color;
+
+  const spreadLabel = game.favorite === side
+    ? ` (${game.spread})`
+    : ` (+${Math.abs(game.spread)})`;
+
+  const selectedStyle: React.CSSProperties = {};
+
+  let borderClass = side === "away" ? "border-t border-r border-gray-100" : "border-t border-gray-100";
+  if (isSelected) {
+    if (result === true) borderClass = side === "away" ? "border-t border-r border-green-200" : "border-t border-green-200";
+    else if (result === false) borderClass = side === "away" ? "border-t border-r border-red-200" : "border-t border-red-200";
+    else borderClass = side === "away" ? "border-t border-r border-gray-200" : "border-t border-gray-200";
+  }
+
+  return (
+    <button
+      onClick={onPick}
+      disabled={game.is_locked || isSaving}
+      className={`flex-1 py-3 px-3 text-center transition-all ${borderClass} ${
+        game.is_locked ? "opacity-70" : "active:bg-gray-50"
+      } ${isSelected ? (result === false ? "bg-red-50" : "bg-green-50") : ""}`}
+    >
+      {logoUrl && (
+        <img src={logoUrl} alt="" className="w-10 h-10 mx-auto mb-1 object-contain" />
+      )}
+      <p
+        className={`text-sm font-semibold ${isSelected ? "text-green-800" : "text-gray-900"}`}
+      >
+        {teamName}
+      </p>
+      <p className="text-xs text-gray-500 mt-0.5">{spreadLabel}</p>
+    </button>
+  );
+}

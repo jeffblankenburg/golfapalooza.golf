@@ -97,6 +97,8 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
 
   // Drag state (mouse + touch)
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+  const [touchPreview, setTouchPreview] = useState<{ name: string; y: number } | null>(null);
   const touchStartY = useRef<number | null>(null);
   const touchCurrentIndex = useRef<number | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -375,51 +377,93 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
               No participants in the Calcutta contest yet. Add them via Contests.
             </p>
           ) : (
-            <div className="space-y-1" ref={listRef}>
-              {participants.map((p, index) => (
+            <div className="space-y-1 relative" ref={listRef}>
+              {/* Floating touch preview */}
+              {touchPreview && (
                 <div
-                  key={p.id}
+                  className="fixed left-4 right-4 z-50 pointer-events-none"
+                  style={{ top: touchPreview.y - 20 }}
+                >
+                  <div className="bg-purple-600 text-white rounded-xl px-4 py-2 shadow-lg text-sm font-medium text-center opacity-90">
+                    {touchPreview.name}
+                  </div>
+                </div>
+              )}
+              {participants.map((p, index) => (
+                <div key={p.id}>
+                  {/* Drop indicator line */}
+                  {dropTargetIndex === index && dragIndex !== null && dragIndex !== index && (
+                    <div className="h-1 bg-purple-500 rounded-full mx-2 -mb-0.5" />
+                  )}
+                <div
                   draggable
                   onDragStart={() => setDragIndex(index)}
-                  onDragOver={(e) => e.preventDefault()}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDropTargetIndex(index);
+                  }}
+                  onDragLeave={() => {
+                    setDropTargetIndex((prev) => prev === index ? null : prev);
+                  }}
                   onDrop={() => {
                     if (dragIndex !== null) {
                       handleDragEnd(dragIndex, index);
                       setDragIndex(null);
+                      setDropTargetIndex(null);
                     }
                   }}
+                  onDragEnd={() => {
+                    setDragIndex(null);
+                    setDropTargetIndex(null);
+                  }}
                   onTouchStart={(e) => {
-                    // Only start drag from the grip handle area (first 40px)
                     const touch = e.touches[0];
                     const rect = e.currentTarget.getBoundingClientRect();
                     if (touch.clientX - rect.left > 40) return;
                     touchStartY.current = touch.clientY;
                     touchCurrentIndex.current = index;
                     setDragIndex(index);
+                    setDropTargetIndex(index);
+                    setTouchPreview({
+                      name: p.user?.display_name || "Unknown",
+                      y: touch.clientY,
+                    });
                   }}
                   onTouchMove={(e) => {
                     if (dragIndex === null || !listRef.current) return;
                     e.preventDefault();
                     const touch = e.touches[0];
-                    const items = listRef.current.children;
+                    setTouchPreview((prev) => prev ? { ...prev, y: touch.clientY } : null);
+                    const items = listRef.current.querySelectorAll("[data-drag-item]");
                     for (let i = 0; i < items.length; i++) {
                       const rect = items[i].getBoundingClientRect();
-                      if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+                      const midY = rect.top + rect.height / 2;
+                      if (touch.clientY < midY) {
                         touchCurrentIndex.current = i;
-                        break;
+                        setDropTargetIndex(i);
+                        return;
                       }
                     }
+                    touchCurrentIndex.current = items.length - 1;
+                    setDropTargetIndex(items.length - 1);
                   }}
                   onTouchEnd={() => {
                     if (dragIndex !== null && touchCurrentIndex.current !== null) {
                       handleDragEnd(dragIndex, touchCurrentIndex.current);
                     }
                     setDragIndex(null);
+                    setDropTargetIndex(null);
+                    setTouchPreview(null);
                     touchStartY.current = null;
                     touchCurrentIndex.current = null;
                   }}
-                  className={`flex items-center gap-2 bg-white border rounded-xl px-3 py-2.5 ${
-                    dragIndex === index ? "opacity-50 border-purple-300" : "border-gray-200"
+                  data-drag-item
+                  className={`flex items-center gap-2 bg-white border-2 rounded-xl px-3 py-2.5 transition-colors ${
+                    dragIndex === index
+                      ? "opacity-40 border-purple-300 bg-purple-50"
+                      : dropTargetIndex === index && dragIndex !== null && dragIndex !== index
+                      ? "border-purple-400 bg-purple-50"
+                      : "border-gray-200"
                   }`}
                 >
                   <div className="flex flex-col gap-0.5 text-gray-300 cursor-grab active:cursor-grabbing flex-shrink-0 touch-none">
@@ -470,6 +514,7 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
                       </svg>
                     </button>
                   </div>
+                </div>
                 </div>
               ))}
             </div>

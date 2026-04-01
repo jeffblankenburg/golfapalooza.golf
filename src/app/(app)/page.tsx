@@ -56,6 +56,7 @@ export default async function HomePage() {
     scheduleResult,
     contestTypesResult,
     eventDaysResult,
+    pickemGamesResult,
   ] = await Promise.all([
     // Course info
     trip.course_id
@@ -81,6 +82,8 @@ export default async function HomePage() {
     supabase.from("contests").select("contest_type").eq("trip_id", trip.id),
     // Event days for day name lookups
     supabase.from("event_days").select("day_number, name").eq("trip_id", trip.id).order("day_number"),
+    // Earliest pickem game time
+    supabase.from("pickem_games").select("game_time, contest:contests!pickem_games_contest_id_fkey(trip_id)").order("game_time").limit(1),
   ]);
 
   // ── Process Phase 2 results ──
@@ -360,6 +363,21 @@ export default async function HomePage() {
     }
   }
 
+  // Check if pickem picks are urgent (within 3 hours of first game)
+  const pickemFirstGame = (pickemGamesResult.data || []).find(
+    (g) => {
+      const c = Array.isArray(g.contest) ? g.contest[0] : g.contest;
+      return c?.trip_id === trip.id;
+    }
+  );
+  const pickemUrgent = await (async () => {
+    if (!pickemFirstGame) return false;
+    const gameTime = new Date(pickemFirstGame.game_time).getTime();
+    const now = (await getEffectiveDate()).getTime();
+    const threeHours = 3 * 60 * 60 * 1000;
+    return now >= gameTime - threeHours && now < gameTime;
+  })();
+
   return (
     <HomeContent
       displayName={profile?.display_name || "Loozer"}
@@ -380,6 +398,8 @@ export default async function HomePage() {
       contestTypes={contestTypes}
       activeRound={activeRound}
       kgbCupActiveRound={kgbCupActiveRound}
+      calcuttaAuctionActive={calcuttaContest?.calcutta_active_order != null && calcuttaContest.calcutta_active_order > 0}
+      pickemUrgent={pickemUrgent}
     />
   );
 }

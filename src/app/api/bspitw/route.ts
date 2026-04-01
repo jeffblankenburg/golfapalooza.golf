@@ -186,8 +186,21 @@ export async function GET(request: Request) {
     }
   }
 
-  // Sort by total descending, then by display_name
+  // Only players who are a participant in ALL scramble contests qualify for BSPITW
+  const { data: allContestParticipants } = await supabase
+    .from("contest_participants")
+    .select("contest_id, user_id")
+    .in("contest_id", contestIds);
+
+  const playerContestCount: Record<string, number> = {};
+  for (const cp of allContestParticipants || []) {
+    playerContestCount[cp.user_id] = (playerContestCount[cp.user_id] || 0) + 1;
+  }
+
+  const totalScrambleContests = contestIds.length;
+
   const leaderboard = Object.values(playerMap)
+    .filter((p) => (playerContestCount[p.user_id] || 0) === totalScrambleContests)
     .sort((a, b) => b.total_points - a.total_points || a.display_name.localeCompare(b.display_name));
 
   return NextResponse.json({ leaderboard });

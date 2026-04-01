@@ -66,7 +66,7 @@ export async function GET(request: Request) {
       (p) => p.auction_order === contest.calcutta_active_order
     );
 
-    let teamPartners: { contest_name: string; partners: string[]; day_number: number | null; score: number | null; course_par: number | null }[] = [];
+    let teamPartners: { contest_name: string; partners: string[]; day_number: number | null; score: number | null; course_par: number | null; is_participant: boolean }[] = [];
     let accolades: { title: string; trip_name?: string }[] = [];
     let cornholeSinglesIn: boolean | null = null;
 
@@ -140,7 +140,16 @@ export async function GET(request: Request) {
         }
       }
 
-      // Build teamPartners for ALL contests (empty partners = not yet assigned)
+      // Check which contests this user is a participant in
+      const contestIdsToCheck = (tripTeamContests || []).map((tc) => tc.id);
+      const { data: userParticipations } = await adminClient
+        .from("contest_participants")
+        .select("contest_id")
+        .eq("user_id", activeParticipant.user_id)
+        .in("contest_id", contestIdsToCheck);
+      const participatingContestIds = new Set((userParticipations || []).map((p) => p.contest_id));
+
+      // Build teamPartners for ALL contests
       for (const tc of tripTeamContests || []) {
         teamPartners.push({
           contest_name: tc.name,
@@ -148,6 +157,7 @@ export async function GET(request: Request) {
           day_number: tc.day_number,
           score: tc.contest_type === "scramble" ? (scoreMap.get(tc.id) ?? null) : null,
           course_par: tc.contest_type === "scramble" ? (parMap.get(tc.id) ?? null) : null,
+          is_participant: participatingContestIds.has(tc.id),
         });
       }
 

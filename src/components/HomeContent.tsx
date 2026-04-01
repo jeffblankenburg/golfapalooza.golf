@@ -138,13 +138,11 @@ const allQuickLinks = [
   },
   {
     href: "/pickem",
-    label: "Whitey's Pick'em",
+    label: "Pick'em",
     color: "bg-amber-50 text-amber-700",
     requiresContest: "pickem" as const,
     icon: (
-      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-      </svg>
+      <SvgIcon src="/noun-american-football-2591628.svg" className="w-7 h-7" />
     ),
   },
 ];
@@ -168,6 +166,8 @@ export function HomeContent({
   contestTypes = [],
   activeRound = null,
   kgbCupActiveRound = null,
+  calcuttaAuctionActive = false,
+  pickemUrgent = false,
 }: {
   displayName: string;
   trip: TripData | null;
@@ -187,6 +187,8 @@ export function HomeContent({
   contestTypes?: string[];
   activeRound?: { teamId: string; teeTime: string; startingHole: number | null } | null;
   kgbCupActiveRound?: { teeTime: string; startingHole: number | null } | null;
+  calcuttaAuctionActive?: boolean;
+  pickemUrgent?: boolean;
 }) {
   const router = useRouter();
 
@@ -709,23 +711,42 @@ export function HomeContent({
           Quick Links
         </h2>
         <div className="flex flex-wrap justify-center gap-3">
-          {quickLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="flex flex-col items-center p-4 bg-white rounded-2xl border border-gray-200 shadow-sm active:scale-95 transition-transform"
-              style={{ width: "calc(33.333% - 8px)" }}
-            >
-              <div
-                className={`flex items-center justify-center w-12 h-12 rounded-full ${link.color} mb-2`}
+          {quickLinks.map((link) => {
+            const isCalcuttaLive = link.href === "/calcutta" && calcuttaAuctionActive;
+            const isPickemUrgent = link.href === "/pickem" && pickemUrgent;
+
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`flex flex-col items-center p-4 rounded-2xl border shadow-sm active:scale-95 transition-transform ${
+                  isCalcuttaLive
+                    ? "bg-purple-50 border-purple-300 shadow-md animate-auction-pulse"
+                    : isPickemUrgent
+                    ? "bg-amber-50 border-amber-300 shadow-md animate-pickem-pulse"
+                    : "bg-white border-gray-200"
+                }`}
+                style={{ width: "calc(33.333% - 8px)" }}
               >
-                {link.icon}
-              </div>
-              <span className="text-xs font-semibold text-gray-900 text-center">
-                {link.label}
-              </span>
-            </Link>
-          ))}
+                <div
+                  className={`flex items-center justify-center w-12 h-12 rounded-full ${link.color} mb-2`}
+                >
+                  {link.icon}
+                </div>
+                <span className={`text-xs font-semibold text-center ${
+                  isCalcuttaLive ? "text-purple-800" : isPickemUrgent ? "text-amber-800" : "text-gray-900"
+                }`}>
+                  {link.label}
+                </span>
+                {isCalcuttaLive && (
+                  <span className="text-[10px] font-black text-purple-600 uppercase tracking-wider animate-pulse">LIVE</span>
+                )}
+                {isPickemUrgent && (
+                  <span className="text-[10px] font-black text-amber-600 uppercase tracking-wider animate-pulse">MAKE PICKS</span>
+                )}
+              </Link>
+            );
+          })}
         </div>
       </div>
 

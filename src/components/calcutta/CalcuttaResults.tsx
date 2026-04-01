@@ -41,6 +41,7 @@ interface TeamPartner {
   partners: string[];
   score: number | null;
   course_par: number | null;
+  is_participant?: boolean;
 }
 
 interface Accolade {
@@ -228,42 +229,60 @@ export function CalcuttaResults({ contestId }: { contestId: string }) {
 
           {/* Metadata grid */}
           <div className="grid grid-cols-2 gap-2">
-            {/* Thursday Scramble */}
+            {/* Scramble days */}
             {(spotlight?.teamPartners || [])
-              .filter((tp) => !tp.contest_name.toLowerCase().includes("cornhole") && tp.contest_name.toLowerCase().includes("thursday"))
-              .map((tp, i) => (
-              <div key={`thu-${i}`} className="bg-white rounded-xl border border-gray-200 p-3">
-                <p className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">{tp.contest_name}</p>
-                <p className="text-sm font-medium text-gray-800">
-                  {tp.partners.length > 0 ? tp.partners.join(", ") : "—"}
-                </p>
-                {tp.score != null && (
-                  <div className="flex justify-center mt-2">
-                    <span className={`w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-lg font-bold ${
-                      tp.course_par != null
-                        ? tp.score - tp.course_par < 0 ? "text-green-700" : tp.score - tp.course_par > 0 ? "text-red-600" : "text-gray-700"
-                        : "text-green-700"
-                    }`}>
-                      {tp.course_par != null
-                        ? (tp.score - tp.course_par <= 0 ? "" : "+") + (tp.score - tp.course_par)
-                        : tp.score}
-                    </span>
+              .filter((tp) => !tp.contest_name.toLowerCase().includes("cornhole"))
+              .map((tp, i) => {
+                if (!tp.is_participant) {
+                  return (
+                    <div key={`scramble-${i}`} className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold text-red-600 uppercase tracking-wide mb-1">{tp.contest_name}</p>
+                        <span className="text-sm font-black text-red-500 uppercase">OUT</span>
+                      </div>
+                      <svg className="w-8 h-8 text-red-500 flex-shrink-0" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="currentColor" fillOpacity="0.1" />
+                        <line x1="4.5" y1="4.5" x2="19.5" y2="19.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                  );
+                }
+                if (tp.partners.length === 0 && tp.score == null) {
+                  return (
+                    <div key={`scramble-${i}`} className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">{tp.contest_name}</p>
+                        <span className="text-sm font-black text-green-600 uppercase">IN</span>
+                      </div>
+                      <svg className="w-8 h-8 text-green-500 flex-shrink-0" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="currentColor" fillOpacity="0.1" />
+                        <path d="M7.5 12.5l3 3 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={`scramble-${i}`} className="bg-white rounded-xl border border-gray-200 p-3">
+                    <p className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">{tp.contest_name}</p>
+                    <p className="text-sm font-medium text-gray-800">
+                      {tp.partners.join(", ")}
+                    </p>
+                    {tp.score != null && (
+                      <div className="flex justify-center mt-2">
+                        <span className={`w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-lg font-bold ${
+                          tp.course_par != null
+                            ? tp.score - tp.course_par < 0 ? "text-green-700" : tp.score - tp.course_par > 0 ? "text-red-600" : "text-gray-700"
+                            : "text-green-700"
+                        }`}>
+                          {tp.course_par != null
+                            ? (tp.score - tp.course_par <= 0 ? "" : "+") + (tp.score - tp.course_par)
+                            : tp.score}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
-
-            {/* Friday Scramble */}
-            {(spotlight?.teamPartners || [])
-              .filter((tp) => !tp.contest_name.toLowerCase().includes("cornhole") && tp.contest_name.toLowerCase().includes("friday"))
-              .map((tp, i) => (
-              <div key={`fri-${i}`} className="bg-white rounded-xl border border-gray-200 p-3">
-                <p className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">{tp.contest_name}</p>
-                <p className="text-sm font-medium text-gray-800">
-                  {tp.partners.length > 0 ? tp.partners.join(", ") : "—"}
-                </p>
-              </div>
-            ))}
+                );
+              })}
 
             {/* Cornhole Singles */}
             <div className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between">

@@ -194,7 +194,18 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id, title, lyrics, tagged_user_id, sort_order } = await request.json();
+  const body = await request.json();
+
+  // Bulk reorder
+  if (body.action === "reorder" && Array.isArray(body.order)) {
+    const adminClient = createAdminClient();
+    for (const item of body.order as Array<{ id: string; sort_order: number }>) {
+      await adminClient.from("songs").update({ sort_order: item.sort_order }).eq("id", item.id);
+    }
+    return NextResponse.json({ success: true });
+  }
+
+  const { id, title, lyrics, tagged_user_id, sort_order } = body;
   if (!id) {
     return NextResponse.json({ error: "id is required" }, { status: 400 });
   }

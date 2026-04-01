@@ -132,6 +132,33 @@ textarea::placeholder {
   }
 }
 
+/* Calcutta auction live pulse */
+@keyframes auction-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(147, 51, 234, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(147, 51, 234, 0);
+  }
+}
+
+.animate-auction-pulse {
+  animation: auction-pulse 2s ease-in-out infinite;
+}
+
+@keyframes pickem-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(245, 158, 11, 0);
+  }
+}
+
+.animate-pickem-pulse {
+  animation: pickem-pulse 2s ease-in-out infinite;
+}
+
 /* Venmo button shimmer */
 @keyframes shimmer {
   0% {

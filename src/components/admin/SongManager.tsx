@@ -28,6 +28,13 @@ export function SongManager() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Drag-to-reorder state
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+  const [touchPreview, setTouchPreview] = useState<{ name: string; y: number } | null>(null);
+  const touchCurrentIndex = useRef<number | null>(null);
+  const songListRef = useRef<HTMLDivElement>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -135,6 +142,9 @@ export function SongManager() {
       if (mp3InputRef.current) mp3InputRef.current.value = "";
       if (artInputRef.current) artInputRef.current.value = "";
       setShowAdd(false);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(`Failed to add song: ${data.error || res.statusText}`);
     }
     setSaving(false);
   };
@@ -153,7 +163,6 @@ export function SongManager() {
     // Check if new art was selected
     const newArtFile = editArtInputRef.current?.files?.[0];
     if (newArtFile) {
-      // Compress and upload art via a separate POST-like call using FormData
       const [full, thumb] = await Promise.all([
         compressImage(newArtFile, 512, 0.85),
         generateThumbnail(newArtFile, 80),
@@ -162,13 +171,19 @@ export function SongManager() {
       formData.set("id", songId);
       formData.set("art", new File([full.blob], "art.jpg", { type: "image/jpeg" }));
       formData.set("art_thumb", new File([thumb], "thumb.jpg", { type: "image/jpeg" }));
-      await fetch("/api/admin/songs/art", {
+      const artRes = await fetch("/api/admin/songs/art", {
         method: "PUT",
         body: formData,
       });
+      if (!artRes.ok) {
+        const data = await artRes.json().catch(() => ({}));
+        alert(`Failed to upload art: ${data.error || artRes.statusText}`);
+        setSaving(false);
+        return;
+      }
     }
 
-    await fetch("/api/admin/songs", {
+    const res = await fetch("/api/admin/songs", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -178,6 +193,10 @@ export function SongManager() {
         tagged_user_id: editTaggedUserId || null,
       }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(`Failed to save: ${data.error || res.statusText}`);
+    }
     await fetchSongs();
     setEditingId(null);
     setSaving(false);
@@ -196,6 +215,25 @@ export function SongManager() {
         });
         await fetchSongs();
       },
+    });
+  };
+
+  const handleDragEnd = async (fromIdx: number, toIdx: number) => {
+    if (fromIdx === toIdx) return;
+    const newList = [...songs];
+    const [moved] = newList.splice(fromIdx, 1);
+    newList.splice(toIdx, 0, moved);
+
+    const reordered = newList.map((s, i) => ({ ...s, sort_order: i }));
+    setSongs(reordered);
+
+    await fetch("/api/admin/songs", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "reorder",
+        order: reordered.map((s) => ({ id: s.id, sort_order: s.sort_order })),
+      }),
     });
   };
 
@@ -309,9 +347,78 @@ export function SongManager() {
       )}
 
       {/* Song list */}
-      <div className="divide-y divide-gray-100 -mx-4">
-        {songs.map((song) => (
-          <div key={song.id} className="px-4 py-1.5">
+      <div className="divide-y divide-gray-100 -mx-4" ref={songListRef}>
+        {/* Floating touch preview */}
+        {touchPreview && (
+          <div
+            className="fixed left-4 right-4 z-50 pointer-events-none"
+            style={{ top: touchPreview.y - 20 }}
+          >
+            <div className="bg-green-600 text-white rounded-xl px-4 py-2 shadow-lg text-sm font-medium text-center opacity-90">
+              {touchPreview.name}
+            </div>
+          </div>
+        )}
+        {songs.map((song, index) => (
+          <div key={song.id}>
+            {/* Drop indicator line */}
+            {dropTargetIndex === index && dragIndex !== null && dragIndex !== index && (
+              <div className="h-1 bg-green-500 rounded-full mx-4" />
+            )}
+          <div
+            data-drag-item
+            draggable={editingId !== song.id}
+            onDragStart={() => setDragIndex(index)}
+            onDragOver={(e) => { e.preventDefault(); setDropTargetIndex(index); }}
+            onDragLeave={() => setDropTargetIndex((prev) => prev === index ? null : prev)}
+            onDrop={() => {
+              if (dragIndex !== null) {
+                handleDragEnd(dragIndex, index);
+                setDragIndex(null);
+                setDropTargetIndex(null);
+              }
+            }}
+            onDragEnd={() => { setDragIndex(null); setDropTargetIndex(null); }}
+            onTouchStart={(e) => {
+              const touch = e.touches[0];
+              const rect = e.currentTarget.getBoundingClientRect();
+              if (touch.clientX - rect.left > 40) return;
+              touchCurrentIndex.current = index;
+              setDragIndex(index);
+              setDropTargetIndex(index);
+              setTouchPreview({ name: song.title, y: touch.clientY });
+            }}
+            onTouchMove={(e) => {
+              if (dragIndex === null || !songListRef.current) return;
+              e.preventDefault();
+              const touch = e.touches[0];
+              setTouchPreview((prev) => prev ? { ...prev, y: touch.clientY } : null);
+              const items = songListRef.current.querySelectorAll("[data-drag-item]");
+              for (let i = 0; i < items.length; i++) {
+                const rect = items[i].getBoundingClientRect();
+                const midY = rect.top + rect.height / 2;
+                if (touch.clientY < midY) {
+                  touchCurrentIndex.current = i;
+                  setDropTargetIndex(i);
+                  return;
+                }
+              }
+              touchCurrentIndex.current = items.length - 1;
+              setDropTargetIndex(items.length - 1);
+            }}
+            onTouchEnd={() => {
+              if (dragIndex !== null && touchCurrentIndex.current !== null) {
+                handleDragEnd(dragIndex, touchCurrentIndex.current);
+              }
+              setDragIndex(null);
+              setDropTargetIndex(null);
+              setTouchPreview(null);
+              touchCurrentIndex.current = null;
+            }}
+            className={`px-4 py-1.5 transition-colors ${
+              dragIndex === index ? "opacity-40 bg-green-50" : ""
+            } ${dropTargetIndex === index && dragIndex !== null && dragIndex !== index ? "bg-green-50" : ""}`}
+          >
             {editingId === song.id ? (
               /* Edit mode */
               <div className="space-y-2">
@@ -391,6 +498,11 @@ export function SongManager() {
             ) : (
               /* Display mode */
               <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-0.5 text-gray-300 cursor-grab active:cursor-grabbing flex-shrink-0 touch-none">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 6a2 2 0 112 0 2 2 0 01-2 0zm8 0a2 2 0 112 0 2 2 0 01-2 0zm-8 6a2 2 0 112 0 2 2 0 01-2 0zm8 0a2 2 0 112 0 2 2 0 01-2 0zm-8 6a2 2 0 112 0 2 2 0 01-2 0zm8 0a2 2 0 112 0 2 2 0 01-2 0z" />
+                  </svg>
+                </div>
                 {(song.art_thumb_url || song.art_url) ? (
                   <img src={song.art_thumb_url || song.art_url!} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
                 ) : (
@@ -443,6 +555,7 @@ export function SongManager() {
                 </button>
               </div>
             )}
+          </div>
           </div>
         ))}
         {songs.length === 0 && (

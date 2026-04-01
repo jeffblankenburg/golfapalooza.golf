@@ -108,43 +108,49 @@ export function SongManager() {
     if (!title.trim() || !mp3File) return;
 
     setSaving(true);
-    const formData = new FormData();
-    formData.set("title", title.trim());
-    formData.set("mp3", mp3File);
-    if (taggedUserId) formData.set("tagged_user_id", taggedUserId);
-    if (lyrics.trim()) formData.set("lyrics", lyrics.trim());
-    if (durationSeconds) formData.set("duration_seconds", String(durationSeconds));
-    formData.set("sort_order", String(songs.length));
+    try {
+      const formData = new FormData();
+      formData.set("title", title.trim());
+      formData.set("mp3", mp3File);
+      if (taggedUserId) formData.set("tagged_user_id", taggedUserId);
+      if (lyrics.trim()) formData.set("lyrics", lyrics.trim());
+      if (durationSeconds) formData.set("duration_seconds", String(durationSeconds));
+      formData.set("sort_order", String(songs.length));
 
-    const artFile = artInputRef.current?.files?.[0];
-    if (artFile) {
-      // Compress art to 512px (hero/lock screen) and 80px thumbnail
-      const [full, thumb] = await Promise.all([
-        compressImage(artFile, 512, 0.85),
-        generateThumbnail(artFile, 80),
-      ]);
-      formData.set("art", new File([full.blob], "art.jpg", { type: "image/jpeg" }));
-      formData.set("art_thumb", new File([thumb], "thumb.jpg", { type: "image/jpeg" }));
-    }
+      const artFile = artInputRef.current?.files?.[0];
+      if (artFile) {
+        // Compress art to 512px (hero/lock screen) and 80px thumbnail
+        const [full, thumb] = await Promise.all([
+          compressImage(artFile, 512, 0.85),
+          generateThumbnail(artFile, 80),
+        ]);
+        formData.set("art", new File([full.blob], "art.jpg", { type: "image/jpeg" }));
+        formData.set("art_thumb", new File([thumb], "thumb.jpg", { type: "image/jpeg" }));
+      }
 
-    const res = await fetch("/api/admin/songs", {
-      method: "POST",
-      body: formData,
-    });
+      const res = await fetch("/api/admin/songs", {
+        method: "POST",
+        body: formData,
+      });
 
-    if (res.ok) {
-      await fetchSongs();
-      setTitle("");
-      setTaggedUserId("");
-      setLyrics("");
-      setDurationSeconds(null);
-      setShowLyricsPreview(false);
-      if (mp3InputRef.current) mp3InputRef.current.value = "";
-      if (artInputRef.current) artInputRef.current.value = "";
-      setShowAdd(false);
-    } else {
-      const data = await res.json().catch(() => ({}));
-      alert(`Failed to add song: ${data.error || res.statusText}`);
+      if (res.ok) {
+        await fetchSongs();
+        setTitle("");
+        setTaggedUserId("");
+        setLyrics("");
+        setDurationSeconds(null);
+        setShowLyricsPreview(false);
+        if (mp3InputRef.current) mp3InputRef.current.value = "";
+        if (artInputRef.current) artInputRef.current.value = "";
+        setShowAdd(false);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        const detail = data.error || `${res.status} ${res.statusText}`;
+        alert(`Failed to add song.\n\nError: ${detail}\n\nPlease share this with Jeff.`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`Failed to add song.\n\nError: ${msg}\n\nPlease share this with Jeff.`);
     }
     setSaving(false);
   };

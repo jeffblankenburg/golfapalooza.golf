@@ -119,9 +119,17 @@ export function BspitwContent({
                 </div>
                 {DAYS.map((d) => {
                   const dayPts = entry.days[d];
+                  const bonus = dayPts ? dayPts.on_green + dayPts.holed_out : 0;
                   return (
                     <div key={d} className="px-1 py-2 text-center text-xs text-gray-600">
-                      {dayPts ? dayPts.total : "—"}
+                      {dayPts ? (
+                        <>
+                          {dayPts.total}
+                          {bonus > 0 && (
+                            <sup className="ml-0.5 text-[9px] font-semibold text-amber-600">{bonus}</sup>
+                          )}
+                        </>
+                      ) : "—"}
                     </div>
                   );
                 })}
@@ -140,6 +148,7 @@ export function BspitwContent({
           <p><span className="font-semibold text-gray-700">Net Under Par:</span> 1 pt per stroke team is under par (net). Shared by all team members.</p>
           <p><span className="font-semibold text-gray-700">On Green:</span> 1 pt per tee shot that lands on the green.</p>
           <p><span className="font-semibold text-gray-700">Holed Out:</span> 1 pt per shot holed from outside flagstick length.</p>
+          <p>The <sup className="text-amber-600 font-semibold">superscript</sup> next to a daily score shows how many of those points came from bonuses (on green + holed out).</p>
         </div>
       )}
     </div>

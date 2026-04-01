@@ -86,6 +86,22 @@ export async function GET(request: Request) {
     }
   }
 
+  // Fetch tee times for teams in this contest
+  const { data: teeTimesData } = await supabase
+    .from("tee_times")
+    .select("scramble_team_id, tee_time, starting_hole")
+    .in("scramble_team_id", teamIds.length > 0 ? teamIds : ["none"]);
+
+  const teeTimeMap: Record<string, { tee_time: string; starting_hole: number | null }> = {};
+  for (const tt of teeTimesData || []) {
+    if (tt.scramble_team_id) {
+      teeTimeMap[tt.scramble_team_id] = {
+        tee_time: tt.tee_time,
+        starting_hole: tt.starting_hole,
+      };
+    }
+  }
+
   // Normalize teams
   const normalizedTeams = (teams || []).map((t) => ({
     id: t.id,
@@ -93,6 +109,8 @@ export async function GET(request: Request) {
     gross_score: t.gross_score,
     course_par: t.course_par,
     verified_at: t.verified_at || null,
+    tee_time: teeTimeMap[t.id]?.tee_time || null,
+    starting_hole: teeTimeMap[t.id]?.starting_hole || null,
     members: (t.members || []).map((m: { user_id: string; user: { display_name: string; avatar_url: string | null } | { display_name: string; avatar_url: string | null }[] }) => {
       const u = Array.isArray(m.user) ? m.user[0] : m.user;
       return {

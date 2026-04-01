@@ -166,6 +166,7 @@ export function HomeContent({
   contestTypes = [],
   activeRound = null,
   kgbCupActiveRound = null,
+  teeTimeLinkHref = "/scorecards",
   calcuttaAuctionActive = false,
   pickemUrgent = false,
 }: {
@@ -187,6 +188,7 @@ export function HomeContent({
   contestTypes?: string[];
   activeRound?: { teamId: string; teeTime: string; startingHole: number | null } | null;
   kgbCupActiveRound?: { teeTime: string; startingHole: number | null } | null;
+  teeTimeLinkHref?: string;
   calcuttaAuctionActive?: boolean;
   pickemUrgent?: boolean;
 }) {
@@ -484,7 +486,7 @@ export function HomeContent({
       {/* My Tee Time Card */}
       {myTeeTime && (
         <Link
-          href="/contests"
+          href={teeTimeLinkHref}
           className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-200 shadow-sm active:scale-95 transition-transform"
         >
           <div className="flex items-center justify-center w-12 h-12 rounded-full bg-green-50 text-green-600">

@@ -51,7 +51,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const admin = await checkPermissionAccess("manage_music");
   if (!admin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    console.error("Songs POST: permission denied — user not admin and lacks manage_music");
+    return NextResponse.json({ error: "Unauthorized — you need the manage_music permission" }, { status: 401 });
   }
 
   try {
@@ -83,6 +84,7 @@ export async function POST(request: Request) {
       .upload(mp3Path, mp3File, { cacheControl: "31536000", upsert: true });
 
     if (mp3Error) {
+      console.error("Songs POST: MP3 upload failed:", mp3Error);
       return NextResponse.json(
         { error: `Failed to upload MP3: ${mp3Error.message}` },
         { status: 500 }
@@ -150,8 +152,9 @@ export async function POST(request: Request) {
       .single();
 
     if (insertError) {
+      console.error("Songs POST: DB insert failed:", insertError);
       return NextResponse.json(
-        { error: insertError.message },
+        { error: `DB insert failed: ${insertError.message}` },
         { status: 500 }
       );
     }

@@ -389,6 +389,7 @@ export default async function HomePage() {
       myStartingHole={trip?.show_tee_times ? myStartingHole : null}
       myTeammates={trip?.show_tee_times ? myTeammates : []}
       teeTimeDay={trip?.show_tee_times ? teeTimeDay : null}
+      teeTimeLinkHref={bestMatch?.source === "player" ? "/kgb-cup" : bestMatch ? `/scorecards?day=${bestMatch.dayNumber}` : "/scorecards"}
       simulatedDate={simDate}
       participants={participants}
       nextScheduleItem={nextScheduleItem}

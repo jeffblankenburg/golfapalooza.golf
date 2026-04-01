@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 
 interface Contest {
   id: string;
@@ -19,6 +20,8 @@ interface Team {
   gross_score: number | null;
   course_par: number;
   verified_at: string | null;
+  tee_time: string | null;
+  starting_hole: number | null;
   members: TeamMember[];
 }
 
@@ -138,7 +141,10 @@ export function ScorecardsContent({
   contests: Contest[];
   startDate: string;
 }) {
-  const [selectedDay, setSelectedDay] = useState<number>(contests[0]?.day_number || 2);
+  const searchParams = useSearchParams();
+  const dayParam = searchParams.get("day");
+  const initialDay = dayParam ? parseInt(dayParam, 10) : (contests[0]?.day_number || 2);
+  const [selectedDay, setSelectedDay] = useState<number>(initialDay);
   const [data, setData] = useState<ScorecardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -196,7 +202,7 @@ export function ScorecardsContent({
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Scorecards</h1>
+      <h1 className="text-2xl font-bold text-gray-900">Scrambles</h1>
 
       {/* Day tabs */}
       <div className="flex gap-2">
@@ -282,6 +288,27 @@ export function ScorecardsContent({
                     ) : null}
                   </div>
                 </div>
+
+                {/* Tee time info when no scores entered */}
+                {Object.keys(teamScores).length === 0 && (team.tee_time || team.starting_hole) && (
+                  <div className="px-3 py-2 flex items-center gap-3 text-sm text-gray-600 bg-gray-50 border-b border-gray-100">
+                    {team.tee_time && (
+                      <span className="inline-flex items-center gap-1">
+                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {new Date(`1970-01-01T${team.tee_time}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                      </span>
+                    )}
+                    {team.starting_hole && (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                          Hole {team.starting_hole}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* Scorecard grid — fixed columns so front/back 9 align */}
                 {(front9.length > 0 || back9.length > 0) && (

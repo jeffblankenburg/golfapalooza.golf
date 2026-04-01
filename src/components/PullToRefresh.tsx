@@ -20,9 +20,10 @@ export function PullToRefresh() {
     }
 
     function onTouchStart(e: TouchEvent) {
-      // Don't pull-to-refresh when a modal/viewer overlay is open
+      // Don't pull-to-refresh when a modal/viewer overlay is open or dragging
       const target = e.target as HTMLElement;
       if (target.closest(".fixed.z-50, .fixed.z-40")) return;
+      if (target.closest("[data-drag-item]")) return;
 
       const scrollTop = getScrollTop();
       if (scrollTop <= 1) {

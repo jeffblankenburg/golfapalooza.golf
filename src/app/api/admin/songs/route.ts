@@ -51,121 +51,44 @@ export async function GET() {
 export async function POST(request: Request) {
   const admin = await checkPermissionAccess("manage_music");
   if (!admin) {
-    console.error("Songs POST: permission denied — user not admin and lacks manage_music");
     return NextResponse.json({ error: "Unauthorized — you need the manage_music permission" }, { status: 401 });
   }
 
   try {
-    const formData = await request.formData();
-    const mp3File = formData.get("mp3") as File;
-    const artFile = formData.get("art") as File | null;
-    const artThumbFile = formData.get("art_thumb") as File | null;
-    const title = formData.get("title") as string;
-    const lyrics = formData.get("lyrics") as string | null;
-    const taggedUserId = formData.get("tagged_user_id") as string | null;
-    const durationSeconds = formData.get("duration_seconds") as string | null;
-    const sortOrder = formData.get("sort_order") as string | null;
+    const body = await request.json();
+    const { songId, title, mp3Url, artUrl, artThumbUrl, lyrics, taggedUserId, durationSeconds, sortOrder } = body;
 
-    if (!mp3File || !title) {
-      return NextResponse.json(
-        { error: "mp3 file and title are required" },
-        { status: 400 }
-      );
+    if (!songId || !title || !mp3Url) {
+      return NextResponse.json({ error: "songId, title, and mp3Url are required" }, { status: 400 });
     }
 
     const adminClient = createAdminClient();
-    const songId = crypto.randomUUID();
-    const timestamp = Date.now();
 
-    // Upload MP3
-    const mp3Path = `audio/${timestamp}-${songId}.mp3`;
-    const { error: mp3Error } = await adminClient.storage
-      .from("songs")
-      .upload(mp3Path, mp3File, { cacheControl: "31536000", upsert: true });
-
-    if (mp3Error) {
-      console.error("Songs POST: MP3 upload failed:", mp3Error);
-      return NextResponse.json(
-        { error: `Failed to upload MP3: ${mp3Error.message}` },
-        { status: 500 }
-      );
-    }
-
-    const { data: mp3UrlData } = adminClient.storage
-      .from("songs")
-      .getPublicUrl(mp3Path);
-
-    // Upload art if provided (full 512px + 80px thumbnail)
-    let artUrl: string | null = null;
-    let artThumbUrl: string | null = null;
-    if (artFile && artFile.size > 0) {
-      const ext = artFile.name.split(".").pop() || "jpg";
-      const artPath = `art/${timestamp}-${songId}.${ext}`;
-      const { error: artError } = await adminClient.storage
-        .from("songs")
-        .upload(artPath, artFile, { cacheControl: "31536000", upsert: true });
-
-      if (artError) {
-        return NextResponse.json(
-          { error: `Failed to upload art: ${artError.message}` },
-          { status: 500 }
-        );
-      }
-
-      const { data: artUrlData } = adminClient.storage
-        .from("songs")
-        .getPublicUrl(artPath);
-      artUrl = artUrlData.publicUrl;
-
-      // Upload thumbnail
-      if (artThumbFile && artThumbFile.size > 0) {
-        const thumbExt = artThumbFile.name.split(".").pop() || "jpg";
-        const thumbPath = `art/${timestamp}-${songId}-thumb.${thumbExt}`;
-        const { error: thumbError } = await adminClient.storage
-          .from("songs")
-          .upload(thumbPath, artThumbFile, { cacheControl: "31536000", upsert: true });
-
-        if (!thumbError) {
-          const { data: thumbUrlData } = adminClient.storage
-            .from("songs")
-            .getPublicUrl(thumbPath);
-          artThumbUrl = thumbUrlData.publicUrl;
-        }
-      }
-    }
-
-    // Insert song record
     const { data: song, error: insertError } = await adminClient
       .from("songs")
       .insert({
         id: songId,
         title,
-        mp3_url: mp3UrlData.publicUrl,
-        art_url: artUrl,
-        art_thumb_url: artThumbUrl,
+        mp3_url: mp3Url,
+        art_url: artUrl || null,
+        art_thumb_url: artThumbUrl || null,
         lyrics: lyrics || null,
         duration_seconds: durationSeconds ? parseInt(durationSeconds) : null,
         tagged_user_id: taggedUserId || null,
-        sort_order: sortOrder ? parseInt(sortOrder) : 0,
+        sort_order: sortOrder != null ? parseInt(sortOrder) : 0,
       })
       .select()
       .single();
 
     if (insertError) {
       console.error("Songs POST: DB insert failed:", insertError);
-      return NextResponse.json(
-        { error: `DB insert failed: ${insertError.message}` },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: `DB insert failed: ${insertError.message}` }, { status: 500 });
     }
 
     return NextResponse.json({ song });
   } catch (error) {
     console.error("Upload song error:", error);
-    return NextResponse.json(
-      { error: "Failed to upload song" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to save song record" }, { status: 500 });
   }
 }
 

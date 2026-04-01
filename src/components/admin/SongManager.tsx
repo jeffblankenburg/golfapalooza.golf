@@ -109,28 +109,77 @@ export function SongManager() {
 
     setSaving(true);
     try {
-      const formData = new FormData();
-      formData.set("title", title.trim());
-      formData.set("mp3", mp3File);
-      if (taggedUserId) formData.set("tagged_user_id", taggedUserId);
-      if (lyrics.trim()) formData.set("lyrics", lyrics.trim());
-      if (durationSeconds) formData.set("duration_seconds", String(durationSeconds));
-      formData.set("sort_order", String(songs.length));
-
       const artFile = artInputRef.current?.files?.[0];
+      let artBlob: Blob | null = null;
+      let thumbBlob: Blob | null = null;
+
       if (artFile) {
-        // Compress art to 512px (hero/lock screen) and 80px thumbnail
         const [full, thumb] = await Promise.all([
           compressImage(artFile, 512, 0.85),
           generateThumbnail(artFile, 80),
         ]);
-        formData.set("art", new File([full.blob], "art.jpg", { type: "image/jpeg" }));
-        formData.set("art_thumb", new File([thumb], "thumb.jpg", { type: "image/jpeg" }));
+        artBlob = full.blob;
+        thumbBlob = thumb;
       }
 
+      // Step 1: Get signed upload URLs (small JSON request)
+      const urlRes = await fetch("/api/admin/songs/upload-urls", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hasArt: !!artBlob, hasThumb: !!thumbBlob }),
+      });
+      if (!urlRes.ok) {
+        const data = await urlRes.json().catch(() => ({}));
+        throw new Error(data.error || `${urlRes.status} ${urlRes.statusText}`);
+      }
+      const urls = await urlRes.json();
+
+      // Step 2: Upload files directly to Supabase Storage
+      const mp3Upload = await fetch(urls.mp3.signedUrl, {
+        method: "PUT",
+        headers: { "Content-Type": "audio/mpeg", "Cache-Control": "max-age=31536000" },
+        body: mp3File,
+      });
+      if (!mp3Upload.ok) {
+        throw new Error(`MP3 upload failed: ${mp3Upload.status} ${mp3Upload.statusText}`);
+      }
+
+      let artUrl: string | null = null;
+      let artThumbUrl: string | null = null;
+
+      if (artBlob && urls.art) {
+        const artUpload = await fetch(urls.art.signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": "image/jpeg", "Cache-Control": "max-age=31536000" },
+          body: artBlob,
+        });
+        if (artUpload.ok) artUrl = urls.art.publicUrl;
+      }
+
+      if (thumbBlob && urls.thumb) {
+        const thumbUpload = await fetch(urls.thumb.signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": "image/jpeg", "Cache-Control": "max-age=31536000" },
+          body: thumbBlob,
+        });
+        if (thumbUpload.ok) artThumbUrl = urls.thumb.publicUrl;
+      }
+
+      // Step 3: Save song record (small JSON request)
       const res = await fetch("/api/admin/songs", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          songId: urls.songId,
+          title: title.trim(),
+          mp3Url: urls.mp3.publicUrl,
+          artUrl,
+          artThumbUrl,
+          lyrics: lyrics.trim() || null,
+          taggedUserId: taggedUserId || null,
+          durationSeconds: durationSeconds || null,
+          sortOrder: songs.length,
+        }),
       });
 
       if (res.ok) {
@@ -145,8 +194,7 @@ export function SongManager() {
         setShowAdd(false);
       } else {
         const data = await res.json().catch(() => ({}));
-        const detail = data.error || `${res.status} ${res.statusText}`;
-        alert(`Failed to add song.\n\nError: ${detail}\n\nPlease share this with Jeff.`);
+        throw new Error(data.error || `${res.status} ${res.statusText}`);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

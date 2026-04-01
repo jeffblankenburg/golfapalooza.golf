@@ -10,9 +10,20 @@ import { getSimUserId } from "@/lib/simulator";
  */
 async function getEffectiveProfile() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+
+  // Retry getUser up to 2 times — the edge middleware sandbox occasionally
+  // causes transient "fetch failed" errors on the first attempt.
+  let user = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data, error } = await supabase.auth.getUser();
+    if (data?.user) {
+      user = data.user;
+      break;
+    }
+    if (error) {
+      console.warn(`getEffectiveProfile: getUser attempt ${attempt + 1} failed:`, error.message);
+    }
+  }
 
   if (!user) return null;
 

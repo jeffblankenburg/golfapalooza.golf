@@ -1,7 +1,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { AdminNav } from "@/components/AdminNav";
 import { HeaderBar } from "@/components/HeaderBar";
+import { SimulatorBanner } from "@/components/SimulatorBanner";
+import { hasAnyPermission } from "@/lib/permissions";
+import { getSimUserId, getSimDate } from "@/lib/simulator";
 
 export default async function AdminLayout({
   children,
@@ -17,13 +21,44 @@ export default async function AdminLayout({
 
   const { data: profile } = await supabase
     .from("users")
-    .select("is_admin, display_name, avatar_url")
+    .select("is_admin, display_name, avatar_url, permissions")
     .eq("id", user.id)
     .single();
 
-  if (!profile?.is_admin) {
+  const realIsAdmin = profile?.is_admin ?? false;
+  const realPermissions = (profile?.permissions as Record<string, boolean>) ?? null;
+
+  if (!realIsAdmin && !hasAnyPermission(realPermissions)) {
     redirect("/");
   }
+
+  // If the real user is admin and simulating someone, use the simulated user's access
+  let isAdmin = realIsAdmin;
+  let permissions = realPermissions;
+  const simUserId = realIsAdmin ? await getSimUserId() : null;
+  const simDate = realIsAdmin ? await getSimDate() : null;
+  let simUserName: string | null = null;
+  let simAvatarUrl: string | null = null;
+
+  if (simUserId && realIsAdmin) {
+    const adminClient = createAdminClient();
+    const { data: simProfile } = await adminClient
+      .from("users")
+      .select("is_admin, permissions, display_name, avatar_url")
+      .eq("id", simUserId)
+      .single();
+
+    isAdmin = simProfile?.is_admin ?? false;
+    permissions = (simProfile?.permissions as Record<string, boolean>) ?? null;
+    simUserName = simProfile?.display_name || null;
+    simAvatarUrl = simProfile?.avatar_url || null;
+  }
+
+  const showBanner = realIsAdmin && (simDate || simUserId);
+
+  const effectiveUserId = simUserId || user.id;
+  const effectiveDisplayName = simUserName || profile?.display_name || "";
+  const effectiveAvatarUrl = simUserId ? simAvatarUrl : (profile?.avatar_url || null);
 
   // Get unread notification count (exclude chat_message, same as app layout)
   const { count: unreadCount } = await supabase
@@ -35,15 +70,21 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-screen pb-20">
+      {showBanner && (
+        <SimulatorBanner
+          simDate={simDate}
+          simUserName={simUserName}
+        />
+      )}
       <HeaderBar
         initialUnreadCount={unreadCount || 0}
         initialChatUnreadCount={0}
-        userId={user.id}
-        displayName={profile?.display_name || ""}
-        avatarUrl={profile?.avatar_url || null}
+        userId={effectiveUserId}
+        displayName={effectiveDisplayName}
+        avatarUrl={effectiveAvatarUrl}
       />
       <main>{children}</main>
-      <AdminNav />
+      <AdminNav isAdmin={isAdmin} permissions={permissions} />
     </div>
   );
 }

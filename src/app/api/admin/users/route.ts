@@ -42,14 +42,21 @@ export async function GET() {
   const adminClient = createAdminClient();
   const { data: users, error } = await adminClient
     .from("users")
-    .select("*")
+    .select("*, player_handicaps(handicap_index)")
     .order("display_name");
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ users });
+  // Normalize: extract handicap_index from joined table
+  const normalizedUsers = (users || []).map((u) => {
+    const ph = Array.isArray(u.player_handicaps) ? u.player_handicaps[0] : u.player_handicaps;
+    const { player_handicaps: _, ...rest } = u;
+    return { ...rest, handicap_index: ph?.handicap_index ?? null };
+  });
+
+  return NextResponse.json({ users: normalizedUsers });
 }
 
 /**
@@ -170,7 +177,7 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const { userId, displayName, fullName, phone, isAdmin, permissions } = await request.json();
+    const { userId, displayName, fullName, phone, isAdmin, permissions, handicapIndex } = await request.json();
 
     if (!userId) {
       return NextResponse.json(
@@ -219,6 +226,27 @@ export async function PUT(request: Request) {
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    }
+
+    // Upsert handicap if provided
+    if (handicapIndex !== undefined) {
+      if (handicapIndex === null || handicapIndex === "") {
+        // Remove handicap
+        await adminClient
+          .from("player_handicaps")
+          .delete()
+          .eq("user_id", userId);
+      } else {
+        const { error: hcError } = await adminClient
+          .from("player_handicaps")
+          .upsert(
+            { user_id: userId, handicap_index: parseFloat(handicapIndex) },
+            { onConflict: "user_id" }
+          );
+        if (hcError) {
+          return NextResponse.json({ error: hcError.message }, { status: 500 });
+        }
       }
     }
 

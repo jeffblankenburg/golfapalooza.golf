@@ -7,6 +7,7 @@ import { SimulatorBanner } from "@/components/SimulatorBanner";
 import { MusicPlayerProvider } from "@/components/MusicPlayerProvider";
 import { AppShell } from "@/components/AppShell";
 import { getSimDate, getSimUserId, getEffectiveUserId, isSimulating } from "@/lib/simulator";
+import { hasAnyPermission } from "@/lib/permissions";
 
 export default async function AppLayout({
   children,
@@ -24,11 +25,12 @@ export default async function AppLayout({
   // Single users query (replaces two separate queries)
   const { data: realProfile } = await supabase
     .from("users")
-    .select("is_admin, display_name, avatar_url")
+    .select("is_admin, display_name, avatar_url, permissions")
     .eq("id", user.id)
     .single();
 
   const realIsAdmin = realProfile?.is_admin ?? false;
+  const realPermissions = (realProfile?.permissions as Record<string, boolean>) ?? null;
 
   // Determine effective user (sim or real)
   const simulating = realIsAdmin && await isSimulating();
@@ -42,7 +44,7 @@ export default async function AppLayout({
   // Run profile (if simulating), notifications, and chat memberships in parallel
   const [profileResult, notifResult, membershipsResult] = await Promise.all([
     simulating
-      ? queryClient.from("users").select("is_admin, display_name, avatar_url").eq("id", effectiveUserId).single()
+      ? queryClient.from("users").select("is_admin, display_name, avatar_url, permissions").eq("id", effectiveUserId).single()
       : Promise.resolve({ data: realProfile }),
     queryClient
       .from("notifications")
@@ -115,7 +117,7 @@ export default async function AppLayout({
           avatarUrl={profile?.avatar_url || null}
         />
         <main>{children}</main>
-        <BottomNav isAdmin={isAdmin} />
+        <BottomNav isAdmin={isAdmin || hasAnyPermission(simulating ? (profile?.permissions as Record<string, boolean> | null) : realPermissions)} />
       </AppShell>
     </MusicPlayerProvider>
   );

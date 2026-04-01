@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-async function checkIsAdmin() {
+async function checkMusicAccess() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -12,17 +12,20 @@ async function checkIsAdmin() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("is_admin")
+    .select("is_admin, permissions")
     .eq("id", user.id)
     .single();
 
-  if (!profile?.is_admin) return null;
+  if (!profile) return null;
+
+  const perms = profile.permissions as Record<string, boolean> | null;
+  if (!profile.is_admin && !perms?.manage_music) return null;
 
   return user;
 }
 
 export async function GET() {
-  const admin = await checkIsAdmin();
+  const admin = await checkMusicAccess();
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -68,7 +71,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkMusicAccess();
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -186,7 +189,7 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkMusicAccess();
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -216,7 +219,7 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkMusicAccess();
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

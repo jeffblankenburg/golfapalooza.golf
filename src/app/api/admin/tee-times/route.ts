@@ -44,7 +44,7 @@ export async function GET(request: Request) {
     const { data: groups, error: groupsError } = await adminClient
       .from("tee_times")
       .select(
-        "id, trip_id, day_number, tee_time, starting_hole, scramble_team_id, created_at, tee_time_players(id, user_id, user:users(id, display_name, avatar_url))"
+        "id, trip_id, day_number, tee_time, starting_hole, scramble_team_id, kgb_foursome_id, created_at, tee_time_players(id, user_id, user:users(id, display_name, avatar_url))"
       )
       .eq("trip_id", tripId)
       .eq("day_number", dayNum)
@@ -212,6 +212,7 @@ export async function GET(request: Request) {
         tee_time: group.tee_time,
         starting_hole: group.starting_hole,
         scramble_team_id: group.scramble_team_id,
+        kgb_foursome_id: (group as Record<string, unknown>).kgb_foursome_id || null,
         players,
       };
     });
@@ -238,9 +239,12 @@ export async function POST(request: Request) {
     }
 
     const adminClient = createAdminClient();
+    const insertData: Record<string, unknown> = { trip_id, day_number, starting_hole: 1 };
+    if (kgb_foursome_id) insertData.kgb_foursome_id = kgb_foursome_id;
+
     const { data: group, error } = await adminClient
       .from("tee_times")
-      .insert({ trip_id, day_number, starting_hole: 1 })
+      .insert(insertData)
       .select()
       .single();
 

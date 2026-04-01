@@ -68,13 +68,16 @@ const adminNavItems = [
   },
 ];
 
-export function AdminNav() {
+export function AdminNav({ isAdmin }: { isAdmin: boolean; permissions: Record<string, boolean> | null }) {
   const pathname = usePathname();
+
+  // Permission-only users see only the Home item
+  const items = isAdmin ? adminNavItems : adminNavItems.filter((item) => (item as { exact?: boolean }).exact);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 pb-safe z-40">
       <div className="flex justify-around items-center h-16">
-        {adminNavItems.map((item) => {
+        {items.map((item) => {
           const isActive = (item as { exact?: boolean }).exact
             ? pathname === item.href
             : pathname.startsWith(item.href);

@@ -632,10 +632,12 @@ function HandicapsTab({
             <div key={p.player_id} className="flex items-center gap-3 px-3 py-2">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">{p.display_name}</p>
-                <p className="text-xs text-gray-400">
-                  Current: {p.current_handicap !== null ? p.current_handicap : "N/A"}
-                  {p.original_handicap !== null && ` → Original: ${p.original_handicap}`}
-                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">Base:</span>
+                <span className="w-14 h-8 flex items-center justify-center text-sm text-gray-500">
+                  {p.current_handicap !== null ? p.current_handicap : "—"}
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <label className="text-xs text-gray-400">Adj:</label>
@@ -652,6 +654,13 @@ function HandicapsTab({
               </div>
             </div>
           ))}
+          {players.some((p) => p.current_handicap === null) && (
+            <div className="px-3 py-2 bg-amber-50">
+              <p className="text-xs text-amber-700">
+                Some players have no base handicap. Set handicaps on the Loozers admin page.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

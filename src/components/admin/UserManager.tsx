@@ -13,6 +13,7 @@ interface User {
   is_admin: boolean;
   is_active: boolean;
   permissions: Record<string, boolean> | null;
+  handicap_index: number | null;
   created_at: string;
 }
 
@@ -32,6 +33,7 @@ export function UserManager({ ref }: { ref?: Ref<{ openAdd: () => void }> }) {
     phone: "",
     displayName: "",
     fullName: "",
+    handicapIndex: "",
   });
   const [editIsAdmin, setEditIsAdmin] = useState(false);
   const [editPermissions, setEditPermissions] = useState<
@@ -78,8 +80,9 @@ export function UserManager({ ref }: { ref?: Ref<{ openAdd: () => void }> }) {
         ? {
             userId: editingUser.id,
             ...formData,
+            handicapIndex: formData.handicapIndex === "" ? null : formData.handicapIndex,
             isAdmin: editIsAdmin,
-            permissions: editIsAdmin ? editPermissions : {},
+            permissions: editIsAdmin ? {} : editPermissions,
           }
         : formData;
 
@@ -107,7 +110,7 @@ export function UserManager({ ref }: { ref?: Ref<{ openAdd: () => void }> }) {
 
   const openAdd = () => {
     setEditingUser(null);
-    setFormData({ phone: "", displayName: "", fullName: "" });
+    setFormData({ phone: "", displayName: "", fullName: "", handicapIndex: "" });
     setEditIsAdmin(false);
     setEditPermissions({});
     setError("");
@@ -120,6 +123,7 @@ export function UserManager({ ref }: { ref?: Ref<{ openAdd: () => void }> }) {
       phone: formatPhone(user.phone),
       displayName: user.display_name,
       fullName: user.full_name || "",
+      handicapIndex: user.handicap_index !== null ? String(user.handicap_index) : "",
     });
     setEditIsAdmin(user.is_admin);
     setEditPermissions(user.permissions || {});
@@ -210,6 +214,11 @@ export function UserManager({ ref }: { ref?: Ref<{ openAdd: () => void }> }) {
                 {formatPhone(user.phone)}
               </p>
             </div>
+            {user.handicap_index !== null && (
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 bg-blue-50 text-blue-700">
+                {user.handicap_index}
+              </span>
+            )}
             <span
               className={`px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 ${
                 user.is_admin
@@ -305,6 +314,24 @@ export function UserManager({ ref }: { ref?: Ref<{ openAdd: () => void }> }) {
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">
+                    Handicap Index (optional)
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    min="0"
+                    max="54"
+                    value={formData.handicapIndex}
+                    onChange={(e) =>
+                      setFormData({ ...formData, handicapIndex: e.target.value })
+                    }
+                    placeholder="e.g. 12.4"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                  />
+                </div>
 
                 {editingUser && (
                   <div className="pt-3 border-t border-gray-100 space-y-3">
@@ -326,7 +353,7 @@ export function UserManager({ ref }: { ref?: Ref<{ openAdd: () => void }> }) {
                         />
                       </div>
                     </button>
-                    {editIsAdmin && (
+                    {!editIsAdmin && (
                       <PermissionsEditor
                         permissions={editPermissions}
                         onChange={setEditPermissions}

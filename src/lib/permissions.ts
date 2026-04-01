@@ -13,6 +13,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { key: "manage_contests", label: "Contests & Accolades", description: "Contests, accolades" },
   { key: "manage_finances", label: "Finances", description: "Financial data & budgets" },
   { key: "send_announcements", label: "Announcements", description: "Send push notifications" },
+  { key: "manage_music", label: "Music", description: "Manage songs & audio files" },
 ];
 
 export function hasPermission(
@@ -22,4 +23,11 @@ export function hasPermission(
 ): boolean {
   if (isAdmin) return true;
   return permissions?.[key] === true;
+}
+
+export function hasAnyPermission(
+  permissions: Record<string, boolean> | null
+): boolean {
+  if (!permissions) return false;
+  return Object.values(permissions).some((v) => v === true);
 }

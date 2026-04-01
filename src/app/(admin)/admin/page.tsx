@@ -11,6 +11,21 @@ interface TripSummary {
   status: string;
 }
 
+interface UserAccess {
+  isAdmin: boolean;
+  permissions: Record<string, boolean> | null;
+}
+
+// Map card labels to the permission key required (if not is_admin)
+const cardPermissionMap: Record<string, string> = {
+  Loozers: "manage_loozers",
+  Facilities: "manage_facilities",
+  Courses: "manage_facilities",
+  Announcements: "send_announcements",
+  Gallery: "manage_events",
+  Music: "manage_music",
+};
+
 const dataActions = [
   {
     href: "/admin/users",
@@ -98,6 +113,8 @@ const dataActions = [
 export default function AdminPage() {
   const [events, setEvents] = useState<TripSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [access, setAccess] = useState<UserAccess>({ isAdmin: false, permissions: null });
+  const [accessLoading, setAccessLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [pushTest, setPushTest] = useState<{ loading: boolean; result: null | { success: boolean; error?: string; diagnostics?: Record<string, unknown> } }>({ loading: false, result: null });
   const [newTrip, setNewTrip] = useState({
@@ -116,8 +133,30 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
+    // Fetch user access level
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.user) {
+          setAccess({
+            isAdmin: data.user.is_admin ?? false,
+            permissions: data.user.permissions ?? null,
+          });
+        }
+        setAccessLoading(false);
+      })
+      .catch(() => setAccessLoading(false));
+
     fetchEvents();
   }, [fetchEvents]);
+
+  // Filter data actions based on access
+  const visibleActions = access.isAdmin
+    ? dataActions
+    : dataActions.filter((action) => {
+        const requiredPerm = cardPermissionMap[action.label];
+        return requiredPerm && access.permissions?.[requiredPerm] === true;
+      });
 
   const handleCreate = async () => {
     if (!newTrip.trip_name || !newTrip.start_date || !newTrip.end_date) return;
@@ -187,12 +226,20 @@ export default function AdminPage() {
     </Link>
   );
 
+  if (accessLoading) {
+    return (
+      <div className="flex justify-center py-16">
+        <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="px-4 pt-6 pb-8 space-y-8">
       <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
 
-      {/* Active Event (top) */}
-      {loading ? (
+      {/* Active Event (top) — admin only */}
+      {access.isAdmin && (loading ? (
         <div className="flex justify-center py-8">
           <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
         </div>
@@ -203,36 +250,38 @@ export default function AdminPage() {
           </h2>
           {renderEventCard(activeEvent)}
         </div>
-      ) : null}
+      ) : null)}
 
       {/* Data Management */}
-      <div>
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-          Data Management
-        </h2>
-        <div className="grid grid-cols-2 gap-3">
-          {dataActions.map((action) => (
-            <Link
-              key={action.href}
-              href={action.href}
-              className="flex flex-col items-center text-center p-4 bg-white rounded-2xl border border-gray-200 shadow-sm active:scale-95 transition-transform"
-            >
-              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-green-50 text-green-700 mb-2">
-                {action.icon}
-              </div>
-              <span className="text-sm font-semibold text-gray-900">
-                {action.label}
-              </span>
-              <span className="text-xs text-gray-500 mt-0.5">
-                {action.description}
-              </span>
-            </Link>
-          ))}
+      {visibleActions.length > 0 && (
+        <div>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Data Management
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            {visibleActions.map((action) => (
+              <Link
+                key={action.href}
+                href={action.href}
+                className="flex flex-col items-center text-center p-4 bg-white rounded-2xl border border-gray-200 shadow-sm active:scale-95 transition-transform"
+              >
+                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-green-50 text-green-700 mb-2">
+                  {action.icon}
+                </div>
+                <span className="text-sm font-semibold text-gray-900">
+                  {action.label}
+                </span>
+                <span className="text-xs text-gray-500 mt-0.5">
+                  {action.description}
+                </span>
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Past Events */}
-      {!loading && (
+      {/* Past Events — admin only */}
+      {access.isAdmin && !loading && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -331,8 +380,8 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Diagnostics */}
-      <div>
+      {/* Diagnostics — admin only */}
+      {access.isAdmin && <div>
         <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
           Diagnostics
         </h2>
@@ -370,7 +419,7 @@ export default function AdminPage() {
             </div>
           )}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

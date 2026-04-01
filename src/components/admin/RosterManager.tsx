@@ -129,18 +129,9 @@ export function RosterManager({ tripId: propTripId }: { tripId?: string } = {}) 
 
   const participantCount = users.filter((u) => u.is_participating).length;
 
-  // Sort: participating first (by likelihood desc, null last), then non-participating
-  const sortedUsers = [...users].sort((a, b) => {
-    if (a.is_participating !== b.is_participating) {
-      return a.is_participating ? -1 : 1;
-    }
-    if (a.is_participating && b.is_participating) {
-      const aLike = a.likelihood ?? -1;
-      const bLike = b.likelihood ?? -1;
-      if (aLike !== bLike) return bLike - aLike;
-    }
-    return (a.display_name || "").localeCompare(b.display_name || "");
-  });
+  const sortedUsers = [...users].sort((a, b) =>
+    (a.display_name || "").localeCompare(b.display_name || "")
+  );
 
   return (
     <div>

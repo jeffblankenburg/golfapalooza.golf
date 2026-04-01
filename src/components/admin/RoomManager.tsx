@@ -55,6 +55,7 @@ export function RoomManager({ tripId: propTripId }: { tripId?: string } = {}) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [showRealNames, setShowRealNames] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
     message: string;
@@ -217,8 +218,6 @@ export function RoomManager({ tripId: propTripId }: { tripId?: string } = {}) {
   const linkedFacilities = facilities.filter((f) => linkedFacilityIds.includes(f.id));
   const unassigned = users.filter((u) => !u.room_id);
   const anyAssigned = users.some((u) => u.room_id);
-
-  const [showRealNames, setShowRealNames] = useState(false);
 
   const getName = (player: { display_name: string; full_name: string | null }) =>
     showRealNames && player.full_name ? player.full_name : player.display_name;

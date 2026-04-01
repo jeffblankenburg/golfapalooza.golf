@@ -1,5 +1,4 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { PickemContent } from "@/components/PickemContent";
 
 export default async function PickemPage() {
@@ -40,9 +39,8 @@ export default async function PickemPage() {
     );
   }
 
-  // Check if pick'em is open
-  const adminClient = createAdminClient();
-  const { data: settings } = await adminClient
+  // Check if pick'em is open (pickem_settings has SELECT for authenticated)
+  const { data: settings } = await supabase
     .from("pickem_settings")
     .select("is_open")
     .eq("contest_id", contest.id)

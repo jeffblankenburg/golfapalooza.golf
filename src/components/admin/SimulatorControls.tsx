@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 interface User {
@@ -26,28 +26,41 @@ function formatDateLabel(startDate: string, dayNum: number): string {
 export function SimulatorControls({
   users,
   tripStartDate,
-  currentSimDate,
   currentSimUserId,
   eventDays = [],
 }: {
   users: User[];
   tripStartDate: string | null;
-  currentSimDate: string | null;
   currentSimUserId: string | null;
   eventDays?: { day_number: number; name: string }[];
 }) {
   const router = useRouter();
-  // Parse existing sim date cookie into date and time parts
-  const initialDate = currentSimDate?.includes("T")
-    ? currentSimDate.split("T")[0]
-    : currentSimDate || "";
-  const initialTime = currentSimDate?.includes("T")
-    ? currentSimDate.split("T")[1]
-    : "";
-  const [simDate, setSimDate] = useState(initialDate);
-  const [simTime, setSimTime] = useState(initialTime);
+  const [currentSimDate, setCurrentSimDate] = useState<string | null>(null);
+  const [simDate, setSimDate] = useState("");
+  const [simTime, setSimTime] = useState("");
   const [simUserId, setSimUserId] = useState(currentSimUserId || "");
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchSimState() {
+      try {
+        const res = await fetch("/api/admin/simulator");
+        if (res.ok) {
+          const data = await res.json();
+          const sd = data.simDate || null;
+          setCurrentSimDate(sd);
+          if (sd) {
+            setSimDate(sd.includes("T") ? sd.split("T")[0] : sd);
+            setSimTime(sd.includes("T") ? sd.split("T")[1] : "");
+          }
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchSimState();
+  }, []);
 
   function buildSimDateValue(): string {
     if (!simDate) return "";
@@ -63,6 +76,7 @@ export function SimulatorControls({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ simDate: value }),
     });
+    setCurrentSimDate(value);
     router.refresh();
     setSaving(false);
   }
@@ -74,6 +88,7 @@ export function SimulatorControls({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clearDate: true, clearUser: false }),
     });
+    setCurrentSimDate(null);
     setSimDate("");
     setSimTime("");
     router.refresh();
@@ -103,6 +118,16 @@ export function SimulatorControls({
     setSimUserId("");
     router.refresh();
     setSaving(false);
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center text-gray-400 text-sm">
+          Loading simulator...
+        </div>
+      </div>
+    );
   }
 
   return (

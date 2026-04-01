@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { SimulatorControls } from "@/components/admin/SimulatorControls";
-import { getSimDate, getSimUserId } from "@/lib/simulator";
+import { getSimUserId } from "@/lib/simulator";
 
 export default async function SimulatorPage() {
   const supabase = await createClient();
@@ -29,7 +29,6 @@ export default async function SimulatorPage() {
   const users = usersResult.data;
   const eventDays = (eventDaysResult.data || []) as { day_number: number; name: string }[];
 
-  const simDate = await getSimDate();
   const simUserId = await getSimUserId();
 
   return (
@@ -38,7 +37,6 @@ export default async function SimulatorPage() {
       <SimulatorControls
         users={users || []}
         tripStartDate={trip?.start_date || null}
-        currentSimDate={simDate}
         currentSimUserId={simUserId}
         eventDays={eventDays}
       />

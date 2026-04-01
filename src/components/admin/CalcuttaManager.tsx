@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import { BottomDrawer } from "@/components/admin/BottomDrawer";
 
 interface ParticipantUser {
   id: string;
@@ -82,6 +83,7 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
   const [prizePerPlayer, setPrizePerPlayer] = useState(false);
   const [prizePlayerCount, setPrizePlayerCount] = useState("4");
   const [editingPrizeId, setEditingPrizeId] = useState<string | null>(null);
+  const [prizeDrawerOpen, setPrizeDrawerOpen] = useState(false);
 
   // Auction state
   const [bidAmount, setBidAmount] = useState("");
@@ -186,6 +188,7 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
     if (!res.ok) {
       setError("Failed to save prize");
     } else {
+      setPrizeDrawerOpen(false);
       setPrizeLinkedContestId("");
       setPrizePlace(1);
       setPrizePercentage("");
@@ -456,16 +459,18 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
           {prizes.length > 0 && (
             <div className="space-y-1.5">
               {prizes.map((prize) => {
-                const displayName = prize.linked_contest?.name || prize.prize_name || "Unknown";
+                const baseName = prize.linked_contest?.name || prize.prize_name || "Unknown";
+                const displayName = prize.place === 1
+                  ? `${baseName} Champion`
+                  : prize.place === 2
+                  ? `${baseName} Runner-Up`
+                  : `${baseName} ${ordinal(prize.place)} Place`;
                 const perPlayerPct = prize.per_player ? prize.percentage / prize.player_count : null;
                 return (
                 <div key={prize.id} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900">
                       {displayName}
-                      {prize.place > 1 && (
-                        <span className="text-gray-400 ml-1">({ordinal(prize.place)})</span>
-                      )}
                     </p>
                     {prize.per_player && perPlayerPct != null && (
                       <p className="text-xs text-gray-400">
@@ -489,6 +494,7 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
                       setPrizePercentage(String(prize.percentage));
                       setPrizePerPlayer(prize.per_player);
                       setPrizePlayerCount(String(prize.player_count));
+                      setPrizeDrawerOpen(true);
                     }}
                     className="text-gray-400 hover:text-gray-600 flex-shrink-0"
                   >
@@ -528,111 +534,20 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
             </div>
           )}
 
-          <div className="bg-gray-50 rounded-xl p-3 space-y-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              {editingPrizeId ? "Edit Prize" : "Add Prize"}
-            </p>
-            <div>
-              <label className="text-xs text-gray-400">Contest</label>
-              <select
-                value={prizeLinkedContestId}
-                onChange={(e) => {
-                  setPrizeLinkedContestId(e.target.value);
-                  // Auto-set per_player based on contest type
-                  const c = tripContests.find((tc) => tc.id === e.target.value);
-                  if (c) {
-                    const isTeam = c.contest_type === "scramble" || c.contest_type === "cornhole_doubles";
-                    setPrizePerPlayer(isTeam);
-                    if (c.contest_type === "scramble") setPrizePlayerCount("4");
-                    else if (c.contest_type === "cornhole_doubles") setPrizePlayerCount("2");
-                    else setPrizePlayerCount("1");
-                  }
-                }}
-                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                autoFocus
-              >
-                <option value="">Select contest...</option>
-                {tripContests.map((tc) => (
-                  <option key={tc.id} value={tc.id}>
-                    {tc.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className="text-xs text-gray-400">Place</label>
-                <select
-                  value={prizePlace}
-                  onChange={(e) => setPrizePlace(Number(e.target.value))}
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value={1}>1st</option>
-                  <option value={2}>2nd</option>
-                  <option value={3}>3rd</option>
-                </select>
-              </div>
-              <div className="flex-1">
-                <label className="text-xs text-gray-400">Total %</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  placeholder="%"
-                  value={prizePercentage}
-                  onChange={(e) => setPrizePercentage(e.target.value)}
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={prizePerPlayer}
-                  onChange={(e) => setPrizePerPlayer(e.target.checked)}
-                  className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
-                />
-                <span className="text-sm text-gray-700">Per player</span>
-              </label>
-              {prizePerPlayer && (
-                <div className="flex items-center gap-1.5">
-                  <label className="text-xs text-gray-400">Players:</label>
-                  <input
-                    type="number"
-                    min="2"
-                    max="8"
-                    value={prizePlayerCount}
-                    onChange={(e) => setPrizePlayerCount(e.target.value)}
-                    className="w-16 text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleSavePrize}
-                disabled={saving || !prizeLinkedContestId || !prizePercentage}
-                className="flex-1 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors"
-              >
-                {editingPrizeId ? "Update" : "Add"}
-              </button>
-              {editingPrizeId && (
-                <button
-                  onClick={() => {
-                    setEditingPrizeId(null);
-                    setPrizeLinkedContestId("");
-                    setPrizePlace(1);
-                    setPrizePercentage("");
-                    setPrizePerPlayer(false);
-                    setPrizePlayerCount("4");
-                  }}
-                  className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-          </div>
+          <button
+            onClick={() => {
+              setEditingPrizeId(null);
+              setPrizeLinkedContestId("");
+              setPrizePlace(1);
+              setPrizePercentage("");
+              setPrizePerPlayer(false);
+              setPrizePlayerCount("4");
+              setPrizeDrawerOpen(true);
+            }}
+            className="w-full py-2.5 bg-purple-600 text-white text-sm font-semibold rounded-xl hover:bg-purple-700 transition-colors"
+          >
+            Add Prize
+          </button>
         </div>
       )}
 
@@ -822,6 +737,105 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
           </div>
         </div>
       )}
+
+      <BottomDrawer
+        open={prizeDrawerOpen}
+        onClose={() => {
+          setPrizeDrawerOpen(false);
+          setEditingPrizeId(null);
+          setPrizeLinkedContestId("");
+          setPrizePlace(1);
+          setPrizePercentage("");
+          setPrizePerPlayer(false);
+          setPrizePlayerCount("4");
+        }}
+        title={editingPrizeId ? "Edit Prize" : "Add Prize"}
+      >
+        <div className="px-6 py-4 space-y-3">
+          <div>
+            <label className="text-xs text-gray-400">Contest</label>
+            <select
+              value={prizeLinkedContestId}
+              onChange={(e) => {
+                setPrizeLinkedContestId(e.target.value);
+                const c = tripContests.find((tc) => tc.id === e.target.value);
+                if (c) {
+                  const isTeam = c.contest_type === "scramble" || c.contest_type === "cornhole_doubles";
+                  setPrizePerPlayer(isTeam);
+                  if (c.contest_type === "scramble") setPrizePlayerCount("4");
+                  else if (c.contest_type === "cornhole_doubles") setPrizePlayerCount("2");
+                  else setPrizePlayerCount("1");
+                }
+              }}
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              autoFocus
+            >
+              <option value="">Select contest...</option>
+              {tripContests.map((tc) => (
+                <option key={tc.id} value={tc.id}>
+                  {tc.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="text-xs text-gray-400">Place</label>
+              <select
+                value={prizePlace}
+                onChange={(e) => setPrizePlace(Number(e.target.value))}
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value={1}>1st</option>
+                <option value={2}>2nd</option>
+                <option value={3}>3rd</option>
+              </select>
+            </div>
+            <div className="flex-1">
+              <label className="text-xs text-gray-400">Total %</label>
+              <input
+                type="number"
+                step="0.5"
+                placeholder="%"
+                value={prizePercentage}
+                onChange={(e) => setPrizePercentage(e.target.value)}
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={prizePerPlayer}
+                onChange={(e) => setPrizePerPlayer(e.target.checked)}
+                className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+              />
+              <span className="text-sm text-gray-700">Per player</span>
+            </label>
+            {prizePerPlayer && (
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs text-gray-400">Players:</label>
+                <input
+                  type="number"
+                  min="2"
+                  max="8"
+                  value={prizePlayerCount}
+                  onChange={(e) => setPrizePlayerCount(e.target.value)}
+                  className="w-16 text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+            )}
+          </div>
+          <button
+            onClick={handleSavePrize}
+            disabled={saving || !prizeLinkedContestId || !prizePercentage}
+            className="w-full py-2.5 bg-purple-600 text-white text-sm font-semibold rounded-xl hover:bg-purple-700 disabled:opacity-50 transition-colors"
+          >
+            {saving ? "Saving..." : editingPrizeId ? "Update Prize" : "Add Prize"}
+          </button>
+        </div>
+      </BottomDrawer>
 
       <ConfirmModal
         open={!!confirmModal}

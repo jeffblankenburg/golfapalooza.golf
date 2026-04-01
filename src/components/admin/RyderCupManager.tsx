@@ -310,36 +310,22 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
 
     setSaving("batch-chip-assign");
 
-    // Create a pool pair (sort_order=0) for each player — tracks team membership
-    for (const userId of userIds) {
-      const res = await fetch("/api/admin/ryder-cup/pairs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ team_id: team.id, sort_order: 0 }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        await fetch("/api/admin/ryder-cup/pairs", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pair_id: data.pair.id, player_a_id: userId }),
-        });
-      }
-    }
-
-    // Pre-create empty pair cards (sort_order auto-incremented from 1)
+    // Pre-create empty pair cards count
     const existingRealPairs = team.pairs.filter((p) => p.sort_order > 0).length;
     const totalPlayers = getPlayersOnTeam(team).length + userIds.length;
     const neededPairCards = Math.ceil(totalPlayers / 2);
     const toCreate = Math.max(0, neededPairCards - existingRealPairs);
 
-    for (let i = 0; i < toCreate; i++) {
-      await fetch("/api/admin/ryder-cup/pairs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ team_id: team.id }),
-      });
-    }
+    // Single batch API call: creates pool pairs + real pair cards
+    await fetch("/api/admin/ryder-cup/pairs/batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        team_id: team.id,
+        user_ids: userIds,
+        create_real_pairs: toCreate,
+      }),
+    });
 
     setChipSelections(new Set());
     await refresh();

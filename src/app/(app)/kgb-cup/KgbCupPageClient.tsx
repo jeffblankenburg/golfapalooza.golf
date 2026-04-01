@@ -200,35 +200,24 @@ export function KgbCupPageClient({
                   )}
                 </div>
 
-                {/* Players grouped by pair, each pair on its own line */}
+                {/* Players grouped by team pair, 2 per line max */}
                 <div className="flex-1 min-w-0 space-y-1.5">
                   {pairs.map((pair, pairIdx) => (
                     <div
                       key={pairIdx}
-                      className="flex flex-wrap gap-1.5 rounded-lg px-2 py-1"
-                      style={
-                        pair[0]?.teamColor
-                          ? { backgroundColor: `${pair[0].teamColor}18` }
-                          : undefined
-                      }
+                      className="flex gap-1.5"
                     >
-                      {pair.map((player) => (
+                      {pair.slice(0, 2).map((player) => (
                         <span
                           key={player.id}
-                          className="inline-flex items-center gap-1.5 pl-0.5 pr-2.5 py-0.5 rounded-full text-xs text-gray-900"
-                          style={
-                            player.teamColor
-                              ? { backgroundColor: `${player.teamColor}20` }
-                              : { backgroundColor: "rgb(249 250 251)" }
-                          }
+                          className="inline-flex items-center gap-1.5 pl-0.5 pr-2.5 py-0.5 rounded-full text-xs text-gray-900 border-2"
+                          style={{
+                            borderColor: player.teamColor || "rgb(229 231 235)",
+                            backgroundColor: player.teamColor
+                              ? `${player.teamColor}12`
+                              : "rgb(249 250 251)",
+                          }}
                         >
-                          {/* Team color dot */}
-                          {player.teamColor && (
-                            <span
-                              className="w-2 h-2 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: player.teamColor }}
-                            />
-                          )}
                           {player.avatarUrl ? (
                             <img src={player.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
                           ) : (

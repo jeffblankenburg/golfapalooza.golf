@@ -43,7 +43,7 @@ export default async function KgbCupPage() {
   // Fetch tee sheet data for KGB Cup day
   const kgbDayNumber = contest.day_number || 1;
 
-  const [teeTimesResult, foursomesResult, teamsResult, pairsResult] = await Promise.all([
+  const [teeTimesResult, foursomesResult, teamsResult] = await Promise.all([
     // Day 1 tee times with players (always fetch — display is state-driven)
     supabase
       .from("tee_times")
@@ -63,13 +63,17 @@ export default async function KgbCupPage() {
       .select("id, team_number, team_name, team_color")
       .eq("contest_id", contest.id)
       .order("team_number"),
-    // Pairs with player info
-    supabase
-      .from("ryder_cup_pairs")
-      .select("id, team_id, player_a_id, player_b_id, sort_order, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name, avatar_url), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name, avatar_url)")
-      .eq("contest_id", contest.id)
-      .order("sort_order"),
   ]);
+
+  // Fetch pairs via team IDs (ryder_cup_pairs has team_id, not contest_id)
+  const teamIds = (teamsResult.data || []).map((t) => t.id);
+  const pairsResult = teamIds.length > 0
+    ? await supabase
+        .from("ryder_cup_pairs")
+        .select("id, team_id, player_a_id, player_b_id, sort_order, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name, avatar_url), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name, avatar_url)")
+        .in("team_id", teamIds)
+        .order("sort_order")
+    : { data: [] };
 
   // Build tee time groups
   interface TeeSheetGroup {

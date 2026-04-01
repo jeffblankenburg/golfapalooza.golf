@@ -47,7 +47,7 @@ export async function GET(request: Request) {
     // Fetch all pairs for this contest (via teams)
     const { data: teams } = await adminClient
       .from("ryder_cup_teams")
-      .select("id, team_number, team_name")
+      .select("id, team_number, team_name, team_color")
       .eq("contest_id", contestId)
       .order("team_number");
 
@@ -93,11 +93,21 @@ export async function GET(request: Request) {
       scores = scoreData || [];
     }
 
-    // Fetch handicap snapshots
-    const { data: playerHandicaps } = await adminClient
-      .from("kgb_cup_player_handicaps")
-      .select("player_id, original_handicap, adjusted_handicap")
-      .eq("contest_id", contestId);
+    // Fetch base handicaps from player_handicaps table
+    const allPlayerIds: string[] = [];
+    for (const p of normalizedPairs) {
+      if (p.player_a_id) allPlayerIds.push(p.player_a_id);
+      if (p.player_b_id) allPlayerIds.push(p.player_b_id);
+    }
+
+    let baseHandicaps: { user_id: string; handicap_index: number }[] = [];
+    if (allPlayerIds.length > 0) {
+      const { data: bh } = await adminClient
+        .from("player_handicaps")
+        .select("user_id, handicap_index")
+        .in("user_id", allPlayerIds);
+      baseHandicaps = bh || [];
+    }
 
     // Fetch pair handicaps
     const { data: pairHandicaps } = await adminClient
@@ -164,7 +174,7 @@ export async function GET(request: Request) {
       teams: teams || [],
       scores,
       holes,
-      player_handicaps: playerHandicaps || [],
+      base_handicaps: baseHandicaps,
       pair_handicaps: pairHandicaps || [],
     });
   } catch (error) {

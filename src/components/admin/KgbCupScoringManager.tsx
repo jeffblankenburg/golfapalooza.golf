@@ -36,16 +36,16 @@ interface TeamInfo {
   id: string;
   team_number: number;
   team_name: string;
+  team_color: string | null;
 }
 
-interface PlayerHandicapRow {
-  player_id: string;
-  display_name: string;
-  full_name: string | null;
-  current_handicap: number | null;
-  original_handicap: number | null;
-  adjusted_handicap: number | null;
-  has_snapshot: boolean;
+// Default colors when no team color is assigned
+const DEFAULT_TEAM1_COLOR = "#3b82f6"; // blue-500
+const DEFAULT_TEAM2_COLOR = "#ef4444"; // red-500
+
+function getTeamColor(teams: TeamInfo[], teamNumber: 1 | 2): string {
+  const team = teams.find((t) => t.team_number === teamNumber);
+  return team?.team_color || (teamNumber === 1 ? DEFAULT_TEAM1_COLOR : DEFAULT_TEAM2_COLOR);
 }
 
 interface PairHandicapRow {
@@ -80,10 +80,8 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
   const [loading, setLoading] = useState(true);
 
   // Handicaps tab state
-  const [players, setPlayers] = useState<PlayerHandicapRow[]>([]);
   const [pairHandicaps, setPairHandicaps] = useState<PairHandicapRow[]>([]);
   const [teams, setTeams] = useState<TeamInfo[]>([]);
-  const [calculating, setCalculating] = useState(false);
 
   // Scoring tab state
   const [foursomes, setFoursomes] = useState<FoursomeInfo[]>([]);
@@ -117,11 +115,10 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
     return rc?.id || null;
   }, [tripId]);
 
-  // Fetch handicap data
+  // Fetch handicap data (pair scramble handicaps only)
   const fetchHandicaps = useCallback(async (cId: string) => {
     const res = await fetch(`/api/admin/kgb-cup/handicaps?contest_id=${cId}`);
     const data = await res.json();
-    setPlayers(data.players || []);
     setPairHandicaps(data.pairs || []);
     setTeams(data.teams || []);
   }, []);
@@ -145,6 +142,13 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
     const hasAnyPlayers = [...t1Pairs, ...t2Pairs].some((p) => p.player_a_id || p.player_b_id);
     if (!hasAnyPlayers) return existingFoursomes;
 
+    // Re-check for existing foursomes (guards against React Strict Mode double-invoke)
+    const checkRes = await fetch(`/api/admin/kgb-cup/scores?contest_id=${cId}`);
+    if (checkRes.ok) {
+      const checkData = await checkRes.json();
+      if ((checkData.foursomes || []).length > 0) return checkData.foursomes;
+    }
+
     const created: FoursomeInfo[] = [];
     for (let i = 0; i < count; i++) {
       const res = await fetch("/api/admin/ryder-cup/foursomes", {
@@ -156,11 +160,7 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
           pair_team2_id: t2Pairs[i].id,
         }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        console.error("Failed to create foursome:", err.error, { pair1: t1Pairs[i].id, pair2: t2Pairs[i].id, team1: t1.id, team2: t2.id });
-        continue;
-      }
+      if (!res.ok) continue;
       const data = await res.json();
       if (data.foursome) created.push(data.foursome);
     }
@@ -185,9 +185,23 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
     setScores(data.scores || []);
     setTeams(teamList);
 
+    // Build base handicap map from player_handicaps table
+    const baseMap = new Map<string, number>();
+    for (const bh of data.base_handicaps || []) {
+      baseMap.set(bh.user_id, bh.handicap_index);
+    }
+
+    // Compute per-foursome adjusted handicaps (subtract lowest in each foursome)
     const phMap = new Map<string, number>();
-    for (const ph of data.player_handicaps || []) {
-      phMap.set(ph.player_id, ph.adjusted_handicap);
+    for (const f of foursomeList) {
+      const p1 = pairList.find((p) => p.id === f.pair_team1_id);
+      const p2 = pairList.find((p) => p.id === f.pair_team2_id);
+      const playerIds = [p1?.player_a_id, p1?.player_b_id, p2?.player_a_id, p2?.player_b_id].filter(Boolean) as string[];
+      const handicaps = playerIds.map((id) => baseMap.get(id) ?? 0);
+      const lowest = Math.min(...handicaps);
+      for (let i = 0; i < playerIds.length; i++) {
+        phMap.set(playerIds[i], Math.round(handicaps[i] - lowest));
+      }
     }
     setPlayerHandicapMap(phMap);
 
@@ -304,48 +318,6 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
   };
 
   // Calculate handicaps
-  const handleCalculateHandicaps = async () => {
-    if (!contestId) return;
-    setCalculating(true);
-    try {
-      const res = await fetch("/api/admin/kgb-cup/handicaps", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contest_id: contestId }),
-      });
-      if (res.ok) {
-        await fetchHandicaps(contestId);
-      }
-    } catch {
-      // silent
-    } finally {
-      setCalculating(false);
-    }
-  };
-
-  // Update individual handicap
-  const handlePlayerHandicapChange = async (playerId: string, adjustedHandicap: number) => {
-    if (!contestId) return;
-
-    setPlayers((prev) =>
-      prev.map((p) =>
-        p.player_id === playerId ? { ...p, adjusted_handicap: adjustedHandicap, has_snapshot: true } : p
-      )
-    );
-
-    const player = players.find((p) => p.player_id === playerId);
-    await fetch("/api/admin/kgb-cup/handicaps", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contest_id: contestId,
-        player_id: playerId,
-        original_handicap: player?.original_handicap ?? player?.current_handicap,
-        adjusted_handicap: adjustedHandicap,
-      }),
-    });
-  };
-
   // Update pair scramble handicap
   const handlePairHandicapChange = async (pairId: string, scrambleHandicap: number) => {
     if (!contestId) return;
@@ -447,32 +419,13 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
     );
   }
 
+  // Determine scoring readiness
+  const hasTeeAssignments = holes.length > 0;
+  const hasFoursomesReady = foursomes.length > 0 && pairs.some((p) => p.player_a_id && p.player_b_id);
+
   return (
     <div className="space-y-4">
-      {/* Tab Selector */}
-      <div className="flex rounded-xl bg-gray-100 p-1 gap-1">
-        {(["handicaps", "scoring", "results"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => {
-              if (t === "scoring" && tab !== "scoring") {
-                // Refresh scoring data when switching to scoring tab
-                if (contestId) fetchScoringData(contestId);
-              }
-              setTab(t);
-            }}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors capitalize ${
-              tab === t
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 active:bg-gray-200"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
-      {/* Scoring Lifecycle Controls */}
+      {/* Scoring Lifecycle Controls — above tabs */}
       <div className="flex items-center gap-2 px-1">
         <div className="flex items-center gap-1.5 flex-1">
           {contestVerified ? (
@@ -489,10 +442,20 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
               </svg>
               Scoring Closed
             </span>
+          ) : !hasFoursomesReady ? (
+            <span className="flex items-center gap-1 text-xs font-medium text-gray-400">
+              <span className="w-2 h-2 rounded-full bg-gray-300" />
+              Not Ready
+            </span>
+          ) : !hasTeeAssignments ? (
+            <span className="flex items-center gap-1 text-xs font-medium text-gray-400">
+              <span className="w-2 h-2 rounded-full bg-gray-300" />
+              Awaiting Tee Times
+            </span>
           ) : (
             <span className="flex items-center gap-1 text-xs font-medium text-green-600">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Live
+              Live Scoring Open
             </span>
           )}
         </div>
@@ -522,7 +485,7 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
                 {lifecycleLoading ? "..." : "Verify Scores"}
               </button>
             </>
-          ) : (
+          ) : (hasFoursomesReady && hasTeeAssignments) ? (
             <button
               onClick={() => handleLifecycle("close")}
               disabled={lifecycleLoading}
@@ -530,20 +493,37 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
             >
               {lifecycleLoading ? "..." : "Close Live Scoring"}
             </button>
-          )}
+          ) : null}
         </div>
+      </div>
+
+      {/* Tab Selector */}
+      <div className="flex rounded-xl bg-gray-100 p-1 gap-1">
+        {(["handicaps", "scoring", "results"] as Tab[]).map((t) => (
+          <button
+            key={t}
+            onClick={() => {
+              if (t === "scoring" && tab !== "scoring") {
+                // Refresh scoring data when switching to scoring tab
+                if (contestId) fetchScoringData(contestId);
+              }
+              setTab(t);
+            }}
+            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors capitalize ${
+              tab === t
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 active:bg-gray-200"
+            }`}
+          >
+            {t}
+          </button>
+        ))}
       </div>
 
       {tab === "handicaps" && (
         <HandicapsTab
-          players={players}
           pairHandicaps={pairHandicaps}
           teams={teams}
-          holes={holes}
-          playerHandicapMap={playerHandicapMap}
-          calculating={calculating}
-          onCalculate={handleCalculateHandicaps}
-          onPlayerChange={handlePlayerHandicapChange}
           onPairChange={handlePairHandicapChange}
         />
       )}
@@ -554,6 +534,7 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
           pairs={pairs}
           holes={holes}
           scores={scores}
+          teams={teams}
           playerHandicapMap={playerHandicapMap}
           pairHandicapMap={pairHandicapMap}
           selectedFoursomeId={selectedFoursomeId}
@@ -583,91 +564,19 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
 // ── Handicaps Tab ──
 
 function HandicapsTab({
-  players,
   pairHandicaps,
   teams,
-  holes,
-  playerHandicapMap,
-  calculating,
-  onCalculate,
-  onPlayerChange,
   onPairChange,
 }: {
-  players: PlayerHandicapRow[];
   pairHandicaps: PairHandicapRow[];
   teams: TeamInfo[];
-  holes: HoleInfo[];
-  playerHandicapMap: Map<string, number>;
-  calculating: boolean;
-  onCalculate: () => void;
-  onPlayerChange: (playerId: string, adjusted: number) => void;
   onPairChange: (pairId: string, handicap: number) => void;
 }) {
-  const hasSnapshots = players.some((p) => p.has_snapshot);
-
   return (
     <div className="space-y-4">
-      {/* Calculate button */}
-      <button
-        onClick={onCalculate}
-        disabled={calculating}
-        className="w-full py-2.5 px-4 bg-green-600 text-white text-sm font-medium rounded-xl hover:bg-green-700 disabled:opacity-50 transition-colors"
-      >
-        {calculating ? "Calculating..." : hasSnapshots ? "Recalculate Handicaps" : "Calculate Handicaps"}
-      </button>
-
-      {hasSnapshots && (
-        <p className="text-xs text-gray-400 text-center">
-          Lowest handicap subtracted from all. Edit adjusted values below.
-        </p>
-      )}
-
-      {/* Individual handicaps table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Individual Handicaps</p>
-        </div>
-        <div className="divide-y divide-gray-100">
-          {players.map((p) => (
-            <div key={p.player_id} className="flex items-center gap-3 px-3 py-2">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{p.display_name}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-400">Base:</span>
-                <span className="w-14 h-8 flex items-center justify-center text-sm text-gray-500">
-                  {p.current_handicap !== null ? p.current_handicap : "—"}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-xs text-gray-400">Adj:</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={p.adjusted_handicap ?? ""}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value);
-                    if (!isNaN(v) && v >= 0) onPlayerChange(p.player_id, v);
-                  }}
-                  className="w-14 h-8 text-center border border-gray-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-1 focus:ring-green-500 appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]"
-                />
-              </div>
-            </div>
-          ))}
-          {players.some((p) => p.current_handicap === null) && (
-            <div className="px-3 py-2 bg-amber-50">
-              <p className="text-xs text-amber-700">
-                Some players have no base handicap. Set handicaps on the Loozers admin page.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Stroke allocation preview */}
-      {hasSnapshots && holes.length > 0 && (
-        <StrokePreview players={players} holes={holes} playerHandicapMap={playerHandicapMap} />
-      )}
+      <p className="text-xs text-gray-400 text-center">
+        Individual handicaps are set on the Loozers admin page. Stroke allocation is computed per-foursome automatically.
+      </p>
 
       {/* Pair scramble handicaps */}
       {pairHandicaps.length > 0 && (
@@ -719,77 +628,6 @@ function HandicapsTab({
   );
 }
 
-// ── Stroke Preview ──
-
-function StrokePreview({
-  players,
-  holes,
-  playerHandicapMap,
-}: {
-  players: PlayerHandicapRow[];
-  holes: HoleInfo[];
-  playerHandicapMap: Map<string, number>;
-}) {
-  const sortedHoles = [...holes].sort((a, b) => a.hole_number - b.hole_number);
-  const activePlayers = players.filter((p) => p.has_snapshot && (p.adjusted_handicap ?? 0) > 0);
-
-  if (activePlayers.length === 0) return null;
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Stroke Allocation</p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs min-w-[500px]">
-          <thead>
-            <tr className="bg-gray-50">
-              <th className="sticky left-0 bg-gray-50 px-2 py-1.5 text-left text-gray-500 font-semibold">Player</th>
-              {sortedHoles.map((h) => (
-                <th key={h.hole_number} className="px-1 py-1.5 text-center font-semibold text-gray-500 w-7">
-                  {h.hole_number}
-                </th>
-              ))}
-            </tr>
-            <tr className="bg-gray-50/50">
-              <td className="sticky left-0 bg-gray-50/50 px-2 py-1 text-gray-400">Hdcp</td>
-              {sortedHoles.map((h) => (
-                <td key={h.hole_number} className="px-1 py-1 text-center text-gray-300">
-                  {h.handicap_index || "—"}
-                </td>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {activePlayers.map((p) => {
-              const adj = playerHandicapMap.get(p.player_id) ?? p.adjusted_handicap ?? 0;
-              return (
-                <tr key={p.player_id}>
-                  <td className="sticky left-0 bg-white px-2 py-1.5 text-gray-700 font-medium truncate max-w-[100px]">
-                    {p.display_name} ({adj})
-                  </td>
-                  {sortedHoles.map((h) => {
-                    const strokes = getStrokesOnHole(adj, h.handicap_index);
-                    return (
-                      <td key={h.hole_number} className="px-1 py-1.5 text-center">
-                        {strokes > 0 && (
-                          <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">
-                            {strokes}
-                          </span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
 // ── Scoring Tab ──
 
 function ScoringTab({
@@ -797,6 +635,7 @@ function ScoringTab({
   pairs,
   holes,
   scores,
+  teams,
   playerHandicapMap,
   pairHandicapMap,
   selectedFoursomeId,
@@ -811,6 +650,7 @@ function ScoringTab({
   pairs: PairInfo[];
   holes: HoleInfo[];
   scores: HoleScore[];
+  teams: TeamInfo[];
   playerHandicapMap: Map<string, number>;
   pairHandicapMap: Map<string, number>;
   selectedFoursomeId: string | null;
@@ -824,8 +664,19 @@ function ScoringTab({
   const selectedFoursome = foursomes.find((f) => f.id === selectedFoursomeId);
   const selectedResult = foursomeResults.find((r) => r.foursomeId === selectedFoursomeId);
 
-  if (foursomes.length === 0) {
-    return <div className="text-center py-8 text-gray-400 text-sm">Create foursomes first.</div>;
+  // Check if pairings are complete (all foursomes have 4 players)
+  const pairingsComplete = foursomes.length > 0 && foursomes.every((f) => {
+    const p1 = pairs.find((p) => p.id === f.pair_team1_id);
+    const p2 = pairs.find((p) => p.id === f.pair_team2_id);
+    return p1?.player_a_id && p1?.player_b_id && p2?.player_a_id && p2?.player_b_id;
+  });
+
+  if (foursomes.length === 0 || !pairingsComplete) {
+    return (
+      <div className="text-center py-8 text-gray-400 text-sm">
+        Complete team pairings in the KGB Cup Teams section first.
+      </div>
+    );
   }
 
   if (holes.length === 0) {
@@ -834,49 +685,48 @@ function ScoringTab({
 
   return (
     <div className="space-y-3">
-      {/* Save status */}
-      <div className={`flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-lg transition-opacity duration-300 ${
-        saveStatus === "idle" ? "opacity-0" :
-        saveStatus === "saving" ? "opacity-100 bg-blue-50 text-blue-600" :
-        saveStatus === "saved" ? "opacity-100 bg-green-50 text-green-600" :
-        "opacity-100 bg-red-50 text-red-600"
-      }`}>
-        {saveStatus === "saving" ? (
-          <>
-            <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-            Saving...
-          </>
-        ) : saveStatus === "saved" ? (
-          <>
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            Saved
-          </>
-        ) : saveStatus === "error" ? (
-          <>
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            Save failed — will retry
-          </>
-        ) : (
-          <span>&nbsp;</span>
+      {/* Foursome selector + save status on same row */}
+      <div className="flex items-center gap-2">
+        <select
+          value={selectedFoursomeId || ""}
+          onChange={(e) => onSelectFoursome(e.target.value)}
+          className="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-medium bg-white"
+        >
+          {foursomes.map((f, i) => (
+            <option key={f.id} value={f.id}>
+              Group {i + 1}: {getFoursomeLabel(f)}
+            </option>
+          ))}
+        </select>
+        {saveStatus !== "idle" && (
+          <div className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg whitespace-nowrap ${
+            saveStatus === "saving" ? "bg-blue-50 text-blue-600" :
+            saveStatus === "saved" ? "bg-green-50 text-green-600" :
+            "bg-red-50 text-red-600"
+          }`}>
+            {saveStatus === "saving" ? (
+              <>
+                <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                Saving
+              </>
+            ) : saveStatus === "saved" ? (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Saved
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Retry
+              </>
+            )}
+          </div>
         )}
       </div>
-
-      {/* Foursome selector */}
-      <select
-        value={selectedFoursomeId || ""}
-        onChange={(e) => onSelectFoursome(e.target.value)}
-        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-medium bg-white"
-      >
-        {foursomes.map((f, i) => (
-          <option key={f.id} value={f.id}>
-            Group {i + 1}: {getFoursomeLabel(f)}
-          </option>
-        ))}
-      </select>
 
       {selectedFoursome && (
         <FoursomeScoreEntry
@@ -885,6 +735,7 @@ function ScoringTab({
           pairs={pairs}
           holes={holes}
           scores={scores}
+          teams={teams}
           playerHandicapMap={playerHandicapMap}
           pairHandicapMap={pairHandicapMap}
           onScoreChange={onScoreChange}
@@ -903,6 +754,7 @@ function FoursomeScoreEntry({
   pairs,
   holes,
   scores,
+  teams,
   playerHandicapMap,
   pairHandicapMap,
   onScoreChange,
@@ -913,11 +765,14 @@ function FoursomeScoreEntry({
   pairs: PairInfo[];
   holes: HoleInfo[];
   scores: HoleScore[];
+  teams: TeamInfo[];
   playerHandicapMap: Map<string, number>;
   pairHandicapMap: Map<string, number>;
   onScoreChange: (foursomeId: string, hole: number, scorerType: "player" | "pair", scorerId: string, value: string) => void;
   result: FoursomeResult | null;
 }) {
+  const team1Color = getTeamColor(teams, 1);
+  const team2Color = getTeamColor(teams, 2);
   const pair1 = pairs.find((p) => p.id === foursome.pair_team1_id);
   const pair2 = pairs.find((p) => p.id === foursome.pair_team2_id);
 
@@ -1001,10 +856,10 @@ function FoursomeScoreEntry({
                 const handicap = scorerType === "pair"
                   ? pairHandicapMap.get(scorer.id) || 0
                   : playerHandicapMap.get(scorer.id) || 0;
-                const teamColor = scorer.team === 1 ? "border-l-blue-400" : "border-l-red-400";
+                const color = scorer.team === 1 ? team1Color : team2Color;
                 return (
-                  <tr key={scorer.id} className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"} border-l-2 ${teamColor}`}>
-                    <td className={`sticky left-0 z-10 px-2 py-1.5 font-medium text-gray-700 truncate max-w-[96px] ${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} border-l-2 ${teamColor}`}>
+                  <tr key={scorer.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"} style={{ borderLeft: `3px solid ${color}` }}>
+                    <td className={`sticky left-0 z-10 px-2 py-1.5 font-medium text-gray-700 truncate max-w-[96px] ${idx % 2 === 0 ? "bg-white" : "bg-gray-50"}`} style={{ borderLeft: `3px solid ${color}` }}>
                       <div className="truncate text-[11px]">{scorer.name}</div>
                       {handicap > 0 && <div className="text-[9px] text-gray-400">HC: {handicap}</div>}
                     </td>
@@ -1015,9 +870,9 @@ function FoursomeScoreEntry({
                       return (
                         <td key={h.hole_number} className="px-0.5 py-0.5 text-center relative">
                           {strokes > 0 && (
-                            <div className="absolute top-0 right-0.5 flex gap-px">
+                            <div className="absolute top-0 inset-x-0 flex justify-center gap-px">
                               {Array.from({ length: strokes }).map((_, i) => (
-                                <span key={i} className="w-1 h-1 rounded-full bg-blue-400" />
+                                <span key={i} className="w-1 h-1 rounded-full" style={{ backgroundColor: color }} />
                               ))}
                             </div>
                           )}
@@ -1068,12 +923,11 @@ function FoursomeScoreEntry({
                 <p className="text-[10px] text-gray-400">Section {m.section} (Holes {(m.section - 1) * 6 + 1}-{m.section * 6})</p>
               </div>
               <div className="text-right">
-                <p className={`text-xs font-bold ${
-                  m.sectionWinner === "team1" ? "text-blue-600" :
-                  m.sectionWinner === "team2" ? "text-red-600" :
-                  m.sectionWinner === "halved" ? "text-gray-500" :
-                  "text-gray-400"
-                }`}>
+                <p className="text-xs font-bold" style={{
+                  color: m.sectionWinner === "team1" ? team1Color :
+                         m.sectionWinner === "team2" ? team2Color :
+                         m.sectionWinner === "halved" ? "#6b7280" : "#9ca3af"
+                }}>
                   {formatMatchStatus(m)}
                 </p>
                 {m.sectionWinner !== "incomplete" && (
@@ -1087,9 +941,9 @@ function FoursomeScoreEntry({
           <div className="flex items-center justify-between px-3 py-2 bg-gray-50">
             <p className="text-xs font-bold text-gray-700">Group Total</p>
             <p className="text-sm font-bold text-gray-900">
-              <span className="text-blue-600">{result.team1TotalPoints}</span>
+              <span style={{ color: team1Color }}>{result.team1TotalPoints}</span>
               {" — "}
-              <span className="text-red-600">{result.team2TotalPoints}</span>
+              <span style={{ color: team2Color }}>{result.team2TotalPoints}</span>
             </p>
           </div>
         </div>
@@ -1133,6 +987,8 @@ function ResultsTab({
 }) {
   const team1 = teams.find((t) => t.team_number === 1);
   const team2 = teams.find((t) => t.team_number === 2);
+  const t1Color = getTeamColor(teams, 1);
+  const t2Color = getTeamColor(teams, 2);
 
   const maxPoints = 45; // 9 groups × 5 matches
   const team1Pct = maxPoints > 0 ? (overall.team1Points / maxPoints) * 100 : 50;
@@ -1144,13 +1000,13 @@ function ResultsTab({
       <div className="bg-white rounded-2xl border border-gray-200 p-4 text-center">
         <div className="flex items-center justify-center gap-6">
           <div className="text-center">
-            <p className="text-sm font-bold text-blue-600">{team1?.team_name || "Team 1"}</p>
-            <p className="text-3xl font-black text-blue-600">{overall.team1Points}</p>
+            <p className="text-sm font-bold" style={{ color: t1Color }}>{team1?.team_name || "Team 1"}</p>
+            <p className="text-3xl font-black" style={{ color: t1Color }}>{overall.team1Points}</p>
           </div>
           <div className="text-gray-300 text-lg font-light">—</div>
           <div className="text-center">
-            <p className="text-sm font-bold text-red-600">{team2?.team_name || "Team 2"}</p>
-            <p className="text-3xl font-black text-red-600">{overall.team2Points}</p>
+            <p className="text-sm font-bold" style={{ color: t2Color }}>{team2?.team_name || "Team 2"}</p>
+            <p className="text-3xl font-black" style={{ color: t2Color }}>{overall.team2Points}</p>
           </div>
         </div>
 
@@ -1158,12 +1014,12 @@ function ResultsTab({
         <div className="mt-3 relative">
           <div className="flex h-3 rounded-full overflow-hidden bg-gray-100">
             <div
-              className="bg-blue-500 transition-all duration-500"
-              style={{ width: `${team1Pct}%` }}
+              className="transition-all duration-500"
+              style={{ width: `${team1Pct}%`, backgroundColor: t1Color }}
             />
             <div
-              className="bg-red-500 transition-all duration-500"
-              style={{ width: `${team2Pct}%` }}
+              className="transition-all duration-500"
+              style={{ width: `${team2Pct}%`, backgroundColor: t2Color }}
             />
           </div>
           {/* First to 23 marker */}
@@ -1196,6 +1052,8 @@ function ResultsTab({
               result={fr}
               team1Name={team1?.team_name || "T1"}
               team2Name={team2?.team_name || "T2"}
+              team1Color={t1Color}
+              team2Color={t2Color}
             />
           );
         })}
@@ -1210,12 +1068,16 @@ function GroupResultCard({
   result,
   team1Name,
   team2Name,
+  team1Color,
+  team2Color,
 }: {
   groupNum: number;
   label: string;
   result: FoursomeResult;
   team1Name: string;
   team2Name: string;
+  team1Color: string;
+  team2Color: string;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -1231,9 +1093,9 @@ function GroupResultCard({
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm font-bold">
-            <span className="text-blue-600">{result.team1TotalPoints}</span>
+            <span style={{ color: team1Color }}>{result.team1TotalPoints}</span>
             {" — "}
-            <span className="text-red-600">{result.team2TotalPoints}</span>
+            <span style={{ color: team2Color }}>{result.team2TotalPoints}</span>
           </span>
           <svg
             className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? "rotate-180" : ""}`}
@@ -1247,7 +1109,7 @@ function GroupResultCard({
       {expanded && (
         <div className="border-t border-gray-100 divide-y divide-gray-50">
           {result.matches.map((m) => (
-            <MatchResultRow key={m.matchIndex} match={m} team1Name={team1Name} team2Name={team2Name} />
+            <MatchResultRow key={m.matchIndex} match={m} team1Name={team1Name} team2Name={team2Name} team1Color={team1Color} team2Color={team2Color} />
           ))}
         </div>
       )}
@@ -1259,16 +1121,20 @@ function MatchResultRow({
   match,
   team1Name,
   team2Name,
+  team1Color,
+  team2Color,
 }: {
   match: MatchResult;
   team1Name: string;
   team2Name: string;
+  team1Color: string;
+  team2Color: string;
 }) {
   const statusColor =
-    match.sectionWinner === "team1" ? "text-blue-600" :
-    match.sectionWinner === "team2" ? "text-red-600" :
-    match.sectionWinner === "halved" ? "text-gray-500" :
-    "text-gray-400";
+    match.sectionWinner === "team1" ? team1Color :
+    match.sectionWinner === "team2" ? team2Color :
+    match.sectionWinner === "halved" ? "#6b7280" :
+    "#9ca3af";
 
   return (
     <div className="flex items-center justify-between px-3 py-2">
@@ -1278,7 +1144,7 @@ function MatchResultRow({
           Sec {match.section} · {match.scorerType === "pair" ? "Scramble" : "Individual"}
         </p>
       </div>
-      <p className={`text-xs font-semibold ${statusColor}`}>
+      <p className="text-xs font-semibold" style={{ color: statusColor }}>
         {formatMatchStatus(match).replace("T1", team1Name.slice(0, 8)).replace("T2", team2Name.slice(0, 8))}
       </p>
     </div>

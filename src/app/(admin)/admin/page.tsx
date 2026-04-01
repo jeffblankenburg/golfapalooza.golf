@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { US_TIMEZONE_OPTIONS } from "@/lib/utils/timezone";
+import { hasAnyEventPermission } from "@/lib/permissions";
 
 interface TripSummary {
   id: string;
@@ -22,7 +23,7 @@ const cardPermissionMap: Record<string, string> = {
   Facilities: "manage_facilities",
   Courses: "manage_facilities",
   Announcements: "send_announcements",
-  Gallery: "manage_events",
+  Gallery: "manage_event_settings",
   Music: "manage_music",
 };
 
@@ -238,8 +239,8 @@ export default function AdminPage() {
     <div className="px-4 pt-6 pb-8 space-y-8">
       <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
 
-      {/* Active Event (top) — admin only */}
-      {access.isAdmin && (loading ? (
+      {/* Active Event (top) — admin or any event permission */}
+      {(access.isAdmin || hasAnyEventPermission(access.permissions)) && (loading ? (
         <div className="flex justify-center py-8">
           <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
         </div>

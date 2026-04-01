@@ -1,11 +1,16 @@
 import { cookies } from "next/headers";
+import { createAdminClient } from "@/lib/supabase/admin";
 
-const SIM_DATE_COOKIE = "sim-date";
 const SIM_USER_COOKIE = "sim-user-id";
 
 export async function getSimDate(): Promise<string | null> {
-  const cookieStore = await cookies();
-  return cookieStore.get(SIM_DATE_COOKIE)?.value || null;
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("trip_settings")
+    .select("sim_date")
+    .eq("status", "active")
+    .single();
+  return data?.sim_date || null;
 }
 
 export async function getEffectiveDate(): Promise<Date> {

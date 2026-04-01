@@ -229,17 +229,32 @@ export default async function KgbCupScoringPage() {
     .select("foursome_id, hole_number, scorer_type, scorer_id, strokes")
     .eq("foursome_id", myFoursome.id);
 
-  // Fetch handicaps
-  const [playerHandicapsResult, pairHandicapsResult] = await Promise.all([
-    adminClient
-      .from("kgb_cup_player_handicaps")
-      .select("player_id, adjusted_handicap")
-      .eq("contest_id", contest.id),
+  // Fetch handicaps: base handicaps from player_handicaps, pair handicaps from kgb_cup_pair_handicaps
+  const allPlayerIds = players.map((p) => p.id);
+  const [baseHandicapsResult, pairHandicapsResult] = await Promise.all([
+    allPlayerIds.length > 0
+      ? adminClient
+          .from("player_handicaps")
+          .select("user_id, handicap_index")
+          .in("user_id", allPlayerIds)
+      : Promise.resolve({ data: [] }),
     adminClient
       .from("kgb_cup_pair_handicaps")
       .select("pair_id, scramble_handicap")
       .eq("contest_id", contest.id),
   ]);
+
+  // Compute per-foursome adjusted handicaps (subtract lowest in the foursome)
+  const baseMap = new Map<string, number>();
+  for (const bh of baseHandicapsResult.data || []) {
+    baseMap.set(bh.user_id, bh.handicap_index ?? 0);
+  }
+  const handicaps = allPlayerIds.map((id) => baseMap.get(id) ?? 0);
+  const lowest = handicaps.length > 0 ? Math.min(...handicaps) : 0;
+  const adjustedPlayerHandicaps = allPlayerIds.map((id) => ({
+    playerId: id,
+    adjustedHandicap: Math.round((baseMap.get(id) ?? 0) - lowest),
+  }));
 
   const sortedHoles = holes.sort((a, b) => a.hole_number - b.hole_number);
 
@@ -252,10 +267,7 @@ export default async function KgbCupScoringPage() {
       startingHole={startingHole}
       holes={sortedHoles}
       initialScores={existingScores || []}
-      playerHandicaps={(playerHandicapsResult.data || []).map((h) => ({
-        playerId: h.player_id,
-        adjustedHandicap: h.adjusted_handicap,
-      }))}
+      playerHandicaps={adjustedPlayerHandicaps}
       pairHandicaps={(pairHandicapsResult.data || []).map((h) => ({
         pairId: h.pair_id,
         scrambleHandicap: h.scramble_handicap,

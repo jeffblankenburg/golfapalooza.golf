@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 async function checkIsAdmin() {
   const supabase = await createClient();
@@ -21,6 +22,28 @@ async function checkIsAdmin() {
   return user;
 }
 
+export async function GET() {
+  const admin = await checkIsAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("trip_settings")
+    .select("sim_date")
+    .eq("status", "active")
+    .single();
+
+  const cookieStore = await cookies();
+  const simUserId = cookieStore.get("sim-user-id")?.value || null;
+
+  return NextResponse.json({
+    simDate: data?.sim_date || null,
+    simUserId,
+  });
+}
+
 export async function POST(request: Request) {
   const admin = await checkIsAdmin();
   if (!admin) {
@@ -28,17 +51,17 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const cookieStore = await cookies();
 
   if (body.simDate) {
-    cookieStore.set("sim-date", body.simDate, {
-      path: "/",
-      sameSite: "lax",
-      httpOnly: false,
-    });
+    const supabase = createAdminClient();
+    await supabase
+      .from("trip_settings")
+      .update({ sim_date: body.simDate })
+      .eq("status", "active");
   }
 
   if (body.simUserId) {
+    const cookieStore = await cookies();
     cookieStore.set("sim-user-id", body.simUserId, {
       path: "/",
       sameSite: "lax",
@@ -58,13 +81,17 @@ export async function DELETE(request: Request) {
   const body = await request.json().catch(() => ({}));
   const clearDate = body.clearDate ?? true;
   const clearUser = body.clearUser ?? true;
-  const cookieStore = await cookies();
 
   if (clearDate) {
-    cookieStore.delete("sim-date");
+    const supabase = createAdminClient();
+    await supabase
+      .from("trip_settings")
+      .update({ sim_date: null })
+      .eq("status", "active");
   }
 
   if (clearUser) {
+    const cookieStore = await cookies();
     cookieStore.delete("sim-user-id");
   }
 

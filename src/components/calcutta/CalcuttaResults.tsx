@@ -183,7 +183,7 @@ export function CalcuttaResults({ contestId }: { contestId: string }) {
         <p className="text-gray-500 text-center py-8">Auction not set up yet.</p>
       )}
 
-      {participants.length > 0 && (
+      {participants.length > 0 && auctionStarted && (
         <div className="flex gap-3">
           <div className="flex-1 bg-purple-50 rounded-xl px-3 py-2.5 text-center">
             <p className="text-xs text-purple-500 font-semibold uppercase">Pool</p>
@@ -384,13 +384,16 @@ export function CalcuttaResults({ contestId }: { contestId: string }) {
           {prizes.map((prize) => {
             const totalPayout = (totalPool * prize.percentage) / 100;
             const perPlayerPayout = prize.per_player ? totalPayout / prize.player_count : null;
+            const baseName = prize.prize_name || "Unknown";
+            const displayName = prize.place === 1
+              ? `${baseName} Champion`
+              : prize.place === 2
+              ? `${baseName} Runner-Up`
+              : `${baseName} ${ordinal(prize.place)} Place`;
             return (
               <div key={prize.id} className="flex items-center gap-3 bg-green-50 rounded-xl px-3 py-2.5">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{prize.prize_name}</p>
-                  {prize.place > 1 && (
-                    <p className="text-xs text-gray-400">{ordinal(prize.place)} Place</p>
-                  )}
+                  <p className="text-sm font-medium text-gray-900">{displayName}</p>
                   {prize.per_player && perPlayerPayout != null && (
                     <p className="text-xs text-gray-400">${perPlayerPayout.toFixed(0)} each × {prize.player_count} players</p>
                   )}
@@ -408,20 +411,25 @@ export function CalcuttaResults({ contestId }: { contestId: string }) {
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
             Prize Breakdown
           </h2>
-          {prizes.map((prize) => (
+          {prizes.map((prize) => {
+            const baseName = prize.prize_name || "Unknown";
+            const displayName = prize.place === 1
+              ? `${baseName} Champion`
+              : prize.place === 2
+              ? `${baseName} Runner-Up`
+              : `${baseName} ${ordinal(prize.place)} Place`;
+            return (
               <div key={prize.id} className="flex items-center gap-3 bg-purple-50 rounded-xl px-3 py-2.5">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{prize.prize_name}</p>
-                  {prize.place > 1 && (
-                    <p className="text-xs text-gray-400">{ordinal(prize.place)} Place</p>
-                  )}
+                  <p className="text-sm font-medium text-gray-900">{displayName}</p>
                   {prize.per_player && (
                     <p className="text-xs text-gray-400">Split across {prize.player_count} players</p>
                   )}
                 </div>
                 <p className="text-lg font-bold text-purple-700">{prize.percentage}%</p>
               </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

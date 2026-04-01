@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { CollapsibleSection } from "@/components/admin/CollapsibleSection";
 import { RyderCupManager } from "@/components/admin/RyderCupManager";
@@ -10,10 +10,25 @@ import { KgbCupScoringManager } from "@/components/admin/KgbCupScoringManager";
 export default function KgbCupAdminPage() {
   const params = useParams();
   const tripId = params.tripId as string;
+  const router = useRouter();
+  const [allowed, setAllowed] = useState<boolean | null>(null);
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [contestId, setContestId] = useState<string | null>(null);
   const [dayNumber, setDayNumber] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => {
+        const user = data.user;
+        if (!user) { router.replace("/admin"); return; }
+        const ok = user.is_admin || user.permissions?.manage_kgb_cup === true;
+        if (!ok) { router.replace(`/admin/events/${tripId}`); return; }
+        setAllowed(true);
+      })
+      .catch(() => router.replace("/admin"));
+  }, [router, tripId]);
 
   useEffect(() => {
     async function fetchContest() {
@@ -54,6 +69,14 @@ export default function KgbCupAdminPage() {
       setShowResetModal(false);
     }
   };
+
+  if (!allowed) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">

@@ -251,9 +251,12 @@ export function CalcuttaDisplay({ contestId }: { contestId: string }) {
                             <p className="text-sm text-gray-400 font-semibold">per player x{prize.player_count}</p>
                           )}
                           <p className="text-lg font-bold text-gray-900 leading-tight">
-                            {prize.prize_name}
+                            {prize.place === 1
+                              ? `${prize.prize_name} Champion`
+                              : prize.place === 2
+                              ? `${prize.prize_name} Runner-Up`
+                              : `${prize.prize_name} ${ordinal(prize.place)} Place`}
                           </p>
-                          <p className="text-sm font-semibold text-gray-400">{ordinal(prize.place)} Place</p>
                         </div>
                       ))}
                     </div>
@@ -518,9 +521,12 @@ export function CalcuttaDisplay({ contestId }: { contestId: string }) {
                               ${totalPayout.toFixed(0)}
                             </p>
                             <p className="text-lg font-bold text-gray-900 leading-tight">
-                              {prize.prize_name}
+                              {prize.place === 1
+                                ? `${prize.prize_name} Champion`
+                                : prize.place === 2
+                                ? `${prize.prize_name} Runner-Up`
+                                : `${prize.prize_name} ${ordinal(prize.place)} Place`}
                             </p>
-                            <p className="text-sm font-semibold text-gray-400">{ordinal(prize.place)} Place</p>
                             {prize.per_player && perPlayerPayout != null && (
                               <p className="text-sm text-gray-400 mt-0.5">${perPlayerPayout.toFixed(0)} each x{prize.player_count}</p>
                             )}

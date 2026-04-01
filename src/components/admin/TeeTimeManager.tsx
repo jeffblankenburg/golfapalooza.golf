@@ -278,6 +278,27 @@ export function TeeTimeManager({ tripId }: { tripId: string }) {
     if (!selectedDay) return;
     setSaving(`assign-kgb-${foursomeId}`);
 
+    // Optimistic: immediately add a group with the foursome's players
+    const foursome = kgbFoursomes.find((f) => f.id === foursomeId);
+    const tempId = `temp-kgb-${foursomeId}`;
+    if (foursome) {
+      const optimisticGroup: TeeTimeGroup = {
+        id: tempId,
+        trip_id: tripId,
+        day_number: selectedDay.number,
+        tee_time: null,
+        starting_hole: 1,
+        scramble_team_id: null,
+        players: foursome.members.map((m) => ({
+          id: `temp-${m.user_id}`,
+          user_id: m.user_id,
+          display_name: m.display_name,
+          avatar_url: m.avatar_url,
+        })),
+      };
+      setGroups((prev) => [...prev, optimisticGroup]);
+    }
+
     // Create a new tee time group with the foursome's players auto-populated
     const res = await fetch("/api/admin/tee-times", {
       method: "POST",
@@ -290,7 +311,11 @@ export function TeeTimeManager({ tripId }: { tripId: string }) {
     });
 
     if (res.ok) {
+      // Replace temp group with real data
       await fetchGroups(selectedDay.number);
+    } else {
+      // Revert on failure
+      setGroups((prev) => prev.filter((g) => g.id !== tempId));
     }
     setAddingToGroup(null);
     setSaving(null);

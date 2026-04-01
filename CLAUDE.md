@@ -226,6 +226,19 @@ When implementing any delete, remove, or reassign operation:
 3. Use optimistic UI updates that can be reverted if the API fails
 4. Notify sibling components if they might be displaying stale data
 
+## Verification Checklist
+
+**After completing any implementation task, always provide a verification checklist.** This should be a concise list of manual tests and checks the user can perform to confirm the feature works correctly. Include:
+
+1. **Happy path** — the primary use case works end-to-end
+2. **Edge cases** — empty states, boundary conditions, missing data
+3. **Undo/clear** — if the feature has a reset or clear action, verify it works
+4. **Cross-user impact** — if the change affects what other users see, verify from another session/browser
+5. **Existing functionality** — related features that could regress still work
+6. **Database** — if a migration was added, confirm it has been run and the schema looks correct
+
+Format as a numbered checklist the user can work through sequentially.
+
 ## Feature Planning & Issue Tracking
 
 **GitHub Issues are the source of truth for feature planning and persistence.**

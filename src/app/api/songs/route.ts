@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveUserId } from "@/lib/simulator";
 
 export async function GET() {
   const supabase = await createClient();
@@ -10,6 +11,8 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const effectiveUserId = await getEffectiveUserId(user.id);
 
   const { data: songs, error } = await supabase
     .from("songs")
@@ -25,7 +28,7 @@ export async function GET() {
   const { data: favorites } = await supabase
     .from("song_favorites")
     .select("song_id")
-    .eq("user_id", user.id);
+    .eq("user_id", effectiveUserId);
 
   const favoriteIds = new Set((favorites || []).map((f) => f.song_id));
 

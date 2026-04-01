@@ -50,7 +50,9 @@ export default async function DailyGamesPage() {
   };
 
   const contestLabels: Record<string, string> = {
-    ctp: "Closest to Pin",
+    ctp_front: "Closest to Pin — Front 9",
+    ctp_back: "Closest to Pin — Back 9",
+    long_drive: "Long Drive",
     long_putt: "Long Putt",
   };
 
@@ -69,21 +71,30 @@ export default async function DailyGamesPage() {
             <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
               Day {dayNum} &middot; {dayLabels(dayNum)}
             </h2>
-            {["ctp", "long_putt"].map((contestType) => {
+            {["ctp_front", "ctp_back", "long_drive", "long_putt"].map((contestType) => {
               const winner = dayWinners.find((w) => w.contest_type === contestType);
               const u = winner?.user
                 ? Array.isArray(winner.user) ? winner.user[0] : winner.user
                 : null;
 
+              const isCtp = contestType.startsWith("ctp");
+              const iconColor = isCtp
+                ? "bg-teal-50 text-teal-600"
+                : contestType === "long_drive"
+                ? "bg-sky-50 text-sky-600"
+                : "bg-amber-50 text-amber-600";
+
               return (
                 <div key={contestType} className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 px-3 py-2.5">
-                  <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
-                    contestType === "ctp" ? "bg-teal-50 text-teal-600" : "bg-amber-50 text-amber-600"
-                  }`}>
-                    {contestType === "ctp" ? (
+                  <div className={`flex items-center justify-center w-10 h-10 rounded-full ${iconColor}`}>
+                    {isCtp ? (
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    ) : contestType === "long_drive" ? (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                       </svg>
                     ) : (
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

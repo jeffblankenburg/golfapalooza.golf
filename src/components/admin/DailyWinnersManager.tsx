@@ -23,7 +23,9 @@ interface EventDay {
 }
 
 const CONTEST_TYPES = [
-  { type: "ctp", label: "Closest to Pin" },
+  { type: "ctp_front", label: "CTP Front 9" },
+  { type: "ctp_back", label: "CTP Back 9" },
+  { type: "long_drive", label: "Long Drive" },
   { type: "long_putt", label: "Long Putt" },
 ];
 
@@ -207,7 +209,7 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
         onClick={() =>
           setConfirmModal({
             title: "Reset Daily Winners",
-            message: "This will clear all Closest to Pin and Long Putt winners across all three days. This cannot be undone.",
+            message: "This will clear all daily game winners across all days. This cannot be undone.",
             onConfirm: handleReset,
           })
         }

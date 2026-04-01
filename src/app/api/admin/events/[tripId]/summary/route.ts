@@ -111,6 +111,7 @@ export async function GET(
       trip_name: trip.trip_name,
       trip_year: trip.trip_year,
       start_date: trip.start_date,
+      sim_date: trip.sim_date || null,
       status: trip.status,
       course_id: trip.course_id,
     },

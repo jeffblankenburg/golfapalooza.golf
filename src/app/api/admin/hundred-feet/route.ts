@@ -103,11 +103,19 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "trip_id is required" }, { status: 400 });
   }
 
+  const dayNumber = searchParams.get("day_number");
   const adminClient = createAdminClient();
-  const { error } = await adminClient
+
+  let query = adminClient
     .from("hundred_feet_scores")
     .delete()
     .eq("trip_id", tripId);
+
+  if (dayNumber) {
+    query = query.eq("day_number", parseInt(dayNumber, 10));
+  }
+
+  const { error } = await query;
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -115,9 +115,7 @@ export default async function DailyGamesPage() {
                         )}
                         <span className="text-sm text-gray-700 font-medium">{u.display_name}</span>
                       </div>
-                    ) : (
-                      <p className="text-xs text-gray-400 mt-0.5">TBD</p>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               );

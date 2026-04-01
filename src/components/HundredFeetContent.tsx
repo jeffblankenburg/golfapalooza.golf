@@ -42,6 +42,8 @@ export function HundredFeetContent({
 }) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sortKey, setSortKey] = useState<string>("total");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const fetchData = useCallback(async () => {
     const res = await fetch(`/api/hundred-feet?trip_id=${tripId}`);
@@ -56,6 +58,43 @@ export function HundredFeetContent({
 
   const DAYS = scrambleDays.length > 0 ? scrambleDays : [2, 3, 4];
   const gridCols = { gridTemplateColumns: `2rem 1fr repeat(${DAYS.length}, 3.5rem) 3.5rem` };
+
+  // Rank map (always by total ascending — lower = better)
+  const rankMap = new Map<string, number>();
+  [...leaderboard]
+    .sort((a, b) => a.totalInches - b.totalInches)
+    .forEach((e, i) => rankMap.set(e.user_id, i + 1));
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "player" ? "asc" : "asc");
+    }
+  };
+
+  const toInches = (d: DayScore) => d.feet * 12 + d.inches;
+
+  const sorted = [...leaderboard].sort((a, b) => {
+    let cmp = 0;
+    if (sortKey === "player") {
+      cmp = a.display_name.localeCompare(b.display_name);
+    } else if (sortKey === "total") {
+      cmp = a.totalInches - b.totalInches;
+    } else if (sortKey.startsWith("day-")) {
+      const d = parseInt(sortKey.slice(4), 10);
+      const aVal = a.days[d] ? toInches(a.days[d]) : 99999;
+      const bVal = b.days[d] ? toInches(b.days[d]) : 99999;
+      cmp = aVal - bVal;
+    }
+    return sortDir === "desc" ? -cmp : cmp;
+  });
+
+  const SortArrow = ({ col }: { col: string }) => {
+    if (sortKey !== col) return null;
+    return <span className="ml-0.5">{sortDir === "asc" ? "↑" : "↓"}</span>;
+  };
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">
@@ -79,18 +118,39 @@ export function HundredFeetContent({
       {!loading && leaderboard.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           {/* Header */}
-          <div className="grid gap-0 bg-gray-50 text-xs font-semibold text-gray-500 uppercase" style={gridCols}>
-            <div className="px-1 py-2 text-center">#</div>
-            <div className="px-2 py-2">Player</div>
+          <div className="grid gap-0 bg-gray-50 text-xs font-semibold text-gray-500 uppercase select-none" style={gridCols}>
+            <div
+              className="px-1 py-2 text-center cursor-pointer active:bg-gray-100"
+              onClick={() => handleSort("total")}
+            >
+              #<SortArrow col="total" />
+            </div>
+            <div
+              className="px-2 py-2 cursor-pointer active:bg-gray-100"
+              onClick={() => handleSort("player")}
+            >
+              Player<SortArrow col="player" />
+            </div>
             {DAYS.map((d) => (
-              <div key={d} className="px-1 py-2 text-center">{getDayLabel(startDate, d)}</div>
+              <div
+                key={d}
+                className="px-1 py-2 text-center cursor-pointer active:bg-gray-100"
+                onClick={() => handleSort(`day-${d}`)}
+              >
+                {getDayLabel(startDate, d)}<SortArrow col={`day-${d}`} />
+              </div>
             ))}
-            <div className="px-2 py-2 text-center">Total</div>
+            <div
+              className="px-2 py-2 text-center cursor-pointer active:bg-gray-100"
+              onClick={() => handleSort("total")}
+            >
+              Total<SortArrow col="total" />
+            </div>
           </div>
 
           {/* Rows */}
-          {leaderboard.map((entry, idx) => {
-            const rank = idx + 1;
+          {sorted.map((entry) => {
+            const rank = rankMap.get(entry.user_id) || 0;
             return (
               <div
                 key={entry.user_id}

@@ -16,7 +16,6 @@ import { ActionItemsManager } from "@/components/admin/ActionItemsManager";
 import { AccoladesManager } from "@/components/admin/AccoladesManager";
 import { TeeTimeManager } from "@/components/admin/TeeTimeManager";
 import { VisibilityToggles } from "@/components/admin/VisibilityToggles";
-import { HundredFeetManager } from "@/components/admin/HundredFeetManager";
 import { DailyWinnersManager } from "@/components/admin/DailyWinnersManager";
 import { EventDaysManager } from "@/components/admin/EventDaysManager";
 
@@ -290,16 +289,21 @@ export default function EventDetailPage() {
       )}
 
       {hasScramble && can("manage_scrambles") && (
-        <CollapsibleSection
-          title="100 Feet!"
-          summary="Distance from pin on #18"
-          iconColor="text-red-700"
-          icon={
-            <SvgIcon src="/noun-measure-tape-8065234.svg" />
-          }
+        <Link
+          href={`/admin/events/${tripId}/hundred-feet`}
+          className="flex items-center gap-3 bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-4 active:bg-gray-50 transition-colors"
         >
-          <HundredFeetManager tripId={tripId} />
-        </CollapsibleSection>
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-50 text-red-700 flex-shrink-0">
+            <SvgIcon src="/noun-measure-tape-8065234.svg" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-900">100 Feet!</p>
+            <p className="text-xs text-gray-500">Distance from pin on #18</p>
+          </div>
+          <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
       )}
 
       {hasScramble && can("manage_scrambles") && (

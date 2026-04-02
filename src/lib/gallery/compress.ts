@@ -147,8 +147,10 @@ export async function compressVideo(
         reject(e);
       };
 
-      recorder.start(100); // collect data every 100ms
+      recorder.start(50); // collect data every 50ms for better audio fidelity
       video.currentTime = 0;
+      // Slow down playback to give audio stream time to keep up
+      video.playbackRate = duration < 5 ? 0.5 : 1;
       video.play().catch((err) => {
         clearTimeout(timeout);
         reject(err);
@@ -171,7 +173,11 @@ export async function compressVideo(
         // Draw final frame
         ctx.drawImage(video, 0, 0, targetW, targetH);
         onProgress?.(100);
-        recorder.stop();
+        // Request final data and stop after a brief delay to flush audio buffer
+        recorder.requestData();
+        setTimeout(() => {
+          if (recorder.state === "recording") recorder.stop();
+        }, 300);
       };
     });
 

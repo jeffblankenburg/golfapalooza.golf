@@ -255,11 +255,22 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
     [startPlayTimer]
   );
 
-  // Resume: unpause the current audio element
-  const resume = useCallback(() => {
+  // Resume: force-reinitialize audio pipeline for iOS lock screen compatibility
+  const resume = useCallback(async () => {
     const audio = audioRef.current;
     if (!audio) return;
-    audio.play().catch(() => {});
+
+    const savedTime = audio.currentTime;
+    audio.pause();
+    audio.currentTime = savedTime;
+    // Nudge volume to force iOS audio pipeline reattachment
+    audio.volume = 0.999;
+    try {
+      await audio.play();
+    } catch {
+      // silent
+    }
+    audio.volume = volumeRef.current;
     setIsPlaying(true);
     const song = songsRef.current[currentIndexRef.current];
     if (song) startPlayTimer(song.id);
@@ -461,14 +472,14 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
 
     navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
 
-    navigator.mediaSession.setActionHandler("play", () => play());
+    navigator.mediaSession.setActionHandler("play", async () => resume());
     navigator.mediaSession.setActionHandler("pause", () => pause());
     navigator.mediaSession.setActionHandler("previoustrack", () => previous());
     navigator.mediaSession.setActionHandler("nexttrack", () => next());
     navigator.mediaSession.setActionHandler("seekto", (details) => {
       if (details.seekTime !== undefined) seek(details.seekTime);
     });
-  }, [songs, currentIndex, isPlaying, play, pause, previous, next, seek]);
+  }, [songs, currentIndex, isPlaying, play, pause, resume, previous, next, seek]);
 
   return (
     <MusicPlayerContext.Provider

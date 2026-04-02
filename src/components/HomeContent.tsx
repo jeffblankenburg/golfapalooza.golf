@@ -165,7 +165,7 @@ export function HomeContent({
   myCalcuttaRoster = null,
   calcuttaBuyerOwes = 0,
   contestTypes = [],
-  activeRound = null,
+  activeRounds = [],
   kgbCupActiveRound = null,
   teeTimeLinkHref = "/scorecards",
   calcuttaAuctionActive = false,
@@ -189,7 +189,7 @@ export function HomeContent({
   myCalcuttaRoster?: { userId: string; displayName: string; avatarUrl: string | null; sharePct: number }[] | null;
   calcuttaBuyerOwes?: number;
   contestTypes?: string[];
-  activeRound?: { teamId: string; teeTime: string; startingHole: number | null } | null;
+  activeRounds?: { teamId: string; teeTime: string; startingHole: number | null; contestId: string; dayNumber: number }[];
   kgbCupActiveRound?: { teeTime: string; startingHole: number | null } | null;
   teeTimeLinkHref?: string;
   calcuttaAuctionActive?: boolean;
@@ -220,8 +220,7 @@ export function HomeContent({
   const [participantsExpanded, setParticipantsExpanded] = useState(false);
   const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported" | "loading">("loading");
   const [pushRequesting, setPushRequesting] = useState(false);
-  const [showScoreCard, setShowScoreCard] = useState(false);
-  const [showKgbScoreCard, setShowKgbScoreCard] = useState(false);
+  // Time gates removed — scoring links show whenever data exists
 
   useEffect(() => {
     if (trip?.start_date) {
@@ -237,78 +236,6 @@ export function HomeContent({
     }
   }, []);
 
-  // Show "Score Your Round" card when within 1 hour of tee time or after
-  useEffect(() => {
-    if (!activeRound?.teeTime) {
-      setShowScoreCard(false);
-      return;
-    }
-
-    const checkTime = () => {
-      let now: Date;
-      if (simulatedDate) {
-        if (simulatedDate.includes("T")) {
-          const [datePart, timePart] = simulatedDate.split("T");
-          const [y, m, d] = datePart.split("-").map(Number);
-          const [h, min] = timePart.split(":").map(Number);
-          now = new Date(y, m - 1, d, h, min);
-        } else {
-          const [y, m, d] = simulatedDate.split("-").map(Number);
-          now = new Date(y, m - 1, d, 12, 0); // Default to noon if no time
-        }
-      } else {
-        now = new Date();
-      }
-
-      // Parse tee time (HH:MM:SS) into today's date
-      const [hh, mm] = activeRound!.teeTime.split(":").map(Number);
-      const teeDate = new Date(now);
-      teeDate.setHours(hh, mm, 0, 0);
-
-      // Show if now >= (teeTime - 1 hour)
-      const oneHourBefore = new Date(teeDate.getTime() - 60 * 60 * 1000);
-      setShowScoreCard(now >= oneHourBefore);
-    };
-
-    checkTime();
-    const interval = setInterval(checkTime, 60000);
-    return () => clearInterval(interval);
-  }, [activeRound, simulatedDate]);
-
-  // Show "Score KGB Cup" card when within 1 hour of tee time or after
-  useEffect(() => {
-    if (!kgbCupActiveRound?.teeTime) {
-      setShowKgbScoreCard(false);
-      return;
-    }
-
-    const checkTime = () => {
-      let now: Date;
-      if (simulatedDate) {
-        if (simulatedDate.includes("T")) {
-          const [datePart, timePart] = simulatedDate.split("T");
-          const [y, m, d] = datePart.split("-").map(Number);
-          const [h, min] = timePart.split(":").map(Number);
-          now = new Date(y, m - 1, d, h, min);
-        } else {
-          const [y, m, d] = simulatedDate.split("-").map(Number);
-          now = new Date(y, m - 1, d, 12, 0);
-        }
-      } else {
-        now = new Date();
-      }
-
-      const [hh, mm] = kgbCupActiveRound!.teeTime.split(":").map(Number);
-      const teeDate = new Date(now);
-      teeDate.setHours(hh, mm, 0, 0);
-      const oneHourBefore = new Date(teeDate.getTime() - 60 * 60 * 1000);
-      setShowKgbScoreCard(now >= oneHourBefore);
-    };
-
-    checkTime();
-    const interval = setInterval(checkTime, 60000);
-    return () => clearInterval(interval);
-  }, [kgbCupActiveRound, simulatedDate]);
 
   const openModal = () => {
     setSelectedLikelihood(currentLikelihood || 99);
@@ -538,31 +465,41 @@ export function HomeContent({
         </Link>
       )}
 
-      {/* Score Your Round Card */}
-      {showScoreCard && activeRound && (
-        <Link
-          href="/scoring"
-          className="flex items-center gap-4 p-4 bg-green-600 rounded-2xl shadow-lg shadow-green-600/25 active:scale-95 transition-transform"
-        >
-          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-white/20 text-white">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+      {/* Score Your Round Cards — one per scramble contest */}
+      {activeRounds.map((round) => {
+        const dayLabel = trip?.start_date
+          ? (() => {
+              const [y, m, d] = trip.start_date.split("-").map(Number);
+              const date = new Date(y, m - 1, d + round.dayNumber - 1);
+              return date.toLocaleDateString("en-US", { weekday: "long" });
+            })()
+          : `Day ${round.dayNumber}`;
+        return (
+          <Link
+            key={round.contestId}
+            href={`/scoring?contest_id=${round.contestId}`}
+            className="flex items-center gap-4 p-4 bg-green-600 rounded-2xl shadow-lg shadow-green-600/25 active:scale-95 transition-transform"
+          >
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-white/20 text-white">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-white text-lg">Score {dayLabel}</p>
+              <p className="text-white/70 text-sm">
+                Enter scramble scores live
+              </p>
+            </div>
+            <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
-          </div>
-          <div className="flex-1">
-            <p className="font-bold text-white text-lg">Score Your Round</p>
-            <p className="text-white/70 text-sm">
-              Enter scores live from the course
-            </p>
-          </div>
-          <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </Link>
-      )}
+          </Link>
+        );
+      })}
 
       {/* Score KGB Cup Card */}
-      {showKgbScoreCard && kgbCupActiveRound && (
+      {kgbCupActiveRound && (
         <Link
           href="/kgb-cup/scoring"
           className="flex items-center gap-4 p-4 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-600/25 active:scale-95 transition-transform"

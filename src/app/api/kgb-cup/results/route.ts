@@ -7,6 +7,7 @@ import {
   type HoleScore,
   type HoleInfo,
 } from "@/lib/kgb-cup/match-logic";
+import { deriveFoursomes } from "@/lib/kgb-cup/derive-foursomes";
 
 // GET - User-facing KGB Cup results (authenticated, not admin-only)
 export async function GET(request: Request) {
@@ -49,13 +50,6 @@ export async function GET(request: Request) {
       .in("team_id", teamIds)
       .order("sort_order");
 
-    // Fetch foursomes
-    const { data: foursomes } = await supabase
-      .from("ryder_cup_foursomes")
-      .select("id, contest_id, pair_team1_id, pair_team2_id, sort_order")
-      .eq("contest_id", contestId)
-      .order("sort_order");
-
     // Build pair lookup
     const pairMap = new Map<
       string,
@@ -81,8 +75,14 @@ export async function GET(request: Request) {
       });
     }
 
+    // Derive foursomes from pairs
+    const foursomes = deriveFoursomes(
+      (pairs || []).map((p) => ({ id: p.id, team_id: p.team_id, sort_order: p.sort_order })),
+      teams || []
+    );
+
     // Fetch scores
-    const foursomeIds = (foursomes || []).map((f) => f.id);
+    const foursomeIds = foursomes.map((f) => f.id);
     let scores: HoleScore[] = [];
     if (foursomeIds.length > 0) {
       const { data: scoreData } = await supabase

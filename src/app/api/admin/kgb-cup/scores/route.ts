@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkIsAdmin } from "@/lib/permissions-server";
+import { deriveFoursomes } from "@/lib/kgb-cup/derive-foursomes";
 
 // GET - Fetch all scoring data for a KGB Cup contest
 export async function GET(request: Request) {
@@ -18,13 +19,6 @@ export async function GET(request: Request) {
 
   try {
     const adminClient = createAdminClient();
-
-    // Fetch foursomes with pair details
-    const { data: foursomes } = await adminClient
-      .from("ryder_cup_foursomes")
-      .select("id, contest_id, pair_team1_id, pair_team2_id, sort_order")
-      .eq("contest_id", contestId)
-      .order("sort_order");
 
     // Fetch all pairs for this contest (via teams)
     const { data: teams } = await adminClient
@@ -64,8 +58,11 @@ export async function GET(request: Request) {
       };
     });
 
-    // Fetch hole scores for all foursomes
-    const foursomeIds = (foursomes || []).map((f) => f.id);
+    // Derive foursomes from pairs
+    const foursomes = deriveFoursomes(normalizedPairs, teams || []);
+
+    // Fetch hole scores for all foursomes (foursome_id = team1 pair ID)
+    const foursomeIds = foursomes.map((f) => f.id);
     let scores: { foursome_id: string; hole_number: number; scorer_type: string; scorer_id: string; strokes: number }[] = [];
     if (foursomeIds.length > 0) {
       const { data: scoreData } = await adminClient
@@ -151,7 +148,7 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({
-      foursomes: foursomes || [],
+      foursomes,
       pairs: normalizedPairs,
       teams: teams || [],
       scores,
@@ -230,13 +227,23 @@ export async function DELETE(request: Request) {
   try {
     const adminClient = createAdminClient();
 
-    // Get foursome IDs for this contest
-    const { data: foursomes } = await adminClient
-      .from("ryder_cup_foursomes")
-      .select("id")
+    // Derive foursome IDs (= team1 pair IDs) for this contest
+    const { data: teams } = await adminClient
+      .from("ryder_cup_teams")
+      .select("id, team_number")
       .eq("contest_id", contestId);
 
-    const foursomeIds = (foursomes || []).map((f) => f.id);
+    const teamIds = (teams || []).map((t) => t.id);
+    const { data: pairs } = teamIds.length > 0
+      ? await adminClient
+          .from("ryder_cup_pairs")
+          .select("id, team_id, sort_order")
+          .in("team_id", teamIds)
+          .gt("sort_order", 0)
+      : { data: [] };
+
+    const foursomes = deriveFoursomes(pairs || [], teams || []);
+    const foursomeIds = foursomes.map((f) => f.id);
 
     if (foursomeIds.length === 0) {
       return NextResponse.json({ success: true, cleared: 0 });

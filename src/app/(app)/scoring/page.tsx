@@ -4,7 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveUserId, getEffectiveDate, isSimulating } from "@/lib/simulator";
 import { LiveScorer } from "@/components/scoring/LiveScorer";
 
-export default async function ScoringPage() {
+export default async function ScoringPage({ searchParams }: { searchParams: Promise<{ contest_id?: string }> }) {
+  const resolvedParams = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -34,14 +35,27 @@ export default async function ScoringPage() {
   );
   const todayDayNumber = diffDays + 1;
 
-  // Find scramble contest for today
-  const { data: contest } = await queryClient
-    .from("contests")
-    .select("id, scoring_closed_at, verified_at")
-    .eq("trip_id", trip.id)
-    .eq("contest_type", "scramble")
-    .eq("day_number", todayDayNumber)
-    .maybeSingle();
+  // Find scramble contest — by contest_id param or fall back to today's day
+  let contest: { id: string; scoring_closed_at: string | null; verified_at: string | null } | null = null;
+  if (resolvedParams.contest_id) {
+    const { data } = await queryClient
+      .from("contests")
+      .select("id, scoring_closed_at, verified_at")
+      .eq("id", resolvedParams.contest_id)
+      .eq("trip_id", trip.id)
+      .eq("contest_type", "scramble")
+      .maybeSingle();
+    contest = data;
+  } else {
+    const { data } = await queryClient
+      .from("contests")
+      .select("id, scoring_closed_at, verified_at")
+      .eq("trip_id", trip.id)
+      .eq("contest_type", "scramble")
+      .eq("day_number", todayDayNumber)
+      .maybeSingle();
+    contest = data;
+  }
 
   if (!contest) redirect("/");
 

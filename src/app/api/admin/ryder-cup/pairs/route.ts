@@ -151,20 +151,6 @@ export async function DELETE(request: Request) {
 
     const adminClient = createAdminClient();
 
-    // Check if pair is in any foursome
-    const { data: foursomes } = await adminClient
-      .from("ryder_cup_foursomes")
-      .select("id")
-      .or(`pair_team1_id.eq.${pair_id},pair_team2_id.eq.${pair_id}`)
-      .limit(1);
-
-    if (foursomes && foursomes.length > 0) {
-      return NextResponse.json(
-        { error: "Cannot delete pair that is part of a foursome. Remove it from the foursome first." },
-        { status: 400 }
-      );
-    }
-
     const { error } = await adminClient
       .from("ryder_cup_pairs")
       .delete()

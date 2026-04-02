@@ -34,13 +34,12 @@ export default async function KgbCupScoringPage() {
   );
   const todayDayNumber = diffDays + 1;
 
-  // Find ryder_cup contest for today
+  // Find ryder_cup contest (no longer restricted to today's day)
   const { data: contest } = await queryClient
     .from("contests")
     .select("id, day_number, scoring_closed_at, verified_at")
     .eq("trip_id", trip.id)
     .eq("contest_type", "ryder_cup")
-    .eq("day_number", todayDayNumber)
     .maybeSingle();
 
   if (!contest) redirect("/kgb-cup");
@@ -71,17 +70,27 @@ export default async function KgbCupScoringPage() {
 
   if (!myPair) redirect("/kgb-cup");
 
-  // Find user's foursome
-  const { data: foursomes } = await adminClient
-    .from("ryder_cup_foursomes")
-    .select("id, pair_team1_id, pair_team2_id, sort_order")
-    .eq("contest_id", contest.id);
+  // Derive user's foursome from pairs (match by sort_order across teams)
+  const myTeam = (teams || []).find((t) => t.id === myPair.team_id);
+  const otherTeam = (teams || []).find((t) => t.id !== myPair.team_id);
 
-  const myFoursome = (foursomes || []).find(
-    (f) => f.pair_team1_id === myPair.id || f.pair_team2_id === myPair.id
+  if (!myTeam || !otherTeam) redirect("/kgb-cup");
+
+  const matchingPair = (allPairs || []).find(
+    (p) => p.team_id === otherTeam.id && p.sort_order === myPair.sort_order
   );
 
-  if (!myFoursome) redirect("/kgb-cup");
+  if (!matchingPair) redirect("/kgb-cup");
+
+  // Foursome ID = team1 pair's ID (pair from team_number=1)
+  const team1 = (teams || []).find((t) => t.team_number === 1)!;
+  const isMyTeamTeam1 = myTeam.id === team1.id;
+  const myFoursome = {
+    id: isMyTeamTeam1 ? myPair.id : matchingPair.id,
+    pair_team1_id: isMyTeamTeam1 ? myPair.id : matchingPair.id,
+    pair_team2_id: isMyTeamTeam1 ? matchingPair.id : myPair.id,
+    sort_order: myPair.sort_order,
+  };
 
   // Get the other pair
   const otherPairId =

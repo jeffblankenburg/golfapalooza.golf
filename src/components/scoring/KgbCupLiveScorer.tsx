@@ -850,7 +850,8 @@ export function KgbCupLiveScorer({
             onMouseUp={handleDecrementEnd}
             onMouseLeave={handleDecrementEnd}
             disabled={isLocked || !hasValue}
-            className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-200 text-gray-700 text-sm font-bold active:bg-gray-300 disabled:opacity-30"
+            className="w-7 h-7 flex items-center justify-center rounded-full text-white text-sm font-bold disabled:opacity-30"
+            style={{ backgroundColor: color }}
           >
             −
           </button>
@@ -860,7 +861,8 @@ export function KgbCupLiveScorer({
           <button
             onClick={() => handleIncrement(side.type, side.id)}
             disabled={isLocked}
-            className="w-7 h-7 flex items-center justify-center rounded-full bg-indigo-600 text-white text-sm font-bold active:bg-indigo-700 disabled:opacity-30"
+            className="w-7 h-7 flex items-center justify-center rounded-full text-white text-sm font-bold disabled:opacity-30"
+            style={{ backgroundColor: color }}
           >
             +
           </button>

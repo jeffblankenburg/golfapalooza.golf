@@ -25,27 +25,50 @@ export async function PUT(request: Request) {
 
     const adminClient = createAdminClient();
 
-    // Verify user is a member of this foursome (via pair membership)
-    const { data: foursome } = await adminClient
-      .from("ryder_cup_foursomes")
-      .select("pair_team1_id, pair_team2_id")
+    // foursome_id = team1 pair ID. Verify user is a member of this foursome.
+    // Find the pair (team1) and its matching pair (team2, same sort_order).
+    const { data: team1Pair } = await adminClient
+      .from("ryder_cup_pairs")
+      .select("id, team_id, sort_order, player_a_id, player_b_id")
       .eq("id", foursome_id)
       .single();
 
-    if (!foursome) {
+    if (!team1Pair) {
       return NextResponse.json({ error: "Foursome not found" }, { status: 404 });
     }
 
-    const { data: pairs } = await adminClient
-      .from("ryder_cup_pairs")
-      .select("player_a_id, player_b_id")
-      .in("id", [foursome.pair_team1_id, foursome.pair_team2_id]);
+    // Find the opposing team's pair with the same sort_order
+    const { data: team1Info } = await adminClient
+      .from("ryder_cup_teams")
+      .select("id, contest_id")
+      .eq("id", team1Pair.team_id)
+      .single();
+
+    if (!team1Info) {
+      return NextResponse.json({ error: "Team not found" }, { status: 404 });
+    }
+
+    const { data: team2 } = await adminClient
+      .from("ryder_cup_teams")
+      .select("id")
+      .eq("contest_id", team1Info.contest_id)
+      .neq("id", team1Info.id)
+      .single();
+
+    const { data: team2Pair } = team2
+      ? await adminClient
+          .from("ryder_cup_pairs")
+          .select("player_a_id, player_b_id")
+          .eq("team_id", team2.id)
+          .eq("sort_order", team1Pair.sort_order)
+          .single()
+      : { data: null };
 
     const playerIds = new Set<string>();
-    for (const p of pairs || []) {
-      if (p.player_a_id) playerIds.add(p.player_a_id);
-      if (p.player_b_id) playerIds.add(p.player_b_id);
-    }
+    if (team1Pair.player_a_id) playerIds.add(team1Pair.player_a_id);
+    if (team1Pair.player_b_id) playerIds.add(team1Pair.player_b_id);
+    if (team2Pair?.player_a_id) playerIds.add(team2Pair.player_a_id);
+    if (team2Pair?.player_b_id) playerIds.add(team2Pair.player_b_id);
 
     if (!playerIds.has(user.id)) {
       return NextResponse.json(
@@ -56,15 +79,12 @@ export async function PUT(request: Request) {
 
     // Check if scoring is closed for this contest
     const { data: contestCheck } = await adminClient
-      .from("ryder_cup_foursomes")
-      .select("contest:contests(scoring_closed_at)")
-      .eq("id", foursome_id)
+      .from("contests")
+      .select("scoring_closed_at")
+      .eq("id", team1Info.contest_id)
       .single();
 
-    const contestData = contestCheck?.contest
-      ? (Array.isArray(contestCheck.contest) ? contestCheck.contest[0] : contestCheck.contest)
-      : null;
-    if (contestData?.scoring_closed_at) {
+    if (contestCheck?.scoring_closed_at) {
       return NextResponse.json(
         { error: "Scoring is closed" },
         { status: 403 }

@@ -951,28 +951,6 @@ export function LiveScorer({
         </div>
       )}
 
-      {/* Save status */}
-      <div
-        className={`flex items-center justify-center gap-1.5 text-xs font-medium transition-all duration-300 shrink-0 ${
-          saveStatus === "idle"
-            ? "h-0 opacity-0 overflow-hidden"
-            : saveStatus === "saving"
-            ? "h-6 opacity-100 bg-blue-50 text-blue-600"
-            : saveStatus === "saved"
-            ? "h-6 opacity-100 bg-green-50 text-green-600"
-            : "h-6 opacity-100 bg-red-50 text-red-600"
-        }`}
-      >
-        {saveStatus === "saving" && (
-          <>
-            <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-            Saving...
-          </>
-        )}
-        {saveStatus === "saved" && "Saved"}
-        {saveStatus === "error" && "Save failed — will retry"}
-      </div>
-
       {/* Swipeable Image Area with Pinch-to-Zoom */}
       <div
         className="flex-1 min-h-0 overflow-hidden bg-white relative touch-none"
@@ -980,6 +958,26 @@ export function LiveScorer({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
+        {/* Save status overlay */}
+        {saveStatus !== "idle" && (
+          <div
+            className={`absolute top-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium shadow-md transition-opacity duration-300 ${
+              saveStatus === "saving"
+                ? "bg-blue-50 text-blue-600"
+                : saveStatus === "saved"
+                ? "bg-green-50 text-green-600"
+                : "bg-red-50 text-red-600"
+            }`}
+          >
+            {saveStatus === "saving" && (
+              <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            )}
+            {saveStatus === "saving" && "Saving..."}
+            {saveStatus === "saved" && "Saved"}
+            {saveStatus === "error" && "Save failed — will retry"}
+          </div>
+        )}
+
         {/* Prev/Next arrows */}
         {currentHoleIndex > 0 && (
           <button
@@ -1094,23 +1092,17 @@ export function LiveScorer({
               {members.map((m) => {
                 const key = `${hole.hole_number}-${m.user_id}`;
                 const isChecked = bonuses[key]?.on_green || false;
-                const isMe = m.user_id === currentUserId;
                 return (
                   <button
                     key={m.user_id}
-                    onClick={() => isMe && handleOnGreenChange(m.user_id, !isChecked)}
-                    disabled={isLocked || !isMe}
+                    onClick={() => handleOnGreenChange(m.user_id, !isChecked)}
+                    disabled={isLocked}
                     className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
                       isChecked
                         ? "bg-green-600 text-white"
                         : "bg-white text-gray-600 border border-gray-200"
-                    } ${!isMe || isLocked ? "opacity-60" : "active:scale-95"}`}
+                    } ${isLocked ? "opacity-60" : "active:scale-95"}`}
                   >
-                    {isChecked && (
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
                     {m.display_name}
                   </button>
                 );
@@ -1126,23 +1118,17 @@ export function LiveScorer({
               {members.map((m) => {
                 const key = `${hole.hole_number}-${m.user_id}`;
                 const isHoled = bonuses[key]?.holed_out || false;
-                const isMe = m.user_id === currentUserId;
                 return (
                   <button
                     key={m.user_id}
-                    onClick={() => isMe && handleHoledOutChange(m.user_id)}
-                    disabled={isLocked || !isMe}
+                    onClick={() => handleHoledOutChange(m.user_id)}
+                    disabled={isLocked}
                     className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
                       isHoled
                         ? "bg-amber-600 text-white"
                         : "bg-white text-gray-600 border border-gray-200"
-                    } ${!isMe || isLocked ? "opacity-60" : "active:scale-95"}`}
+                    } ${isLocked ? "opacity-60" : "active:scale-95"}`}
                   >
-                    {isHoled && (
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
                     {m.display_name}
                   </button>
                 );

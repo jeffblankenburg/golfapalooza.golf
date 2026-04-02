@@ -23,8 +23,7 @@ interface ScrambleTeam {
 
 interface RyderData {
   teams: { id: string; team_number: number; team_name: string }[];
-  pairs: { id: string; team_id: string; player_a: string; player_b: string }[];
-  foursomes: { id: string; pair_a_id: string; pair_b_id: string; foursome_number: number }[];
+  pairs: { id: string; team_id: string; sort_order: number; player_a: string; player_b: string }[];
 }
 
 interface TeeTimeGroup {
@@ -452,33 +451,30 @@ function RyderCupContent({
         })}
       </div>
 
-      {/* Foursomes matchups */}
-      {ryder.foursomes.length > 0 && (
-        <div>
-          <p className="text-xs text-gray-400 uppercase font-semibold tracking-wide mb-2">
-            Foursomes
-          </p>
-          <div className="space-y-2">
-            {ryder.foursomes
-              .sort((a, b) => a.foursome_number - b.foursome_number)
-              .map((f) => {
-                const pairA = ryder.pairs.find((p) => p.id === f.pair_a_id);
-                const pairB = ryder.pairs.find((p) => p.id === f.pair_b_id);
-                return (
-                  <div key={f.id} className="bg-gray-50 rounded-xl px-3 py-2.5 text-sm">
-                    <span className="text-gray-900">
-                      {pairA ? `${pairA.player_a} & ${pairA.player_b}` : "TBD"}
-                    </span>
-                    <span className="text-gray-400 mx-2">vs</span>
-                    <span className="text-gray-900">
-                      {pairB ? `${pairB.player_a} & ${pairB.player_b}` : "TBD"}
-                    </span>
-                  </div>
-                );
-              })}
+      {/* Foursomes matchups — derived from pairs matched by sort_order */}
+      {(() => {
+        const team1 = ryder.teams.find((t) => t.team_number === 1);
+        const team2 = ryder.teams.find((t) => t.team_number === 2);
+        if (!team1 || !team2) return null;
+        const t1Pairs = ryder.pairs.filter((p) => p.team_id === team1.id && p.sort_order > 0).sort((a, b) => a.sort_order - b.sort_order);
+        const t2Map = new Map(ryder.pairs.filter((p) => p.team_id === team2.id && p.sort_order > 0).map((p) => [p.sort_order, p]));
+        const matchups = t1Pairs.map((p1) => ({ p1, p2: t2Map.get(p1.sort_order) })).filter((m) => m.p2);
+        if (matchups.length === 0) return null;
+        return (
+          <div>
+            <p className="text-xs text-gray-400 uppercase font-semibold tracking-wide mb-2">Foursomes</p>
+            <div className="space-y-2">
+              {matchups.map((m) => (
+                <div key={m.p1.id} className="bg-gray-50 rounded-xl px-3 py-2.5 text-sm">
+                  <span className="text-gray-900">{m.p1.player_a} & {m.p1.player_b}</span>
+                  <span className="text-gray-400 mx-2">vs</span>
+                  <span className="text-gray-900">{m.p2!.player_a} & {m.p2!.player_b}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/simulator";
 import { ContestList } from "@/components/ContestList";
+import { deriveFoursomes } from "@/lib/kgb-cup/derive-foursomes";
 
 export default async function ContestsPage() {
   const user = await getAuthUser();
@@ -76,7 +77,7 @@ export default async function ContestsPage() {
     .map((c) => c.id);
 
   // Parallel fetches for detail data
-  const [teamsResult, ryderTeamsResult, ryderPairsResult, ryderFoursomesResult, teeTimesResult] =
+  const [teamsResult, ryderTeamsResult, ryderPairsResult, teeTimesResult] =
     await Promise.all([
       // Scramble teams
       scrambleContestIds.length > 0 && trip.show_teams
@@ -101,16 +102,8 @@ export default async function ContestsPage() {
         ? supabase
             .from("ryder_cup_pairs")
             .select(
-              "id, contest_id, team_id, player_a:users!ryder_cup_pairs_player_a_id_fkey(display_name), player_b:users!ryder_cup_pairs_player_b_id_fkey(display_name)"
+              "id, contest_id, team_id, sort_order, player_a:users!ryder_cup_pairs_player_a_id_fkey(display_name), player_b:users!ryder_cup_pairs_player_b_id_fkey(display_name)"
             )
-            .in("contest_id", ryderContestIds)
-        : Promise.resolve({ data: [] }),
-
-      // Ryder cup foursomes
-      ryderContestIds.length > 0 && trip.show_teams
-        ? supabase
-            .from("ryder_cup_foursomes")
-            .select("id, contest_id, pair_a_id, pair_b_id, foursome_number")
             .in("contest_id", ryderContestIds)
         : Promise.resolve({ data: [] }),
 
@@ -206,12 +199,19 @@ export default async function ContestsPage() {
           .select("id, team_number, team_name, team_color")
           .eq("contest_id", cId);
 
-        const { data: rcFoursomes } = await supabase
-          .from("ryder_cup_foursomes")
-          .select("id")
-          .eq("contest_id", cId);
+        // Derive foursomes from pairs
+        const rcTeamIds = (rcTeams || []).map((t) => t.id);
+        const { data: rcPairsData } = rcTeamIds.length > 0
+          ? await supabase
+              .from("ryder_cup_pairs")
+              .select("id, team_id, sort_order")
+              .in("team_id", rcTeamIds)
+              .gt("sort_order", 0)
+          : { data: [] };
 
-        if (rcTeams && rcTeams.length === 2 && rcFoursomes && rcFoursomes.length > 0) {
+        const rcFoursomes = deriveFoursomes(rcPairsData || [], rcTeams || []);
+
+        if (rcTeams && rcTeams.length === 2 && rcFoursomes.length > 0) {
           const foursomeIds = rcFoursomes.map((f) => f.id);
           const { data: allScores } = await supabase
             .from("kgb_cup_hole_scores")
@@ -296,21 +296,16 @@ export default async function ContestsPage() {
       pairs: {
         id: string;
         team_id: string;
+        sort_order: number;
         player_a: string;
         player_b: string;
-      }[];
-      foursomes: {
-        id: string;
-        pair_a_id: string;
-        pair_b_id: string;
-        foursome_number: number;
       }[];
     }
   > = {};
 
   for (const t of ryderTeamsResult.data || []) {
     if (!ryderDataByContest[t.contest_id]) {
-      ryderDataByContest[t.contest_id] = { teams: [], pairs: [], foursomes: [] };
+      ryderDataByContest[t.contest_id] = { teams: [], pairs: [] };
     }
     ryderDataByContest[t.contest_id].teams.push({
       id: t.id,
@@ -321,7 +316,7 @@ export default async function ContestsPage() {
 
   for (const p of ryderPairsResult.data || []) {
     if (!ryderDataByContest[p.contest_id]) {
-      ryderDataByContest[p.contest_id] = { teams: [], pairs: [], foursomes: [] };
+      ryderDataByContest[p.contest_id] = { teams: [], pairs: [] };
     }
     const playerA = Array.isArray(p.player_a)
       ? p.player_a[0]?.display_name
@@ -332,20 +327,9 @@ export default async function ContestsPage() {
     ryderDataByContest[p.contest_id].pairs.push({
       id: p.id,
       team_id: p.team_id,
+      sort_order: p.sort_order,
       player_a: playerA || "TBD",
       player_b: playerB || "TBD",
-    });
-  }
-
-  for (const f of ryderFoursomesResult.data || []) {
-    if (!ryderDataByContest[f.contest_id]) {
-      ryderDataByContest[f.contest_id] = { teams: [], pairs: [], foursomes: [] };
-    }
-    ryderDataByContest[f.contest_id].foursomes.push({
-      id: f.id,
-      pair_a_id: f.pair_a_id,
-      pair_b_id: f.pair_b_id,
-      foursome_number: f.foursome_number,
     });
   }
 

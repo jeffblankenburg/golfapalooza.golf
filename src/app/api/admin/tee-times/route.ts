@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkIsAdmin } from "@/lib/permissions-server";
+import { deriveFoursomes } from "@/lib/kgb-cup/derive-foursomes";
 
 // GET - Fetch tee time groups for a trip + day, with players and unassigned participants
 export async function GET(request: Request) {
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
     const { data: groups, error: groupsError } = await adminClient
       .from("tee_times")
       .select(
-        "id, trip_id, day_number, tee_time, starting_hole, scramble_team_id, kgb_foursome_id, created_at, tee_time_players(id, user_id, user:users(id, display_name, avatar_url))"
+        "id, trip_id, day_number, tee_time, starting_hole, scramble_team_id, created_at, tee_time_players(id, user_id, user:users(id, display_name, avatar_url))"
       )
       .eq("trip_id", tripId)
       .eq("day_number", dayNum)
@@ -82,7 +83,7 @@ export async function GET(request: Request) {
       });
     }
 
-    // If KGB Cup day, fetch foursomes with pairs and player names
+    // If KGB Cup day, derive foursomes from pairs
     let kgbFoursomes: Array<{
       id: string;
       sort_order: number;
@@ -90,59 +91,54 @@ export async function GET(request: Request) {
     }> = [];
 
     if (ryderCupContest) {
-      const { data: foursomes } = await adminClient
-        .from("ryder_cup_foursomes")
-        .select("id, pair_team1_id, pair_team2_id, sort_order")
-        .eq("contest_id", ryderCupContest.id)
-        .order("sort_order");
+      // Fetch teams for colors and team_number
+      const { data: rcTeams } = await adminClient
+        .from("ryder_cup_teams")
+        .select("id, team_number, team_color")
+        .eq("contest_id", ryderCupContest.id);
 
-      if (foursomes && foursomes.length > 0) {
-        // Fetch teams for colors
-        const { data: rcTeams } = await adminClient
-          .from("ryder_cup_teams")
-          .select("id, team_color")
-          .eq("contest_id", ryderCupContest.id);
-
-        const teamColorMap = new Map<string, string | null>();
-        for (const t of rcTeams || []) {
-          teamColorMap.set(t.id, t.team_color);
-        }
-
-        // Fetch all pairs
-        const teamIds = (rcTeams || []).map((t) => t.id);
-        const { data: rcPairs } = teamIds.length > 0
-          ? await adminClient
-              .from("ryder_cup_pairs")
-              .select("id, team_id, player_a_id, player_b_id, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name, avatar_url), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name, avatar_url)")
-              .in("team_id", teamIds)
-          : { data: [] };
-
-        // Build pair lookup
-        const pairLookup = new Map<string, { team_id: string; players: Array<{ user_id: string; display_name: string; avatar_url: string | null }> }>();
-        for (const p of rcPairs || []) {
-          const playerA = Array.isArray(p.player_a) ? p.player_a[0] : p.player_a;
-          const playerB = Array.isArray(p.player_b) ? p.player_b[0] : p.player_b;
-          const players: Array<{ user_id: string; display_name: string; avatar_url: string | null }> = [];
-          if (playerA) players.push({ user_id: playerA.id, display_name: playerA.display_name, avatar_url: playerA.avatar_url });
-          if (playerB) players.push({ user_id: playerB.id, display_name: playerB.display_name, avatar_url: playerB.avatar_url });
-          pairLookup.set(p.id, { team_id: p.team_id, players });
-        }
-
-        kgbFoursomes = foursomes.map((f) => {
-          const pair1 = pairLookup.get(f.pair_team1_id);
-          const pair2 = pairLookup.get(f.pair_team2_id);
-          const members: Array<{ user_id: string; display_name: string; avatar_url: string | null; team_color: string | null }> = [];
-
-          for (const p of pair1?.players || []) {
-            members.push({ ...p, team_color: teamColorMap.get(pair1!.team_id) || null });
-          }
-          for (const p of pair2?.players || []) {
-            members.push({ ...p, team_color: teamColorMap.get(pair2!.team_id) || null });
-          }
-
-          return { id: f.id, sort_order: f.sort_order, members };
-        });
+      const teamColorMap = new Map<string, string | null>();
+      for (const t of rcTeams || []) {
+        teamColorMap.set(t.id, t.team_color);
       }
+
+      // Fetch all pairs with player info
+      const rcTeamIds = (rcTeams || []).map((t) => t.id);
+      const { data: rcPairs } = rcTeamIds.length > 0
+        ? await adminClient
+            .from("ryder_cup_pairs")
+            .select("id, team_id, sort_order, player_a_id, player_b_id, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name, avatar_url), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name, avatar_url)")
+            .in("team_id", rcTeamIds)
+        : { data: [] };
+
+      // Build pair lookup
+      const pairLookup = new Map<string, { team_id: string; players: Array<{ user_id: string; display_name: string; avatar_url: string | null }> }>();
+      for (const p of rcPairs || []) {
+        const playerA = Array.isArray(p.player_a) ? p.player_a[0] : p.player_a;
+        const playerB = Array.isArray(p.player_b) ? p.player_b[0] : p.player_b;
+        const players: Array<{ user_id: string; display_name: string; avatar_url: string | null }> = [];
+        if (playerA) players.push({ user_id: playerA.id, display_name: playerA.display_name, avatar_url: playerA.avatar_url });
+        if (playerB) players.push({ user_id: playerB.id, display_name: playerB.display_name, avatar_url: playerB.avatar_url });
+        pairLookup.set(p.id, { team_id: p.team_id, players });
+      }
+
+      // Derive foursomes from pairs by matching sort_order
+      const derived = deriveFoursomes(rcPairs || [], rcTeams || []);
+
+      kgbFoursomes = derived.map((f) => {
+        const pair1 = pairLookup.get(f.pair_team1_id);
+        const pair2 = pairLookup.get(f.pair_team2_id);
+        const members: Array<{ user_id: string; display_name: string; avatar_url: string | null; team_color: string | null }> = [];
+
+        for (const p of pair1?.players || []) {
+          members.push({ ...p, team_color: teamColorMap.get(pair1!.team_id) || null });
+        }
+        for (const p of pair2?.players || []) {
+          members.push({ ...p, team_color: teamColorMap.get(pair2!.team_id) || null });
+        }
+
+        return { id: f.id, sort_order: f.sort_order, members };
+      });
     }
 
     // Fetch all event participants (the pool of available players) — for non-scramble days
@@ -194,7 +190,6 @@ export async function GET(request: Request) {
         tee_time: group.tee_time,
         starting_hole: group.starting_hole,
         scramble_team_id: group.scramble_team_id,
-        kgb_foursome_id: (group as Record<string, unknown>).kgb_foursome_id || null,
         players,
       };
     });
@@ -221,12 +216,10 @@ export async function POST(request: Request) {
     }
 
     const adminClient = createAdminClient();
-    const insertData: Record<string, unknown> = { trip_id, day_number, starting_hole: 1 };
-    if (kgb_foursome_id) insertData.kgb_foursome_id = kgb_foursome_id;
 
     const { data: group, error } = await adminClient
       .from("tee_times")
-      .insert(insertData)
+      .insert({ trip_id, day_number, starting_hole: 1 })
       .select()
       .single();
 
@@ -234,27 +227,48 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // If kgb_foursome_id provided, auto-populate tee_time_players from the foursome
+    // If kgb_foursome_id provided (= team1 pair ID), auto-populate tee_time_players
+    // from the pair and its matching opposing pair (same sort_order)
     if (kgb_foursome_id && group) {
-      // Fetch the foursome's pairs and their players
-      const { data: foursome } = await adminClient
-        .from("ryder_cup_foursomes")
-        .select("pair_team1_id, pair_team2_id")
+      const { data: team1Pair } = await adminClient
+        .from("ryder_cup_pairs")
+        .select("id, team_id, sort_order, player_a_id, player_b_id")
         .eq("id", kgb_foursome_id)
         .single();
 
-      if (foursome) {
-        const pairIds = [foursome.pair_team1_id, foursome.pair_team2_id];
-        const { data: fPairs } = await adminClient
-          .from("ryder_cup_pairs")
-          .select("player_a_id, player_b_id")
-          .in("id", pairIds);
+      if (team1Pair) {
+        // Find the opposing team's pair with the same sort_order
+        const { data: team1Info } = await adminClient
+          .from("ryder_cup_teams")
+          .select("id, contest_id")
+          .eq("id", team1Pair.team_id)
+          .single();
+
+        let team2Pair: { player_a_id: string | null; player_b_id: string | null } | null = null;
+        if (team1Info) {
+          const { data: team2 } = await adminClient
+            .from("ryder_cup_teams")
+            .select("id")
+            .eq("contest_id", team1Info.contest_id)
+            .neq("id", team1Info.id)
+            .single();
+
+          if (team2) {
+            const { data: p2 } = await adminClient
+              .from("ryder_cup_pairs")
+              .select("player_a_id, player_b_id")
+              .eq("team_id", team2.id)
+              .eq("sort_order", team1Pair.sort_order)
+              .single();
+            team2Pair = p2;
+          }
+        }
 
         const playerIds: string[] = [];
-        for (const p of fPairs || []) {
-          if (p.player_a_id) playerIds.push(p.player_a_id);
-          if (p.player_b_id) playerIds.push(p.player_b_id);
-        }
+        if (team1Pair.player_a_id) playerIds.push(team1Pair.player_a_id);
+        if (team1Pair.player_b_id) playerIds.push(team1Pair.player_b_id);
+        if (team2Pair?.player_a_id) playerIds.push(team2Pair.player_a_id);
+        if (team2Pair?.player_b_id) playerIds.push(team2Pair.player_b_id);
 
         if (playerIds.length > 0) {
           await adminClient

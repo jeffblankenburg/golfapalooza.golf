@@ -49,7 +49,6 @@ export async function GET(request: Request) {
       const freshTeams = seeded || [];
       return NextResponse.json({
         teams: freshTeams.map((t) => ({ ...t, pairs: [] })),
-        foursomes: [],
         unassigned: await getUnassigned(adminClient, contestId, []),
       });
     }
@@ -63,13 +62,6 @@ export async function GET(request: Request) {
         "id, team_id, player_a_id, player_b_id, sort_order, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name, full_name, avatar_url), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name, full_name, avatar_url)"
       )
       .in("team_id", teamIds)
-      .order("sort_order");
-
-    // Fetch foursomes
-    const { data: foursomes } = await adminClient
-      .from("ryder_cup_foursomes")
-      .select("id, contest_id, pair_team1_id, pair_team2_id, sort_order")
-      .eq("contest_id", contestId)
       .order("sort_order");
 
     // Normalize pairs
@@ -108,7 +100,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       teams: teamsWithPairs,
-      foursomes: foursomes || [],
       unassigned,
     });
   } catch (error) {

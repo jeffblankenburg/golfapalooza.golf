@@ -36,6 +36,8 @@ export function KgbCupPageClient({
   firstTeeTime,
   teeSheetGroups,
   hasTeams,
+  scoringLive,
+  contestComplete,
   simulatedDate,
   timezone,
 }: {
@@ -45,91 +47,35 @@ export function KgbCupPageClient({
   firstTeeTime: string | null;
   teeSheetGroups: TeeSheetGroup[];
   hasTeams: boolean;
+  scoringLive: boolean;
+  contestComplete: boolean;
   simulatedDate: string | null;
   timezone: string | null;
 }) {
   const [displayMode, setDisplayMode] = useState<DisplayMode>("forming");
 
   useEffect(() => {
-    // 1. No teams yet
     if (!hasTeams) {
       setDisplayMode("forming");
-      return;
-    }
-
-    // 2. Teams exist but no tee times → leaderboard (shows teams)
-    if (teeSheetGroups.length === 0) {
+    } else if (scoringLive || contestComplete) {
       setDisplayMode("leaderboard");
-      return;
-    }
-
-    // 3. Tee times exist — show tee sheet unless time-based switch kicks in
-    // If no actual tee time values set yet, just show tee sheet
-    if (!firstTeeTime) {
+    } else {
       setDisplayMode("teesheet");
-      return;
     }
-
-    // 4. Time-based: switch to leaderboard 1 hour before first tee
-    const checkTime = () => {
-      let now: Date;
-      if (simulatedDate) {
-        if (simulatedDate.includes("T")) {
-          const [datePart, timePart] = simulatedDate.split("T");
-          const [y, m, d] = datePart.split("-").map(Number);
-          const [h, min] = timePart.split(":").map(Number);
-          now = new Date(y, m - 1, d, h, min);
-        } else {
-          const [y, m, d] = simulatedDate.split("-").map(Number);
-          now = new Date(y, m - 1, d, 12, 0);
-        }
-      } else {
-        now = new Date();
-      }
-
-      const [sy, sm, sd] = startDate.split("-").map(Number);
-      const tripStart = new Date(sy, sm - 1, sd);
-      const diffDays = Math.floor((now.getTime() - tripStart.getTime()) / (1000 * 60 * 60 * 24));
-      const todayDayNumber = diffDays + 1;
-
-      if (todayDayNumber < kgbDayNumber) {
-        // Before KGB Cup day — show tee sheet
-        setDisplayMode("teesheet");
-        return;
-      }
-
-      if (todayDayNumber > kgbDayNumber) {
-        // After KGB Cup day — show leaderboard
-        setDisplayMode("leaderboard");
-        return;
-      }
-
-      // It's KGB Cup day — check if we're within 1 hour of first tee time
-      const [hh, mm] = firstTeeTime!.split(":").map(Number);
-      const teeDate = new Date(now);
-      teeDate.setHours(hh, mm, 0, 0);
-      const oneHourBefore = new Date(teeDate.getTime() - 60 * 60 * 1000);
-
-      setDisplayMode(now >= oneHourBefore ? "leaderboard" : "teesheet");
-    };
-
-    checkTime();
-    const interval = setInterval(checkTime, 60000);
-    return () => clearInterval(interval);
-  }, [hasTeams, teeSheetGroups.length, firstTeeTime, simulatedDate, startDate, kgbDayNumber]);
+  }, [hasTeams, scoringLive, contestComplete]);
 
   // State 1: Teams not yet formed
   if (displayMode === "forming") {
     return (
       <div className="px-4 pt-6 pb-8 space-y-4">
         <Link
-          href="/contests"
+          href="/"
           className="flex items-center gap-1 text-indigo-700 text-sm font-medium"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          Contests
+          Home
         </Link>
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900">KGB Cup</h1>
@@ -148,13 +94,13 @@ export function KgbCupPageClient({
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">
       <Link
-        href="/contests"
+        href="/"
         className="flex items-center gap-1 text-indigo-700 text-sm font-medium"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
-        Contests
+        Home
       </Link>
 
       <div className="text-center">

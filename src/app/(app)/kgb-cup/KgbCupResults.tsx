@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
+
 import {
   formatMatchStatus,
   type FoursomeResult,
@@ -90,16 +90,6 @@ export function KgbCupResults({ contestId }: { contestId: string }) {
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">
-      <Link
-        href="/contests"
-        className="flex items-center gap-1 text-indigo-700 text-sm font-medium"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Contests
-      </Link>
-
       {/* Hero Scoreboard */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-center">
         <div className="flex items-center justify-center gap-2 mb-4">

@@ -169,46 +169,79 @@ export default async function HomePage() {
     }
   }
 
-  // Derive activeRound: user's scramble tee time for today
+  // Derive day number for best-match logic below
   const todayForActiveRound = await getEffectiveDate();
   const startForActiveRound = new Date(trip.start_date + "T00:00:00");
   const diffForActiveRound = Math.floor((todayForActiveRound.getTime() - startForActiveRound.getTime()) / (1000 * 60 * 60 * 24));
   const todayDayNumber = diffForActiveRound + 1;
 
-  const todayTeamTeeTime = (teamTeeTimesResult.data || [])
-    .find(tt => tt.day_number === todayDayNumber && tt.scramble_team_id);
-
-  let activeRound: { teamId: string; teeTime: string; startingHole: number | null } | null = null;
-  if (todayTeamTeeTime?.tee_time && todayTeamTeeTime.scramble_team_id) {
-    activeRound = {
-      teamId: todayTeamTeeTime.scramble_team_id as string,
-      teeTime: todayTeamTeeTime.tee_time as string,
-      startingHole: todayTeamTeeTime.starting_hole as number | null,
-    };
+  // Derive active scramble rounds — all scramble tee times the user has (any day)
+  // Look up contest_id for each scramble team
+  const scrambleTeamContestMap = new Map<string, string>();
+  if (scrambleTeamIds.length > 0) {
+    const { data: teamContests } = await queryClient
+      .from("scramble_teams")
+      .select("id, contest_id")
+      .in("id", scrambleTeamIds);
+    for (const tc of teamContests || []) {
+      scrambleTeamContestMap.set(tc.id, tc.contest_id);
+    }
   }
 
-  // Derive KGB Cup active round: user's direct tee time on a ryder_cup day
+  // Look up day labels and scoring state for scramble contests
+  const scrambleContestDayMap = new Map<string, number>();
+  const scrambleContestScoringOpen = new Set<string>();
+  if (scrambleTeamContestMap.size > 0) {
+    const contestIds = [...new Set(scrambleTeamContestMap.values())];
+    const { data: contestDays } = await queryClient
+      .from("contests")
+      .select("id, day_number, scoring_closed_at")
+      .in("id", contestIds);
+    for (const cd of contestDays || []) {
+      if (cd.day_number) scrambleContestDayMap.set(cd.id, cd.day_number);
+      if (!cd.scoring_closed_at) scrambleContestScoringOpen.add(cd.id);
+    }
+  }
+
+  const activeRounds: { teamId: string; teeTime: string; startingHole: number | null; contestId: string; dayNumber: number }[] = [];
+  for (const tt of teamTeeTimesResult.data || []) {
+    if (tt.tee_time && tt.scramble_team_id) {
+      const contestId = scrambleTeamContestMap.get(tt.scramble_team_id as string);
+      if (contestId && scrambleContestScoringOpen.has(contestId)) {
+        activeRounds.push({
+          teamId: tt.scramble_team_id as string,
+          teeTime: tt.tee_time as string,
+          startingHole: tt.starting_hole as number | null,
+          contestId,
+          dayNumber: scrambleContestDayMap.get(contestId) || (tt.day_number as number),
+        });
+      }
+    }
+  }
+  // Sort by day number
+  activeRounds.sort((a, b) => a.dayNumber - b.dayNumber);
+
+  // Derive KGB Cup active round — any ryder_cup contest the user has a tee time for
   let kgbCupActiveRound: { teeTime: string; startingHole: number | null } | null = null;
   const hasRyderCup = (contestTypesResult.data || []).some(
     (c: { contest_type: string }) => c.contest_type === "ryder_cup"
   );
   if (hasRyderCup) {
-    const todayDirectTeeTime = allMatches.find(
-      (tt) => tt.dayNumber === todayDayNumber && tt.source === "player"
-    );
-    if (todayDirectTeeTime?.teeTime) {
-      // Verify this day actually has a ryder_cup contest
+    // Find any player tee time on a ryder_cup day (not restricted to today)
+    const playerTeeTime = allMatches.find((tt) => tt.source === "player");
+    if (playerTeeTime?.teeTime) {
+      const dayNum = playerTeeTime.dayNumber;
       const { data: rcContest } = await queryClient
         .from("contests")
-        .select("id")
+        .select("id, scoring_closed_at")
         .eq("trip_id", trip.id)
         .eq("contest_type", "ryder_cup")
-        .eq("day_number", todayDayNumber)
+        .eq("day_number", dayNum)
         .maybeSingle();
-      if (rcContest) {
+      if (rcContest && !rcContest.scoring_closed_at) {
         kgbCupActiveRound = {
-          teeTime: todayDirectTeeTime.teeTime,
-          startingHole: todayDirectTeeTime.startingHole,
+          teeTime: playerTeeTime.teeTime,
+          startingHole: playerTeeTime.startingHole,
         };
       }
     }
@@ -504,7 +537,7 @@ export default async function HomePage() {
       myCalcuttaRoster={myCalcuttaRoster}
       calcuttaBuyerOwes={calcuttaBuyerOwes}
       contestTypes={contestTypes}
-      activeRound={activeRound}
+      activeRounds={activeRounds}
       kgbCupActiveRound={kgbCupActiveRound}
       calcuttaAuctionActive={calcuttaContest?.calcutta_active_order != null && calcuttaContest.calcutta_active_order > 0}
       pickemUrgent={pickemUrgent}

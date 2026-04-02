@@ -26,7 +26,7 @@ export default async function ScorecardsPage() {
   // Get scramble contests (dynamic days from event_days)
   const { data: contests } = await supabase
     .from("contests")
-    .select("id, name, day_number")
+    .select("id, name, day_number, scoring_closed_at, verified_at")
     .eq("trip_id", trip.id)
     .eq("contest_type", "scramble")
     .order("day_number");

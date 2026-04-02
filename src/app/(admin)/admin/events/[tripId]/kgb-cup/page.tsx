@@ -8,6 +8,7 @@ import { ContestSetup } from "@/components/admin/ContestSetup";
 import { ContestParticipants } from "@/components/admin/ContestParticipants";
 import { RyderCupManager } from "@/components/admin/RyderCupManager";
 import { KgbCupScoringManager } from "@/components/admin/KgbCupScoringManager";
+import { TeeTimeManager } from "@/components/admin/TeeTimeManager";
 
 export default function KgbCupAdminPage() {
   const params = useParams();
@@ -130,6 +131,20 @@ export default function KgbCupAdminPage() {
       >
         <RyderCupManager tripId={tripId} />
       </CollapsibleSection>
+
+      {dayNumber && (
+        <CollapsibleSection
+          title="Tee Times"
+          summary="Tee times & starting holes"
+          icon={
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
+        >
+          <TeeTimeManager tripId={tripId} dayNumber={dayNumber} contestType="ryder_cup" />
+        </CollapsibleSection>
+      )}
 
       <CollapsibleSection
         title="Scoring"

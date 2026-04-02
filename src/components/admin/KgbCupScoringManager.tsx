@@ -123,61 +123,14 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
     setTeams(data.teams || []);
   }, []);
 
-  // Auto-generate foursomes from pair positions if none exist
-  const ensureFoursomes = useCallback(async (cId: string, existingFoursomes: FoursomeInfo[], allPairs: PairInfo[], teamList: TeamInfo[]) => {
-    if (existingFoursomes.length > 0) return existingFoursomes;
-    if (allPairs.length === 0 || teamList.length < 2) return existingFoursomes;
-
-    const t1 = teamList.find((t) => t.team_number === 1);
-    const t2 = teamList.find((t) => t.team_number === 2);
-    if (!t1 || !t2) return existingFoursomes;
-
-    // Real pairs (sort_order > 0) sorted by position
-    const t1Pairs = allPairs.filter((p) => p.team_id === t1.id && p.sort_order > 0).sort((a, b) => a.sort_order - b.sort_order);
-    const t2Pairs = allPairs.filter((p) => p.team_id === t2.id && p.sort_order > 0).sort((a, b) => a.sort_order - b.sort_order);
-    const count = Math.min(t1Pairs.length, t2Pairs.length);
-    if (count === 0) return existingFoursomes;
-
-    // Only auto-create if at least some pairs have players (Step 2 is done)
-    const hasAnyPlayers = [...t1Pairs, ...t2Pairs].some((p) => p.player_a_id || p.player_b_id);
-    if (!hasAnyPlayers) return existingFoursomes;
-
-    // Re-check for existing foursomes (guards against React Strict Mode double-invoke)
-    const checkRes = await fetch(`/api/admin/kgb-cup/scores?contest_id=${cId}`);
-    if (checkRes.ok) {
-      const checkData = await checkRes.json();
-      if ((checkData.foursomes || []).length > 0) return checkData.foursomes;
-    }
-
-    const created: FoursomeInfo[] = [];
-    for (let i = 0; i < count; i++) {
-      const res = await fetch("/api/admin/ryder-cup/foursomes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contest_id: cId,
-          pair_team1_id: t1Pairs[i].id,
-          pair_team2_id: t2Pairs[i].id,
-        }),
-      });
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (data.foursome) created.push(data.foursome);
-    }
-    return created.length > 0 ? created : existingFoursomes;
-  }, []);
-
-  // Fetch scoring data
+  // Fetch scoring data (foursomes are now derived server-side from pairs)
   const fetchScoringData = useCallback(async (cId: string) => {
     const res = await fetch(`/api/admin/kgb-cup/scores?contest_id=${cId}`);
     const data = await res.json();
 
-    let foursomeList: FoursomeInfo[] = data.foursomes || [];
+    const foursomeList: FoursomeInfo[] = data.foursomes || [];
     const pairList: PairInfo[] = data.pairs || [];
     const teamList: TeamInfo[] = data.teams || [];
-
-    // Auto-create foursomes from pair positions if none exist
-    foursomeList = await ensureFoursomes(cId, foursomeList, pairList, teamList);
 
     setFoursomes(foursomeList);
     setPairs(pairList);
@@ -214,7 +167,7 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
     if (!selectedFoursomeId && foursomeList.length > 0) {
       setSelectedFoursomeId(foursomeList[0].id);
     }
-  }, [selectedFoursomeId, ensureFoursomes]);
+  }, [selectedFoursomeId]);
 
   // Initialize
   useEffect(() => {

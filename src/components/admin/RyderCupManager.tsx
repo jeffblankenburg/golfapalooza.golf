@@ -30,14 +30,6 @@ interface Team {
   pairs: Pair[];
 }
 
-interface Foursome {
-  id: string;
-  contest_id: string;
-  pair_team1_id: string;
-  pair_team2_id: string;
-  sort_order: number;
-}
-
 interface UnassignedPlayer {
   user_id: string;
   display_name: string;
@@ -56,7 +48,6 @@ interface Contest {
 export function RyderCupManager({ tripId }: { tripId: string }) {
   const [contest, setContest] = useState<Contest | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
-  const [foursomes, setFoursomes] = useState<Foursome[]>([]);
   const [unassigned, setUnassigned] = useState<UnassignedPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -84,7 +75,6 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
     const res = await fetch(`/api/admin/ryder-cup?contest_id=${contestId}`);
     const data = await res.json();
     setTeams(data.teams || []);
-    setFoursomes(data.foursomes || []);
     setUnassigned(data.unassigned || []);
   }, []);
 

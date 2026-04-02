@@ -7,6 +7,8 @@ interface Contest {
   id: string;
   name: string;
   day_number: number;
+  scoring_closed_at: string | null;
+  verified_at: string | null;
 }
 
 interface TeamMember {
@@ -188,6 +190,9 @@ export function ScorecardsContent({
   const [loading, setLoading] = useState(true);
 
   const selectedContest = contests.find((c) => c.day_number === selectedDay);
+  const scoringLive = !selectedContest?.scoring_closed_at;
+  const contestComplete = !!selectedContest?.verified_at;
+  const showLeaderboard = scoringLive || contestComplete;
 
   const fetchData = useCallback(async () => {
     if (!selectedContest) {
@@ -311,7 +316,47 @@ export function ScorecardsContent({
         <p className="text-gray-500 text-center py-8">No teams or scores yet.</p>
       )}
 
-      {!loading && teams.length > 0 && (
+      {/* Tee sheet — shown when scoring is not live and contest is not complete */}
+      {!loading && teams.length > 0 && !showLeaderboard && (
+        <div className="space-y-3">
+          <p className="text-sm text-gray-500 text-center">Tee Sheet</p>
+          {teams.map((team) => (
+            <div key={team.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 flex items-center gap-3">
+                <div className="flex-shrink-0 w-20">
+                  {team.tee_time ? (
+                    <p className="text-sm font-bold text-green-700">
+                      {new Date(`1970-01-01T${team.tee_time}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-300">TBD</p>
+                  )}
+                  {team.starting_hole && (
+                    <p className="text-[10px] text-gray-400 mt-0.5">Hole {team.starting_hole}</p>
+                  )}
+                </div>
+                <div className="flex-1 flex flex-wrap gap-1.5">
+                  {team.members.map((m, i) => (
+                    <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 rounded-full text-xs font-medium text-gray-700 border border-gray-200">
+                      {m.avatar_url ? (
+                        <img src={m.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                      ) : (
+                        <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                          {(m.display_name || "?")[0].toUpperCase()}
+                        </span>
+                      )}
+                      {m.display_name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Leaderboard — shown when scoring is live or contest is complete */}
+      {!loading && teams.length > 0 && showLeaderboard && (
         <div className="space-y-4">
           {/* Legend */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-gray-500 px-1">

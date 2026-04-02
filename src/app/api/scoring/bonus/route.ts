@@ -23,17 +23,9 @@ export async function PUT(request: Request) {
       );
     }
 
-    // Players can only set their own bonuses
-    if (user_id !== user.id) {
-      return NextResponse.json(
-        { error: "Can only set your own bonuses" },
-        { status: 403 }
-      );
-    }
-
     const adminClient = createAdminClient();
 
-    // Verify user is a team member and team is not verified
+    // Verify the caller is a member of this team and team is not verified
     const { data: membership } = await adminClient
       .from("scramble_team_members")
       .select("id, team:scramble_teams(verified_at)")
@@ -75,6 +67,23 @@ export async function PUT(request: Request) {
       );
     }
 
+    // Verify the target user is also a member of this team
+    if (user_id !== user.id) {
+      const { data: targetMembership } = await adminClient
+        .from("scramble_team_members")
+        .select("id")
+        .eq("team_id", team_id)
+        .eq("user_id", user_id)
+        .maybeSingle();
+
+      if (!targetMembership) {
+        return NextResponse.json(
+          { error: "Target user is not a member of this team" },
+          { status: 403 }
+        );
+      }
+    }
+
     // If holed_out is true, clear holed_out on other players for this team+hole
     if (holed_out) {
       await adminClient
@@ -85,8 +94,8 @@ export async function PUT(request: Request) {
         .neq("user_id", user_id);
     }
 
-    // Upsert via authenticated client (RLS applies)
-    const { error: upsertError } = await supabase
+    // Upsert via admin client (team membership already verified above)
+    const { error: upsertError } = await adminClient
       .from("bspitw_bonus_points")
       .upsert(
         {

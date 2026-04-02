@@ -65,15 +65,15 @@ interface Day {
 
 type View = "days" | "groups";
 
-export function TeeTimeManager({ tripId }: { tripId: string }) {
+export function TeeTimeManager({ tripId, dayNumber, contestType }: { tripId: string; dayNumber?: number; contestType?: "ryder_cup" | "scramble" }) {
   const [eventDays, setEventDays] = useState<EventDay[]>([]);
   const [selectedDay, setSelectedDay] = useState<Day | null>(null);
   const [groups, setGroups] = useState<TeeTimeGroup[]>([]);
   const [unassigned, setUnassigned] = useState<UnassignedPlayer[]>([]);
   const [scrambleTeams, setScrambleTeams] = useState<ScrambleTeam[]>([]);
   const [kgbFoursomes, setKgbFoursomes] = useState<KgbFoursome[]>([]);
-  const [view, setView] = useState<View>("days");
-  const [loading, setLoading] = useState(false);
+  const [view, setView] = useState<View>(dayNumber ? "groups" : "days");
+  const [loading, setLoading] = useState(!!dayNumber);
   const [saving, setSaving] = useState<string | null>(null);
   const [addingToGroup, setAddingToGroup] = useState<string | null>(null);
   const [dayCounts, setDayCounts] = useState<Record<number, number>>({});
@@ -84,8 +84,8 @@ export function TeeTimeManager({ tripId }: { tripId: string }) {
     onConfirm: () => void;
   } | null>(null);
 
-  const isScrambleDay = scrambleTeams.length > 0;
-  const isKgbDay = kgbFoursomes.length > 0;
+  const isScrambleDay = contestType === "scramble" || scrambleTeams.length > 0;
+  const isKgbDay = contestType === "ryder_cup" || kgbFoursomes.length > 0;
 
   // Build DAYS from event_days
   const DAYS: Day[] = eventDays.map((ed) => ({
@@ -148,6 +148,21 @@ export function TeeTimeManager({ tripId }: { tripId: string }) {
     setScrambleTeams(data.scramble_teams || []);
     setKgbFoursomes(data.kgb_foursomes || []);
   }, [tripId]);
+
+  // When dayNumber prop is provided, auto-select that day and load groups
+  useEffect(() => {
+    if (dayNumber === undefined || eventDays.length === 0) return;
+    const eventDay = eventDays.find((ed) => ed.day_number === dayNumber);
+    const day: Day = {
+      number: dayNumber,
+      label: `Day ${dayNumber}`,
+      sublabel: eventDay?.name || "",
+    };
+    setSelectedDay(day);
+    setView("groups");
+    setLoading(true);
+    fetchGroups(dayNumber).then(() => setLoading(false));
+  }, [dayNumber, eventDays, fetchGroups]);
 
   // ── Helpers ──
 
@@ -453,26 +468,30 @@ export function TeeTimeManager({ tripId }: { tripId: string }) {
 
     return (
       <div>
-        <button
-          onClick={() => {
-            setView("days");
-            setSelectedDay(null);
-            fetchDayCounts();
-          }}
-          className="flex items-center gap-1 text-green-700 text-sm font-medium mb-4"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Back
-        </button>
+        {!dayNumber && (
+          <>
+            <button
+              onClick={() => {
+                setView("days");
+                setSelectedDay(null);
+                fetchDayCounts();
+              }}
+              className="flex items-center gap-1 text-green-700 text-sm font-medium mb-4"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back
+            </button>
 
-        <h2 className="text-lg font-bold text-gray-900 mb-1">
-          {selectedDay.label} Tee Times
-        </h2>
-        <p className="text-sm text-gray-500 mb-4">
-          {selectedDay.sublabel}
-        </p>
+            <h2 className="text-lg font-bold text-gray-900 mb-1">
+              {selectedDay.label} Tee Times
+            </h2>
+            <p className="text-sm text-gray-500 mb-4">
+              {selectedDay.sublabel}
+            </p>
+          </>
+        )}
 
         {/* Unassigned banner — teams for scramble days, players for other days */}
         {isScrambleDay && unassignedTeams.length > 0 && (
@@ -548,6 +567,14 @@ export function TeeTimeManager({ tripId }: { tripId: string }) {
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {isKgbDay && !isScrambleDay && kgbFoursomes.length === 0 && groups.length === 0 && (
+          <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-4 text-center">
+            <p className="text-sm text-gray-500">
+              No foursomes yet. Create pairings in Teams & Pairings first.
+            </p>
           </div>
         )}
 
@@ -835,14 +862,16 @@ export function TeeTimeManager({ tripId }: { tripId: string }) {
           })}
         </div>
 
-        {/* New Group Button */}
-        <button
-          onClick={createGroup}
-          disabled={saving === "new-group"}
-          className="w-full mt-3 py-3 border-2 border-dashed border-gray-300 rounded-xl text-sm font-medium text-gray-500 active:bg-gray-50 disabled:opacity-50"
-        >
-          {saving === "new-group" ? "Creating..." : "+ New Tee Time"}
-        </button>
+        {/* New Group Button — hidden on KGB days where groups are created via foursome assignment */}
+        {!(isKgbDay && !isScrambleDay) && (
+          <button
+            onClick={createGroup}
+            disabled={saving === "new-group"}
+            className="w-full mt-3 py-3 border-2 border-dashed border-gray-300 rounded-xl text-sm font-medium text-gray-500 active:bg-gray-50 disabled:opacity-50"
+          >
+            {saving === "new-group" ? "Creating..." : "+ New Tee Time"}
+          </button>
+        )}
 
         <ConfirmModal
           open={!!confirmModal}

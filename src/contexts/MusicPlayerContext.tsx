@@ -255,12 +255,43 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
     [startPlayTimer]
   );
 
+  // Resume: just unpause the current audio element (no src reload)
+  const resume = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.play().then(() => {
+      setIsPlaying(true);
+      const song = songsRef.current[currentIndexRef.current];
+      if (song) startPlayTimer(song.id);
+    }).catch(() => {
+      // If resume fails (e.g. iOS audio session interrupted), reload and retry
+      const song = songsRef.current[currentIndexRef.current];
+      if (song && audio) {
+        const pos = audio.currentTime;
+        audio.src = song.mp3_url;
+        audio.load();
+        const onCanPlay = () => {
+          if (pos > 0) audio.currentTime = pos;
+          audio.play().catch(() => {});
+          audio.removeEventListener("canplay", onCanPlay);
+        };
+        audio.addEventListener("canplay", onCanPlay);
+      }
+    });
+  }, [startPlayTimer]);
+
   const play = useCallback(
     (index?: number) => {
       if (songsRef.current.length === 0) return;
-      playIndex(index ?? currentIndexRef.current);
+      const targetIdx = index ?? currentIndexRef.current;
+      // If resuming the same song that's already loaded, just unpause
+      if (targetIdx === currentIndexRef.current && audioRef.current?.src) {
+        resume();
+        return;
+      }
+      playIndex(targetIdx);
     },
-    [playIndex]
+    [playIndex, resume]
   );
 
   const pause = useCallback(() => {

@@ -18,6 +18,15 @@ interface ParticipantOwner {
   avatar_url: string | null;
 }
 
+interface OwnershipRecord {
+  id: string;
+  owner_id: string;
+  share_pct: number;
+  amount_paid: number;
+  is_buyback: boolean;
+  owner: ParticipantOwner | null;
+}
+
 interface CalcuttaParticipant {
   id: string;
   user_id: string;
@@ -27,6 +36,7 @@ interface CalcuttaParticipant {
   owner_id: string | null;
   user: ParticipantUser | null;
   owner: ParticipantOwner | null;
+  ownerships: OwnershipRecord[];
 }
 
 interface LinkedContest {
@@ -62,7 +72,7 @@ interface EventUser {
   avatar_url: string | null;
 }
 
-type Tab = "order" | "prizes" | "auction";
+type Tab = "order" | "auction" | "summary";
 
 export function CalcuttaManager({ tripId }: { tripId: string }) {
   const [contestId, setContestId] = useState<string | null>(null);
@@ -88,6 +98,13 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
   // Auction state
   const [bidAmount, setBidAmount] = useState("");
   const [bidOwnerId, setBidOwnerId] = useState("");
+  const [bidBuyback, setBidBuyback] = useState(false);
+
+  // Summary state
+  const [paidBuyers, setPaidBuyers] = useState<Set<string>>(new Set());
+  const [prizesOpen, setPrizesOpen] = useState(false);
+  const [summarySort, setSummarySort] = useState<"amount" | "name">("name");
+  const [expandedBuyers, setExpandedBuyers] = useState<Set<string>>(new Set());
 
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
@@ -123,6 +140,7 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
     setActiveOrder(data.active_order);
     setAllUsers(data.allUsers || []);
     setTripContests(data.tripContests || []);
+    setPaidBuyers(new Set(data.paidBuyers || []));
   }, []);
 
   useEffect(() => {
@@ -258,6 +276,7 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
         participant_id: current.id,
         bid_amount: amount,
         owner_id: bidOwnerId || null,
+        buyback: bidBuyback,
       }),
     });
 
@@ -273,6 +292,7 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
 
     setBidAmount("");
     setBidOwnerId("");
+    setBidBuyback(false);
     await fetchData(contestId);
     setSaving(false);
   }
@@ -307,6 +327,48 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
     setSaving(false);
   }
 
+  // Toggle buyer paid status
+  async function handleTogglePaid(userId: string) {
+    if (!contestId) return;
+    // Optimistic update
+    setPaidBuyers((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+    await fetch("/api/admin/calcutta", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "toggle_paid", contest_id: contestId, user_id: userId }),
+    });
+  }
+
+  // Toggle buyback after the fact
+  async function handleBuyback(participantId: string) {
+    if (!contestId) return;
+    setSaving(true);
+    await fetch("/api/admin/calcutta", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "buyback", participant_id: participantId }),
+    });
+    await fetchData(contestId);
+    setSaving(false);
+  }
+
+  async function handleUndoBuyback(participantId: string) {
+    if (!contestId) return;
+    setSaving(true);
+    await fetch("/api/admin/calcutta", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "undo_buyback", participant_id: participantId }),
+    });
+    await fetchData(contestId);
+    setSaving(false);
+  }
+
   // Navigate to specific participant
   async function handleGoTo(order: number) {
     const p = participants.find((pp) => pp.auction_order === order);
@@ -315,9 +377,11 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
     if (p.bid_amount != null) {
       setBidAmount(String(p.bid_amount));
       setBidOwnerId(p.owner_id || "");
+      setBidBuyback(p.ownerships?.some((o) => o.is_buyback) || false);
     } else {
       setBidAmount("");
       setBidOwnerId("");
+      setBidBuyback(false);
     }
   }
 
@@ -348,9 +412,122 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
         <div className="bg-red-50 text-red-700 text-sm px-3 py-2 rounded-lg">{error}</div>
       )}
 
+      {/* Prize Breakdown accordion */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden">
+        <button
+          onClick={() => setPrizesOpen(!prizesOpen)}
+          className="flex items-center justify-between w-full px-4 py-3 bg-gray-50 text-left"
+        >
+          <span className="text-sm font-semibold text-gray-700">
+            Prize Breakdown
+            {prizes.length > 0 && (
+              <span className="ml-2 text-xs text-gray-400 font-normal">
+                {prizes.length} prize{prizes.length !== 1 ? "s" : ""} · {totalPercentage.toFixed(0)}%
+              </span>
+            )}
+          </span>
+          <svg
+            className={`w-4 h-4 text-gray-400 transition-transform ${prizesOpen ? "rotate-180" : ""}`}
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {prizesOpen && (
+          <div className="px-4 py-3 space-y-2 border-t border-gray-200">
+            {prizes.length > 0 && (
+              <div className="space-y-1.5">
+                {prizes.map((prize) => {
+                  const baseName = prize.linked_contest?.name || prize.prize_name || "Unknown";
+                  const displayName = prize.place === 1
+                    ? `${baseName} Champion`
+                    : prize.place === 2
+                    ? `${baseName} Runner-Up`
+                    : `${baseName} ${ordinal(prize.place)} Place`;
+                  const perPlayerPct = prize.per_player ? prize.percentage / prize.player_count : null;
+                  return (
+                    <div key={prize.id} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{displayName}</p>
+                        {prize.per_player && perPlayerPct != null && (
+                          <p className="text-xs text-gray-400">Split across {prize.player_count} players</p>
+                        )}
+                      </div>
+                      <span className="text-sm font-bold text-purple-700 flex-shrink-0">{prize.percentage}%</span>
+                      {totalPool > 0 && (
+                        <span className="text-xs text-gray-400 flex-shrink-0 w-16 text-right">
+                          ${((totalPool * prize.percentage) / 100).toFixed(0)}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => {
+                          setEditingPrizeId(prize.id);
+                          setPrizeLinkedContestId(prize.linked_contest_id || "");
+                          setPrizePlace(prize.place);
+                          setPrizePercentage(String(prize.percentage));
+                          setPrizePerPlayer(prize.per_player);
+                          setPrizePlayerCount(String(prize.player_count));
+                          setPrizeDrawerOpen(true);
+                        }}
+                        className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() =>
+                          setConfirmModal({
+                            title: "Delete Prize",
+                            message: `Delete "${prize.prize_name}" from the prize breakdown?`,
+                            onConfirm: () => handleDeletePrize(prize.id),
+                          })
+                        }
+                        className="text-gray-300 hover:text-red-500 flex-shrink-0"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  );
+                })}
+
+                <div className={`flex items-center justify-between px-3 py-2 rounded-xl ${
+                  Math.abs(totalPercentage - 100) < 0.01 ? "bg-green-50" : "bg-yellow-50"
+                }`}>
+                  <span className="text-sm font-medium text-gray-700">Total</span>
+                  <span className={`text-sm font-bold ${
+                    Math.abs(totalPercentage - 100) < 0.01 ? "text-green-700" : "text-yellow-700"
+                  }`}>
+                    {totalPercentage.toFixed(1)}%
+                    {Math.abs(totalPercentage - 100) >= 0.01 && " (should be 100%)"}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => {
+                setEditingPrizeId(null);
+                setPrizeLinkedContestId("");
+                setPrizePlace(1);
+                setPrizePercentage("");
+                setPrizePerPlayer(false);
+                setPrizePlayerCount("4");
+                setPrizeDrawerOpen(true);
+              }}
+              className="w-full py-2.5 bg-purple-600 text-white text-sm font-semibold rounded-xl hover:bg-purple-700 transition-colors"
+            >
+              Add Prize
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Tab bar */}
       <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-        {(["order", "prizes", "auction"] as Tab[]).map((t) => (
+        {(["order", "auction", "summary"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -360,7 +537,7 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            {t === "order" ? "Auction Order" : t === "prizes" ? "Prize Breakdown" : "Live Auction"}
+            {t === "order" ? "Auction Order" : t === "auction" ? "Live Auction" : "Summary"}
           </button>
         ))}
       </div>
@@ -531,104 +708,6 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
         </div>
       )}
 
-      {/* PRIZES TAB */}
-      {tab === "prizes" && (
-        <div className="space-y-3">
-          {prizes.length > 0 && (
-            <div className="space-y-1.5">
-              {prizes.map((prize) => {
-                const baseName = prize.linked_contest?.name || prize.prize_name || "Unknown";
-                const displayName = prize.place === 1
-                  ? `${baseName} Champion`
-                  : prize.place === 2
-                  ? `${baseName} Runner-Up`
-                  : `${baseName} ${ordinal(prize.place)} Place`;
-                const perPlayerPct = prize.per_player ? prize.percentage / prize.player_count : null;
-                return (
-                <div key={prize.id} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">
-                      {displayName}
-                    </p>
-                    {prize.per_player && perPlayerPct != null && (
-                      <p className="text-xs text-gray-400">
-                        Split across {prize.player_count} players
-                      </p>
-                    )}
-                  </div>
-                  <span className="text-sm font-bold text-purple-700 flex-shrink-0">
-                    {prize.percentage}%
-                  </span>
-                  {totalPool > 0 && (
-                    <span className="text-xs text-gray-400 flex-shrink-0 w-16 text-right">
-                      ${((totalPool * prize.percentage) / 100).toFixed(0)}
-                    </span>
-                  )}
-                  <button
-                    onClick={() => {
-                      setEditingPrizeId(prize.id);
-                      setPrizeLinkedContestId(prize.linked_contest_id || "");
-                      setPrizePlace(prize.place);
-                      setPrizePercentage(String(prize.percentage));
-                      setPrizePerPlayer(prize.per_player);
-                      setPrizePlayerCount(String(prize.player_count));
-                      setPrizeDrawerOpen(true);
-                    }}
-                    className="text-gray-400 hover:text-gray-600 flex-shrink-0"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() =>
-                      setConfirmModal({
-                        title: "Delete Prize",
-                        message: `Delete "${prize.prize_name}" from the prize breakdown?`,
-                        onConfirm: () => handleDeletePrize(prize.id),
-                      })
-                    }
-                    className="text-gray-300 hover:text-red-500 flex-shrink-0"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                );
-              })}
-
-              <div className={`flex items-center justify-between px-3 py-2 rounded-xl ${
-                Math.abs(totalPercentage - 100) < 0.01 ? "bg-green-50" : "bg-yellow-50"
-              }`}>
-                <span className="text-sm font-medium text-gray-700">Total</span>
-                <span className={`text-sm font-bold ${
-                  Math.abs(totalPercentage - 100) < 0.01 ? "text-green-700" : "text-yellow-700"
-                }`}>
-                  {totalPercentage.toFixed(1)}%
-                  {Math.abs(totalPercentage - 100) >= 0.01 && " (should be 100%)"}
-                </span>
-              </div>
-            </div>
-          )}
-
-          <button
-            onClick={() => {
-              setEditingPrizeId(null);
-              setPrizeLinkedContestId("");
-              setPrizePlace(1);
-              setPrizePercentage("");
-              setPrizePerPlayer(false);
-              setPrizePlayerCount("4");
-              setPrizeDrawerOpen(true);
-            }}
-            className="w-full py-2.5 bg-purple-600 text-white text-sm font-semibold rounded-xl hover:bg-purple-700 transition-colors"
-          >
-            Add Prize
-          </button>
-        </div>
-      )}
-
       {/* AUCTION TAB */}
       {tab === "auction" && (
         <div className="space-y-4">
@@ -708,6 +787,21 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
                 </div>
               </div>
 
+              {/* Buyback checkbox — only show when buyer is not the player */}
+              {bidOwnerId && bidOwnerId !== current.user_id && (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={bidBuyback}
+                    onChange={(e) => setBidBuyback(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    {current.user?.display_name || "Player"} buys 50%
+                  </span>
+                </label>
+              )}
+
               <button
                 onClick={handleRecordBid}
                 disabled={saving || !bidAmount || !bidOwnerId}
@@ -740,47 +834,83 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">All Participants</p>
             {participants.map((p) => {
               const isActive = p.auction_order === activeOrder;
+              const isSold = !!p.sold_at;
+              const hasBuyback = p.ownerships?.some((o) => o.is_buyback);
+              const canBuyback = isSold && !hasBuyback && p.owner_id !== p.user_id;
               return (
-                <button
-                  key={p.id}
-                  onClick={() => handleGoTo(p.auction_order!)}
-                  className={`flex items-center gap-2 w-full text-left px-3 py-2 rounded-xl transition-colors ${
-                    isActive
-                      ? "bg-purple-100 border border-purple-300"
-                      : p.sold_at
-                      ? "bg-green-50"
-                      : "bg-gray-50 hover:bg-gray-100"
-                  }`}
-                >
-                  <span className="text-xs font-bold text-gray-400 w-5">
-                    {p.auction_order}
-                  </span>
-                  {p.user?.avatar_url ? (
-                    <img src={p.user.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
-                  ) : (
-                    <span className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 text-[10px] font-bold">
-                      {(p.user?.display_name || "?")[0].toUpperCase()}
+                <div key={p.id} className="space-y-0.5">
+                  <button
+                    onClick={() => handleGoTo(p.auction_order!)}
+                    className={`flex items-center gap-2 w-full text-left px-3 py-2 rounded-xl transition-colors ${
+                      isActive
+                        ? "bg-purple-100 border border-purple-300"
+                        : isSold
+                        ? "bg-green-50"
+                        : "bg-gray-50 hover:bg-gray-100"
+                    }`}
+                  >
+                    <span className="text-xs font-bold text-gray-400 w-5">
+                      {p.auction_order}
                     </span>
-                  )}
-                  <span className="text-sm text-gray-900 flex-1 truncate">
-                    {p.user?.display_name}
-                  </span>
-                  {p.sold_at && (
-                    <>
+                    {p.user?.avatar_url ? (
+                      <img src={p.user.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
+                    ) : (
+                      <span className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 text-[10px] font-bold">
+                        {(p.user?.display_name || "?")[0].toUpperCase()}
+                      </span>
+                    )}
+                    <span className="text-sm text-gray-900 flex-1 truncate">
+                      {p.user?.display_name}
+                    </span>
+                    {isSold && (
                       <span className="text-xs text-green-700 font-medium">
                         ${Number(p.bid_amount).toFixed(0)}
                       </span>
-                      <span className="text-xs text-gray-400">
-                        {p.owner?.display_name}
+                    )}
+                    {isActive && !isSold && (
+                      <span className="text-xs font-medium text-purple-700 bg-purple-200 px-1.5 py-0.5 rounded">
+                        LIVE
                       </span>
-                    </>
+                    )}
+                  </button>
+                  {/* Ownership details + buyback toggle */}
+                  {isSold && (
+                    <div className="ml-8 pl-3 border-l-2 border-gray-200 space-y-0.5">
+                      {p.ownerships && p.ownerships.length > 0 && p.ownerships.map((o) => (
+                        <div key={o.id} className="flex items-center gap-2 text-xs text-gray-500">
+                          <span className="font-medium">{o.owner?.display_name || "Unknown"}</span>
+                          <span className="text-gray-300">·</span>
+                          <span>{o.share_pct}%</span>
+                          <span className="text-gray-300">·</span>
+                          <span>${Number(o.amount_paid).toFixed(0)}</span>
+                          {o.is_buyback && (
+                            <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1 py-0.5 rounded">
+                              BUYBACK
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                      {canBuyback && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleBuyback(p.id); }}
+                          disabled={saving}
+                          className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                        >
+                          + {p.user?.display_name} buys 50%
+                        </button>
+                      )}
+                      {hasBuyback && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleUndoBuyback(p.id); }}
+                          disabled={saving}
+                          className="text-[11px] font-semibold text-red-500 hover:text-red-700 disabled:opacity-50"
+                        >
+                          Remove buyback
+                        </button>
+                      )}
+                    </div>
                   )}
-                  {isActive && !p.sold_at && (
-                    <span className="text-xs font-medium text-purple-700 bg-purple-200 px-1.5 py-0.5 rounded">
-                      LIVE
-                    </span>
-                  )}
-                </button>
+                </div>
               );
             })}
           </div>
@@ -815,6 +945,172 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
           </div>
         </div>
       )}
+
+      {/* SUMMARY TAB */}
+      {tab === "summary" && (() => {
+        // Aggregate by buyer: total loozers bought, total spent, paid status, owned loozers
+        interface OwnedLoozer { name: string; amount: number; sharePct: number; isBuyback: boolean }
+        const buyerMap = new Map<string, { userId: string; displayName: string; avatarUrl: string | null; count: number; totalSpent: number; loozers: OwnedLoozer[] }>();
+        for (const p of participants) {
+          if (!p.sold_at) continue;
+          const owners = p.ownerships && p.ownerships.length > 0
+            ? p.ownerships
+            : p.owner_id
+            ? [{ owner_id: p.owner_id, amount_paid: Number(p.bid_amount) || 0, share_pct: 100, is_buyback: false, owner: p.owner }]
+            : [];
+          for (const o of owners) {
+            const loozer: OwnedLoozer = {
+              name: p.user?.display_name || "Unknown",
+              amount: Number(o.amount_paid) || 0,
+              sharePct: Number((o as { share_pct?: number }).share_pct) || 100,
+              isBuyback: !!(o as { is_buyback?: boolean }).is_buyback,
+            };
+            const existing = buyerMap.get(o.owner_id);
+            if (existing) {
+              existing.count++;
+              existing.totalSpent += loozer.amount;
+              existing.loozers.push(loozer);
+            } else {
+              buyerMap.set(o.owner_id, {
+                userId: o.owner_id,
+                displayName: o.owner?.display_name || "Unknown",
+                avatarUrl: o.owner?.avatar_url || null,
+                count: 1,
+                totalSpent: loozer.amount,
+                loozers: [loozer],
+              });
+            }
+          }
+        }
+        const buyers = Array.from(buyerMap.values()).sort((a, b) =>
+          summarySort === "name"
+            ? a.displayName.localeCompare(b.displayName)
+            : b.totalSpent - a.totalSpent
+        );
+        const paidCount = buyers.filter((b) => paidBuyers.has(b.userId)).length;
+
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 bg-purple-50 rounded-xl px-3 py-2.5">
+              <div className="flex-1">
+                <p className="text-xs text-purple-500 uppercase font-semibold">Pool</p>
+                <p className="text-lg font-bold text-purple-900">${totalPool.toFixed(0)}</p>
+              </div>
+              <div className="flex-1 text-center">
+                <p className="text-xs text-purple-500 uppercase font-semibold">Buyers</p>
+                <p className="text-lg font-bold text-purple-900">{buyers.length}</p>
+              </div>
+              <div className="flex-1 text-right">
+                <p className="text-xs text-purple-500 uppercase font-semibold">Paid</p>
+                <p className="text-lg font-bold text-purple-900">{paidCount}/{buyers.length}</p>
+              </div>
+            </div>
+
+            {buyers.length > 0 && (
+              <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+                <button
+                  onClick={() => setSummarySort("amount")}
+                  className={`flex-1 text-xs font-medium py-1.5 rounded-md transition-colors ${
+                    summarySort === "amount" ? "bg-white text-purple-700 shadow-sm" : "text-gray-500"
+                  }`}
+                >
+                  By Amount
+                </button>
+                <button
+                  onClick={() => setSummarySort("name")}
+                  className={`flex-1 text-xs font-medium py-1.5 rounded-md transition-colors ${
+                    summarySort === "name" ? "bg-white text-purple-700 shadow-sm" : "text-gray-500"
+                  }`}
+                >
+                  By Name
+                </button>
+              </div>
+            )}
+
+            {buyers.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">No sales yet.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {buyers.map((b) => {
+                  const isPaid = paidBuyers.has(b.userId);
+                  const isExpanded = expandedBuyers.has(b.userId);
+                  return (
+                    <div key={b.userId} className={`rounded-xl overflow-hidden ${isPaid ? "bg-green-50" : "bg-gray-50"}`}>
+                      <div className="flex items-center gap-3 px-3 py-2.5">
+                        <button
+                          onClick={() => setExpandedBuyers((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(b.userId)) next.delete(b.userId);
+                            else next.add(b.userId);
+                            return next;
+                          })}
+                          className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                        >
+                          {b.avatarUrl ? (
+                            <img src={b.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                          ) : (
+                            <span className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 text-sm font-bold flex-shrink-0">
+                              {b.displayName[0].toUpperCase()}
+                            </span>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{b.displayName}</p>
+                            <p className="text-xs text-gray-400">
+                              {b.count} Loozer{b.count !== 1 ? "s" : ""}
+                            </p>
+                          </div>
+                          <svg
+                            className={`w-3.5 h-3.5 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? "rotate-180" : ""}`}
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        <span className="text-sm font-bold text-gray-900 flex-shrink-0">
+                          ${b.totalSpent.toFixed(0)}
+                        </span>
+                        <button
+                          onClick={() => handleTogglePaid(b.userId)}
+                          className={`flex-shrink-0 w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-colors ${
+                            isPaid
+                              ? "bg-green-600 border-green-600 text-white"
+                              : "bg-white border-gray-300 hover:border-gray-400"
+                          }`}
+                        >
+                          {isPaid && (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                      {isExpanded && (
+                        <div className="px-3 pb-2.5 flex flex-wrap gap-1.5">
+                          {b.loozers.map((l, i) => (
+                            <span
+                              key={i}
+                              className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
+                                l.isBuyback
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-purple-100 text-purple-700"
+                              }`}
+                            >
+                              {l.name}
+                              {l.sharePct < 100 && (
+                                <span className="opacity-60">{l.sharePct}%</span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <BottomDrawer
         open={prizeDrawerOpen}

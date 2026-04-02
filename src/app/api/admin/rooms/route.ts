@@ -36,7 +36,7 @@ export async function GET(request: Request) {
   if (facilityId) {
     const { data: rooms, error } = await adminClient
       .from("rooms")
-      .select("id, room_number, facility_id, smoking, showers, bed_type")
+      .select("id, room_number, facility_id, smoking, showers, bed_type, handicapped, pet_friendly")
       .eq("facility_id", facilityId)
       .order("room_number");
 
@@ -77,7 +77,7 @@ export async function GET(request: Request) {
     var roomsResult = await adminClient
       .from("rooms")
       .select(
-        "id, room_number, facility_id, smoking, showers, bed_type, room_assignments!left(id, user_id, trip_id, user:users(id, display_name, full_name, avatar_url))"
+        "id, room_number, facility_id, smoking, showers, bed_type, handicapped, pet_friendly, room_assignments!left(id, user_id, trip_id, user:users(id, display_name, full_name, avatar_url))"
       )
       .in("facility_id", Array.from(linkedFacilityIds))
       .order("room_number");
@@ -121,7 +121,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { room_number, facility_id, smoking, showers, bed_type } =
+    const { room_number, facility_id, smoking, showers, bed_type, handicapped, pet_friendly } =
       await request.json();
 
     if (!facility_id || !room_number) {
@@ -141,6 +141,8 @@ export async function POST(request: Request) {
         smoking: smoking ?? false,
         showers: showers ?? 1,
         bed_type: bed_type || "Double",
+        handicapped: handicapped ?? false,
+        pet_friendly: pet_friendly ?? false,
       })
       .select()
       .single();
@@ -184,7 +186,7 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const { id, smoking, showers, bed_type } = await request.json();
+    const { id, smoking, showers, bed_type, handicapped, pet_friendly } = await request.json();
 
     if (!id) {
       return NextResponse.json(
@@ -201,6 +203,8 @@ export async function PUT(request: Request) {
         smoking: smoking ?? false,
         showers: showers ?? 1,
         bed_type: bed_type || "Double",
+        handicapped: handicapped ?? false,
+        pet_friendly: pet_friendly ?? false,
       })
       .eq("id", id);
 

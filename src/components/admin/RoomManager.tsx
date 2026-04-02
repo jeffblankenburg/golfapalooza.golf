@@ -11,6 +11,8 @@ interface Room {
   smoking: boolean;
   showers: number;
   bed_type: string;
+  handicapped: boolean;
+  pet_friendly: boolean;
   room_assignments: {
     id: string;
     user_id: string;
@@ -308,9 +310,15 @@ export function RoomManager({ tripId: propTripId }: { tripId?: string } = {}) {
                           <div className="text-xs text-gray-400 italic">Empty</div>
                         )}
                       </div>
-                      <div className="text-xs text-gray-400 mr-2">
-                        {room.bed_type}
-                        {room.smoking ? " · Smoking" : ""}
+                      <div className="text-xs text-gray-400 mr-2 flex items-center gap-1">
+                        {(room.smoking || room.handicapped || room.pet_friendly) && (
+                          <span className="flex items-center gap-0.5 mr-1">
+                            {room.smoking && <span title="Smoking">🚬</span>}
+                            {room.handicapped && <span title="Handicap Accessible">♿</span>}
+                            {room.pet_friendly && <span title="Pet Friendly">🐾</span>}
+                          </span>
+                        )}
+                        <span>{room.bed_type}</span>
                       </div>
                       <svg className="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -330,7 +338,7 @@ export function RoomManager({ tripId: propTripId }: { tripId?: string } = {}) {
         title={selectedRoom ? `Room ${selectedRoom.room_number}` : ""}
         subtitle={
           selectedRoom
-            ? `${facilities.find((f) => f.id === selectedRoom.facility_id)?.name || ""} · ${selectedRoom.bed_type}${selectedRoom.smoking ? " · Smoking" : ""} · ${assignedToSelected} assigned`
+            ? `${facilities.find((f) => f.id === selectedRoom.facility_id)?.name || ""} · ${selectedRoom.bed_type}${selectedRoom.smoking ? " 🚬" : ""}${selectedRoom.handicapped ? " ♿" : ""}${selectedRoom.pet_friendly ? " 🐾" : ""} · ${assignedToSelected} assigned`
             : undefined
         }
       >

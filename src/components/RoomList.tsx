@@ -13,6 +13,8 @@ interface Room {
   smoking: boolean;
   showers: number;
   bed_type: string;
+  handicapped: boolean;
+  pet_friendly: boolean;
   room_assignments: {
     user_id: string;
     user: Occupant | Occupant[] | null;
@@ -124,9 +126,15 @@ export function RoomList({
               const occupants = getOccupants(room);
               return (
                 <div key={room.id} className="flex items-center gap-3 px-4 py-3">
-                  <span className="w-10 text-sm font-semibold text-gray-500 shrink-0 self-start pt-1.5">
-                    {room.room_number}
-                  </span>
+                  <div className="w-10 shrink-0 self-start pt-1.5">
+                    <span className="text-sm font-semibold text-gray-500">{room.room_number}</span>
+                    {(room.handicapped || room.pet_friendly) && (
+                      <div className="flex gap-0.5 mt-0.5">
+                        {room.handicapped && <span className="text-[10px]" title="Handicap Accessible">♿</span>}
+                        {room.pet_friendly && <span className="text-[10px]" title="Pet Friendly">🐾</span>}
+                      </div>
+                    )}
+                  </div>
                   {occupants.length > 0 ? (
                     <div className="flex-1 space-y-2">
                       {occupants.map((occupant) => (

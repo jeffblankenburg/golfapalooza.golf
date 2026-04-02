@@ -65,7 +65,7 @@ export default async function RoomsPage() {
     supabase
       .from("rooms")
       .select(
-        "id, room_number, facility_id, smoking, showers, bed_type, room_assignments(user_id, trip_id, user:users(id, display_name, avatar_url))"
+        "id, room_number, facility_id, smoking, showers, bed_type, handicapped, pet_friendly, room_assignments(user_id, trip_id, user:users(id, display_name, avatar_url))"
       )
       .in("facility_id", linkedFacilityIds)
       .order("room_number"),

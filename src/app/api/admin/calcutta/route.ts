@@ -37,6 +37,15 @@ export async function GET(request: Request) {
       .eq("contest_id", contestId)
       .order("auction_order", { nullsFirst: false });
 
+    // Fetch ownership records for all participants
+    const participantIds = (participants || []).map((p) => p.id);
+    const { data: ownershipRows } = participantIds.length > 0
+      ? await adminClient
+          .from("calcutta_ownership")
+          .select("id, participant_id, owner_id, share_pct, amount_paid, is_buyback, owner:users!calcutta_ownership_owner_id_fkey(id, display_name, avatar_url)")
+          .in("participant_id", participantIds)
+      : { data: [] };
+
     if (partError) {
       return NextResponse.json({ error: partError.message }, { status: 500 });
     }
@@ -97,10 +106,29 @@ export async function GET(request: Request) {
       };
     });
 
+    // Build ownership map by participant_id
+    const ownershipMap = new Map<string, typeof ownershipRows>();
+    for (const row of ownershipRows || []) {
+      const list = ownershipMap.get(row.participant_id) || [];
+      list.push(row);
+      ownershipMap.set(row.participant_id, list);
+    }
+
     // Normalize participants
     const normalizedParticipants = sorted.map((p) => {
       const user = Array.isArray(p.user) ? p.user[0] : p.user;
       const owner = Array.isArray(p.owner) ? p.owner[0] : p.owner;
+      const ownerships = (ownershipMap.get(p.id) || []).map((o) => {
+        const oUser = Array.isArray(o.owner) ? o.owner[0] : o.owner;
+        return {
+          id: o.id,
+          owner_id: o.owner_id,
+          share_pct: o.share_pct,
+          amount_paid: o.amount_paid,
+          is_buyback: o.is_buyback,
+          owner: oUser ? { id: oUser.id, display_name: oUser.display_name, avatar_url: oUser.avatar_url } : null,
+        };
+      });
       return {
         id: p.id,
         user_id: p.user_id,
@@ -120,6 +148,7 @@ export async function GET(request: Request) {
           display_name: owner.display_name,
           avatar_url: owner.avatar_url,
         } : null,
+        ownerships,
       };
     });
 
@@ -140,12 +169,20 @@ export async function GET(request: Request) {
       };
     });
 
+    // Fetch buyer payment status
+    const { data: paidRows } = await adminClient
+      .from("calcutta_buyer_paid")
+      .select("user_id")
+      .eq("contest_id", contestId);
+    const paidBuyers = new Set((paidRows || []).map((r) => r.user_id));
+
     return NextResponse.json({
       participants: normalizedParticipants,
       prizes: normalizedPrizes,
       active_order: contest.calcutta_active_order,
       allUsers,
       tripContests: tripContests || [],
+      paidBuyers: Array.from(paidBuyers),
     });
   } catch (error) {
     console.error("Get calcutta error:", error);
@@ -184,10 +221,17 @@ export async function PUT(request: Request) {
 
     // Action: record bid
     if (body.action === "bid") {
-      const { participant_id, bid_amount, owner_id } = body;
+      const { participant_id, bid_amount, owner_id, buyback } = body;
       if (!participant_id) {
         return NextResponse.json({ error: "participant_id is required" }, { status: 400 });
       }
+
+      // Get the participant's user_id for buyback
+      const { data: participant } = await adminClient
+        .from("contest_participants")
+        .select("user_id")
+        .eq("id", participant_id)
+        .single();
 
       const { error } = await adminClient
         .from("contest_participants")
@@ -201,6 +245,128 @@ export async function PUT(request: Request) {
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
+
+      // Sync ownership: clear existing and create ownership records
+      await adminClient
+        .from("calcutta_ownership")
+        .delete()
+        .eq("participant_id", participant_id);
+
+      if (owner_id && bid_amount != null) {
+        if (buyback && participant) {
+          // Split 50/50: buyer gets half, player gets half
+          const halfAmount = Number(bid_amount) / 2;
+          await adminClient
+            .from("calcutta_ownership")
+            .insert([
+              {
+                participant_id,
+                owner_id,
+                share_pct: 50,
+                amount_paid: halfAmount,
+                is_buyback: false,
+              },
+              {
+                participant_id,
+                owner_id: participant.user_id,
+                share_pct: 50,
+                amount_paid: halfAmount,
+                is_buyback: true,
+              },
+            ]);
+        } else {
+          await adminClient
+            .from("calcutta_ownership")
+            .insert({
+              participant_id,
+              owner_id,
+              share_pct: 100,
+              amount_paid: bid_amount,
+              is_buyback: false,
+            });
+        }
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
+    // Action: toggle buyback on an already-sold participant
+    if (body.action === "buyback") {
+      const { participant_id } = body;
+      if (!participant_id) {
+        return NextResponse.json({ error: "participant_id is required" }, { status: 400 });
+      }
+
+      const { data: participant } = await adminClient
+        .from("contest_participants")
+        .select("id, user_id, bid_amount, owner_id")
+        .eq("id", participant_id)
+        .single();
+
+      if (!participant || !participant.bid_amount || !participant.owner_id) {
+        return NextResponse.json({ error: "Participant must be sold first" }, { status: 400 });
+      }
+
+      const halfAmount = Number(participant.bid_amount) / 2;
+
+      await adminClient
+        .from("calcutta_ownership")
+        .delete()
+        .eq("participant_id", participant_id);
+
+      await adminClient
+        .from("calcutta_ownership")
+        .insert([
+          {
+            participant_id,
+            owner_id: participant.owner_id,
+            share_pct: 50,
+            amount_paid: halfAmount,
+            is_buyback: false,
+          },
+          {
+            participant_id,
+            owner_id: participant.user_id,
+            share_pct: 50,
+            amount_paid: halfAmount,
+            is_buyback: true,
+          },
+        ]);
+
+      return NextResponse.json({ success: true });
+    }
+
+    // Action: undo buyback (revert to single 100% owner)
+    if (body.action === "undo_buyback") {
+      const { participant_id } = body;
+      if (!participant_id) {
+        return NextResponse.json({ error: "participant_id is required" }, { status: 400 });
+      }
+
+      const { data: participant } = await adminClient
+        .from("contest_participants")
+        .select("id, bid_amount, owner_id")
+        .eq("id", participant_id)
+        .single();
+
+      if (!participant || !participant.bid_amount || !participant.owner_id) {
+        return NextResponse.json({ error: "Participant must be sold first" }, { status: 400 });
+      }
+
+      await adminClient
+        .from("calcutta_ownership")
+        .delete()
+        .eq("participant_id", participant_id);
+
+      await adminClient
+        .from("calcutta_ownership")
+        .insert({
+          participant_id,
+          owner_id: participant.owner_id,
+          share_pct: 100,
+          amount_paid: Number(participant.bid_amount),
+          is_buyback: false,
+        });
 
       return NextResponse.json({ success: true });
     }
@@ -224,11 +390,24 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: true });
     }
 
-    // Action: reset auction (clear all bids, owners, sold_at, and active_order)
+    // Action: reset auction (clear all bids, owners, sold_at, ownership, and active_order)
     if (body.action === "reset") {
       const { contest_id } = body;
       if (!contest_id) {
         return NextResponse.json({ error: "contest_id is required" }, { status: 400 });
+      }
+
+      // Clear ownership records for all participants in this contest
+      const { data: contestParticipants } = await adminClient
+        .from("contest_participants")
+        .select("id")
+        .eq("contest_id", contest_id);
+      const pIds = (contestParticipants || []).map((p) => p.id);
+      if (pIds.length > 0) {
+        await adminClient
+          .from("calcutta_ownership")
+          .delete()
+          .in("participant_id", pIds);
       }
 
       const { error: resetError } = await adminClient
@@ -267,6 +446,35 @@ export async function PUT(request: Request) {
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
+    // Action: toggle buyer paid status
+    if (body.action === "toggle_paid") {
+      const { contest_id, user_id } = body;
+      if (!contest_id || !user_id) {
+        return NextResponse.json({ error: "contest_id and user_id are required" }, { status: 400 });
+      }
+
+      // Check if already paid
+      const { data: existing } = await adminClient
+        .from("calcutta_buyer_paid")
+        .select("id")
+        .eq("contest_id", contest_id)
+        .eq("user_id", user_id)
+        .maybeSingle();
+
+      if (existing) {
+        await adminClient
+          .from("calcutta_buyer_paid")
+          .delete()
+          .eq("id", existing.id);
+      } else {
+        await adminClient
+          .from("calcutta_buyer_paid")
+          .insert({ contest_id, user_id });
       }
 
       return NextResponse.json({ success: true });

@@ -200,10 +200,37 @@ export async function GET(request: Request) {
       }
     }
 
+    // Fetch ownership records
+    const participantIds = (participants || []).map((p) => p.id);
+    const { data: ownershipRows } = participantIds.length > 0
+      ? await adminClient
+          .from("calcutta_ownership")
+          .select("id, participant_id, owner_id, share_pct, amount_paid, is_buyback, owner:users!calcutta_ownership_owner_id_fkey(id, display_name, avatar_url)")
+          .in("participant_id", participantIds)
+      : { data: [] };
+
+    const ownershipMap = new Map<string, typeof ownershipRows>();
+    for (const row of ownershipRows || []) {
+      const list = ownershipMap.get(row.participant_id) || [];
+      list.push(row);
+      ownershipMap.set(row.participant_id, list);
+    }
+
     // Normalize
     const normalizedParticipants = (participants || []).map((p) => {
       const u = Array.isArray(p.user) ? p.user[0] : p.user;
       const o = Array.isArray(p.owner) ? p.owner[0] : p.owner;
+      const ownerships = (ownershipMap.get(p.id) || []).map((ow) => {
+        const owUser = Array.isArray(ow.owner) ? ow.owner[0] : ow.owner;
+        return {
+          id: ow.id,
+          owner_id: ow.owner_id,
+          share_pct: ow.share_pct,
+          amount_paid: ow.amount_paid,
+          is_buyback: ow.is_buyback,
+          owner: owUser ? { id: owUser.id, display_name: owUser.display_name, avatar_url: owUser.avatar_url } : null,
+        };
+      });
       return {
         id: p.id,
         user_id: p.user_id,
@@ -223,6 +250,7 @@ export async function GET(request: Request) {
           display_name: o.display_name,
           avatar_url: o.avatar_url,
         } : null,
+        ownerships,
       };
     });
 

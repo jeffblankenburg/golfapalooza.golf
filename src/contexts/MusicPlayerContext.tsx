@@ -60,6 +60,27 @@ export function useMusicPlayer() {
   return ctx;
 }
 
+// localStorage helpers for persisting player state
+const STORAGE_KEY_INDEX = "golfapalooza_player_index";
+const STORAGE_KEY_SHUFFLE = "golfapalooza_player_shuffle";
+const STORAGE_KEY_PLAYING = "golfapalooza_player_playing";
+const STORAGE_KEY_TIME = "golfapalooza_player_time";
+
+function loadStoredNumber(key: string, fallback: number): number {
+  if (typeof window === "undefined") return fallback;
+  const v = localStorage.getItem(key);
+  if (v === null) return fallback;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function loadStoredBool(key: string, fallback: boolean): boolean {
+  if (typeof window === "undefined") return fallback;
+  const v = localStorage.getItem(key);
+  if (v === null) return fallback;
+  return v === "true";
+}
+
 export function MusicPlayerContextProvider({ children }: { children: ReactNode }) {
   // Dual audio elements for gapless playback
   const audioARef = useRef<HTMLAudioElement | null>(null);
@@ -70,15 +91,19 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
   const preloadedIndexRef = useRef(-1);
 
   const [songs, setSongs] = useState<Song[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(() => loadStoredNumber(STORAGE_KEY_INDEX, 0));
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(1);
-  const [isShuffled, setIsShuffled] = useState(false);
+  const [isShuffled, setIsShuffled] = useState(() => loadStoredBool(STORAGE_KEY_SHUFFLE, false));
   const [shuffleOrder, setShuffleOrder] = useState<number[]>([]);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+
+  // Whether we should auto-resume after songs load
+  const shouldAutoResumeRef = useRef(loadStoredBool(STORAGE_KEY_PLAYING, false));
+  const storedTimeRef = useRef(loadStoredNumber(STORAGE_KEY_TIME, 0));
 
   // Refs for stable access inside callbacks (avoids stale closures)
   const songsRef = useRef(songs);
@@ -233,17 +258,62 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
       setSongs(newSongs);
       songsRef.current = newSongs;
 
-      // Eagerly preload the first song so tap-to-play is instant
-      if (newSongs.length > 0 && currentIndexRef.current === 0) {
-        const active = getActive();
-        if (active && !active.currentTime) {
-          active.src = newSongs[0].mp3_url;
+      if (newSongs.length === 0) return;
+
+      // Clamp stored index to valid range
+      const storedIdx = currentIndexRef.current;
+      const idx = storedIdx >= 0 && storedIdx < newSongs.length ? storedIdx : 0;
+      if (idx !== storedIdx) {
+        setCurrentIndex(idx);
+        currentIndexRef.current = idx;
+      }
+
+      // If shuffle was persisted, regenerate shuffle order
+      if (isShuffledRef.current && shuffleOrderRef.current.length === 0) {
+        const playlist = newSongs.map((_, i) => i);
+        for (let i = playlist.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [playlist[i], playlist[j]] = [playlist[j], playlist[i]];
+        }
+        setShuffleOrder(playlist);
+        shuffleOrderRef.current = playlist;
+      }
+
+      const active = getActive();
+      if (!active) return;
+
+      // Auto-resume if we were playing before refresh
+      if (shouldAutoResumeRef.current) {
+        shouldAutoResumeRef.current = false;
+        const song = newSongs[idx];
+        if (song) {
+          active.src = song.mp3_url;
           active.volume = volumeRef.current;
           active.load();
+          const resumeTime = storedTimeRef.current;
+          const onCanPlay = () => {
+            if (resumeTime > 0) active.currentTime = resumeTime;
+            active.play().catch(() => {});
+            setIsPlaying(true);
+            setIsVisible(true);
+            startPlayTimer(song.id);
+            active.removeEventListener("canplay", onCanPlay);
+            setTimeout(preloadNext, 100);
+          };
+          active.addEventListener("canplay", onCanPlay);
+          setIsVisible(true);
+          return;
         }
       }
+
+      // Otherwise just preload the current song
+      if (!active.currentTime) {
+        active.src = newSongs[idx].mp3_url;
+        active.volume = volumeRef.current;
+        active.load();
+      }
     },
-    [getActive]
+    [getActive, preloadNext, startPlayTimer]
   );
 
   const play = useCallback(
@@ -370,6 +440,7 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
     pause();
     cancelPlayTimer();
     setIsVisible(false);
+    localStorage.setItem(STORAGE_KEY_PLAYING, "false");
   }, [pause, cancelPlayTimer]);
 
   // ── Event listeners on BOTH audio elements ─────────────────────────────
@@ -423,6 +494,29 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
     };
   }, [advanceToNext]);
 
+  // ── Persist player state to localStorage ────────────────────────────────
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_INDEX, String(currentIndex));
+  }, [currentIndex]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_SHUFFLE, String(isShuffled));
+  }, [isShuffled]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_PLAYING, String(isPlaying));
+  }, [isPlaying]);
+
+  // Persist current time periodically (every 5 seconds to avoid thrashing)
+  const lastSavedTimeRef = useRef(0);
+  useEffect(() => {
+    if (Math.abs(currentTime - lastSavedTimeRef.current) >= 5) {
+      lastSavedTimeRef.current = currentTime;
+      localStorage.setItem(STORAGE_KEY_TIME, String(currentTime));
+    }
+  }, [currentTime]);
+
   // ── Media Session API (lock screen controls) ───────────────────────────
 
   useEffect(() => {
@@ -439,6 +533,8 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
         ? [{ src: currentSong.art_url, sizes: "512x512", type: "image/jpeg" }]
         : [],
     });
+
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
 
     navigator.mediaSession.setActionHandler("play", () => play());
     navigator.mediaSession.setActionHandler("pause", () => pause());

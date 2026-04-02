@@ -16,6 +16,15 @@ interface ResultOwner {
   avatar_url: string | null;
 }
 
+interface OwnershipRecord {
+  id: string;
+  owner_id: string;
+  share_pct: number;
+  amount_paid: number;
+  is_buyback: boolean;
+  owner: ResultOwner | null;
+}
+
 interface ResultParticipant {
   id: string;
   auction_order: number;
@@ -25,6 +34,7 @@ interface ResultParticipant {
   owner_id: string | null;
   user: ResultUser | null;
   owner: ResultOwner | null;
+  ownerships?: OwnershipRecord[];
 }
 
 interface Prize {
@@ -93,15 +103,6 @@ function fake40YardDash(displayName: string): string {
   return seconds.toFixed(1);
 }
 
-function fakeWallJump(displayName: string): string {
-  let hash = 0;
-  for (let i = 0; i < displayName.length; i++) {
-    hash = ((hash << 5) - hash) + displayName.charCodeAt(i);
-    hash |= 0;
-  }
-  const inches = 14 + (Math.abs(hash) % 16);
-  return `${inches}"`;
-}
 
 export function CalcuttaResults({ contestId }: { contestId: string }) {
   const [participants, setParticipants] = useState<ResultParticipant[]>([]);
@@ -109,6 +110,10 @@ export function CalcuttaResults({ contestId }: { contestId: string }) {
   const [activeOrder, setActiveOrder] = useState<number | null>(null);
   const [spotlight, setSpotlight] = useState<SpotlightData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [resultsView, setResultsView] = useState<"auction" | "summary">("auction");
+  const [expandedBuyers, setExpandedBuyers] = useState<Set<string>>(new Set());
+  const [resultsSort, setResultsSort] = useState<"order" | "name" | "amount">("order");
+  const [summarySort, setSummarySort] = useState<"name" | "count" | "amount">("name");
 
   const fetchData = useCallback(async () => {
     try {
@@ -331,13 +336,6 @@ export function CalcuttaResults({ contestId }: { contestId: string }) {
               </p>
             </div>
 
-            {/* Standing Wall Jump */}
-            <div className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Wall Jump</p>
-              <p className="text-lg font-bold text-gray-700">
-                {current.user ? fakeWallJump(current.user.display_name) : "—"}
-              </p>
-            </div>
           </div>
 
           {/* BSPITW mini-leaderboard — horizontally scrollable */}
@@ -454,10 +452,67 @@ export function CalcuttaResults({ contestId }: { contestId: string }) {
 
       {participants.length > 0 && participants.some((p) => p.sold_at) && (
         <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-            Auction Results
-          </h2>
-          {participants.map((p) => {
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+              {resultsView === "auction" ? "Auction Results" : "Buyer Summary"}
+            </h2>
+            <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+              <button
+                onClick={() => setResultsView("auction")}
+                className={`text-xs font-medium px-2.5 py-1 rounded-md transition-colors ${
+                  resultsView === "auction" ? "bg-white text-purple-700 shadow-sm" : "text-gray-500"
+                }`}
+              >
+                Results
+              </button>
+              <button
+                onClick={() => setResultsView("summary")}
+                className={`text-xs font-medium px-2.5 py-1 rounded-md transition-colors ${
+                  resultsView === "summary" ? "bg-white text-purple-700 shadow-sm" : "text-gray-500"
+                }`}
+              >
+                Summary
+              </button>
+            </div>
+          </div>
+
+          {/* Sort controls */}
+          {resultsView === "auction" && (
+            <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+              {([["order", "#"], ["name", "Name"], ["amount", "Bid"]] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setResultsSort(key)}
+                  className={`flex-1 text-xs font-medium py-1.5 rounded-md transition-colors ${
+                    resultsSort === key ? "bg-white text-purple-700 shadow-sm" : "text-gray-500"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {resultsView === "summary" && (
+            <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+              {([["name", "Name"], ["count", "Loozers"], ["amount", "Spent"]] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setSummarySort(key)}
+                  className={`flex-1 text-xs font-medium py-1.5 rounded-md transition-colors ${
+                    summarySort === key ? "bg-white text-purple-700 shadow-sm" : "text-gray-500"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {resultsView === "auction" && [...participants].sort((a, b) => {
+            if (resultsSort === "name") return (a.user?.display_name || "").localeCompare(b.user?.display_name || "");
+            if (resultsSort === "amount") return (Number(b.bid_amount) || 0) - (Number(a.bid_amount) || 0);
+            return (a.auction_order || 999) - (b.auction_order || 999);
+          }).map((p) => {
             const isActive = p.auction_order === activeOrder;
             const isSold = !!p.sold_at;
 
@@ -484,11 +539,15 @@ export function CalcuttaResults({ contestId }: { contestId: string }) {
                   <p className="text-sm font-medium text-gray-900 truncate">
                     {p.user?.display_name || "Unknown"}
                   </p>
-                  {isSold && p.owner && (
+                  {isSold && p.ownerships && p.ownerships.length > 1 ? (
+                    <p className="text-xs text-gray-400">
+                      {p.ownerships.map((o) => `${o.owner?.display_name || "Unknown"} ${o.share_pct}%`).join(" / ")}
+                    </p>
+                  ) : isSold && p.owner ? (
                     <p className="text-xs text-gray-400">
                       Owned by {p.owner.display_name}
                     </p>
-                  )}
+                  ) : null}
                 </div>
                 {isSold ? (
                   <span className="text-sm font-bold text-green-700">
@@ -504,6 +563,110 @@ export function CalcuttaResults({ contestId }: { contestId: string }) {
               </div>
             );
           })}
+
+          {resultsView === "summary" && (() => {
+            interface OwnedLoozer { name: string; amount: number; sharePct: number; isBuyback: boolean }
+            const buyerMap = new Map<string, { userId: string; displayName: string; avatarUrl: string | null; count: number; totalSpent: number; loozers: OwnedLoozer[] }>();
+            for (const p of participants) {
+              if (!p.sold_at) continue;
+              const owners = p.ownerships && p.ownerships.length > 0
+                ? p.ownerships
+                : p.owner_id
+                ? [{ owner_id: p.owner_id, amount_paid: Number(p.bid_amount) || 0, share_pct: 100, is_buyback: false, owner: p.owner }]
+                : [];
+              for (const o of owners) {
+                const loozer: OwnedLoozer = {
+                  name: p.user?.display_name || "Unknown",
+                  amount: Number(o.amount_paid) || 0,
+                  sharePct: Number(o.share_pct) || 100,
+                  isBuyback: !!o.is_buyback,
+                };
+                const existing = buyerMap.get(o.owner_id);
+                if (existing) {
+                  existing.count++;
+                  existing.totalSpent += loozer.amount;
+                  existing.loozers.push(loozer);
+                } else {
+                  buyerMap.set(o.owner_id, {
+                    userId: o.owner_id,
+                    displayName: o.owner?.display_name || "Unknown",
+                    avatarUrl: o.owner?.avatar_url || null,
+                    count: 1,
+                    totalSpent: loozer.amount,
+                    loozers: [loozer],
+                  });
+                }
+              }
+            }
+            const buyers = Array.from(buyerMap.values()).sort((a, b) => {
+              if (summarySort === "count") return b.count - a.count || a.displayName.localeCompare(b.displayName);
+              if (summarySort === "amount") return b.totalSpent - a.totalSpent || a.displayName.localeCompare(b.displayName);
+              return a.displayName.localeCompare(b.displayName);
+            });
+
+            return (
+              <div className="space-y-1.5">
+                {buyers.map((b) => {
+                  const isExpanded = expandedBuyers.has(b.userId);
+                  return (
+                    <div key={b.userId} className="rounded-xl overflow-hidden bg-gray-50">
+                      <button
+                        onClick={() => setExpandedBuyers((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(b.userId)) next.delete(b.userId);
+                          else next.add(b.userId);
+                          return next;
+                        })}
+                        className="flex items-center gap-3 w-full text-left px-3 py-2.5"
+                      >
+                        {b.avatarUrl ? (
+                          <img src={b.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                        ) : (
+                          <span className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 text-sm font-bold flex-shrink-0">
+                            {b.displayName[0].toUpperCase()}
+                          </span>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{b.displayName}</p>
+                          <p className="text-xs text-gray-400">
+                            {b.count} Loozer{b.count !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                        <span className="text-sm font-bold text-green-700 flex-shrink-0">
+                          ${b.totalSpent.toFixed(0)}
+                        </span>
+                        <svg
+                          className={`w-3.5 h-3.5 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? "rotate-180" : ""}`}
+                          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      {isExpanded && (
+                        <div className="px-3 pb-2.5 flex flex-wrap gap-1.5">
+                          {b.loozers.map((l, i) => (
+                            <span
+                              key={i}
+                              className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${
+                                l.isBuyback
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-purple-100 text-purple-700"
+                              }`}
+                            >
+                              {l.name}
+                              {l.sharePct < 100 && (
+                                <span className="opacity-60">{l.sharePct}%</span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>

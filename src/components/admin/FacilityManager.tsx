@@ -10,6 +10,8 @@ interface Room {
   smoking: boolean;
   showers: number;
   bed_type: string;
+  handicapped: boolean;
+  pet_friendly: boolean;
 }
 
 interface Facility {
@@ -37,6 +39,8 @@ export function FacilityManager({ ref }: { ref?: Ref<{ openAdd: () => void }> })
   const [roomSmoking, setRoomSmoking] = useState(false);
   const [roomShowers, setRoomShowers] = useState(1);
   const [roomBedType, setRoomBedType] = useState("Double");
+  const [roomHandicapped, setRoomHandicapped] = useState(false);
+  const [roomPetFriendly, setRoomPetFriendly] = useState(false);
 
   // Confirm modal
   const [confirmModal, setConfirmModal] = useState<{
@@ -173,6 +177,8 @@ export function FacilityManager({ ref }: { ref?: Ref<{ openAdd: () => void }> })
     setRoomSmoking(false);
     setRoomShowers(1);
     setRoomBedType("Double");
+    setRoomHandicapped(false);
+    setRoomPetFriendly(false);
     setError("");
     setShowRoomModal(true);
   };
@@ -183,6 +189,8 @@ export function FacilityManager({ ref }: { ref?: Ref<{ openAdd: () => void }> })
     setRoomSmoking(room.smoking);
     setRoomShowers(room.showers);
     setRoomBedType(room.bed_type);
+    setRoomHandicapped(room.handicapped);
+    setRoomPetFriendly(room.pet_friendly);
     setError("");
     setShowRoomModal(true);
   };
@@ -208,6 +216,8 @@ export function FacilityManager({ ref }: { ref?: Ref<{ openAdd: () => void }> })
           smoking: roomSmoking,
           showers: roomShowers,
           bed_type: roomBedType,
+          handicapped: roomHandicapped,
+          pet_friendly: roomPetFriendly,
         }),
       });
       if (!res.ok) {
@@ -226,6 +236,8 @@ export function FacilityManager({ ref }: { ref?: Ref<{ openAdd: () => void }> })
           smoking: roomSmoking,
           showers: roomShowers,
           bed_type: roomBedType,
+          handicapped: roomHandicapped,
+          pet_friendly: roomPetFriendly,
         }),
       });
       if (!res.ok) {
@@ -393,7 +405,9 @@ export function FacilityManager({ ref }: { ref?: Ref<{ openAdd: () => void }> })
                               {room.bed_type}
                               {" · "}
                               {room.showers} shower{room.showers !== 1 ? "s" : ""}
-                              {room.smoking && " · Smoking"}
+                              {room.smoking && " 🚬"}
+                              {room.handicapped && " ♿"}
+                              {room.pet_friendly && " 🐾"}
                             </p>
                           </div>
                           <svg className="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -507,7 +521,25 @@ export function FacilityManager({ ref }: { ref?: Ref<{ openAdd: () => void }> })
                     onChange={(e) => setRoomSmoking(e.target.checked)}
                     className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                   />
-                  Smoking
+                  🚬 Smoking
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={roomHandicapped}
+                    onChange={(e) => setRoomHandicapped(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                  />
+                  ♿ Handicap Accessible
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={roomPetFriendly}
+                    onChange={(e) => setRoomPetFriendly(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                  />
+                  🐾 Pet Friendly
                 </label>
               </form>
 

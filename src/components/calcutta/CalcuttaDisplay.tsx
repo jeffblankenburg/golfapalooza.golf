@@ -16,6 +16,15 @@ interface DisplayOwner {
   avatar_url: string | null;
 }
 
+interface OwnershipRecord {
+  id: string;
+  owner_id: string;
+  share_pct: number;
+  amount_paid: number;
+  is_buyback: boolean;
+  owner: DisplayOwner | null;
+}
+
 interface DisplayParticipant {
   id: string;
   user_id: string;
@@ -25,6 +34,7 @@ interface DisplayParticipant {
   owner_id: string | null;
   user: DisplayUser | null;
   owner: DisplayOwner | null;
+  ownerships?: OwnershipRecord[];
 }
 
 interface DisplayPrize {
@@ -90,16 +100,6 @@ function fake40YardDash(displayName: string): string {
   return seconds.toFixed(1);
 }
 
-// Fake standing wall jump — replace with real data when available
-function fakeWallJump(displayName: string): string {
-  let hash = 0;
-  for (let i = 0; i < displayName.length; i++) {
-    hash = ((hash << 5) - hash) + displayName.charCodeAt(i);
-    hash |= 0;
-  }
-  const inches = 14 + (Math.abs(hash) % 16);
-  return `${inches}"`;
-}
 
 function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
@@ -199,7 +199,9 @@ export function CalcuttaDisplay({ contestId }: { contestId: string }) {
                   {isSold && (
                     <>
                       <span className="text-lg font-bold text-gray-400 truncate flex-shrink-0">
-                        {p.owner?.display_name?.slice(0, 10)}
+                        {p.ownerships && p.ownerships.length > 1
+                          ? p.ownerships.map((o) => o.owner?.display_name?.slice(0, 8)).join(" / ")
+                          : p.owner?.display_name?.slice(0, 10)}
                       </span>
                       <span className="text-lg font-bold text-green-600 flex-shrink-0">
                         ${Number(p.bid_amount).toFixed(0)}
@@ -424,15 +426,6 @@ export function CalcuttaDisplay({ contestId }: { contestId: string }) {
                     </span>
                   </div>
 
-                  {/* Standing Wall Jump */}
-                  <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-gray-500 uppercase tracking-wide">
-                      Standing Wall Jump
-                    </h3>
-                    <span className="text-4xl font-black text-gray-700 flex-shrink-0 ml-4">
-                      {current.user ? fakeWallJump(current.user.display_name) : "—"}
-                    </span>
-                  </div>
 
                   {/* Past Wins — commented out, may re-enable later
                   <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200">

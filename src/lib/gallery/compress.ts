@@ -59,11 +59,8 @@ export async function compressVideo(
     const origH = video.videoHeight;
     const duration = video.duration;
 
-    // Skip compression if already small enough — but always re-encode
-    // .mov / QuickTime files (e.g. Live Photos) to ensure browser-compatible
-    // H.264 MP4 output with proper audio
-    const isMov = file.name.toLowerCase().endsWith(".mov") || file.type === "video/quicktime";
-    if (!isMov && origH <= maxHeight && file.size < SKIP_COMPRESS_MAX_SIZE) {
+    // Skip compression if already small enough
+    if (origH <= maxHeight && file.size < SKIP_COMPRESS_MAX_SIZE) {
       cleanup();
       return { blob: file, width: origW, height: origH };
     }

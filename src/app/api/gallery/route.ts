@@ -318,10 +318,11 @@ export async function POST(request: NextRequest) {
     const pathPrefix = tripId || "shared";
     const filePath = `${pathPrefix}/${timestamp}-${effectiveUserId}.${ext}`;
 
-    // Upload main file
+    // Upload main file — set explicit content type for proper browser playback
+    const contentType = file.type || (mediaType === "video" ? "video/mp4" : "image/jpeg");
     const { data: uploadData, error: uploadError } = await client.storage
       .from("gallery-media")
-      .upload(filePath, file, { cacheControl: "31536000", upsert: false });
+      .upload(filePath, file, { cacheControl: "31536000", upsert: false, contentType });
 
     if (uploadError) {
       return NextResponse.json(

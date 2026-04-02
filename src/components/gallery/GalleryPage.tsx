@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { MediaUploader } from "./MediaUploader";
 import { MediaViewer } from "./MediaViewer";
 
@@ -50,6 +51,7 @@ export function GalleryPage({
   availableYears: number[];
 }) {
   const searchParams = useSearchParams();
+  const { isVisible: musicPlayerVisible } = useMusicPlayer();
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -437,7 +439,7 @@ export function GalleryPage({
       {/* Upload FAB — triggers native file picker directly */}
       <button
         onClick={() => fileInputRef.current?.click()}
-        className="fixed bottom-24 right-4 z-20 w-14 h-14 bg-green-600 text-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform"
+        className={`fixed right-4 z-20 w-14 h-14 bg-green-600 text-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-all ${musicPlayerVisible ? "bottom-40" : "bottom-24"}`}
       >
         <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 5v14M5 12h14" />

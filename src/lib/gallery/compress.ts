@@ -4,7 +4,7 @@
  */
 
 const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
-const SKIP_COMPRESS_MAX_SIZE = 10 * 1024 * 1024; // 10MB — skip if already small
+const SKIP_COMPRESS_MAX_SIZE = 50 * 1024 * 1024; // 50MB — skip if already reasonable
 
 interface CompressVideoOptions {
   maxHeight?: number;
@@ -45,6 +45,8 @@ export async function compressVideo(
     video.remove();
   };
 
+  let audioCtx: AudioContext | null = null;
+
   try {
     // Wait for metadata
     await new Promise<void>((resolve, reject) => {
@@ -57,8 +59,11 @@ export async function compressVideo(
     const origH = video.videoHeight;
     const duration = video.duration;
 
-    // Skip compression if already small enough
-    if (origH <= maxHeight && file.size < SKIP_COMPRESS_MAX_SIZE) {
+    // Skip compression if already small enough — but always re-encode
+    // .mov / QuickTime files (e.g. Live Photos) to ensure browser-compatible
+    // H.264 MP4 output with proper audio
+    const isMov = file.name.toLowerCase().endsWith(".mov") || file.type === "video/quicktime";
+    if (!isMov && origH <= maxHeight && file.size < SKIP_COMPRESS_MAX_SIZE) {
       cleanup();
       return { blob: file, width: origW, height: origH };
     }
@@ -79,30 +84,29 @@ export async function compressVideo(
     // Capture video stream from canvas at 30fps
     const canvasStream = canvas.captureStream(30);
 
-    // Try to capture audio
+    // Capture audio via Web Audio API — works on both Chrome and Safari,
+    // even when the video element is muted (muted only silences speakers,
+    // Web Audio still processes the audio data).
     try {
-      // Method 1: direct captureStream (Chrome)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const videoStream = (video as any).captureStream?.() || (video as any).mozCaptureStream?.();
-      if (videoStream) {
-        const audioTracks = videoStream.getAudioTracks();
-        for (const track of audioTracks) {
-          canvasStream.addTrack(track);
-        }
+      audioCtx = new AudioContext();
+      const source = audioCtx.createMediaElementSource(video);
+      const dest = audioCtx.createMediaStreamDestination();
+      source.connect(dest);
+      // Don't connect to audioCtx.destination — keeps compression silent
+      for (const track of dest.stream.getAudioTracks()) {
+        canvasStream.addTrack(track);
       }
     } catch {
-      // Method 2: Web Audio API (Safari fallback)
+      // Fallback: try captureStream (Chrome)
       try {
-        const audioCtx = new AudioContext();
-        const source = audioCtx.createMediaElementSource(video);
-        const dest = audioCtx.createMediaStreamDestination();
-        source.connect(dest);
-        // Don't connect to speakers — silent compression
-        for (const track of dest.stream.getAudioTracks()) {
-          canvasStream.addTrack(track);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const videoStream = (video as any).captureStream?.() || (video as any).mozCaptureStream?.();
+        if (videoStream) {
+          for (const track of videoStream.getAudioTracks()) {
+            canvasStream.addTrack(track);
+          }
         }
       } catch {
-        // No audio — proceed without it
         console.warn("Video compression: could not capture audio track");
       }
     }
@@ -175,10 +179,12 @@ export async function compressVideo(
     });
 
     const blob = await compressPromise;
+    audioCtx?.close().catch(() => {});
     cleanup();
 
     return { blob, width: targetW, height: targetH };
   } catch (err) {
+    audioCtx?.close().catch(() => {});
     cleanup();
     throw err;
   }

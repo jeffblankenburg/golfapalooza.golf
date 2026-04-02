@@ -82,13 +82,7 @@ function loadStoredBool(key: string, fallback: boolean): boolean {
 }
 
 export function MusicPlayerContextProvider({ children }: { children: ReactNode }) {
-  // Dual audio elements for gapless playback
-  const audioARef = useRef<HTMLAudioElement | null>(null);
-  const audioBRef = useRef<HTMLAudioElement | null>(null);
-  // Which slot is active: 0 = A, 1 = B
-  const activeSlotRef = useRef<0 | 1>(0);
-  // What song index the buffer has preloaded (-1 = nothing)
-  const preloadedIndexRef = useRef(-1);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const [songs, setSongs] = useState<Song[]>([]);
   const [currentIndex, setCurrentIndex] = useState(() => loadStoredNumber(STORAGE_KEY_INDEX, 0));
@@ -119,16 +113,6 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
   const volumeRef = useRef(volume);
   volumeRef.current = volume;
 
-  // ── Audio element helpers ──────────────────────────────────────────────
-
-  const getActive = useCallback((): HTMLAudioElement | null => {
-    return activeSlotRef.current === 0 ? audioARef.current : audioBRef.current;
-  }, []);
-
-  const getBuffer = useCallback((): HTMLAudioElement | null => {
-    return activeSlotRef.current === 0 ? audioBRef.current : audioARef.current;
-  }, []);
-
   // ── Playlist navigation ────────────────────────────────────────────────
 
   const computeNextIndex = useCallback((fromIndex: number, direction: 1 | -1): number => {
@@ -154,26 +138,6 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
     const nextPos = (currentPos + direction + playlist.length) % playlist.length;
     return playlist[nextPos].idx;
   }, []);
-
-  // ── Preload next song into buffer ──────────────────────────────────────
-
-  const preloadNext = useCallback(() => {
-    const buffer = getBuffer();
-    const s = songsRef.current;
-    const idx = currentIndexRef.current;
-    if (!buffer || s.length < 2) return;
-
-    const nextIdx = computeNextIndex(idx, 1);
-    if (nextIdx === idx) return; // single-song playlist
-
-    const nextSong = s[nextIdx];
-    if (!nextSong) return;
-
-    buffer.src = nextSong.mp3_url;
-    buffer.volume = volumeRef.current;
-    buffer.load();
-    preloadedIndexRef.current = nextIdx;
-  }, [getBuffer, computeNextIndex]);
 
   // ── Record play after 10s of playback (fire and forget) ─────────────
 
@@ -209,48 +173,24 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
       const targetSong = s[targetIndex];
       if (!targetSong) return;
 
+      const audio = audioRef.current;
+      if (!audio) return;
+
       setIsVisible(true);
       startPlayTimer(targetSong.id);
 
-      // If the buffer already has this song preloaded → swap for instant start
-      if (preloadedIndexRef.current === targetIndex) {
-        const buffer = getBuffer();
-        if (buffer) {
-          // Grab ref to old element before swapping
-          const old = activeSlotRef.current === 0 ? audioARef.current : audioBRef.current;
-
-          // Swap slot FIRST so onPause from old element won't affect state
-          activeSlotRef.current = activeSlotRef.current === 0 ? 1 : 0;
-          setCurrentIndex(targetIndex);
-          currentIndexRef.current = targetIndex;
-
-          if (old) old.pause();
-          buffer.play().catch(() => {});
-          setIsPlaying(true);
-          preloadedIndexRef.current = -1;
-          setTimeout(preloadNext, 0);
-          return;
-        }
-      }
-
-      // Otherwise load into active element and play
-      const active = getActive();
-      if (!active) return;
-
       // Only reload if the src actually changed
-      if (!active.src || !active.src.endsWith(new URL(targetSong.mp3_url).pathname)) {
-        active.src = targetSong.mp3_url;
-        active.load();
+      if (!audio.src || !audio.src.endsWith(new URL(targetSong.mp3_url).pathname)) {
+        audio.src = targetSong.mp3_url;
+        audio.load();
       }
 
       setCurrentIndex(targetIndex);
       currentIndexRef.current = targetIndex;
-      active.play().catch(() => {});
+      audio.play().catch(() => {});
       setIsPlaying(true);
-      preloadedIndexRef.current = -1;
-      setTimeout(preloadNext, 100);
     },
-    [getActive, getBuffer, preloadNext]
+    [startPlayTimer]
   );
 
   const loadSongs = useCallback(
@@ -279,41 +219,40 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
         shuffleOrderRef.current = playlist;
       }
 
-      const active = getActive();
-      if (!active) return;
+      const audio = audioRef.current;
+      if (!audio) return;
 
       // Auto-resume if we were playing before refresh
       if (shouldAutoResumeRef.current) {
         shouldAutoResumeRef.current = false;
         const song = newSongs[idx];
         if (song) {
-          active.src = song.mp3_url;
-          active.volume = volumeRef.current;
-          active.load();
+          audio.src = song.mp3_url;
+          audio.volume = volumeRef.current;
+          audio.load();
           const resumeTime = storedTimeRef.current;
           const onCanPlay = () => {
-            if (resumeTime > 0) active.currentTime = resumeTime;
-            active.play().catch(() => {});
+            if (resumeTime > 0) audio.currentTime = resumeTime;
+            audio.play().catch(() => {});
             setIsPlaying(true);
             setIsVisible(true);
             startPlayTimer(song.id);
-            active.removeEventListener("canplay", onCanPlay);
-            setTimeout(preloadNext, 100);
+            audio.removeEventListener("canplay", onCanPlay);
           };
-          active.addEventListener("canplay", onCanPlay);
+          audio.addEventListener("canplay", onCanPlay);
           setIsVisible(true);
           return;
         }
       }
 
       // Otherwise just preload the current song
-      if (!active.currentTime) {
-        active.src = newSongs[idx].mp3_url;
-        active.volume = volumeRef.current;
-        active.load();
+      if (!audio.currentTime) {
+        audio.src = newSongs[idx].mp3_url;
+        audio.volume = volumeRef.current;
+        audio.load();
       }
     },
-    [getActive, preloadNext, startPlayTimer]
+    [startPlayTimer]
   );
 
   const play = useCallback(
@@ -325,10 +264,10 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
   );
 
   const pause = useCallback(() => {
-    getActive()?.pause();
+    audioRef.current?.pause();
     setIsPlaying(false);
     cancelPlayTimer();
-  }, [getActive, cancelPlayTimer]);
+  }, [cancelPlayTimer]);
 
   const togglePlayPause = useCallback(() => {
     if (isPlaying) pause();
@@ -344,37 +283,34 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
   const next = useCallback(() => advanceToNext(), [advanceToNext]);
 
   const previous = useCallback(() => {
-    const active = getActive();
-    if (active && active.currentTime > 3) {
-      active.currentTime = 0;
+    const audio = audioRef.current;
+    if (audio && audio.currentTime > 3) {
+      audio.currentTime = 0;
       return;
     }
     if (songsRef.current.length === 0) return;
     const prevIdx = computeNextIndex(currentIndexRef.current, -1);
     playIndex(prevIdx);
-  }, [getActive, computeNextIndex, playIndex]);
+  }, [computeNextIndex, playIndex]);
 
   const seek = useCallback(
     (time: number) => {
-      const active = getActive();
-      if (active) {
-        active.currentTime = time;
+      const audio = audioRef.current;
+      if (audio) {
+        audio.currentTime = time;
         setCurrentTime(time);
       }
     },
-    [getActive]
+    []
   );
 
   const setVolume = useCallback(
     (vol: number) => {
       setVolumeState(vol);
       volumeRef.current = vol;
-      const a = getActive();
-      const b = getBuffer();
-      if (a) a.volume = vol;
-      if (b) b.volume = vol;
+      if (audioRef.current) audioRef.current.volume = vol;
     },
-    [getActive, getBuffer]
+    []
   );
 
   const toggleShuffle = useCallback(() => {
@@ -396,17 +332,14 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
       isShuffledRef.current = !prev;
       return !prev;
     });
-    // Re-preload since next song may have changed
-    setTimeout(preloadNext, 0);
-  }, [preloadNext]);
+  }, []);
 
   const toggleFavoritesOnly = useCallback(() => {
     setFavoritesOnly((prev) => {
       favoritesOnlyRef.current = !prev;
       return !prev;
     });
-    setTimeout(preloadNext, 0);
-  }, [preloadNext]);
+  }, []);
 
   const toggleFavorite = useCallback((songId: string) => {
     setSongs((prev) => {
@@ -443,54 +376,30 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
     localStorage.setItem(STORAGE_KEY_PLAYING, "false");
   }, [pause, cancelPlayTimer]);
 
-  // ── Event listeners on BOTH audio elements ─────────────────────────────
+  // ── Event listeners on audio element ───────────────────────────────────
 
   useEffect(() => {
-    const audioA = audioARef.current;
-    const audioB = audioBRef.current;
-    if (!audioA || !audioB) return;
+    const audio = audioRef.current;
+    if (!audio) return;
 
-    const isActiveAudio = (el: EventTarget | null) => {
-      if (activeSlotRef.current === 0) return el === audioA;
-      return el === audioB;
-    };
+    const onTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const onDurationChange = () => setDuration(audio.duration || 0);
+    const onEnded = () => advanceToNext();
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
 
-    const onTimeUpdate = (e: Event) => {
-      if (isActiveAudio(e.target)) {
-        setCurrentTime((e.target as HTMLAudioElement).currentTime);
-      }
-    };
-    const onDurationChange = (e: Event) => {
-      if (isActiveAudio(e.target)) {
-        setDuration((e.target as HTMLAudioElement).duration || 0);
-      }
-    };
-    const onEnded = (e: Event) => {
-      if (isActiveAudio(e.target)) advanceToNext();
-    };
-    const onPlay = (e: Event) => {
-      if (isActiveAudio(e.target)) setIsPlaying(true);
-    };
-    const onPause = (e: Event) => {
-      if (isActiveAudio(e.target)) setIsPlaying(false);
-    };
-
-    for (const el of [audioA, audioB]) {
-      el.addEventListener("timeupdate", onTimeUpdate);
-      el.addEventListener("durationchange", onDurationChange);
-      el.addEventListener("ended", onEnded);
-      el.addEventListener("play", onPlay);
-      el.addEventListener("pause", onPause);
-    }
+    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("durationchange", onDurationChange);
+    audio.addEventListener("ended", onEnded);
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
 
     return () => {
-      for (const el of [audioA, audioB]) {
-        el.removeEventListener("timeupdate", onTimeUpdate);
-        el.removeEventListener("durationchange", onDurationChange);
-        el.removeEventListener("ended", onEnded);
-        el.removeEventListener("play", onPlay);
-        el.removeEventListener("pause", onPause);
-      }
+      audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("durationchange", onDurationChange);
+      audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
     };
   }, [advanceToNext]);
 
@@ -517,7 +426,7 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
     }
   }, [currentTime]);
 
-  // ── Media Session API (lock screen controls) ───────────────────────────
+  // ── Media Session API (lock screen / CarPlay controls) ─────────────────
 
   useEffect(() => {
     if (!("mediaSession" in navigator) || songs.length === 0) return;
@@ -571,8 +480,7 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
         dismiss,
       }}
     >
-      <audio ref={audioARef} preload="auto" />
-      <audio ref={audioBRef} preload="auto" />
+      <audio ref={audioRef} preload="auto" />
       {children}
     </MusicPlayerContext.Provider>
   );

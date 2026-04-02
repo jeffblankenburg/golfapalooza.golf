@@ -55,7 +55,7 @@ interface Contest {
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
-export function ScoringManager({ tripId }: { tripId: string }) {
+export function ScoringManager({ tripId, contestId: externalContestId, onVerified }: { tripId: string; contestId?: string | null; onVerified?: () => void }) {
   const [contests, setContests] = useState<Contest[]>([]);
   const [selectedContestId, setSelectedContestId] = useState<string | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -99,9 +99,12 @@ export function ScoringManager({ tripId }: { tripId: string }) {
     setHoles(data.holes || []);
     setBonusPoints(data.bonus_points || []);
 
-    // Set default bonus team
+    // Set default team only if none selected or selected team no longer exists
     if (fetchedTeams.length > 0) {
-      setSelectedTeamId(fetchedTeams[0].id);
+      setSelectedTeamId((prev) => {
+        if (prev && fetchedTeams.some((t: { id: string }) => t.id === prev)) return prev;
+        return fetchedTeams[0].id;
+      });
     }
 
     // Transform scores array into Record<team_id, Record<hole_number, strokes>>
@@ -118,17 +121,20 @@ export function ScoringManager({ tripId }: { tripId: string }) {
     async function init() {
       setLoading(true);
       const scrambles = await fetchContests();
-      if (scrambles.length > 0) {
-        const first = scrambles[0];
-        setSelectedContestId(first.id);
-        setScoringClosed(!!first.scoring_closed_at);
-        setContestVerified(!!first.verified_at);
-        await fetchScoringData(first.id);
+      const targetId = externalContestId || (scrambles.length > 0 ? scrambles[0].id : null);
+      if (targetId) {
+        const target = scrambles.find((c: Contest) => c.id === targetId) || scrambles[0];
+        if (target) {
+          setSelectedContestId(target.id);
+          setScoringClosed(!!target.scoring_closed_at);
+          setContestVerified(!!target.verified_at);
+          await fetchScoringData(target.id);
+        }
       }
       setLoading(false);
     }
     init();
-  }, [fetchContests, fetchScoringData]);
+  }, [fetchContests, fetchScoringData, externalContestId]);
 
   // Re-fetch when sibling ScrambleManager changes teams
   useEffect(() => {
@@ -392,12 +398,56 @@ export function ScoringManager({ tripId }: { tripId: string }) {
         body: JSON.stringify({ team_id: teamId, action }),
       });
       if (res.ok && selectedContestId) {
-        await fetchScoringData(selectedContestId);
+        if (action === "verify") {
+          // Optimistically mark this team as verified locally
+          const updatedTeams = teams.map((t) =>
+            t.id === teamId ? { ...t, verified_at: new Date().toISOString() } : t
+          );
+          setTeams(updatedTeams);
+
+          const allDone = updatedTeams.every((t) => !!t.verified_at);
+          if (allDone) {
+            // Close the accordion immediately, lock in background
+            onVerified?.();
+            doLockScoring();
+          } else {
+            // Advance to next unverified team
+            const nextUnverified = updatedTeams.find((t) => !t.verified_at);
+            if (nextUnverified) setSelectedTeamId(nextUnverified.id);
+          }
+        } else {
+          // Unverify — optimistically clear verified_at
+          setTeams((prev) =>
+            prev.map((t) => t.id === teamId ? { ...t, verified_at: null, verified_by_name: null } : t)
+          );
+        }
       }
     } catch {
       // silent
     } finally {
       setVerifying(null);
+    }
+  };
+
+  // Lock scoring: verify contest (auto-closes if needed) to trigger winner resolution
+  const doLockScoring = async () => {
+    if (!selectedContestId) return;
+
+    const verifyRes = await fetch("/api/admin/scoring-lifecycle", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contest_id: selectedContestId, action: "verify" }),
+    });
+    if (verifyRes.ok) {
+      setContestVerified(true);
+      setContests((prev) =>
+        prev.map((c) =>
+          c.id === selectedContestId
+            ? { ...c, scoring_closed_at: c.scoring_closed_at || new Date().toISOString(), verified_at: new Date().toISOString() }
+            : c
+        )
+      );
+      onVerified?.();
     }
   };
 
@@ -414,8 +464,8 @@ export function ScoringManager({ tripId }: { tripId: string }) {
       if (res.ok) {
         if (action === "close") setScoringClosed(true);
         else if (action === "open") setScoringClosed(false);
-        else if (action === "verify") setContestVerified(true);
-        else if (action === "unverify") setContestVerified(false);
+        else if (action === "verify") { setContestVerified(true); onVerified?.(); }
+        else if (action === "unverify") { setContestVerified(false); }
         // Update the contests array so switching back works
         setContests((prev) =>
           prev.map((c) =>
@@ -490,6 +540,59 @@ export function ScoringManager({ tripId }: { tripId: string }) {
     return "text-gray-900 font-bold";
   };
 
+  const renderLockButton = () => {
+    if (contestVerified) return null;
+    const allDone = teams.length > 0 && teams.every((t) => !!t.verified_at);
+    if (!allDone) return null;
+    return (
+      <button
+        onClick={() => doLockScoring()}
+        className="w-full py-2 text-sm font-semibold text-white bg-amber-600 rounded-xl active:bg-amber-700"
+      >
+        Lock Scoring
+      </button>
+    );
+  };
+
+  const renderVerifyRow = () => {
+    if (contestVerified) return null; // All cards locked, no per-card actions
+    const team = teams.find((t) => t.id === selectedTeamId);
+    if (!team) return null;
+    const verified = !!team.verified_at;
+    const complete = calcTotal(team.id) !== null;
+    return verified ? (
+      <div className="flex items-center justify-between px-3 py-1.5 bg-green-50 rounded-xl border border-green-200">
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          Verified
+          {team.verified_by_name && (
+            <span className="text-gray-400 font-normal">by {team.verified_by_name}</span>
+          )}
+        </span>
+        <button
+          onClick={() => handleVerify(team.id, "unverify")}
+          disabled={verifying === team.id}
+          className="px-2 py-1 text-[10px] font-medium text-gray-500 bg-white rounded-lg active:bg-gray-100 disabled:opacity-50"
+        >
+          {verifying === team.id ? "..." : "Unverify"}
+        </button>
+      </div>
+    ) : (
+      <div className="flex items-center justify-between px-3 py-1.5 bg-amber-50 rounded-xl border border-amber-200">
+        <span className="text-xs text-amber-600 font-medium">Unofficial</span>
+        <button
+          onClick={() => handleVerify(team.id, "verify")}
+          disabled={verifying === team.id || !complete}
+          className="px-2 py-1 text-[10px] font-medium text-white bg-green-600 rounded-lg active:bg-green-700 disabled:opacity-50"
+        >
+          {verifying === team.id ? "..." : "Verify"}
+        </button>
+      </div>
+    );
+  };
+
   // Loading
   if (loading && contests.length === 0) {
     return (
@@ -509,98 +612,94 @@ export function ScoringManager({ tripId }: { tripId: string }) {
 
   return (
     <div className="space-y-2">
-      {/* Day Selector */}
-      <div className="flex rounded-xl bg-gray-100 p-1 gap-1">
-        {contests.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => handleDaySwitch(c.id)}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-              selectedContestId === c.id
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 active:bg-gray-200"
-            }`}
-          >
-            {getDayLabel(c.day_number)}
-          </button>
-        ))}
-      </div>
+      {/* Day Selector — hidden when parent controls the contest */}
+      {!externalContestId && (
+        <div className="flex rounded-xl bg-gray-100 p-1 gap-1">
+          {contests.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => handleDaySwitch(c.id)}
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+                selectedContestId === c.id
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 active:bg-gray-200"
+              }`}
+            >
+              {getDayLabel(c.day_number)}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {/* Scoring Lifecycle Controls */}
+      {/* Live Scoring — controls whether players can edit their scorecards */}
       <div className="flex items-center gap-2 px-1">
         <div className="flex items-center gap-1.5 flex-1">
-          {contestVerified ? (
-            <span className="flex items-center gap-1 text-xs font-medium text-green-700">
+          {scoringClosed ? (
+            <span className="flex items-center gap-1 text-xs font-medium text-gray-500">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
               </svg>
-              Verified
-            </span>
-          ) : scoringClosed ? (
-            <span className="flex items-center gap-1 text-xs font-medium text-amber-600">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-              Scoring Closed
+              Live Scoring Disabled
             </span>
           ) : (
             <span className="flex items-center gap-1 text-xs font-medium text-green-600">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Live
+              Live Scoring
             </span>
           )}
-          {/* Inline save status */}
+        </div>
+        {!contestVerified && (
+          <button
+            onClick={() => handleLifecycle(scoringClosed ? "open" : "close")}
+            disabled={lifecycleLoading}
+            className={`px-2.5 py-1 text-xs font-medium rounded-lg disabled:opacity-50 ${
+              scoringClosed
+                ? "bg-green-100 text-green-700 active:bg-green-200"
+                : "bg-red-100 text-red-700 active:bg-red-200"
+            }`}
+          >
+            {lifecycleLoading ? "..." : scoringClosed ? "Open Live Scoring" : "Disable Live Scoring"}
+          </button>
+        )}
+      </div>
+
+      {/* Scoring Lock — admin verification state */}
+      {contestVerified && (
+        <div className="flex items-center gap-2 px-1">
+          <span className="flex items-center gap-1 text-xs font-medium text-amber-700 flex-1">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            Scoring Locked
+          </span>
+          <button
+            onClick={() => handleLifecycle("unverify")}
+            disabled={lifecycleLoading}
+            className="px-2.5 py-1 text-xs font-medium rounded-lg bg-gray-100 text-gray-600 active:bg-gray-200 disabled:opacity-50"
+          >
+            {lifecycleLoading ? "..." : "Unlock Scoring"}
+          </button>
+        </div>
+      )}
+
+      {/* Inline save status */}
+      {!contestVerified && saveStatus !== "idle" && (
+        <div className="flex items-center gap-1.5 px-1">
           {saveStatus === "saving" && (
-            <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-1.5" />
+            <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           )}
           {saveStatus === "saved" && (
-            <svg className="w-3.5 h-3.5 text-green-500 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           )}
           {saveStatus === "error" && (
-            <svg className="w-3.5 h-3.5 text-red-500 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           )}
         </div>
-        <div className="flex items-center gap-1.5">
-          {contestVerified ? (
-            <button
-              onClick={() => handleLifecycle("unverify")}
-              disabled={lifecycleLoading}
-              className="px-2.5 py-1 text-xs font-medium rounded-lg bg-gray-100 text-gray-600 active:bg-gray-200 disabled:opacity-50"
-            >
-              {lifecycleLoading ? "..." : "Unverify"}
-            </button>
-          ) : scoringClosed ? (
-            <>
-              <button
-                onClick={() => handleLifecycle("open")}
-                disabled={lifecycleLoading}
-                className="px-2.5 py-1 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 active:bg-amber-200 disabled:opacity-50"
-              >
-                {lifecycleLoading ? "..." : "Reopen Scoring"}
-              </button>
-              <button
-                onClick={() => handleLifecycle("verify")}
-                disabled={lifecycleLoading}
-                className="px-2.5 py-1 text-xs font-medium rounded-lg bg-green-600 text-white active:bg-green-700 disabled:opacity-50"
-              >
-                {lifecycleLoading ? "..." : "Verify Scores"}
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => handleLifecycle("close")}
-              disabled={lifecycleLoading}
-              className="px-2.5 py-1 text-xs font-medium rounded-lg bg-red-100 text-red-700 active:bg-red-200 disabled:opacity-50"
-            >
-              {lifecycleLoading ? "..." : "Close Live Scoring"}
-            </button>
-          )}
-        </div>
-      </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-12">
@@ -624,49 +723,14 @@ export function ScoringManager({ tripId }: { tripId: string }) {
           >
             {teams.map((team, idx) => (
               <option key={team.id} value={team.id}>
-                Team {idx + 1}: {getTeamLabel(team, idx)}
+                {team.verified_at ? "\u2705 " : ""}Team {idx + 1}: {getTeamLabel(team, idx)}
               </option>
             ))}
           </select>
 
           {/* Verify for selected team */}
-          {(() => {
-            const team = teams.find((t) => t.id === selectedTeamId);
-            if (!team) return null;
-            const verified = !!team.verified_at;
-            const complete = calcTotal(team.id) !== null;
-            return verified ? (
-              <div className="flex items-center justify-between px-3 py-1.5 bg-green-50 rounded-xl border border-green-200">
-                <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Verified
-                  {team.verified_by_name && (
-                    <span className="text-gray-400 font-normal">by {team.verified_by_name}</span>
-                  )}
-                </span>
-                <button
-                  onClick={() => handleVerify(team.id, "unverify")}
-                  disabled={verifying === team.id}
-                  className="px-2 py-1 text-[10px] font-medium text-gray-500 bg-white rounded-lg active:bg-gray-100 disabled:opacity-50"
-                >
-                  {verifying === team.id ? "..." : "Unverify"}
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between px-3 py-1.5 bg-amber-50 rounded-xl border border-amber-200">
-                <span className="text-xs text-amber-600 font-medium">Unofficial</span>
-                <button
-                  onClick={() => handleVerify(team.id, "verify")}
-                  disabled={verifying === team.id || !complete}
-                  className="px-2 py-1 text-[10px] font-medium text-white bg-green-600 rounded-lg active:bg-green-700 disabled:opacity-50"
-                >
-                  {verifying === team.id ? "..." : "Verify"}
-                </button>
-              </div>
-            );
-          })()}
+          {renderVerifyRow()}
+          {renderLockButton()}
 
           {/* Hole-by-hole scoring + BSPITW Bonus */}
           <HoleScoringCards
@@ -684,12 +748,16 @@ export function ScoringManager({ tripId }: { tripId: string }) {
             calcTotal={calcTotal}
             parForNine={parForNine}
             totalPar={totalPar}
+            readOnly={contestVerified}
           />
+
+          {/* Verify row duplicated at bottom of scorecard */}
+          {renderVerifyRow()}
         </>
       )}
 
-      {/* Clear Buttons */}
-      {contests.length > 0 && (
+      {/* Clear Buttons — hidden when locked */}
+      {contests.length > 0 && !contestVerified && (
         <div className="border-t border-gray-200 pt-4 mt-6 space-y-3">
           {confirmClear ? (
             <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-3">
@@ -755,6 +823,7 @@ function HoleScoringCards({
   calcTotal,
   parForNine,
   totalPar,
+  readOnly = false,
 }: {
   teams: Team[];
   selectedTeamId: string | null;
@@ -770,12 +839,13 @@ function HoleScoringCards({
   calcTotal: (teamId: string) => number | null;
   parForNine: (start: number, end: number) => number;
   totalPar: () => number;
+  readOnly?: boolean;
 }) {
   const team = teams.find((t) => t.id === selectedTeamId);
   if (!team) return null;
 
   const sortedHoles = [...holes].sort((a, b) => a.hole_number - b.hole_number);
-  const isLocked = !!team.verified_at;
+  const isLocked = readOnly || !!team.verified_at;
   const teamScores = holeScores[team.id] || {};
 
   const { skinCounts, skinWins } = teams.length > 1
@@ -843,23 +913,28 @@ function HoleScoringCards({
                       {strokes - hole.par >= 0 ? "+" : ""}{strokes - hole.par}
                     </span>
                   )}
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    min={1}
-                    max={20}
-                    data-score-hole={hole.hole_number}
-                    tabIndex={hole.hole_number}
-                    value={teamScores[hole.hole_number] ?? ""}
-                    onChange={(e) => onScoreChange(team.id, hole.hole_number, e.target.value)}
-                    onKeyDown={(e) => handleScoreKeyDown(e, hole.hole_number)}
-                    onFocus={(e) => e.target.select()}
-                    disabled={isLocked}
-                    className={`w-10 h-7 text-center border border-gray-300 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] ${
-                      scoreColor(teamScores[hole.hole_number], hole.par)
-                    } ${isLocked ? "bg-gray-100 cursor-not-allowed" : "bg-white"}`}
-                  />
+                  {isLocked ? (
+                    <span className={`w-10 h-7 flex items-center justify-center text-sm font-bold ${scoreColor(teamScores[hole.hole_number], hole.par)}`}>
+                      {teamScores[hole.hole_number] ?? "—"}
+                    </span>
+                  ) : (
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      min={1}
+                      max={20}
+                      data-score-hole={hole.hole_number}
+                      tabIndex={hole.hole_number}
+                      value={teamScores[hole.hole_number] ?? ""}
+                      onChange={(e) => onScoreChange(team.id, hole.hole_number, e.target.value)}
+                      onKeyDown={(e) => handleScoreKeyDown(e, hole.hole_number)}
+                      onFocus={(e) => e.target.select()}
+                      className={`w-10 h-7 text-center border border-gray-300 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] bg-white ${
+                        scoreColor(teamScores[hole.hole_number], hole.par)
+                      }`}
+                    />
+                  )}
                 </div>
               </div>
 
@@ -876,33 +951,42 @@ function HoleScoringCards({
                         {member.display_name}
                       </span>
 
-                      <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          tabIndex={-1}
-                          checked={isOnGreen}
-                          onChange={(e) => onOnGreenChange(team.id, hole.hole_number, member.user_id, e.target.checked)}
-                          className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                        />
-                        <span className="text-[10px] text-gray-400 uppercase tracking-wide">Green</span>
-                      </label>
+                      {isLocked ? (
+                        <>
+                          {isOnGreen && <span className="text-[10px] font-semibold text-green-600 uppercase">Green</span>}
+                          {isHoledOut && <span className="text-[10px] font-semibold text-blue-600 uppercase">Holed</span>}
+                        </>
+                      ) : (
+                        <>
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              tabIndex={-1}
+                              checked={isOnGreen}
+                              onChange={(e) => onOnGreenChange(team.id, hole.hole_number, member.user_id, e.target.checked)}
+                              className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                            />
+                            <span className="text-[10px] text-gray-400 uppercase tracking-wide">Green</span>
+                          </label>
 
-                      <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input
-                          type="radio"
-                          tabIndex={-1}
-                          name={`holed-${team.id}-${hole.hole_number}`}
-                          checked={isHoledOut}
-                          onChange={() => onHoledOutChange(team.id, hole.hole_number, isHoledOut ? null : member.user_id)}
-                          className="w-4 h-4 border-gray-300 text-green-600 focus:ring-green-500"
-                        />
-                        <span className="text-[10px] text-gray-400 uppercase tracking-wide">Holed</span>
-                      </label>
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input
+                              type="radio"
+                              tabIndex={-1}
+                              name={`holed-${team.id}-${hole.hole_number}`}
+                              checked={isHoledOut}
+                              onChange={() => onHoledOutChange(team.id, hole.hole_number, isHoledOut ? null : member.user_id)}
+                              className="w-4 h-4 border-gray-300 text-green-600 focus:ring-green-500"
+                            />
+                            <span className="text-[10px] text-gray-400 uppercase tracking-wide">Holed</span>
+                          </label>
+                        </>
+                      )}
                     </div>
                   );
                 })}
 
-                {holedOutUserId && (
+                {holedOutUserId && !isLocked && (
                   <div className="flex items-center gap-3 px-3 py-1.5">
                     <span className="flex-1" />
                     <button

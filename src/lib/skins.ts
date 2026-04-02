@@ -6,6 +6,8 @@
  * A team wins a skin when they have the sole lowest net score on a hole.
  */
 
+import { getStrokesOnHole, sortByDifficulty } from "@/lib/golf/stroke-distribution";
+
 export interface SkinTeam {
   id: string;
   team_handicap: number;
@@ -30,15 +32,7 @@ export function calcSkins(
   holes: SkinHole[],
   holeScores: Record<string, Record<number, number>>
 ): SkinsResult {
-  const sortedByDifficulty = [...holes].sort((a, b) => a.handicap_index - b.handicap_index);
-
-  function getStrokesOnHole(teamHandicap: number, holeNumber: number): number {
-    const holeRank = sortedByDifficulty.findIndex((h) => h.hole_number === holeNumber);
-    if (holeRank === -1) return 0;
-    const fullPasses = Math.floor(teamHandicap / 18);
-    const remainder = teamHandicap % 18;
-    return fullPasses + (holeRank < remainder ? 1 : 0);
-  }
+  const sortedByDifficulty = sortByDifficulty(holes);
 
   const skinCounts = new Map<string, number>();
   const skinWins = new Map<string, Set<number>>();
@@ -56,7 +50,7 @@ export function calcSkins(
     for (const team of teams) {
       const gross = holeScores[team.id]?.[hole.hole_number];
       if (gross === undefined) { allHaveScores = false; break; }
-      const strokes = getStrokesOnHole(team.team_handicap, hole.hole_number);
+      const strokes = getStrokesOnHole(team.team_handicap, hole.hole_number, sortedByDifficulty);
       netScores.push({ teamId: team.id, net: gross - strokes });
     }
 

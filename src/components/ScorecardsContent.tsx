@@ -41,6 +41,9 @@ interface ScorecardData {
   teams: Team[];
   holeScores: HoleScore[];
   holes: HoleInfo[];
+  contest_verified?: boolean;
+  tiebreaker_notes?: Record<string, string>; // team_id -> tiebreaker explanation
+  ranked_order?: string[]; // team IDs in tiebreak-resolved order
 }
 
 /** How many strokes a team receives on a given hole */
@@ -259,8 +262,16 @@ export function ScorecardsContent({
     return lowest.count === 1 ? "sole" : "tied";
   }
 
-  // Sort teams by net score ascending (lower is better)
+  // Sort teams: use server-provided tiebreak order when available, otherwise by net
+  const rankedOrder = data?.ranked_order;
   const teams = [...allTeams].sort((a, b) => {
+    if (rankedOrder && rankedOrder.length > 0) {
+      const ai = rankedOrder.indexOf(a.id);
+      const bi = rankedOrder.indexOf(b.id);
+      if (ai !== -1 && bi !== -1) return ai - bi;
+      if (ai !== -1) return -1;
+      if (bi !== -1) return 1;
+    }
     const na = calcNet(a);
     const nb = calcNet(b);
     if (na !== null && nb !== null) return na - nb;
@@ -318,16 +329,33 @@ export function ScorecardsContent({
             </span>
           </div>
 
-          {teams.map((team) => {
+          {teams.map((team, teamIndex) => {
             const teamScores = scoreMap[team.id] || {};
             const front9Total = front9.reduce((s, h) => s + (teamScores[h.hole_number] || 0), 0);
             const back9Total = back9.reduce((s, h) => s + (teamScores[h.hole_number] || 0), 0);
             const hasFront = front9.some((h) => teamScores[h.hole_number] !== undefined);
             const hasBack = back9.some((h) => teamScores[h.hole_number] !== undefined);
             const net = calcNet(team);
+            const isContestVerified = data?.contest_verified;
+            const isChampion = isContestVerified && teamIndex === 0 && net !== null;
+            const isRunnerUp = isContestVerified && teamIndex === 1 && net !== null;
 
             return (
-              <div key={team.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div key={team.id} className={`rounded-2xl shadow-sm overflow-hidden ${
+                isChampion
+                  ? "bg-amber-50 border-2 border-amber-400"
+                  : isRunnerUp
+                  ? "bg-gray-50 border-2 border-gray-400"
+                  : "bg-white border border-gray-200"
+              }`}>
+                {/* Champion / Runner-Up badge */}
+                {(isChampion || isRunnerUp) && (
+                  <div className={`px-3 py-1 text-xs font-bold uppercase tracking-wider text-center ${
+                    isChampion ? "bg-amber-400 text-amber-900" : "bg-gray-400 text-white"
+                  }`}>
+                    {isChampion ? "Champion" : "Runner-Up"}
+                  </div>
+                )}
                 {/* Team header */}
                 <div className="px-3 py-2 border-b border-gray-100 flex items-center">
                   <div className="flex-1 min-w-0">
@@ -494,6 +522,15 @@ export function ScorecardsContent({
                       )}
 
                     </table>
+                  </div>
+                )}
+
+                {/* Tiebreaker footer */}
+                {isContestVerified && data?.tiebreaker_notes?.[team.id] && (
+                  <div className={`px-3 py-2 border-t text-xs ${
+                    isChampion ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-gray-50 border-gray-200 text-gray-600"
+                  }`}>
+                    {data.tiebreaker_notes[team.id]}
                   </div>
                 )}
               </div>

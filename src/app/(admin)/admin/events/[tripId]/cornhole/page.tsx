@@ -7,6 +7,7 @@ import { CollapsibleSection } from "@/components/admin/CollapsibleSection";
 import { ContestParticipants } from "@/components/admin/ContestParticipants";
 import { CornholeDoublesManager } from "@/components/admin/CornholeDoublesManager";
 import { CornholeBracketManager } from "@/components/admin/CornholeBracketManager";
+import { computeChampionId } from "@/lib/bracket/champion";
 
 export default function CornholeAdminPage() {
   const params = useParams();
@@ -15,6 +16,10 @@ export default function CornholeAdminPage() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [singlesContestId, setSinglesContestId] = useState<string | null>(null);
   const [doublesContestId, setDoublesContestId] = useState<string | null>(null);
+  const [singlesLocked, setSinglesLocked] = useState(false);
+  const [doublesLocked, setDoublesLocked] = useState(false);
+  const [singlesResult, setSinglesResult] = useState<string | null>(null);
+  const [doublesResult, setDoublesResult] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -35,9 +40,61 @@ export default function CornholeAdminPage() {
     const contests = data.contests || [];
     const singles = contests.find((c: { contest_type: string }) => c.contest_type === "cornhole_singles");
     const doubles = contests.find((c: { contest_type: string }) => c.contest_type === "cornhole_doubles");
-    if (singles) setSinglesContestId(singles.id);
-    if (doubles) setDoublesContestId(doubles.id);
+    if (singles) {
+      setSinglesContestId(singles.id);
+      setSinglesLocked(!!singles.winners_locked_at);
+      fetchResultText(singles.id).then(setSinglesResult);
+    }
+    if (doubles) {
+      setDoublesContestId(doubles.id);
+      setDoublesLocked(!!doubles.winners_locked_at);
+      fetchResultText(doubles.id).then(setDoublesResult);
+    }
   }, [tripId]);
+
+  const fetchResultText = async (contestId: string): Promise<string | null> => {
+    try {
+      const res = await fetch(`/api/admin/cornhole/bracket?contest_id=${contestId}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const matches = data.matches || [];
+      const nameMap: Record<string, { display_name: string }> = data.nameMap || {};
+      const championId = computeChampionId(matches);
+      if (!championId) return null;
+
+      // Find the final match to get the runner-up
+      const champMatches = matches.filter((m: { bracket_type: string }) => m.bracket_type === "championship");
+      let runnerUpId: string | null = null;
+      if (champMatches.length > 0) {
+        const reset = champMatches.find((m: { round_number: number; winner_participant_id: string | null }) => m.round_number === 2 && m.winner_participant_id);
+        const champ = champMatches.find((m: { round_number: number }) => m.round_number === 1);
+        const finalMatch = reset || champ;
+        if (finalMatch) {
+          runnerUpId = finalMatch.slot1_participant_id === championId
+            ? finalMatch.slot2_participant_id
+            : finalMatch.slot1_participant_id;
+        }
+      } else {
+        const mainMatches = matches.filter((m: { bracket_type: string }) => m.bracket_type === "main");
+        const maxRound = Math.max(...mainMatches.map((m: { round_number: number }) => m.round_number));
+        const finalMatch = mainMatches.find((m: { round_number: number }) => m.round_number === maxRound);
+        if (finalMatch) {
+          runnerUpId = finalMatch.slot1_participant_id === championId
+            ? finalMatch.slot2_participant_id
+            : finalMatch.slot1_participant_id;
+        }
+      }
+
+      const champName = nameMap[championId]?.display_name || "Unknown";
+      const runnerUpName = runnerUpId ? (nameMap[runnerUpId]?.display_name || "Unknown") : null;
+
+      return runnerUpName
+        ? `${champName} defeated ${runnerUpName}`
+        : `Champion: ${champName}`;
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
     fetchContests();
@@ -106,27 +163,43 @@ export default function CornholeAdminPage() {
       </CollapsibleSection>
 
       <CollapsibleSection
+        key={`singles-${singlesLocked}`}
         title="Singles Bracket"
-        summary="Single elimination"
+        summary={singlesResult || (singlesLocked ? "Locked" : "Single elimination")}
         icon={
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16" />
-          </svg>
+          singlesLocked ? (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16" />
+            </svg>
+          )
         }
+        iconColor={singlesLocked ? "text-amber-700" : undefined}
       >
-        <CornholeBracketManager tripId={tripId} contestType="cornhole_singles" />
+        <CornholeBracketManager tripId={tripId} contestType="cornhole_singles" onChampionCrowned={fetchContests} />
       </CollapsibleSection>
 
       <CollapsibleSection
+        key={`doubles-${doublesLocked}`}
         title="Doubles Bracket"
-        summary="Double elimination"
+        summary={doublesResult || (doublesLocked ? "Locked" : "Double elimination")}
         icon={
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16" />
-          </svg>
+          doublesLocked ? (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16" />
+            </svg>
+          )
         }
+        iconColor={doublesLocked ? "text-amber-700" : undefined}
       >
-        <CornholeBracketManager tripId={tripId} contestType="cornhole_doubles" />
+        <CornholeBracketManager tripId={tripId} contestType="cornhole_doubles" onChampionCrowned={fetchContests} />
       </CollapsibleSection>
     </div>
   );

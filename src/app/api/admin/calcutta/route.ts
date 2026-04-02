@@ -69,8 +69,29 @@ export async function GET(request: Request) {
       maxOrder += withoutOrder.length;
     }
 
-    // Sort by auction_order
+    // Sort by auction_order and compact gaps
     const sorted = (participants || []).sort((a, b) => (a.auction_order || 999) - (b.auction_order || 999));
+
+    // Re-sequence if there are gaps (e.g., a participant was removed)
+    let needsCompact = false;
+    for (let i = 0; i < sorted.length; i++) {
+      if (sorted[i].auction_order !== i + 1) { needsCompact = true; break; }
+    }
+    if (needsCompact) {
+      await Promise.all(
+        sorted.map((p, i) => {
+          const newOrder = i + 1;
+          if (p.auction_order !== newOrder) {
+            p.auction_order = newOrder;
+            return adminClient
+              .from("contest_participants")
+              .update({ auction_order: newOrder })
+              .eq("id", p.id);
+          }
+          return Promise.resolve();
+        })
+      );
+    }
 
     // Fetch prizes with linked contest name
     const { data: prizes, error: prizesError } = await adminClient
@@ -176,6 +197,16 @@ export async function GET(request: Request) {
       .eq("contest_id", contestId);
     const paidBuyers = new Set((paidRows || []).map((r) => r.user_id));
 
+    // Fetch winner payout status (per prize per owner)
+    const prizeIds = normalizedPrizes.map((p) => p.id);
+    const { data: winnerPaidRows } = prizeIds.length > 0
+      ? await adminClient
+          .from("calcutta_winner_paid")
+          .select("prize_id, owner_id")
+          .in("prize_id", prizeIds)
+      : { data: [] };
+    const winnerPaid = (winnerPaidRows || []).map((r) => `${r.prize_id}:${r.owner_id}`);
+
     return NextResponse.json({
       participants: normalizedParticipants,
       prizes: normalizedPrizes,
@@ -183,6 +214,7 @@ export async function GET(request: Request) {
       allUsers,
       tripContests: tripContests || [],
       paidBuyers: Array.from(paidBuyers),
+      winnerPaid,
     });
   } catch (error) {
     console.error("Get calcutta error:", error);
@@ -475,6 +507,28 @@ export async function PUT(request: Request) {
         await adminClient
           .from("calcutta_buyer_paid")
           .insert({ contest_id, user_id });
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
+    if (body.action === "toggle_winner_paid") {
+      const { prize_id, owner_id } = body;
+      if (!prize_id || !owner_id) {
+        return NextResponse.json({ error: "prize_id and owner_id are required" }, { status: 400 });
+      }
+
+      const { data: existing } = await adminClient
+        .from("calcutta_winner_paid")
+        .select("id")
+        .eq("prize_id", prize_id)
+        .eq("owner_id", owner_id)
+        .maybeSingle();
+
+      if (existing) {
+        await adminClient.from("calcutta_winner_paid").delete().eq("id", existing.id);
+      } else {
+        await adminClient.from("calcutta_winner_paid").insert({ prize_id, owner_id });
       }
 
       return NextResponse.json({ success: true });

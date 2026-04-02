@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { BottomDrawer } from "@/components/admin/BottomDrawer";
+import { CollapsibleSection } from "@/components/admin/CollapsibleSection";
 
 interface ParticipantUser {
   id: string;
@@ -45,6 +46,20 @@ interface LinkedContest {
   contest_type: string;
 }
 
+interface PrizeWinnerOwner {
+  owner_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  share_pct: number;
+}
+
+interface PrizeWinner {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  owners: PrizeWinnerOwner[];
+}
+
 interface CalcuttaPrize {
   id: string;
   contest_id: string;
@@ -56,6 +71,8 @@ interface CalcuttaPrize {
   per_player: boolean;
   player_count: number;
   linked_contest: LinkedContest | null;
+  winners?: PrizeWinner[];
+  locked?: boolean;
 }
 
 interface TripContest {
@@ -102,6 +119,7 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
 
   // Summary state
   const [paidBuyers, setPaidBuyers] = useState<Set<string>>(new Set());
+  const [paidWinners, setPaidWinners] = useState<Set<string>>(new Set()); // "prizeId:ownerId"
   const [prizesOpen, setPrizesOpen] = useState(false);
   const [summarySort, setSummarySort] = useState<"amount" | "name">("name");
   const [expandedBuyers, setExpandedBuyers] = useState<Set<string>>(new Set());
@@ -133,14 +151,60 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
 
   // Fetch calcutta data
   const fetchData = useCallback(async (cId: string) => {
-    const res = await fetch(`/api/admin/calcutta?contest_id=${cId}`);
-    const data = await res.json();
+    const [calcuttaRes, winnersRes] = await Promise.all([
+      fetch(`/api/admin/calcutta?contest_id=${cId}`),
+      fetch(`/api/admin/contest-winners?contest_id=${cId}`),
+    ]);
+    const data = await calcuttaRes.json();
     setParticipants(data.participants || []);
-    setPrizes(data.prizes || []);
     setActiveOrder(data.active_order);
     setAllUsers(data.allUsers || []);
     setTripContests(data.tripContests || []);
     setPaidBuyers(new Set(data.paidBuyers || []));
+    setPaidWinners(new Set(data.winnerPaid || []));
+
+    // Build ownership lookup from participants: user_id -> owners
+    const participants = data.participants || [];
+    const ownersByUser: Record<string, PrizeWinnerOwner[]> = {};
+    for (const p of participants) {
+      if (p.ownerships && p.ownerships.length > 0) {
+        ownersByUser[p.user_id] = p.ownerships.map((o: { owner_id: string; share_pct: number; owner: { display_name: string; avatar_url: string | null } | null }) => ({
+          owner_id: o.owner_id,
+          display_name: o.owner?.display_name || "Unknown",
+          avatar_url: o.owner?.avatar_url || null,
+          share_pct: o.share_pct,
+        }));
+      } else if (p.owner_id && p.owner) {
+        ownersByUser[p.user_id] = [{
+          owner_id: p.owner_id,
+          display_name: p.owner.display_name,
+          avatar_url: p.owner.avatar_url,
+          share_pct: 100,
+        }];
+      }
+    }
+
+    // Merge winner data into prizes
+    const winnersData = winnersRes.ok ? await winnersRes.json() : { prizes: [] };
+    const winnersByPrize: Record<string, { winners: PrizeWinner[]; locked: boolean }> = {};
+    for (const wp of winnersData.prizes || []) {
+      winnersByPrize[wp.id] = {
+        winners: (wp.winners || []).map((w: { user: { display_name: string; avatar_url: string | null } | null; user_id: string }) => ({
+          user_id: w.user_id,
+          display_name: w.user?.display_name || "Unknown",
+          avatar_url: w.user?.avatar_url || null,
+          owners: ownersByUser[w.user_id] || [],
+        })),
+        locked: !!(wp.linked_contest?.winners_locked_at),
+      };
+    }
+
+    const enrichedPrizes = (data.prizes || []).map((p: CalcuttaPrize) => ({
+      ...p,
+      winners: winnersByPrize[p.id]?.winners || [],
+      locked: winnersByPrize[p.id]?.locked || false,
+    }));
+    setPrizes(enrichedPrizes);
   }, []);
 
   useEffect(() => {
@@ -344,6 +408,22 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
     });
   }
 
+  async function handleToggleWinnerPaid(prizeId: string, ownerId: string) {
+    if (!contestId) return;
+    const key = `${prizeId}:${ownerId}`;
+    setPaidWinners((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+    await fetch("/api/admin/calcutta", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "toggle_winner_paid", prize_id: prizeId, owner_id: ownerId }),
+    });
+  }
+
   // Toggle buyback after the fact
   async function handleBuyback(participantId: string) {
     if (!contestId) return;
@@ -412,53 +492,37 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
         <div className="bg-red-50 text-red-700 text-sm px-3 py-2 rounded-lg">{error}</div>
       )}
 
-      {/* Prize Breakdown accordion */}
-      <div className="border border-gray-200 rounded-xl overflow-hidden">
-        <button
-          onClick={() => setPrizesOpen(!prizesOpen)}
-          className="flex items-center justify-between w-full px-4 py-3 bg-gray-50 text-left"
-        >
-          <span className="text-sm font-semibold text-gray-700">
-            Prize Breakdown
-            {prizes.length > 0 && (
-              <span className="ml-2 text-xs text-gray-400 font-normal">
-                {prizes.length} prize{prizes.length !== 1 ? "s" : ""} · {totalPercentage.toFixed(0)}%
-              </span>
-            )}
-          </span>
-          <svg
-            className={`w-4 h-4 text-gray-400 transition-transform ${prizesOpen ? "rotate-180" : ""}`}
-            fill="none" stroke="currentColor" viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      {/* Prize Breakdown — percentages only */}
+      <CollapsibleSection
+        title="Prize Breakdown"
+        summary={prizes.length > 0
+          ? `${prizes.length} prize${prizes.length !== 1 ? "s" : ""} · ${totalPercentage.toFixed(0)}%`
+          : "No prizes configured"
+        }
+        icon={
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-        </button>
-        {prizesOpen && (
-          <div className="px-4 py-3 space-y-2 border-t border-gray-200">
-            {prizes.length > 0 && (
-              <div className="space-y-1.5">
-                {prizes.map((prize) => {
-                  const baseName = prize.linked_contest?.name || prize.prize_name || "Unknown";
-                  const displayName = prize.place === 1
-                    ? `${baseName} Champion`
-                    : prize.place === 2
-                    ? `${baseName} Runner-Up`
-                    : `${baseName} ${ordinal(prize.place)} Place`;
-                  const perPlayerPct = prize.per_player ? prize.percentage / prize.player_count : null;
-                  return (
-                    <div key={prize.id} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900">{displayName}</p>
-                        {prize.per_player && perPlayerPct != null && (
-                          <p className="text-xs text-gray-400">Split across {prize.player_count} players</p>
-                        )}
-                      </div>
-                      <span className="text-sm font-bold text-purple-700 flex-shrink-0">{prize.percentage}%</span>
-                      {totalPool > 0 && (
-                        <span className="text-xs text-gray-400 flex-shrink-0 w-16 text-right">
-                          ${((totalPool * prize.percentage) / 100).toFixed(0)}
-                        </span>
-                      )}
+        }
+        iconColor="text-purple-700"
+      >
+        <div className="space-y-3">
+          {prizes.length > 0 && (
+            <div className="space-y-1">
+              {prizes.map((prize) => {
+                const baseName = prize.linked_contest?.name || prize.prize_name || "Unknown";
+                const displayName = prize.place === 1
+                  ? `${baseName} Champion`
+                  : prize.place === 2
+                  ? `${baseName} Runner-Up`
+                  : `${baseName} ${ordinal(prize.place)} Place`;
+                const payout = totalPool > 0 ? (totalPool * prize.percentage) / 100 : 0;
+                return (
+                  <div key={prize.id} className="flex items-center justify-between rounded-lg px-3 py-2">
+                    <p className="text-sm font-medium text-gray-900 truncate flex-1 min-w-0">{displayName}</p>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {payout > 0 && <span className="text-sm font-semibold text-gray-700">${payout.toFixed(0)}</span>}
+                      <span className="text-xs text-gray-400 w-10 text-right">{prize.percentage}%</span>
                       <button
                         onClick={() => {
                           setEditingPrizeId(prize.id);
@@ -469,61 +533,150 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
                           setPrizePlayerCount(String(prize.player_count));
                           setPrizeDrawerOpen(true);
                         }}
-                        className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                        className="text-gray-300 hover:text-gray-600"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                         </svg>
                       </button>
-                      <button
-                        onClick={() =>
-                          setConfirmModal({
-                            title: "Delete Prize",
-                            message: `Delete "${prize.prize_name}" from the prize breakdown?`,
-                            onConfirm: () => handleDeletePrize(prize.id),
-                          })
-                        }
-                        className="text-gray-300 hover:text-red-500 flex-shrink-0"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
                     </div>
-                  );
-                })}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
-                <div className={`flex items-center justify-between px-3 py-2 rounded-xl ${
-                  Math.abs(totalPercentage - 100) < 0.01 ? "bg-green-50" : "bg-yellow-50"
-                }`}>
-                  <span className="text-sm font-medium text-gray-700">Total</span>
-                  <span className={`text-sm font-bold ${
-                    Math.abs(totalPercentage - 100) < 0.01 ? "text-green-700" : "text-yellow-700"
-                  }`}>
-                    {totalPercentage.toFixed(1)}%
-                    {Math.abs(totalPercentage - 100) >= 0.01 && " (should be 100%)"}
-                  </span>
+          {/* Total bar */}
+          {prizes.length > 0 && (
+            <div className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-sm ${
+              Math.abs(totalPercentage - 100) < 0.01 ? "bg-green-50 text-green-700" : "bg-yellow-50 text-yellow-700"
+            }`}>
+              <span className="font-medium">Total</span>
+              <span className="font-bold">
+                {totalPool > 0 && <span className="mr-2">${totalPool.toFixed(0)}</span>}
+                {totalPercentage.toFixed(1)}%
+                {Math.abs(totalPercentage - 100) >= 0.01 && " (should be 100%)"}
+              </span>
+            </div>
+          )}
+
+          <button
+            onClick={() => {
+              setEditingPrizeId(null);
+              setPrizeLinkedContestId("");
+              setPrizePlace(1);
+              setPrizePercentage("");
+              setPrizePerPlayer(false);
+              setPrizePlayerCount("4");
+              setPrizeDrawerOpen(true);
+            }}
+            className="w-full py-2.5 bg-purple-600 text-white text-sm font-semibold rounded-xl hover:bg-purple-700 transition-colors"
+          >
+            Add Prize
+          </button>
+        </div>
+      </CollapsibleSection>
+
+      {/* Winners & Payouts */}
+      <CollapsibleSection
+        title="Winners & Payouts"
+        summary={(() => {
+          const resolved = prizes.filter((p) => (p.winners?.length || 0) > 0).length;
+          return resolved > 0 ? `${resolved}/${prizes.length} resolved` : "No winners yet";
+        })()}
+        icon={
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+          </svg>
+        }
+        iconColor="text-green-700"
+      >
+        <div className="space-y-3">
+          {prizes.map((prize) => {
+            const baseName = prize.linked_contest?.name || prize.prize_name || "Unknown";
+            const displayName = prize.place === 1
+              ? `${baseName} Champion`
+              : prize.place === 2
+              ? `${baseName} Runner-Up`
+              : `${baseName} ${ordinal(prize.place)} Place`;
+            const hasWinners = (prize.winners?.length || 0) > 0;
+            const payout = totalPool > 0 ? (totalPool * prize.percentage) / 100 : 0;
+            const winnerCount = prize.winners?.length || 1;
+            const perPlayerPayout = payout / winnerCount;
+
+            return (
+              <div key={prize.id} className={`rounded-lg px-3 py-2 ${hasWinners ? "bg-emerald-50" : "bg-gray-50"}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-sm font-semibold text-gray-900">
+                    {displayName} <span className="text-gray-400 font-normal">({prize.percentage}%)</span>
+                  </p>
+                  {payout > 0 && <span className="text-sm font-bold text-green-700">${payout.toFixed(0)}</span>}
                 </div>
+                {hasWinners ? (
+                  <div className="space-y-1.5">
+                    {(() => {
+                      // Collect unique owners across all winners for this prize
+                      const seen = new Set<string>();
+                      const owners: { owner_id: string; display_name: string; avatar_url: string | null; share_pct: number; payout: number }[] = [];
+                      for (const w of prize.winners!) {
+                        for (const o of w.owners) {
+                          if (!seen.has(o.owner_id)) {
+                            seen.add(o.owner_id);
+                            owners.push({
+                              owner_id: o.owner_id,
+                              display_name: o.display_name,
+                              avatar_url: o.avatar_url,
+                              share_pct: o.share_pct,
+                              payout: perPlayerPayout * (o.share_pct / 100),
+                            });
+                          }
+                        }
+                      }
+                      return owners.map((o) => {
+                        const isPaid = paidWinners.has(`${prize.id}:${o.owner_id}`);
+                        return (
+                          <div key={o.owner_id} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={isPaid}
+                              onChange={() => handleToggleWinnerPaid(prize.id, o.owner_id)}
+                              className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 flex-shrink-0"
+                            />
+                            <span className="text-sm font-bold text-green-700 w-12 text-right flex-shrink-0">${o.payout.toFixed(0)}</span>
+                            {o.avatar_url ? (
+                              <img src={o.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                            ) : (
+                              <span className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center text-[9px] font-bold text-purple-700">
+                                {(o.display_name || "?")[0].toUpperCase()}
+                              </span>
+                            )}
+                            <span className={`text-sm font-semibold flex-1 ${isPaid ? "text-gray-400 line-through" : "text-gray-900"}`}>{o.display_name}</span>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 italic">Pending</p>
+                )}
               </div>
-            )}
+            );
+          })}
+        </div>
+      </CollapsibleSection>
 
-            <button
-              onClick={() => {
-                setEditingPrizeId(null);
-                setPrizeLinkedContestId("");
-                setPrizePlace(1);
-                setPrizePercentage("");
-                setPrizePerPlayer(false);
-                setPrizePlayerCount("4");
-                setPrizeDrawerOpen(true);
-              }}
-              className="w-full py-2.5 bg-purple-600 text-white text-sm font-semibold rounded-xl hover:bg-purple-700 transition-colors"
-            >
-              Add Prize
-            </button>
-          </div>
-        )}
-      </div>
+      {/* Auction */}
+      <CollapsibleSection
+        title="Auction"
+        summary={allSold ? `${participants.length} sold · $${totalPool.toFixed(0)} pool` : `${participants.filter((p) => p.sold_at).length}/${participants.length} sold`}
+        icon={
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+        }
+        iconColor="text-purple-700"
+      >
+        <div className="space-y-3">
 
       {/* Tab bar */}
       <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
@@ -1111,6 +1264,9 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
           </div>
         );
       })()}
+
+        </div>
+      </CollapsibleSection>
 
       <BottomDrawer
         open={prizeDrawerOpen}

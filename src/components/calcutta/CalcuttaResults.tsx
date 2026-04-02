@@ -37,6 +37,14 @@ interface ResultParticipant {
   ownerships?: OwnershipRecord[];
 }
 
+interface PrizeWinner {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  is_playoff: boolean;
+  notes: string | null;
+}
+
 interface Prize {
   id: string;
   prize_name: string;
@@ -44,6 +52,8 @@ interface Prize {
   percentage: number;
   per_player: boolean;
   player_count: number;
+  winners?: PrizeWinner[];
+  total_payout?: number;
 }
 
 interface TeamPartner {
@@ -104,16 +114,20 @@ function fake40YardDash(displayName: string): string {
 }
 
 
-export function CalcuttaResults({ contestId }: { contestId: string }) {
+export function CalcuttaResults({ contestId, userId }: { contestId: string; userId?: string }) {
   const [participants, setParticipants] = useState<ResultParticipant[]>([]);
   const [prizes, setPrizes] = useState<Prize[]>([]);
   const [activeOrder, setActiveOrder] = useState<number | null>(null);
   const [spotlight, setSpotlight] = useState<SpotlightData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [resultsView, setResultsView] = useState<"auction" | "summary">("auction");
+  const [resultsView, setResultsView] = useState<"auction" | "summary" | "winners">("auction");
   const [expandedBuyers, setExpandedBuyers] = useState<Set<string>>(new Set());
   const [resultsSort, setResultsSort] = useState<"order" | "name" | "amount">("order");
   const [summarySort, setSummarySort] = useState<"name" | "count" | "amount">("name");
+
+  const [pool, setPool] = useState(0);
+  const [buyerPaid, setBuyerPaid] = useState(true);
+  const [buyerOwes, setBuyerOwes] = useState(0);
 
   const fetchData = useCallback(async () => {
     try {
@@ -124,6 +138,9 @@ export function CalcuttaResults({ contestId }: { contestId: string }) {
       setPrizes(data.prizes || []);
       setActiveOrder(data.active_order);
       setSpotlight(data.spotlight || null);
+      if (data.pool != null) setPool(data.pool);
+      if (data.buyer_paid != null) setBuyerPaid(data.buyer_paid);
+      if (data.buyer_owes != null) setBuyerOwes(data.buyer_owes);
     } catch {
       // retry next poll
     } finally {
@@ -183,6 +200,28 @@ export function CalcuttaResults({ contestId }: { contestId: string }) {
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-6">
+      {/* Venmo payment prompt for unpaid buyers */}
+      {!buyerPaid && buyerOwes > 0 && (() => {
+        const venmoDeepLink = `venmo://paycharge?txn=pay&recipients=jwatson1869&amount=${buyerOwes.toFixed(2)}&note=${encodeURIComponent("Calcutta Auction")}`;
+        const venmoWebLink = `https://venmo.com/jwatson1869?txn=pay&amount=${buyerOwes.toFixed(2)}&note=${encodeURIComponent("Calcutta Auction")}`;
+        return (
+          <div className="space-y-2">
+            <a
+              href={venmoDeepLink}
+              onClick={() => {
+                setTimeout(() => { window.open(venmoWebLink, "_blank"); }, 500);
+              }}
+              className="relative flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-[#008CFF] text-white font-bold tracking-wide active:bg-[#0074D4] transition-colors overflow-hidden"
+            >
+              <div className="absolute top-0 bottom-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/25 to-transparent" style={{ animation: "shimmer 2.5s ease-in-out infinite" }} />
+              <img src="/Venmo.png" alt="Venmo" className="w-8 h-8 object-contain relative" />
+              <span className="relative">Pay Randy Watson ${buyerOwes.toFixed(2)}</span>
+            </a>
+            <p className="text-xs text-gray-400 text-center">You can also give Randy Watson cash.</p>
+          </div>
+        );
+      })()}
+
       {!auctionStarted && <h1 className="text-2xl font-bold text-gray-900">Calcutta</h1>}
 
       {participants.length === 0 && (
@@ -393,36 +432,6 @@ export function CalcuttaResults({ contestId }: { contestId: string }) {
         </div>
       )}
 
-      {allSold && prizes.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-            Prize Payouts
-          </h2>
-          {prizes.map((prize) => {
-            const totalPayout = (totalPool * prize.percentage) / 100;
-            const perPlayerPayout = prize.per_player ? totalPayout / prize.player_count : null;
-            const baseName = prize.prize_name || "Unknown";
-            const displayName = prize.place === 1
-              ? `${baseName} Champion`
-              : prize.place === 2
-              ? `${baseName} Runner-Up`
-              : `${baseName} ${ordinal(prize.place)} Place`;
-            return (
-              <div key={prize.id} className="flex items-center gap-3 bg-green-50 rounded-xl px-3 py-2.5">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{displayName}</p>
-                  {prize.per_player && perPlayerPayout != null && (
-                    <p className="text-xs text-gray-400">${perPlayerPayout.toFixed(0)} each × {prize.player_count} players</p>
-                  )}
-                </div>
-                <p className="text-lg font-bold text-green-700">${totalPayout.toFixed(0)}</p>
-                <p className="text-xs text-gray-400 w-10 text-right">{prize.percentage}%</p>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
       {!auctionStarted && prizes.length > 0 && (
         <div className="space-y-2">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
@@ -454,7 +463,7 @@ export function CalcuttaResults({ contestId }: { contestId: string }) {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-              {resultsView === "auction" ? "Auction Results" : "Buyer Summary"}
+              {resultsView === "auction" ? "Auction Results" : resultsView === "winners" ? "Winners & Payouts" : "Buyer Summary"}
             </h2>
             <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
               <button
@@ -464,6 +473,14 @@ export function CalcuttaResults({ contestId }: { contestId: string }) {
                 }`}
               >
                 Results
+              </button>
+              <button
+                onClick={() => setResultsView("winners")}
+                className={`text-xs font-medium px-2.5 py-1 rounded-md transition-colors ${
+                  resultsView === "winners" ? "bg-white text-purple-700 shadow-sm" : "text-gray-500"
+                }`}
+              >
+                Winners
               </button>
               <button
                 onClick={() => setResultsView("summary")}
@@ -507,6 +524,112 @@ export function CalcuttaResults({ contestId }: { contestId: string }) {
               ))}
             </div>
           )}
+
+          {resultsView === "winners" && (() => {
+            // Build lookup: user_id -> ownership info from participants
+            const ownershipByUser: Record<string, OwnershipRecord[]> = {};
+            for (const p of participants) {
+              if (p.ownerships && p.ownerships.length > 0) {
+                ownershipByUser[p.user_id] = p.ownerships;
+              } else if (p.owner) {
+                ownershipByUser[p.user_id] = [{
+                  id: "",
+                  owner_id: p.owner.id,
+                  share_pct: 100,
+                  amount_paid: Number(p.bid_amount) || 0,
+                  is_buyback: false,
+                  owner: p.owner,
+                }];
+              }
+            }
+
+            return (
+              <div className="space-y-2">
+                {prizes.filter((p) => (p.winners?.length || 0) > 0 || p.total_payout).map((prize) => {
+                  const hasWinners = (prize.winners?.length || 0) > 0;
+                  const totalPayout = prize.total_payout || (pool * prize.percentage / 100);
+                  const winnerCount = prize.winners?.length || 1;
+                  const perPlayerPayout = totalPayout / winnerCount;
+                  const baseName = prize.prize_name || "Unknown";
+                  const displayName = prize.place === 1
+                    ? `${baseName} Champion`
+                    : prize.place === 2
+                    ? `${baseName} Runner-Up`
+                    : `${baseName} ${ordinal(prize.place)} Place`;
+
+                  return (
+                    <div
+                      key={prize.id}
+                      className={`rounded-xl p-3 ${
+                        hasWinners ? "bg-emerald-50 border border-emerald-200" : "bg-gray-50 border border-gray-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm font-semibold text-gray-900">
+                          {displayName} <span className="text-gray-400 font-normal">({prize.percentage}%)</span>
+                        </p>
+                        <p className="text-sm font-bold text-green-700">${totalPayout.toFixed(0)}</p>
+                      </div>
+                      {hasWinners ? (
+                        <div className="space-y-2.5 mt-1">
+                          {prize.winners!.map((w) => {
+                            const ownerships = ownershipByUser[w.user_id] || [];
+                            return (
+                              <div key={w.user_id}>
+                                {ownerships.map((o) => {
+                                  const ownerPayout = perPlayerPayout * (o.share_pct / 100);
+                                  return (
+                                    <div key={o.owner_id} className="flex items-center gap-2">
+                                      <span className="text-sm font-bold text-green-700 flex-shrink-0 w-12 text-right">
+                                        ${ownerPayout.toFixed(0)}
+                                      </span>
+                                      {o.owner?.avatar_url ? (
+                                        <img src={o.owner.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
+                                      ) : (
+                                        <span className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-xs font-bold text-purple-700">
+                                          {(o.owner?.display_name || "?")[0].toUpperCase()}
+                                        </span>
+                                      )}
+                                      <p className="text-sm text-gray-700 flex-1">
+                                        <span className="font-semibold text-gray-900">{o.owner?.display_name || "Unknown"}</span>
+                                        {" owns "}
+                                        <span className="font-medium">{w.display_name}</span>
+                                        {o.share_pct < 100 && <span className="text-gray-400"> ({o.share_pct}%)</span>}
+                                      </p>
+                                    </div>
+                                  );
+                                })}
+                                {ownerships.length === 0 && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-bold text-green-700 flex-shrink-0 w-12 text-right">
+                                      ${perPlayerPayout.toFixed(0)}
+                                    </span>
+                                    {w.avatar_url ? (
+                                      <img src={w.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
+                                    ) : (
+                                      <span className="w-6 h-6 rounded-full bg-emerald-200 flex items-center justify-center text-xs font-bold text-emerald-700">
+                                        {(w.display_name || "?")[0].toUpperCase()}
+                                      </span>
+                                    )}
+                                    <span className="text-sm text-gray-700 flex-1">{w.display_name}</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 italic">Pending</p>
+                      )}
+                    </div>
+                  );
+                })}
+                {prizes.every((p) => (p.winners?.length || 0) === 0) && (
+                  <p className="text-sm text-gray-400 text-center py-4">No winners resolved yet.</p>
+                )}
+              </div>
+            );
+          })()}
 
           {resultsView === "auction" && [...participants].sort((a, b) => {
             if (resultsSort === "name") return (a.user?.display_name || "").localeCompare(b.user?.display_name || "");

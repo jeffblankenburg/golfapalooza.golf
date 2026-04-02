@@ -40,5 +40,5 @@ export default async function CalcuttaPage() {
     );
   }
 
-  return <CalcuttaResults contestId={contest.id} />;
+  return <CalcuttaResults contestId={contest.id} userId={user.id} />;
 }

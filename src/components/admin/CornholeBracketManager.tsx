@@ -3,13 +3,16 @@
 import { useState, useEffect, useCallback } from "react";
 import { BracketView, BracketMatchData } from "@/components/BracketView";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import { computeChampionId } from "@/lib/bracket/champion";
 
 export function CornholeBracketManager({
   tripId,
   contestType,
+  onChampionCrowned,
 }: {
   tripId: string;
   contestType: "cornhole_singles" | "cornhole_doubles";
+  onChampionCrowned?: () => void;
 }) {
   const [contestId, setContestId] = useState<string | null>(null);
   const [matches, setMatches] = useState<BracketMatchData[]>([]);
@@ -21,12 +24,15 @@ export function CornholeBracketManager({
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
     message: string;
+    confirmLabel?: string;
+    destructive?: boolean;
     onConfirm: () => void;
   } | null>(null);
+  const [locked, setLocked] = useState(false);
 
   const isSingles = contestType === "cornhole_singles";
 
-  // Fetch contest ID
+  // Fetch contest ID + lock status
   const fetchContest = useCallback(async () => {
     const res = await fetch(`/api/admin/contests?trip_id=${tripId}`);
     const data = await res.json();
@@ -34,6 +40,7 @@ export function CornholeBracketManager({
       (c: { contest_type: string }) => c.contest_type === contestType
     );
     setContestId(c?.id || null);
+    setLocked(!!c?.winners_locked_at);
     return c?.id || null;
   }, [tripId, contestType]);
 
@@ -68,7 +75,9 @@ export function CornholeBracketManager({
       setLoading(false);
     }
     init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchContest, fetchBracket, fetchParticipantCount]);
+
 
   // Generate bracket (random seeding handled server-side)
   const handleGenerate = async () => {
@@ -90,6 +99,8 @@ export function CornholeBracketManager({
     setConfirmModal({
       title: "Reset Bracket",
       message: "This will delete the entire bracket. You can regenerate it afterwards.",
+      confirmLabel: "Reset",
+      destructive: true,
       onConfirm: async () => {
         setConfirmModal(null);
         if (!contestId) return;
@@ -249,6 +260,22 @@ export function CornholeBracketManager({
     return Array.from(byId.values());
   };
 
+  // Unlock the bracket: clears winners and removes lock server-side
+  const handleUnlock = async () => {
+    if (!contestId) return;
+    setConfirmModal(null);
+    try {
+      await fetch("/api/admin/contest-winners/lock", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contest_id: contestId, action: "unlock" }),
+      });
+      setLocked(false);
+    } catch (err) {
+      console.error("Unlock bracket error:", err);
+    }
+  };
+
   // Advance / un-advance a match winner (optimistic)
   const handleAdvance = async (matchId: string, participantId: string) => {
     if (!contestId) return;
@@ -265,11 +292,19 @@ export function CornholeBracketManager({
         body: JSON.stringify({ match_id: matchId, participant_id: participantId }),
       });
       if (!res.ok) {
-        // Revert on failure
         setMatches(prevMatches);
+      } else {
+        // Check if there's now a champion — notify parent to update
+        setMatches((current) => {
+          if (computeChampionId(current)) {
+            setTimeout(() => onChampionCrowned?.(), 100);
+            setLocked(true);
+          }
+          return current;
+        });
       }
-    } catch {
-      // Revert on network error
+    } catch (e) {
+      console.error("[Bracket advance error]", e);
       setMatches(prevMatches);
     }
   };
@@ -305,35 +340,66 @@ export function CornholeBracketManager({
         </button>
       </div>
 
-      {/* Action buttons */}
-      <div className="flex gap-2 mb-4">
-        {matches.length === 0 ? (
-          <button
-            onClick={handleGenerate}
-            disabled={saving === "generate" || participantCount < 2}
-            className="flex-1 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg active:bg-green-700 disabled:opacity-50"
-          >
-            {saving === "generate" ? "Generating..." : "Generate Bracket"}
-          </button>
-        ) : (
-          <>
+      {/* Locked state: unlock button */}
+      {locked && (
+        <div className="mb-4 space-y-2">
+          <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+            <svg className="w-4 h-4 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <p className="text-xs text-amber-700 flex-1">
+              This bracket is locked because winners have been resolved.
+            </p>
+            <button
+              onClick={() =>
+                setConfirmModal({
+                  title: "Unlock Bracket",
+                  message:
+                    "Unlocking this bracket will clear the resolved winners for this contest and allow bracket changes. Are you sure?",
+                  confirmLabel: "Unlock",
+                  destructive: false,
+                  onConfirm: handleUnlock,
+                })
+              }
+              className="text-xs font-medium text-amber-700 bg-amber-100 px-3 py-1.5 rounded-lg hover:bg-amber-200 flex-shrink-0"
+            >
+              Unlock
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Action buttons (hidden when locked) */}
+      {!locked && (
+        <div className="flex gap-2 mb-4">
+          {matches.length === 0 ? (
             <button
               onClick={handleGenerate}
-              disabled={!!saving}
+              disabled={saving === "generate" || participantCount < 2}
               className="flex-1 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg active:bg-green-700 disabled:opacity-50"
             >
-              {saving === "generate" ? "Regenerating..." : "Regenerate (Reshuffle)"}
+              {saving === "generate" ? "Generating..." : "Generate Bracket"}
             </button>
-            <button
-              onClick={handleReset}
-              disabled={!!saving}
-              className="py-2.5 px-4 bg-red-50 text-red-600 text-sm font-semibold rounded-lg active:bg-red-100 disabled:opacity-50"
-            >
-              Reset
-            </button>
-          </>
-        )}
-      </div>
+          ) : (
+            <>
+              <button
+                onClick={handleGenerate}
+                disabled={!!saving}
+                className="flex-1 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg active:bg-green-700 disabled:opacity-50"
+              >
+                {saving === "generate" ? "Regenerating..." : "Regenerate (Reshuffle)"}
+              </button>
+              <button
+                onClick={handleReset}
+                disabled={!!saving}
+                className="py-2.5 px-4 bg-red-50 text-red-600 text-sm font-semibold rounded-lg active:bg-red-100 disabled:opacity-50"
+              >
+                Reset
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {participantCount < 2 && matches.length === 0 && (
         <p className="text-xs text-amber-600 mb-4">
@@ -347,7 +413,7 @@ export function CornholeBracketManager({
         matches={matches}
         nameMap={nameMap}
         showRealNames={showRealNames}
-        onSlotClick={handleAdvance}
+        onSlotClick={locked ? undefined : handleAdvance}
       />
 
       {/* Confirm modal */}
@@ -355,8 +421,8 @@ export function CornholeBracketManager({
         open={!!confirmModal}
         title={confirmModal?.title || ""}
         message={confirmModal?.message || ""}
-        confirmLabel="Reset"
-        destructive
+        confirmLabel={confirmModal?.confirmLabel || "Confirm"}
+        destructive={confirmModal?.destructive ?? true}
         onConfirm={() => confirmModal?.onConfirm()}
         onCancel={() => setConfirmModal(null)}
       />

@@ -254,12 +254,72 @@ export async function GET(request: Request) {
       };
     });
 
+    // Fetch resolved winners for prizes
+    const prizeIds = (prizes || []).map((p) => p.id);
+    const { data: winnerRows } = prizeIds.length > 0
+      ? await adminClient
+          .from("contest_winners")
+          .select("prize_id, user_id, is_playoff, notes, user:users!contest_winners_user_id_fkey(id, display_name, avatar_url)")
+          .in("prize_id", prizeIds)
+      : { data: [] };
+
+    // Group winners by prize_id
+    const winnersByPrize: Record<string, Array<{ user_id: string; display_name: string; avatar_url: string | null; is_playoff: boolean; notes: string | null }>> = {};
+    for (const w of winnerRows || []) {
+      const wu = Array.isArray(w.user) ? w.user[0] : w.user;
+      if (!winnersByPrize[w.prize_id]) winnersByPrize[w.prize_id] = [];
+      winnersByPrize[w.prize_id].push({
+        user_id: w.user_id,
+        display_name: wu?.display_name || "Unknown",
+        avatar_url: wu?.avatar_url || null,
+        is_playoff: w.is_playoff,
+        notes: w.notes,
+      });
+    }
+
+    // Calculate pool for payout display
+    const pool = normalizedParticipants.reduce((sum, p) => sum + (Number(p.bid_amount) || 0), 0);
+
+    // Enrich prizes with winners
+    const enrichedPrizes = prizes.map((p) => ({
+      ...p,
+      winners: winnersByPrize[p.id] || [],
+      total_payout: pool * p.percentage / 100,
+    }));
+
+    // Check if the current user is a buyer who hasn't paid
+    const { data: buyerPaidRow } = await adminClient
+      .from("calcutta_buyer_paid")
+      .select("id")
+      .eq("contest_id", contestId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    // Calculate total amount this user owes as a buyer
+    let buyerOwes = 0;
+    if (!buyerPaidRow) {
+      for (const p of normalizedParticipants) {
+        if (p.ownerships && p.ownerships.length > 0) {
+          for (const o of p.ownerships) {
+            if (o.owner_id === user.id) {
+              buyerOwes += Number(o.amount_paid) || 0;
+            }
+          }
+        } else if (p.owner_id === user.id) {
+          buyerOwes += Number(p.bid_amount) || 0;
+        }
+      }
+    }
+
     return NextResponse.json({
       contest_name: contest.name,
       active_order: contest.calcutta_active_order,
       participants: normalizedParticipants,
-      prizes: prizes || [],
+      prizes: enrichedPrizes,
+      pool,
       spotlight: activeParticipant ? { teamPartners, accolades, cornholeSinglesIn } : null,
+      buyer_paid: !!buyerPaidRow,
+      buyer_owes: buyerOwes,
     });
   } catch (error) {
     console.error("Get calcutta display error:", error);

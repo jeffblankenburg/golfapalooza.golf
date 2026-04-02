@@ -8,6 +8,7 @@ interface CollapsibleSectionProps {
   icon: React.ReactNode;
   iconColor?: string;
   defaultOpen?: boolean;
+  badge?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -17,6 +18,7 @@ export function CollapsibleSection({
   icon,
   iconColor,
   defaultOpen = false,
+  badge,
   children,
 }: CollapsibleSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -47,6 +49,7 @@ export function CollapsibleSection({
           <div className="text-sm font-semibold text-gray-900">{title}</div>
           <div className="text-xs text-gray-500 truncate">{summary}</div>
         </div>
+        {badge}
         <svg
           className={`w-5 h-5 text-gray-400 transition-transform ${
             open ? "rotate-180" : ""

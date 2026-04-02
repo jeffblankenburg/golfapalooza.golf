@@ -235,8 +235,8 @@ export default async function HomePage() {
 
   const soldCount = (calcuttaSoldResult as { count: number | null }).count || 0;
 
-  // ── Phase 4: teammates + calcutta golfers in parallel ──
-  const [teammatesResult, calcuttaGolfersResult] = await Promise.all([
+  // ── Phase 4: teammates + calcutta golfers + winnings in parallel ──
+  const [teammatesResult, calcuttaGolfersResult, winningsResult] = await Promise.all([
     bestMatch?.source === "scramble" && bestMatch.scrambleTeamId
       ? queryClient.from("scramble_team_members").select("user_id, user:users(display_name)").eq("team_id", bestMatch.scrambleTeamId)
       : bestMatch
@@ -244,6 +244,10 @@ export default async function HomePage() {
         : Promise.resolve({ data: null as null }),
     needCalcuttaSold && soldCount > 0
       ? queryClient.from("contest_participants").select("user_id, user:users!contest_participants_user_id_fkey(display_name, avatar_url)").eq("contest_id", calcuttaContest!.id).eq("owner_id", effectiveUserId)
+      : Promise.resolve({ data: null as null }),
+    // Fetch contest winners for winnings calculation
+    calcuttaContest
+      ? queryClient.from("contest_winners").select("prize_id, user_id").then((r) => r)
       : Promise.resolve({ data: null as null }),
   ]);
 
@@ -290,6 +294,88 @@ export default async function HomePage() {
         avatarUrl: (u as { display_name: string; avatar_url: string | null })?.avatar_url || null,
       };
     });
+  }
+
+  // Process winnings
+  let myWinnings: { total: number; breakdown: { prizeName: string; amount: number }[] } | null = null;
+  if (calcuttaContest && winningsResult.data && winningsResult.data.length > 0) {
+    // Get all ownership records for the current user
+    const { data: myOwnership } = await queryClient
+      .from("calcutta_ownership")
+      .select("participant_id, share_pct, participant:contest_participants!inner(user_id)")
+      .eq("owner_id", effectiveUserId);
+
+    if (myOwnership && myOwnership.length > 0) {
+      // Get owned user_ids
+      const ownedUserIds = new Set(
+        myOwnership.map((o) => {
+          const p = Array.isArray(o.participant) ? o.participant[0] : o.participant;
+          return (p as { user_id: string })?.user_id;
+        }).filter(Boolean)
+      );
+
+      // Build ownership share lookup: user_id -> share_pct
+      const shareByUser: Record<string, number> = {};
+      for (const o of myOwnership) {
+        const p = Array.isArray(o.participant) ? o.participant[0] : o.participant;
+        const uid = (p as { user_id: string })?.user_id;
+        if (uid) shareByUser[uid] = o.share_pct;
+      }
+
+      // Get pool
+      const { data: poolParticipants } = await queryClient
+        .from("contest_participants")
+        .select("bid_amount")
+        .eq("contest_id", calcuttaContest.id)
+        .not("bid_amount", "is", null);
+      const pool = (poolParticipants || []).reduce((s, p) => s + (Number(p.bid_amount) || 0), 0);
+
+      // Get prizes
+      const { data: prizes } = await queryClient
+        .from("calcutta_prizes")
+        .select("id, prize_name, percentage, linked_contest:contests!calcutta_prizes_linked_contest_id_fkey(name)")
+        .eq("contest_id", calcuttaContest.id);
+
+      // Check which contest_winners match owned players
+      const winnerRows = winningsResult.data as { prize_id: string; user_id: string }[];
+      const breakdown: { prizeName: string; amount: number }[] = [];
+      let total = 0;
+
+      const prizeMap = new Map((prizes || []).map((p) => [p.id, p]));
+
+      // Group winners by prize
+      const winnersByPrize: Record<string, string[]> = {};
+      for (const w of winnerRows) {
+        if (!winnersByPrize[w.prize_id]) winnersByPrize[w.prize_id] = [];
+        winnersByPrize[w.prize_id].push(w.user_id);
+      }
+
+      for (const [prizeId, userIds] of Object.entries(winnersByPrize)) {
+        const prize = prizeMap.get(prizeId);
+        if (!prize) continue;
+
+        const totalPayout = pool * prize.percentage / 100;
+        const perPlayerPayout = totalPayout / userIds.length;
+        const lc = Array.isArray(prize.linked_contest) ? prize.linked_contest[0] : prize.linked_contest;
+        const prizeName = (lc as { name: string } | null)?.name || prize.prize_name || "Prize";
+
+        let prizeEarnings = 0;
+        for (const uid of userIds) {
+          if (ownedUserIds.has(uid) && shareByUser[uid]) {
+            prizeEarnings += perPlayerPayout * (shareByUser[uid] / 100);
+          }
+        }
+
+        if (prizeEarnings > 0) {
+          breakdown.push({ prizeName, amount: prizeEarnings });
+          total += prizeEarnings;
+        }
+      }
+
+      if (total > 0) {
+        myWinnings = { total, breakdown };
+      }
+    }
   }
 
   // Process schedule
@@ -401,6 +487,7 @@ export default async function HomePage() {
       kgbCupActiveRound={kgbCupActiveRound}
       calcuttaAuctionActive={calcuttaContest?.calcutta_active_order != null && calcuttaContest.calcutta_active_order > 0}
       pickemUrgent={pickemUrgent}
+      myWinnings={myWinnings}
     />
   );
 }

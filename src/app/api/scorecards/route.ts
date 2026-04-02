@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getStrokesOnHole, sortByDifficulty } from "@/lib/golf/stroke-distribution";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -121,9 +122,137 @@ export async function GET(request: Request) {
     }),
   }));
 
+  // Fetch contest verification state
+  const { data: contestState } = await supabase
+    .from("contests")
+    .select("verified_at")
+    .eq("id", contestId)
+    .single();
+
+  // Compute tiebreaker ordering and notes from actual scores
+  // Sort teams by net score, then break ties using handicap hole playoff
+  interface RankedTeam { id: string; net: number; note?: string }
+  const ranked: RankedTeam[] = [];
+  const tiebreaker_notes: Record<string, string> = {}; // team_id -> note
+
+  if (contestState?.verified_at && holes.length > 0) {
+    const sortedHoles = sortByDifficulty(holes);
+
+    // Build score lookup
+    const scoreLookup: Record<string, Record<number, number>> = {};
+    for (const s of holeScores || []) {
+      if (!scoreLookup[s.team_id]) scoreLookup[s.team_id] = {};
+      scoreLookup[s.team_id][s.hole_number] = s.strokes;
+    }
+
+    // Build net scores
+    const teamNets: { id: string; net: number; handicap: number }[] = normalizedTeams
+      .filter((t) => t.gross_score !== null)
+      .map((t) => ({ id: t.id, net: t.gross_score! - t.team_handicap, handicap: t.team_handicap }));
+
+    teamNets.sort((a, b) => a.net - b.net);
+
+    // Group by net score
+    let i = 0;
+    while (i < teamNets.length) {
+      const group = [teamNets[i]];
+      while (i + 1 < teamNets.length && teamNets[i + 1].net === group[0].net) {
+        group.push(teamNets[++i]);
+      }
+      i++;
+
+      if (group.length === 1) {
+        ranked.push({ id: group[0].id, net: group[0].net });
+        continue;
+      }
+
+      // Tiebreak this group hole by hole
+      let remaining = [...group];
+      for (const hole of sortedHoles) {
+        if (remaining.length <= 1) break;
+
+        const netScores: { team: typeof remaining[0]; holeNet: number }[] = [];
+        let allHaveScores = true;
+        for (const team of remaining) {
+          const gross = scoreLookup[team.id]?.[hole.hole_number];
+          if (gross === undefined) { allHaveScores = false; break; }
+          const strokes = getStrokesOnHole(team.handicap, hole.hole_number, sortedHoles);
+          netScores.push({ team, holeNet: gross - strokes });
+        }
+        if (!allHaveScores) continue;
+
+        // Sort by hole net score ascending
+        netScores.sort((a, b) => a.holeNet - b.holeNet);
+
+        // Check if this hole differentiates anyone
+        const allSame = netScores.every((s) => s.holeNet === netScores[0].holeNet);
+        if (allSame) continue; // All tied on this hole, try next
+
+        const holePar = holes.find((h) => h.hole_number === hole.hole_number)?.par || 4;
+        const formatNet = (net: number) => {
+          if (net === holePar) return "net par";
+          if (net === holePar - 1) return "net birdie";
+          if (net === holePar - 2) return "net eagle";
+          if (net < holePar) return `net ${holePar - net} under`;
+          if (net === holePar + 1) return "net bogey";
+          if (net === holePar + 2) return "net double bogey";
+          return `net ${net - holePar} over`;
+        };
+        const allNets = netScores.map((s) => s.holeNet);
+        const bestNet = netScores[0].holeNet;
+
+        // Walk through sorted scores, grouping ties at each level
+        let pos = 0;
+        const nextRemaining: typeof remaining = [];
+        while (pos < netScores.length) {
+          // Find all teams tied at this score
+          const tiedAtScore = [netScores[pos]];
+          while (pos + 1 < netScores.length && netScores[pos + 1].holeNet === tiedAtScore[0].holeNet) {
+            tiedAtScore.push(netScores[++pos]);
+          }
+          pos++;
+
+          if (tiedAtScore.length === 1) {
+            // Unique score — resolved
+            const t = tiedAtScore[0];
+            const others = allNets.filter((n) => n !== t.holeNet);
+            if (t.holeNet === bestNet) {
+              tiebreaker_notes[t.team.id] = `Won tiebreaker on Hole ${hole.hole_number} with ${formatNet(t.holeNet)} (${t.holeNet}) vs ${others.join(", ")}`;
+            } else {
+              tiebreaker_notes[t.team.id] = `Lost tiebreaker on Hole ${hole.hole_number} with ${formatNet(t.holeNet)} (${t.holeNet}) vs ${bestNet}`;
+            }
+            ranked.push({ id: t.team.id, net: t.team.net });
+          } else {
+            // Still tied — need further tiebreaking on next hole
+            for (const t of tiedAtScore) {
+              nextRemaining.push(t.team);
+            }
+          }
+        }
+        remaining = nextRemaining;
+      }
+
+      // Any remaining unbroken ties get added in original order
+      for (const r of remaining) {
+        ranked.push({ id: r.id, net: r.net });
+      }
+    }
+
+    // Add teams without scores at the end
+    for (const t of normalizedTeams) {
+      if (!ranked.some((r) => r.id === t.id)) {
+        ranked.push({ id: t.id, net: Infinity });
+      }
+    }
+  }
+
   return NextResponse.json({
     teams: normalizedTeams,
     holeScores: holeScores || [],
     holes: holes.sort((a, b) => a.hole_number - b.hole_number),
+    contest_verified: !!contestState?.verified_at,
+    tiebreaker_notes,
+    // Correct ordering with tiebreakers applied (team IDs in order)
+    ranked_order: ranked.map((r) => r.id),
   });
 }

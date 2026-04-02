@@ -14,6 +14,8 @@ interface ScrambleContest {
   id: string;
   name: string;
   day_number: number | null;
+  verified_at: string | null;
+  winners_locked_at: string | null;
 }
 
 export default function ScramblesAdminPage() {
@@ -25,6 +27,7 @@ export default function ScramblesAdminPage() {
   const [selectedContestId, setSelectedContestId] = useState<string | null>(null);
   const [startDate, setStartDate] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
+  const [scoringResults, setScoringResults] = useState<Record<string, string>>({});
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
     message: string;
@@ -63,6 +66,27 @@ export default function ScramblesAdminPage() {
     if (scrambles.length > 0 && !selectedContestId) {
       setSelectedContestId(scrambles[0].id);
     }
+
+    // Fetch leaderboard results for verified contests
+    const results: Record<string, string> = {};
+    for (const c of scrambles) {
+      if (c.verified_at) {
+        try {
+          const lbRes = await fetch(`/api/scoring/leaderboard?contest_id=${c.id}`);
+          if (lbRes.ok) {
+            const lbData = await lbRes.json();
+            const teams = lbData.leaderboard || [];
+            if (teams.length >= 1) {
+              const winner = teams[0];
+              const relPar = winner.rel_par;
+              const scoreStr = relPar === 0 ? "E" : relPar > 0 ? `+${relPar}` : `${relPar}`;
+              results[c.id] = `${winner.members.join(", ")} (${scoreStr})`;
+            }
+          }
+        } catch { /* silent */ }
+      }
+    }
+    setScoringResults(results);
   }, [tripId, selectedContestId]);
 
   useEffect(() => {
@@ -168,19 +192,33 @@ export default function ScramblesAdminPage() {
           </svg>
         }
       >
-        <ScrambleManager tripId={tripId} />
+        <ScrambleManager tripId={tripId} contestId={selectedContestId} />
       </CollapsibleSection>
 
       <CollapsibleSection
+        key={`scoring-${selectedContest?.winners_locked_at || "open"}`}
         title="Scoring"
-        summary="Hole-by-hole scores &amp; BSPITW"
-        icon={
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
+        summary={
+          selectedContest && scoringResults[selectedContest.id]
+            ? scoringResults[selectedContest.id]
+            : selectedContest?.winners_locked_at
+            ? "Locked"
+            : "Hole-by-hole scores & BSPITW"
         }
+        icon={
+          selectedContest?.winners_locked_at ? (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          )
+        }
+        iconColor={selectedContest?.winners_locked_at ? "text-amber-700" : undefined}
       >
-        <ScoringManager tripId={tripId} />
+        <ScoringManager tripId={tripId} contestId={selectedContestId} onVerified={fetchContests} />
       </CollapsibleSection>
 
       {/* Reset all scrambles */}

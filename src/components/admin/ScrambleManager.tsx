@@ -37,7 +37,7 @@ interface Contest {
 
 type View = "days" | "teams";
 
-export function ScrambleManager({ tripId }: { tripId: string }) {
+export function ScrambleManager({ tripId, contestId: externalContestId }: { tripId: string; contestId?: string | null }) {
   const [contests, setContests] = useState<Contest[]>([]);
   const [selectedContest, setSelectedContest] = useState<Contest | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -89,6 +89,18 @@ export function ScrambleManager({ tripId }: { tripId: string }) {
     }
     init();
   }, [fetchContests]);
+
+  // When parent provides a contest ID, skip the day selector
+  useEffect(() => {
+    if (!externalContestId || contests.length === 0) return;
+    const target = contests.find((c) => c.id === externalContestId);
+    if (target && selectedContest?.id !== target.id) {
+      setSelectedContest(target);
+      setView("teams");
+      setLoading(true);
+      fetchTeams(target.id).then(() => setLoading(false));
+    }
+  }, [externalContestId, contests, selectedContest?.id, fetchTeams]);
 
   // ── Team CRUD ──
 

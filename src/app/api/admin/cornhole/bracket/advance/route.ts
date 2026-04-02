@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkIsAdmin } from "@/lib/permissions-server";
+import { computeChampionId } from "@/lib/bracket/champion";
+import { resolveAllForContest, clearWinnersForContest } from "@/lib/winners/resolve";
 
 interface BracketMatchRow {
   id: string;
@@ -138,6 +140,20 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Match not found" }, { status: 404 });
     }
 
+    // Check if contest is locked (winners already resolved)
+    const { data: contestState } = await adminClient
+      .from("contests")
+      .select("winners_locked_at")
+      .eq("id", match.contest_id)
+      .single();
+
+    if (contestState?.winners_locked_at) {
+      return NextResponse.json(
+        { error: "This bracket is locked because winners have been resolved. Unlock it from the Calcutta Winners section first." },
+        { status: 400 }
+      );
+    }
+
     // Validation
     if (match.is_bye) {
       return NextResponse.json(
@@ -166,6 +182,17 @@ export async function PUT(request: Request) {
     // Toggle: if already the winner, un-advance
     if (match.winner_participant_id === participant_id) {
       await cascadeUnadvance(adminClient, match);
+
+      // Check if un-advancing removed a champion — clear winners if so
+      const { data: allMatches } = await adminClient
+        .from("cornhole_bracket_matches")
+        .select("bracket_type, round_number, match_number, slot1_participant_id, slot2_participant_id, winner_participant_id")
+        .eq("contest_id", match.contest_id);
+
+      if (allMatches && !computeChampionId(allMatches)) {
+        await clearWinnersForContest(adminClient, match.contest_id).catch(console.error);
+      }
+
       return NextResponse.json({ success: true, action: "unadvanced" });
     }
 
@@ -229,6 +256,18 @@ export async function PUT(request: Request) {
           })
           .eq("id", match.next_loser_match_id);
       }
+    }
+
+    // Check if a champion was just crowned — auto-resolve linked prizes
+    const { data: allMatches } = await adminClient
+      .from("cornhole_bracket_matches")
+      .select("bracket_type, round_number, match_number, slot1_participant_id, slot2_participant_id, winner_participant_id")
+      .eq("contest_id", match.contest_id);
+
+    if (allMatches && computeChampionId(allMatches)) {
+      await resolveAllForContest(adminClient, match.contest_id, admin.id).catch((err) => {
+        console.error("Auto-resolve cornhole winners error:", err);
+      });
     }
 
     return NextResponse.json({ success: true, action: "advanced" });

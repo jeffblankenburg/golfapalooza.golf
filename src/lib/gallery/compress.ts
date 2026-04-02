@@ -59,6 +59,14 @@ export async function compressVideo(
     const origH = video.videoHeight;
     const duration = video.duration;
 
+    // Skip compression for short videos (e.g. Live Photos) — browser Canvas
+    // re-encoding can't reliably capture their full audio track, and the
+    // file size savings on a 1-3 second clip are negligible
+    if (duration <= 5) {
+      cleanup();
+      return { blob: file, width: origW, height: origH };
+    }
+
     // Skip compression if already small enough
     if (origH <= maxHeight && file.size < SKIP_COMPRESS_MAX_SIZE) {
       cleanup();
@@ -147,10 +155,8 @@ export async function compressVideo(
         reject(e);
       };
 
-      recorder.start(50); // collect data every 50ms for better audio fidelity
+      recorder.start(100); // collect data every 100ms
       video.currentTime = 0;
-      // Slow down playback to give audio stream time to keep up
-      video.playbackRate = duration < 5 ? 0.5 : 1;
       video.play().catch((err) => {
         clearTimeout(timeout);
         reject(err);
@@ -173,11 +179,7 @@ export async function compressVideo(
         // Draw final frame
         ctx.drawImage(video, 0, 0, targetW, targetH);
         onProgress?.(100);
-        // Request final data and stop after a brief delay to flush audio buffer
-        recorder.requestData();
-        setTimeout(() => {
-          if (recorder.state === "recording") recorder.stop();
-        }, 300);
+        recorder.stop();
       };
     });
 

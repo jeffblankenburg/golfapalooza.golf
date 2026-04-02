@@ -8,6 +8,7 @@ import { ContestSetup } from "@/components/admin/ContestSetup";
 import { ContestParticipants } from "@/components/admin/ContestParticipants";
 import { ScrambleManager } from "@/components/admin/ScrambleManager";
 import { ScoringManager } from "@/components/admin/ScoringManager";
+import { BspitwPlayoff } from "@/components/admin/BspitwPlayoff";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 
 interface ScrambleContest {
@@ -148,7 +149,14 @@ export default function ScramblesAdminPage() {
                   : "text-gray-500"
               }`}
             >
-              {getWeekdayLabel(c.day_number)}
+              <span className="flex items-center justify-center gap-1">
+                {c.verified_at && (
+                  <svg className="w-3 h-3 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                )}
+                {getWeekdayLabel(c.day_number)}
+              </span>
             </button>
           ))}
         </div>
@@ -196,17 +204,17 @@ export default function ScramblesAdminPage() {
       </CollapsibleSection>
 
       <CollapsibleSection
-        key={`scoring-${selectedContest?.winners_locked_at || "open"}`}
+        key={`scoring-${selectedContest?.verified_at || "open"}`}
         title="Scoring"
         summary={
           selectedContest && scoringResults[selectedContest.id]
             ? scoringResults[selectedContest.id]
-            : selectedContest?.winners_locked_at
+            : selectedContest?.verified_at
             ? "Locked"
             : "Hole-by-hole scores & BSPITW"
         }
         icon={
-          selectedContest?.winners_locked_at ? (
+          selectedContest?.verified_at ? (
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
@@ -216,10 +224,29 @@ export default function ScramblesAdminPage() {
             </svg>
           )
         }
-        iconColor={selectedContest?.winners_locked_at ? "text-amber-700" : undefined}
+        iconColor={selectedContest?.verified_at ? "text-amber-700" : undefined}
       >
         <ScoringManager tripId={tripId} contestId={selectedContestId} onVerified={fetchContests} />
       </CollapsibleSection>
+
+      {/* BSPITW Playoff — only on last day when all scrambles are verified */}
+      {selectedContest &&
+        scrambleContests.every((c) => c.verified_at) &&
+        selectedContest.id === scrambleContests[scrambleContests.length - 1]?.id && (
+        <CollapsibleSection
+          title="BSPITW Playoff"
+          summary="Tiebreaker"
+          defaultOpen
+          icon={
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+            </svg>
+          }
+          iconColor="text-amber-600"
+        >
+          <BspitwPlayoff tripId={tripId} onResolved={fetchContests} />
+        </CollapsibleSection>
+      )}
 
       {/* Reset all scrambles */}
       <button

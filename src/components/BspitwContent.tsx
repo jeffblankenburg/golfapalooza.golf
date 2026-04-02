@@ -91,11 +91,17 @@ export function BspitwContent({
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<ViewOption>("total");
+  const [finalized, setFinalized] = useState(false);
+  const [winnerId, setWinnerId] = useState<string | null>(null);
+  const [sortCol, setSortCol] = useState<"total" | number>("total");
+  const [sortAsc, setSortAsc] = useState(false);
 
   const fetchData = useCallback(async () => {
     const res = await fetch(`/api/bspitw?trip_id=${tripId}`);
     const data = await res.json();
     setLeaderboard(data.leaderboard || []);
+    setFinalized(data.finalized || false);
+    setWinnerId(data.winnerId || null);
     setLoading(false);
   }, [tripId]);
 
@@ -108,16 +114,49 @@ export function BspitwContent({
     ? { gridTemplateColumns: `2rem 1fr 3.5rem` }
     : { gridTemplateColumns: `2rem 1fr repeat(${DAYS.length}, 3.5rem) 3.5rem` };
 
-  // Rank map (always by total descending)
+  // Tiebreaker: playoff winner sorts first among tied players
+  const tiebreak = (a: LeaderboardEntry, b: LeaderboardEntry): number => {
+    if (winnerId) {
+      if (a.user_id === winnerId) return -1;
+      if (b.user_id === winnerId) return 1;
+    }
+    return a.display_name.localeCompare(b.display_name);
+  };
+
+  const toggleSort = (col: "total" | number) => {
+    if (sortCol === col) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortCol(col);
+      setSortAsc(false);
+    }
+  };
+
+  // Reset column sort when view changes
+  useEffect(() => {
+    setSortCol("total");
+    setSortAsc(false);
+  }, [view]);
+
+  // Rank map (always by total descending, playoff winner breaks ties)
   const rankMap = new Map<string, number>();
   [...leaderboard]
-    .sort((a, b) => b.total_points - a.total_points)
+    .sort((a, b) => b.total_points - a.total_points || tiebreak(a, b))
     .forEach((e, i) => rankMap.set(e.user_id, i + 1));
 
+  const getColValue = (entry: LeaderboardEntry, col: "total" | number): number => {
+    if (col === "total") return getSortValue(entry, view);
+    const dayPts = entry.days[col];
+    if (!dayPts) return 0;
+    return getDayValue(dayPts, view) ?? 0;
+  };
+
   const sorted = [...leaderboard].sort((a, b) => {
-    const cmp = getSortValue(b, view) - getSortValue(a, view);
+    const av = getColValue(a, sortCol);
+    const bv = getColValue(b, sortCol);
+    const cmp = sortAsc ? av - bv : bv - av;
     if (cmp !== 0) return cmp;
-    return a.display_name.localeCompare(b.display_name);
+    return tiebreak(a, b);
   });
 
   return (
@@ -161,13 +200,19 @@ export function BspitwContent({
               <div className="px-1 py-2 text-center">#</div>
               <div className="px-2 py-2">Player</div>
               {view === "handicap" ? (
-                <div className="px-1 py-2 text-center">HDCP</div>
+                <button onClick={() => toggleSort("total")} className="px-1 py-2 text-center w-full">
+                  HDCP {sortCol === "total" ? (sortAsc ? "▲" : "▼") : ""}
+                </button>
               ) : (
                 <>
                   {DAYS.map((d) => (
-                    <div key={d} className="px-1 py-2 text-center">{getDayLabel(startDate, d)}</div>
+                    <button key={d} onClick={() => toggleSort(d)} className="px-1 py-2 text-center w-full">
+                      {getDayLabel(startDate, d)} {sortCol === d ? (sortAsc ? "▲" : "▼") : ""}
+                    </button>
                   ))}
-                  <div className="px-1 py-2 text-center">Total</div>
+                  <button onClick={() => toggleSort("total")} className="px-1 py-2 text-center w-full">
+                    Total {sortCol === "total" ? (sortAsc ? "▲" : "▼") : ""}
+                  </button>
                 </>
               )}
             </div>
@@ -175,14 +220,34 @@ export function BspitwContent({
             {/* Rows */}
             {sorted.map((entry) => {
               const rank = rankMap.get(entry.user_id) || 0;
+              const showMedal = finalized && rank <= 3;
+              const medalBg = showMedal
+                ? rank === 1
+                  ? "bg-gradient-to-r from-yellow-100 via-amber-50 to-yellow-100"
+                  : rank === 2
+                  ? "bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200"
+                  : "bg-gradient-to-r from-orange-100 via-amber-50 to-orange-100"
+                : "";
               return (
                 <div
                   key={entry.user_id}
                   style={gridCols}
-                  className={`grid gap-0 border-t border-gray-100 items-center ${
-                    rank <= 3 ? "bg-amber-50/50" : ""
-                  }`}
+                  className={`grid gap-0 border-t border-gray-100 items-center relative overflow-hidden ${medalBg}`}
                 >
+                  {showMedal && (
+                    <div
+                      className="absolute top-0 bottom-0 left-0 w-1/2 pointer-events-none"
+                      style={{
+                        background: rank === 1
+                          ? "linear-gradient(90deg, transparent, rgba(251,191,36,0.2), transparent)"
+                          : rank === 2
+                          ? "linear-gradient(90deg, transparent, rgba(156,163,175,0.25), transparent)"
+                          : "linear-gradient(90deg, transparent, rgba(251,146,60,0.2), transparent)",
+                        animation: "shimmer 4s ease-in-out infinite",
+                        animationDelay: `${(rank - 1) * 0.5}s`,
+                      }}
+                    />
+                  )}
                   <div className="px-1 py-2 text-center">
                     <span className={`text-xs ${rank <= 3 ? "font-bold text-gray-700" : "text-gray-400"}`}>{rank}</span>
                   </div>

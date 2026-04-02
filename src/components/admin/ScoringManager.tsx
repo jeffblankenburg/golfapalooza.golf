@@ -78,6 +78,7 @@ export function ScoringManager({ tripId, contestId: externalContestId, onVerifie
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+
   // Fetch scramble contests for this trip
   const fetchContests = useCallback(async () => {
     const res = await fetch(`/api/admin/contests?trip_id=${tripId}`);
@@ -440,13 +441,12 @@ export function ScoringManager({ tripId, contestId: externalContestId, onVerifie
     });
     if (verifyRes.ok) {
       setContestVerified(true);
-      setContests((prev) =>
-        prev.map((c) =>
-          c.id === selectedContestId
-            ? { ...c, scoring_closed_at: c.scoring_closed_at || new Date().toISOString(), verified_at: new Date().toISOString() }
-            : c
-        )
+      const updatedContests = contests.map((c) =>
+        c.id === selectedContestId
+          ? { ...c, scoring_closed_at: c.scoring_closed_at || new Date().toISOString(), verified_at: new Date().toISOString() }
+          : c
       );
+      setContests(updatedContests);
       onVerified?.();
     }
   };
@@ -802,6 +802,7 @@ export function ScoringManager({ tripId, contestId: externalContestId, onVerifie
           )}
         </div>
       )}
+
     </div>
   );
 }
@@ -1070,6 +1071,7 @@ function HoleScoringCards({
           </div>
         </div>
       )}
+
     </div>
   );
 }

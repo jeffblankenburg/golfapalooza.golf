@@ -42,58 +42,61 @@ export async function computeBspitwLeaderboard(
     contestDayMap[c.id] = c.day_number;
   }
 
-  // 2. Fetch all scramble teams
-  const { data: teams, error: teamErr } = await supabase
-    .from("scramble_teams")
-    .select("id, contest_id, gross_score, course_par, team_handicap")
-    .in("contest_id", contestIds);
+  // 2. Fetch teams and calcutta ownership in parallel
+  const [teamResult, calcuttaResult] = await Promise.all([
+    supabase
+      .from("scramble_teams")
+      .select("id, contest_id, gross_score, course_par, team_handicap")
+      .in("contest_id", contestIds),
+    supabase
+      .from("contests")
+      .select("id")
+      .eq("trip_id", tripId)
+      .eq("contest_type", "calcutta")
+      .single(),
+  ]);
 
-  if (teamErr) throw new Error(teamErr.message);
+  if (teamResult.error) throw new Error(teamResult.error.message);
+  const teams = teamResult.data;
   if (!teams || teams.length === 0) return [];
 
   const teamIds = teams.map((t) => t.id);
 
-  // 3. Fetch team members with user info
-  const { data: members, error: memberErr } = await supabase
-    .from("scramble_team_members")
-    .select("team_id, user_id, user:users(display_name, avatar_url)")
-    .in("team_id", teamIds);
-
-  if (memberErr) throw new Error(memberErr.message);
-
-  // 4. Fetch bonus points
-  const { data: bonuses, error: bonusErr } = await supabase
-    .from("bspitw_bonus_points")
-    .select("team_id, hole_number, user_id, on_green, holed_out")
-    .in("team_id", teamIds);
-
-  if (bonusErr) throw new Error(bonusErr.message);
-
-  // 5. Fetch calcutta ownership
-  const { data: calcuttaContest } = await supabase
-    .from("contests")
-    .select("id")
-    .eq("trip_id", tripId)
-    .eq("contest_type", "calcutta")
-    .single();
-
-  const ownerMap: Record<string, string> = {};
-  if (calcuttaContest) {
-    const { data: participants } = await supabase
-      .from("contest_participants")
-      .select("user_id, owner:users!contest_participants_owner_id_fkey(display_name)")
-      .eq("contest_id", calcuttaContest.id)
-      .not("owner_id", "is", null);
-
-    for (const p of participants || []) {
-      const owner = Array.isArray(p.owner) ? p.owner[0] : p.owner;
-      if (owner?.display_name) {
-        ownerMap[p.user_id] = owner.display_name;
+  // 3. Fetch members, bonuses, ownership, and handicaps in parallel
+  const ownershipPromise = (async () => {
+    const ownerMap: Record<string, string> = {};
+    if (calcuttaResult.data) {
+      const { data: participants } = await supabase
+        .from("contest_participants")
+        .select("user_id, owner:users!contest_participants_owner_id_fkey(display_name)")
+        .eq("contest_id", calcuttaResult.data.id)
+        .not("owner_id", "is", null);
+      for (const p of participants || []) {
+        const owner = Array.isArray(p.owner) ? p.owner[0] : p.owner;
+        if (owner?.display_name) ownerMap[p.user_id] = owner.display_name;
       }
     }
-  }
+    return ownerMap;
+  })();
 
-  // 6. Fetch player handicaps
+  const [memberResult, bonusResult, ownerMap] = await Promise.all([
+    supabase
+      .from("scramble_team_members")
+      .select("team_id, user_id, user:users(display_name, avatar_url)")
+      .in("team_id", teamIds),
+    supabase
+      .from("bspitw_bonus_points")
+      .select("team_id, hole_number, user_id, on_green, holed_out")
+      .in("team_id", teamIds),
+    ownershipPromise,
+  ]);
+
+  if (memberResult.error) throw new Error(memberResult.error.message);
+  if (bonusResult.error) throw new Error(bonusResult.error.message);
+  const members = memberResult.data;
+  const bonuses = bonusResult.data;
+
+  // 4. Fetch player handicaps
   const allUserIds = [...new Set((members || []).map((m) => m.user_id))];
   const handicapMap: Record<string, number | null> = {};
   if (allUserIds.length > 0) {
@@ -188,20 +191,21 @@ export async function computeBspitwLeaderboard(
     }
   }
 
-  // Only players in ALL scramble contests qualify
-  const { data: allContestParticipants } = await supabase
-    .from("contest_participants")
-    .select("contest_id, user_id")
-    .in("contest_id", contestIds);
-
-  const playerContestCount: Record<string, number> = {};
-  for (const cp of allContestParticipants || []) {
-    playerContestCount[cp.user_id] = (playerContestCount[cp.user_id] || 0) + 1;
+  // Only players with a scored team (non-null gross_score) in ALL scramble contests qualify
+  const playerScoredContests: Record<string, Set<string>> = {};
+  for (const m of members || []) {
+    const team = teams.find((t) => t.id === m.team_id);
+    if (team && team.gross_score !== null) {
+      if (!playerScoredContests[m.user_id]) {
+        playerScoredContests[m.user_id] = new Set();
+      }
+      playerScoredContests[m.user_id].add(team.contest_id);
+    }
   }
 
   const totalScrambleContests = contestIds.length;
 
   return Object.values(playerMap)
-    .filter((p) => (playerContestCount[p.user_id] || 0) === totalScrambleContests)
+    .filter((p) => (playerScoredContests[p.user_id]?.size || 0) === totalScrambleContests)
     .sort((a, b) => b.total_points - a.total_points || a.display_name.localeCompare(b.display_name));
 }

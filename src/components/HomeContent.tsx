@@ -163,6 +163,7 @@ export function HomeContent({
   timezone,
   courseName = null,
   myCalcuttaRoster = null,
+  calcuttaBuyerOwes = 0,
   contestTypes = [],
   activeRound = null,
   kgbCupActiveRound = null,
@@ -186,6 +187,7 @@ export function HomeContent({
   timezone?: string;
   courseName?: string | null;
   myCalcuttaRoster?: { userId: string; displayName: string; avatarUrl: string | null }[] | null;
+  calcuttaBuyerOwes?: number;
   contestTypes?: string[];
   activeRound?: { teamId: string; teeTime: string; startingHole: number | null } | null;
   kgbCupActiveRound?: { teeTime: string; startingHole: number | null } | null;
@@ -617,6 +619,7 @@ export function HomeContent({
       )}
 
       {/* My Calcutta Roster Card */}
+      {/* TODO: REMOVE MOCK — using fake 5-name roster for layout preview */}
       {myCalcuttaRoster && myCalcuttaRoster.length > 0 && (
         <Link
           href="/calcutta"
@@ -644,6 +647,12 @@ export function HomeContent({
               ))}
             </div>
           </div>
+          {calcuttaBuyerOwes > 0 && (
+            <div className="flex-shrink-0 bg-red-50 border border-red-200 text-red-700 rounded-xl px-3 py-1.5 text-center animate-pulse">
+              <p className="text-xs font-semibold uppercase leading-tight">You owe</p>
+              <p className="text-base font-bold leading-tight">${calcuttaBuyerOwes.toFixed(0)}</p>
+            </div>
+          )}
           <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>

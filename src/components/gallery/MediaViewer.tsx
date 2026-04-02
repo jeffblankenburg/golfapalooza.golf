@@ -85,7 +85,6 @@ function MediaPanel({
           poster={item.thumbnail_url || undefined}
           className="max-w-full max-h-full object-contain"
           autoPlay={isActive}
-          muted={isMuted}
           loop
           playsInline
           preload="auto"
@@ -239,6 +238,7 @@ export function MediaViewer({
 
   // Swipe state
   const [swipeOffset, setSwipeOffset] = useState(0);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [isSettling, setIsSettling] = useState(false);
   const touchStartY = useRef(0);
   const touchDelta = useRef(0);
@@ -250,9 +250,14 @@ export function MediaViewer({
 
   // Video ref map
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
+  const isMutedRef = useRef(isMuted);
+  isMutedRef.current = isMuted;
+
   const videoRefCallback = useCallback((id: string, el: HTMLVideoElement | null) => {
     if (el) {
       videoRefs.current[id] = el;
+      // Set initial muted state imperatively (required for autoplay on iOS)
+      el.muted = isMutedRef.current;
     } else {
       delete videoRefs.current[id];
     }
@@ -659,10 +664,8 @@ export function MediaViewer({
                     {canDelete && (
                       <button
                         onClick={() => {
-                          if (confirm("Delete this item?")) {
-                            onDelete(item.id);
-                          }
                           setShowMenu(false);
+                          setConfirmDelete(true);
                         }}
                         className="w-full px-4 py-3 text-left text-sm font-medium text-red-600 hover:bg-gray-50 border-t border-gray-100"
                       >
@@ -806,6 +809,33 @@ export function MediaViewer({
             items[currentIndex] = { ...item, tags: newTags };
           }}
         />
+      )}
+
+      {/* Delete confirmation modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60" onClick={() => setConfirmDelete(false)}>
+          <div className="bg-white rounded-2xl p-6 mx-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Delete this item?</h3>
+            <p className="text-sm text-gray-500 mb-5">This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="flex-1 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 rounded-xl active:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmDelete(false);
+                  onDelete(items[currentIndex].id);
+                }}
+                className="flex-1 py-2.5 text-sm font-semibold text-white bg-red-600 rounded-xl active:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

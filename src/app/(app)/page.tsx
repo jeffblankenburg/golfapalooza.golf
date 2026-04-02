@@ -235,8 +235,8 @@ export default async function HomePage() {
 
   const soldCount = (calcuttaSoldResult as { count: number | null }).count || 0;
 
-  // ── Phase 4: teammates + calcutta golfers + winnings in parallel ──
-  const [teammatesResult, calcuttaGolfersResult, winningsResult] = await Promise.all([
+  // ── Phase 4: teammates + calcutta golfers + winnings + buyer paid in parallel ──
+  const [teammatesResult, calcuttaGolfersResult, winningsResult, buyerPaidResult] = await Promise.all([
     bestMatch?.source === "scramble" && bestMatch.scrambleTeamId
       ? queryClient.from("scramble_team_members").select("user_id, user:users(display_name)").eq("team_id", bestMatch.scrambleTeamId)
       : bestMatch
@@ -248,6 +248,10 @@ export default async function HomePage() {
     // Fetch contest winners for winnings calculation
     calcuttaContest
       ? queryClient.from("contest_winners").select("prize_id, user_id").then((r) => r)
+      : Promise.resolve({ data: null as null }),
+    // Check if buyer has paid
+    calcuttaContest
+      ? queryClient.from("calcutta_buyer_paid").select("id").eq("contest_id", calcuttaContest.id).eq("user_id", effectiveUserId).maybeSingle()
       : Promise.resolve({ data: null as null }),
   ]);
 
@@ -294,6 +298,20 @@ export default async function HomePage() {
         avatarUrl: (u as { display_name: string; avatar_url: string | null })?.avatar_url || null,
       };
     });
+  }
+
+  // Process buyer paid status — calculate amount owed if not paid
+  let calcuttaBuyerOwes = 0;
+  if (!buyerPaidResult.data && calcuttaContest) {
+    const { data: myOwnerships } = await queryClient
+      .from("calcutta_ownership")
+      .select("amount_paid")
+      .eq("owner_id", effectiveUserId);
+    if (myOwnerships) {
+      for (const o of myOwnerships) {
+        calcuttaBuyerOwes += Number(o.amount_paid) || 0;
+      }
+    }
   }
 
   // Process winnings
@@ -482,6 +500,7 @@ export default async function HomePage() {
       timezone={trip?.timezone}
       courseName={courseVenue}
       myCalcuttaRoster={myCalcuttaRoster}
+      calcuttaBuyerOwes={calcuttaBuyerOwes}
       contestTypes={contestTypes}
       activeRound={activeRound}
       kgbCupActiveRound={kgbCupActiveRound}

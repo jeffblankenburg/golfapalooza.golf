@@ -21,7 +21,39 @@ export async function GET(request: Request) {
 
   try {
     const leaderboard = await computeBspitwLeaderboard(supabase, tripId);
-    return NextResponse.json({ leaderboard });
+
+    // Check if BSPITW winners have been resolved
+    let finalized = false;
+    let winnerId: string | null = null;
+    const { data: calcuttaContest } = await supabase
+      .from("contests")
+      .select("id")
+      .eq("trip_id", tripId)
+      .eq("contest_type", "calcutta")
+      .single();
+
+    if (calcuttaContest) {
+      const { data: bspitwPrizes } = await supabase
+        .from("calcutta_prizes")
+        .select("id")
+        .eq("contest_id", calcuttaContest.id)
+        .in("resolution_type", ["bspitw", "other"]);
+
+      if (bspitwPrizes && bspitwPrizes.length > 0) {
+        const { data: winners } = await supabase
+          .from("contest_winners")
+          .select("id, user_id")
+          .in("prize_id", bspitwPrizes.map((p) => p.id))
+          .limit(1);
+
+        finalized = (winners?.length || 0) > 0;
+        if (winners?.[0]?.user_id) {
+          winnerId = winners[0].user_id;
+        }
+      }
+    }
+
+    return NextResponse.json({ leaderboard, finalized, winnerId });
   } catch (error) {
     console.error("BSPITW leaderboard error:", error);
     return NextResponse.json(

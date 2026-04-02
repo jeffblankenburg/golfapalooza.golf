@@ -130,6 +130,7 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
     onConfirm: () => void;
   } | null>(null);
 
+
   // Drag state (mouse + touch)
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
@@ -615,23 +616,25 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
                 {hasWinners ? (
                   <div className="space-y-1.5">
                     {(() => {
-                      // Collect unique owners across all winners for this prize
-                      const seen = new Set<string>();
-                      const owners: { owner_id: string; display_name: string; avatar_url: string | null; share_pct: number; payout: number }[] = [];
+                      // Aggregate payouts per owner across all winners for this prize
+                      const ownerMap = new Map<string, { owner_id: string; display_name: string; avatar_url: string | null; payout: number }>();
                       for (const w of prize.winners!) {
                         for (const o of w.owners) {
-                          if (!seen.has(o.owner_id)) {
-                            seen.add(o.owner_id);
-                            owners.push({
+                          const existing = ownerMap.get(o.owner_id);
+                          const ownerPayout = perPlayerPayout * (o.share_pct / 100);
+                          if (existing) {
+                            existing.payout += ownerPayout;
+                          } else {
+                            ownerMap.set(o.owner_id, {
                               owner_id: o.owner_id,
                               display_name: o.display_name,
                               avatar_url: o.avatar_url,
-                              share_pct: o.share_pct,
-                              payout: perPlayerPayout * (o.share_pct / 100),
+                              payout: ownerPayout,
                             });
                           }
                         }
                       }
+                      const owners = Array.from(ownerMap.values());
                       return owners.map((o) => {
                         const isPaid = paidWinners.has(`${prize.id}:${o.owner_id}`);
                         return (

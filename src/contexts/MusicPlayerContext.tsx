@@ -255,23 +255,14 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
     [startPlayTimer]
   );
 
-  // Resume: reload audio to work around iOS lock screen audio session bug
-  // (WebKit bug #198277 — audio.play() resolves but produces no sound after
-  // lock screen pause unless the audio element is reloaded first)
+  // Resume: unpause the current audio element
   const resume = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const pos = audio.currentTime;
-    audio.load();
-    const onCanPlay = () => {
-      if (pos > 0) audio.currentTime = pos;
-      audio.play().catch(() => {});
-      setIsPlaying(true);
-      const song = songsRef.current[currentIndexRef.current];
-      if (song) startPlayTimer(song.id);
-      audio.removeEventListener("canplay", onCanPlay);
-    };
-    audio.addEventListener("canplay", onCanPlay);
+    audio.play().catch(() => {});
+    setIsPlaying(true);
+    const song = songsRef.current[currentIndexRef.current];
+    if (song) startPlayTimer(song.id);
   }, [startPlayTimer]);
 
   const play = useCallback(

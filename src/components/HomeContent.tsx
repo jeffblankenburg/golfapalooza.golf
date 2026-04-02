@@ -186,7 +186,7 @@ export function HomeContent({
   nextScheduleItem?: { title: string; location: string | null; time: string | null; dayLabel: string } | null;
   timezone?: string;
   courseName?: string | null;
-  myCalcuttaRoster?: { userId: string; displayName: string; avatarUrl: string | null }[] | null;
+  myCalcuttaRoster?: { userId: string; displayName: string; avatarUrl: string | null; sharePct: number }[] | null;
   calcuttaBuyerOwes?: number;
   contestTypes?: string[];
   activeRound?: { teamId: string; teeTime: string; startingHole: number | null } | null;
@@ -643,6 +643,9 @@ export function HomeContent({
                     </span>
                   )}
                   {g.displayName}
+                  {g.sharePct < 100 && (
+                    <span className="text-[10px] text-gray-400 font-medium">{g.sharePct}%</span>
+                  )}
                 </span>
               ))}
             </div>

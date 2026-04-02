@@ -135,17 +135,18 @@ export async function DELETE(request: NextRequest) {
   const simulating = await isSimulating();
   const client = simulating ? createAdminClient() : supabase;
 
-  const { id } = await request.json();
+  const { id, all } = await request.json();
 
-  if (!id) {
-    return NextResponse.json({ error: "id is required" }, { status: 400 });
+  if (!id && !all) {
+    return NextResponse.json({ error: "id or all is required" }, { status: 400 });
   }
 
-  const { error } = await client
+  const query = client
     .from("notifications")
     .delete()
-    .eq("id", id)
     .eq("user_id", effectiveUserId);
+
+  const { error } = all ? await query : await query.eq("id", id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

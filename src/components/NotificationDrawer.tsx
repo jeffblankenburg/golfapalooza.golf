@@ -168,6 +168,16 @@ export function NotificationDrawer({
     onCountChange?.();
   };
 
+  const handleClearAll = async () => {
+    await fetch("/api/notifications", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ all: true }),
+    });
+    setNotifications([]);
+    onCountChange?.();
+  };
+
   const hasUnread = notifications.some((n) => !n.read);
 
   return (
@@ -189,12 +199,12 @@ export function NotificationDrawer({
         <div className="flex items-center justify-between px-4 pb-3 border-b border-gray-100">
           <h2 className="text-lg font-semibold text-gray-900">Notifications</h2>
           <div className="flex items-center gap-3">
-            {hasUnread && (
+            {notifications.length > 0 && (
               <button
-                onClick={handleMarkAllRead}
-                className="text-sm text-green-700 font-medium"
+                onClick={handleClearAll}
+                className="text-sm text-red-600 font-medium"
               >
-                Mark all read
+                Clear All
               </button>
             )}
             <button

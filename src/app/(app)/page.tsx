@@ -243,7 +243,7 @@ export default async function HomePage() {
         ? queryClient.from("tee_time_players").select("user_id, user:users(display_name)").eq("tee_time_id", bestMatch.teeTimeId)
         : Promise.resolve({ data: null as null }),
     needCalcuttaSold && soldCount > 0
-      ? queryClient.from("contest_participants").select("user_id, user:users!contest_participants_user_id_fkey(display_name, avatar_url)").eq("contest_id", calcuttaContest!.id).eq("owner_id", effectiveUserId)
+      ? queryClient.from("calcutta_ownership").select("share_pct, participant:contest_participants!inner(user_id, user:users!contest_participants_user_id_fkey(display_name, avatar_url))").eq("owner_id", effectiveUserId)
       : Promise.resolve({ data: null as null }),
     // Fetch contest winners for winnings calculation
     calcuttaContest
@@ -288,14 +288,16 @@ export default async function HomePage() {
   }
 
   // Process Calcutta roster
-  let myCalcuttaRoster: { userId: string; displayName: string; avatarUrl: string | null }[] | null = null;
+  let myCalcuttaRoster: { userId: string; displayName: string; avatarUrl: string | null; sharePct: number }[] | null = null;
   if (calcuttaGolfersResult.data && calcuttaGolfersResult.data.length > 0) {
     myCalcuttaRoster = calcuttaGolfersResult.data.map((g) => {
-      const u = Array.isArray(g.user) ? g.user[0] : g.user;
+      const p = Array.isArray(g.participant) ? g.participant[0] : g.participant;
+      const u = p ? (Array.isArray((p as { user: unknown }).user) ? ((p as { user: unknown[] }).user)[0] : (p as { user: unknown }).user) : null;
       return {
-        userId: g.user_id as string,
+        userId: (p as { user_id: string })?.user_id || "",
         displayName: (u as { display_name: string; avatar_url: string | null })?.display_name || "Unknown",
         avatarUrl: (u as { display_name: string; avatar_url: string | null })?.avatar_url || null,
+        sharePct: g.share_pct as number,
       };
     });
   }

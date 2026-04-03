@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ConfirmModal } from "./ConfirmModal";
+import { ContestParticipantsAccordion } from "./ContestParticipantsAccordion";
 
 interface Participant {
   id: string;
@@ -36,6 +37,10 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
   const [scrambleDayNumbers, setScrambleDayNumbers] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [ctpContestId, setCtpContestId] = useState<string | null>(null);
+  const [longDriveContestId, setLongDriveContestId] = useState<string | null>(null);
+  const [ctpParticipantIds, setCtpParticipantIds] = useState<Set<string>>(new Set());
+  const [ldParticipantIds, setLdParticipantIds] = useState<Set<string>>(new Set());
   const [showRealNames, setShowRealNames] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
@@ -57,10 +62,19 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
     if (data.days) setEventDays(data.days);
   }, [tripId]);
 
+  const fetchContestParticipants = useCallback(async (cId: string | null, ldId: string | null) => {
+    const fetches = await Promise.all([
+      cId ? fetch(`/api/admin/contests/participants?contest_id=${cId}`).then((r) => r.json()) : Promise.resolve({ participants: [] }),
+      ldId ? fetch(`/api/admin/contests/participants?contest_id=${ldId}`).then((r) => r.json()) : Promise.resolve({ participants: [] }),
+    ]);
+    setCtpParticipantIds(new Set<string>((fetches[0].participants || []).map((p: { user_id: string }) => p.user_id)));
+    setLdParticipantIds(new Set<string>((fetches[1].participants || []).map((p: { user_id: string }) => p.user_id)));
+  }, []);
+
   const fetchScrambleDays = useCallback(async () => {
     const res = await fetch(`/api/admin/contests?trip_id=${tripId}`);
     const data = await res.json();
-    const contests = data.contests || [];
+    const contests = data.contests || [] as { id: string; name: string; contest_type: string; day_number: number | null }[];
     const dayNums = [
       ...new Set(
         contests
@@ -70,7 +84,16 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
     ] as number[];
     dayNums.sort((a, b) => a - b);
     setScrambleDayNumbers(dayNums);
-  }, [tripId]);
+
+    // Find CTP and Long Drive contest IDs
+    const ctp = contests.find((c: { name: string; contest_type: string }) => c.name === "Closest to the Pin" && c.contest_type === "other");
+    const ld = contests.find((c: { name: string; contest_type: string }) => c.name === "Long Drive" && c.contest_type === "other");
+    const newCtpId = ctp?.id || null;
+    const newLdId = ld?.id || null;
+    setCtpContestId(newCtpId);
+    setLongDriveContestId(newLdId);
+    fetchContestParticipants(newCtpId, newLdId);
+  }, [tripId, fetchContestParticipants]);
 
   const fetchData = useCallback(async () => {
     const res = await fetch(`/api/admin/daily-winners?trip_id=${tripId}`);
@@ -163,6 +186,24 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
         </button>
       </div>
 
+      {/* Contest Participant Accordions */}
+      {ctpContestId && (
+        <ContestParticipantsAccordion
+          tripId={tripId}
+          contestName="Closest to the Pin"
+          contestId={ctpContestId}
+          onChanged={() => fetchContestParticipants(ctpContestId, longDriveContestId)}
+        />
+      )}
+      {longDriveContestId && (
+        <ContestParticipantsAccordion
+          tripId={tripId}
+          contestName="Long Drive"
+          contestId={longDriveContestId}
+          onChanged={() => fetchContestParticipants(ctpContestId, longDriveContestId)}
+        />
+      )}
+
       {DAYS.map((d) => (
         <div key={d.day} className="bg-white rounded-xl border border-gray-200 p-3 space-y-3">
           <p className="text-sm font-semibold text-gray-900">{d.label}</p>
@@ -170,6 +211,15 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
             const key = winnerKey(d.day, ct.type);
             const selectedUserId = winners[key] || "";
             const isSaving = saving === key;
+
+            // Filter eligible participants by contest type
+            let eligible = participants;
+            if ((ct.type === "ctp_front" || ct.type === "ctp_back") && ctpParticipantIds.size > 0) {
+              eligible = participants.filter((p) => ctpParticipantIds.has(p.id));
+            } else if (ct.type === "long_drive" && ldParticipantIds.size > 0) {
+              eligible = participants.filter((p) => ldParticipantIds.has(p.id));
+            }
+            // long_putt: everyone is eligible
 
             return (
               <div key={ct.type} className="flex items-center gap-3">
@@ -188,7 +238,7 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
                     className="w-full text-sm border border-gray-200 rounded-lg py-1.5 px-2 bg-white focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none disabled:opacity-50 appearance-none"
                   >
                     <option value="">Select winner...</option>
-                    {participants.map((p) => (
+                    {eligible.map((p) => (
                       <option key={p.id} value={p.id}>
                         {showRealNames ? (p.full_name || p.display_name) : p.display_name}
                       </option>

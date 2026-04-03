@@ -52,7 +52,9 @@ export interface FoursomeData {
 export interface MatchResult {
   matchIndex: number; // 0-4
   section: 1 | 2 | 3;
-  label: string; // e.g. "T1-A vs T2-A"
+  label: string; // e.g. "Quack vs Spanky"
+  team1ScorerName: string; // display name(s) for team1 scorer
+  team2ScorerName: string; // display name(s) for team2 scorer
   team1ScorerId: string; // player_id or pair_id
   team2ScorerId: string;
   scorerType: "player" | "pair";
@@ -231,6 +233,8 @@ export function computeFoursomeResult(
     matchIndex: number;
     section: 1 | 2 | 3;
     label: string;
+    team1ScorerName: string;
+    team2ScorerName: string;
     team1ScorerId: string;
     team2ScorerId: string;
     scorerType: "player" | "pair";
@@ -239,11 +243,13 @@ export function computeFoursomeResult(
     {
       matchIndex: 0, section: 1,
       label: `${pn(t1a, "T1-A")} vs ${pn(t2a, "T2-A")}`,
+      team1ScorerName: pn(t1a, "T1-A"), team2ScorerName: pn(t2a, "T2-A"),
       team1ScorerId: t1a!, team2ScorerId: t2a!, scorerType: "player",
     },
     {
       matchIndex: 1, section: 1,
       label: `${pn(t1b, "T1-B")} vs ${pn(t2b, "T2-B")}`,
+      team1ScorerName: pn(t1b, "T1-B"), team2ScorerName: pn(t2b, "T2-B"),
       // In threesome: solo player's score used for their team's B slot
       team1ScorerId: t1b || t1a!, team2ScorerId: t2b || t2a!, scorerType: "player",
     },
@@ -251,17 +257,20 @@ export function computeFoursomeResult(
     {
       matchIndex: 2, section: 2,
       label: `${pn(t1a, "T1-A")} vs ${pn(t2b, "T2-B")}`,
+      team1ScorerName: pn(t1a, "T1-A"), team2ScorerName: pn(t2b, "T2-B"),
       team1ScorerId: t1a!, team2ScorerId: t2b || t2a!, scorerType: "player",
     },
     {
       matchIndex: 3, section: 2,
       label: `${pn(t1b, "T1-B")} vs ${pn(t2a, "T2-A")}`,
+      team1ScorerName: pn(t1b, "T1-B"), team2ScorerName: pn(t2a, "T2-A"),
       team1ScorerId: t1b || t1a!, team2ScorerId: t2a!, scorerType: "player",
     },
     // Section 3 (holes 13-18) — scramble
     {
       matchIndex: 4, section: 3,
       label: `${pairLabel(t1a, t1b, "T1-Pair")} vs ${pairLabel(t2a, t2b, "T2-Pair")}`,
+      team1ScorerName: pairLabel(t1a, t1b, "T1-Pair"), team2ScorerName: pairLabel(t2a, t2b, "T2-Pair"),
       team1ScorerId: foursome.pair_team1_id, team2ScorerId: foursome.pair_team2_id, scorerType: "pair",
     },
   ];
@@ -334,6 +343,8 @@ export function computeFoursomeResult(
       matchIndex: def.matchIndex,
       section: def.section,
       label: def.label,
+      team1ScorerName: def.team1ScorerName,
+      team2ScorerName: def.team2ScorerName,
       team1ScorerId: def.team1ScorerId,
       team2ScorerId: def.team2ScorerId,
       scorerType: def.scorerType,
@@ -398,11 +409,14 @@ export function computeOverallResults(
  * e.g. "2 UP thru 4", "All Square thru 6", "HALVED"
  */
 export function formatMatchStatus(match: MatchResult): string {
+  const t1Name = match.team1ScorerName;
+  const t2Name = match.team2ScorerName;
+
   if (match.sectionWinner === "incomplete") {
     if (match.holesPlayed === 0) return "Not started";
     const lead = Math.abs(match.team1Wins - match.team2Wins);
     if (lead === 0) return `All Square thru ${match.holesPlayed}`;
-    const leader = match.team1Wins > match.team2Wins ? "T1" : "T2";
+    const leader = match.team1Wins > match.team2Wins ? t1Name : t2Name;
     const totalHoles = match.holeResults.length;
     const remaining = totalHoles - match.holesPlayed;
     if (remaining > 0 && lead === remaining) {
@@ -413,6 +427,6 @@ export function formatMatchStatus(match: MatchResult): string {
 
   if (match.sectionWinner === "halved") return "HALVED";
   const lead = Math.abs(match.team1Wins - match.team2Wins);
-  const leader = match.sectionWinner === "team1" ? "T1" : "T2";
+  const leader = match.sectionWinner === "team1" ? t1Name : t2Name;
   return `${leader} wins ${lead} UP`;
 }

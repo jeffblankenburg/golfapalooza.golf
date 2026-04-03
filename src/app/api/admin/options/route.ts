@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   const admin = await checkPermissionAccess("manage_finances");
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { group_id, trip_id, name, description, option_type, choices, cost, is_required, icon, sort_order } = await request.json();
+  const { group_id, trip_id, name, description, option_type, choices, cost, is_required, icon, linked_contest_id, sort_order } = await request.json();
   if (!group_id || !trip_id || !name || !option_type) {
     return NextResponse.json({ error: "group_id, trip_id, name, and option_type are required" }, { status: 400 });
   }
@@ -51,6 +51,7 @@ export async function POST(request: Request) {
   if (cost !== undefined) insert.cost = cost;
   if (is_required !== undefined) insert.is_required = is_required;
   if (icon !== undefined) insert.icon = icon;
+  if (linked_contest_id !== undefined) insert.linked_contest_id = linked_contest_id;
 
   const { data, error } = await adminClient
     .from("trip_options")
@@ -66,7 +67,7 @@ export async function PUT(request: Request) {
   const admin = await checkPermissionAccess("manage_finances");
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { id, name, description, option_type, choices, cost, is_required, icon, sort_order } = await request.json();
+  const { id, name, description, option_type, choices, cost, is_required, icon, linked_contest_id, sort_order } = await request.json();
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
   const adminClient = createAdminClient();
@@ -78,6 +79,7 @@ export async function PUT(request: Request) {
   if (cost !== undefined) updates.cost = cost;
   if (is_required !== undefined) updates.is_required = is_required;
   if (icon !== undefined) updates.icon = icon;
+  if (linked_contest_id !== undefined) updates.linked_contest_id = linked_contest_id;
   if (sort_order !== undefined) updates.sort_order = sort_order;
 
   const { error } = await adminClient

@@ -92,15 +92,36 @@ export async function GET(request: Request) {
       scores = (scoreData || []) as HoleScore[];
     }
 
-    // Fetch player handicaps
-    const { data: playerHandicapData } = await supabase
-      .from("kgb_cup_player_handicaps")
-      .select("player_id, adjusted_handicap")
-      .eq("contest_id", contestId);
+    // Fetch base handicaps from player_handicaps table
+    const allPlayerIds: string[] = [];
+    for (const p of pairMap.values()) {
+      if (p.player_a_id) allPlayerIds.push(p.player_a_id);
+      if (p.player_b_id) allPlayerIds.push(p.player_b_id);
+    }
 
+    const { data: baseHandicapData } = allPlayerIds.length > 0
+      ? await supabase
+          .from("player_handicaps")
+          .select("user_id, handicap_index")
+          .in("user_id", allPlayerIds)
+      : { data: [] };
+
+    const baseHandicaps = new Map<string, number>();
+    for (const bh of baseHandicapData || []) {
+      baseHandicaps.set(bh.user_id, bh.handicap_index);
+    }
+
+    // Compute per-foursome adjusted handicaps (subtract lowest in each foursome)
     const playerHandicaps = new Map<string, number>();
-    for (const ph of playerHandicapData || []) {
-      playerHandicaps.set(ph.player_id, ph.adjusted_handicap);
+    for (const f of foursomes) {
+      const pair1 = pairMap.get(f.pair_team1_id);
+      const pair2 = pairMap.get(f.pair_team2_id);
+      const playerIds = [pair1?.player_a_id, pair1?.player_b_id, pair2?.player_a_id, pair2?.player_b_id].filter(Boolean) as string[];
+      const handicaps = playerIds.map((id) => baseHandicaps.get(id) ?? 0);
+      const lowest = Math.min(...handicaps);
+      for (let i = 0; i < playerIds.length; i++) {
+        playerHandicaps.set(playerIds[i], Math.round(handicaps[i] - lowest));
+      }
     }
 
     // Fetch pair handicaps

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
@@ -10,22 +10,33 @@ export function PinnedNoteButton({ pinnedTo, tripId }: { pinnedTo: string; tripI
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState<{ title: string; content: string } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [fetched, setFetched] = useState(false);
+  const [exists, setExists] = useState<boolean | null>(null);
 
-  const handleOpen = async () => {
-    setOpen(true);
-    if (fetched) return;
-
-    setLoading(true);
+  // Check if a pinned note exists on mount
+  useEffect(() => {
     const params = new URLSearchParams({ pinned_to: pinnedTo });
     if (tripId) params.set("trip_id", tripId);
-    const res = await fetch(`/api/notebook?${params}`);
-    if (res.ok) {
-      const data = await res.json();
-      setNote(data.note || null);
-    }
-    setLoading(false);
-    setFetched(true);
+    fetch(`/api/notebook?${params}`)
+      .then((res) => {
+        if (res.ok) return res.json();
+        return null;
+      })
+      .then((data) => {
+        if (data?.note) {
+          setNote(data.note);
+          setExists(true);
+        } else {
+          setExists(false);
+        }
+      })
+      .catch(() => setExists(false));
+  }, [pinnedTo, tripId]);
+
+  // Don't render anything until we know, and hide if no note
+  if (exists !== true) return null;
+
+  const handleOpen = () => {
+    setOpen(true);
   };
 
   return (

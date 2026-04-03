@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { syncContestEnrollment } from "@/lib/option-contest-sync";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -85,18 +86,19 @@ export async function PUT(request: Request) {
     .eq("source", "option");
   if (deleteChargeError) return NextResponse.json({ error: deleteChargeError.message }, { status: 500 });
 
-  // If value is null (deletion), we're done — no new charge to create
-  if (value === null || value === undefined) {
-    return NextResponse.json({ success: true });
-  }
-
-  // Look up the trip_options row to determine cost
+  // Look up the trip_options row (needed for both charge calc and contest sync)
   const { data: option, error: optionError } = await adminClient
     .from("trip_options")
     .select("*")
     .eq("id", option_id)
     .single();
   if (optionError) return NextResponse.json({ error: optionError.message }, { status: 500 });
+
+  // If value is null (deletion), sync contest enrollment (unenroll) and we're done
+  if (value === null || value === undefined) {
+    await syncContestEnrollment(adminClient, user.id, option, null);
+    return NextResponse.json({ success: true });
+  }
 
   let chargeAmount: number | null = null;
   let description = option.name;
@@ -147,6 +149,9 @@ export async function PUT(request: Request) {
       });
     if (chargeError) return NextResponse.json({ error: chargeError.message }, { status: 500 });
   }
+
+  // 4. Sync contest enrollment
+  await syncContestEnrollment(adminClient, user.id, option, value);
 
   return NextResponse.json({ success: true });
 }

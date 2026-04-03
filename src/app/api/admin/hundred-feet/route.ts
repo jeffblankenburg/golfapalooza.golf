@@ -17,7 +17,18 @@ export async function GET(request: Request) {
 
   const adminClient = createAdminClient();
 
-  const [scoresResult, participantsResult] = await Promise.all([
+  // Find the 100 Feet contest for this trip (contest_type = 'other', name = '100 Feet!')
+  const { data: hundredFeetContest } = await adminClient
+    .from("contests")
+    .select("id")
+    .eq("trip_id", tripId)
+    .eq("name", "100 Feet!")
+    .eq("contest_type", "other")
+    .maybeSingle();
+
+  const contestId = hundredFeetContest?.id || null;
+
+  const [scoresResult, participantsResult, contestParticipantsResult] = await Promise.all([
     adminClient
       .from("hundred_feet_scores")
       .select("*, user:users(id, display_name, full_name, avatar_url)")
@@ -26,6 +37,12 @@ export async function GET(request: Request) {
       .from("event_participants")
       .select("user:users(id, display_name, full_name, avatar_url)")
       .eq("trip_id", tripId),
+    contestId
+      ? adminClient
+          .from("contest_participants")
+          .select("user_id")
+          .eq("contest_id", contestId)
+      : Promise.resolve({ data: [] as { user_id: string }[], error: null }),
   ]);
 
   if (scoresResult.error) {
@@ -37,15 +54,23 @@ export async function GET(request: Request) {
 
   const participants = (participantsResult.data || []).map((p) => {
     const u = Array.isArray(p.user) ? p.user[0] : p.user;
+    const typed = u as unknown as { id: string; display_name: string; full_name: string | null; avatar_url: string | null } | null;
     return {
-      id: u?.id,
-      display_name: u?.display_name || "Unknown",
-      full_name: u?.full_name || null,
-      avatar_url: u?.avatar_url || null,
+      id: typed?.id,
+      display_name: typed?.display_name || "Unknown",
+      full_name: typed?.full_name || null,
+      avatar_url: typed?.avatar_url || null,
     };
   }).sort((a, b) => a.display_name.localeCompare(b.display_name));
 
-  return NextResponse.json({ scores: scoresResult.data, participants });
+  const contestParticipantIds = (contestParticipantsResult.data || []).map((cp) => cp.user_id);
+
+  return NextResponse.json({
+    scores: scoresResult.data,
+    participants,
+    contest_id: contestId,
+    contest_participant_ids: contestParticipantIds,
+  });
 }
 
 export async function PUT(request: Request) {

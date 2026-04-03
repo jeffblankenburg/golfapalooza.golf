@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 interface Game {
@@ -60,6 +61,7 @@ export function PickemContent({
   const [saving, setSaving] = useState<string | null>(null);
   const [tab, setTab] = useState<"picks" | "leaderboard">("picks");
   const [savedIndicator, setSavedIndicator] = useState<string | null>(null);
+  const [whiteyAvatar, setWhiteyAvatar] = useState<string | null>(null);
   const savedTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -76,6 +78,10 @@ export function PickemContent({
 
   useEffect(() => {
     fetchData().then(() => setLoading(false));
+    fetch("/api/loozers/c09e0b49-57bb-47ec-a767-294830509942")
+      .then((r) => r.json())
+      .then((d) => setWhiteyAvatar(d.profile?.avatar_url || null))
+      .catch(() => {});
   }, [fetchData]);
 
   const submitPick = async (gameId: string, pickedTeam: "away" | "home", tiebreakerTotal?: number) => {
@@ -206,17 +212,34 @@ export function PickemContent({
         const venmoDeepLink = `venmo://paycharge?txn=pay&recipients=aaronlwhite&amount=${entryFee}&note=${encodeURIComponent("Whitey's Pick'em")}`;
         const venmoWebLink = `https://venmo.com/aaronlwhite?txn=pay&amount=${entryFee}&note=${encodeURIComponent("Whitey's Pick'em")}`;
         return (
-          <a
-            href={venmoDeepLink}
-            onClick={() => {
-              setTimeout(() => { window.open(venmoWebLink, "_blank"); }, 500);
-            }}
-            className="relative flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-[#008CFF] text-white font-bold tracking-wide active:bg-[#0074D4] transition-colors mb-4 overflow-hidden"
-          >
-            <div className="absolute top-0 bottom-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/25 to-transparent" style={{ animation: "shimmer 2.5s ease-in-out infinite" }} />
-            <img src="/Venmo.png" alt="Venmo" className="w-8 h-8 object-contain relative" />
-            <span className="relative">Pay Whitey ${entryFee}</span>
-          </a>
+          <div className="space-y-2 mb-4">
+            <a
+              href={venmoDeepLink}
+              onClick={() => {
+                setTimeout(() => { window.open(venmoWebLink, "_blank"); }, 500);
+              }}
+              className="relative flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-[#008CFF] text-white font-bold tracking-wide active:bg-[#0074D4] transition-colors overflow-hidden"
+            >
+              <div className="absolute top-0 bottom-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/25 to-transparent" style={{ animation: "shimmer 2.5s ease-in-out infinite" }} />
+              <img src="/Venmo.png" alt="Venmo" className="w-8 h-8 object-contain relative" />
+              <span className="relative">Pay Whitey ${entryFee}</span>
+            </a>
+            <p className="text-xs text-gray-400 text-center">
+              For other payment options, please contact{" "}
+              <Link
+                href="/loozers/c09e0b49-57bb-47ec-a767-294830509942"
+                className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 font-medium pl-0.5 pr-2 py-0.5 rounded-full hover:bg-gray-200 transition-colors align-middle"
+              >
+                {whiteyAvatar ? (
+                  <img src={whiteyAvatar} alt="" className="w-4 h-4 rounded-full object-cover" />
+                ) : (
+                  <span className="w-4 h-4 rounded-full bg-green-700 text-white text-[8px] font-bold flex items-center justify-center">W</span>
+                )}
+                Whitey
+              </Link>
+              {" "}directly.
+            </p>
+          </div>
         );
       })()}
 

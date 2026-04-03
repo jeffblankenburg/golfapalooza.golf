@@ -13,6 +13,7 @@ import {
   type FoursomeResult,
   type MatchResult,
 } from "@/lib/kgb-cup/match-logic";
+import { KgbCupScoreboard, KgbCupGroupResults, type KgbGroupData } from "@/components/kgb-cup/KgbCupResultsView";
 
 // ── Types ──
 
@@ -929,177 +930,44 @@ function ResultsTab({
   pairs,
   foursomeResults,
   overall,
-  getFoursomeLabel,
 }: {
   teams: TeamInfo[];
   foursomes: FoursomeInfo[];
   pairs: PairInfo[];
   foursomeResults: FoursomeResult[];
   overall: ReturnType<typeof computeOverallResults>;
-  getFoursomeLabel: (f: FoursomeInfo) => string;
+  getFoursomeLabel?: (f: FoursomeInfo) => string;
 }) {
   const team1 = teams.find((t) => t.team_number === 1);
   const team2 = teams.find((t) => t.team_number === 2);
   const t1Color = getTeamColor(teams, 1);
   const t2Color = getTeamColor(teams, 2);
 
-  const maxPoints = 45; // 9 groups × 5 matches
-  const team1Pct = maxPoints > 0 ? (overall.team1Points / maxPoints) * 100 : 50;
-  const team2Pct = maxPoints > 0 ? (overall.team2Points / maxPoints) * 100 : 50;
+  const groups: KgbGroupData[] = foursomes.map((f) => {
+    const pair1 = pairs.find((p) => p.id === f.pair_team1_id);
+    const pair2 = pairs.find((p) => p.id === f.pair_team2_id);
+    const p1a = pair1?.player_a?.display_name || "?";
+    const p1b = pair1?.player_b?.display_name || "";
+    const p2a = pair2?.player_a?.display_name || "?";
+    const p2b = pair2?.player_b?.display_name || "";
+    return {
+      id: f.id,
+      sort_order: f.sort_order || 0,
+      team1PairLabel: p1b ? `${p1a} & ${p1b}` : p1a,
+      team2PairLabel: p2b ? `${p2a} & ${p2b}` : p2a,
+      results: foursomeResults.find((r) => r.foursomeId === f.id)!,
+    };
+  }).filter((g) => g.results);
 
   return (
     <div className="space-y-4">
-      {/* Hero scoreboard */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-4 text-center">
-        <div className="flex items-center justify-center gap-6">
-          <div className="text-center">
-            <p className="text-sm font-bold" style={{ color: t1Color }}>{team1?.team_name || "Team 1"}</p>
-            <p className="text-3xl font-black" style={{ color: t1Color }}>{overall.team1Points}</p>
-          </div>
-          <div className="text-gray-300 text-lg font-light">—</div>
-          <div className="text-center">
-            <p className="text-sm font-bold" style={{ color: t2Color }}>{team2?.team_name || "Team 2"}</p>
-            <p className="text-3xl font-black" style={{ color: t2Color }}>{overall.team2Points}</p>
-          </div>
-        </div>
-
-        {/* Progress bar */}
-        <div className="mt-3 relative">
-          <div className="flex h-3 rounded-full overflow-hidden bg-gray-100">
-            <div
-              className="transition-all duration-500"
-              style={{ width: `${team1Pct}%`, backgroundColor: t1Color }}
-            />
-            <div
-              className="transition-all duration-500"
-              style={{ width: `${team2Pct}%`, backgroundColor: t2Color }}
-            />
-          </div>
-          {/* First to 23 marker */}
-          <div
-            className="absolute top-0 h-3 w-px bg-yellow-400"
-            style={{ left: `${(23 / maxPoints) * 100}%` }}
-            title="First to 23"
-          />
-        </div>
-
-        <p className="mt-2 text-xs text-gray-400">
-          {overall.completedSections} of {overall.totalSections} sections complete
-          {overall.winner === "team1" && ` — ${team1?.team_name || "Team 1"} wins!`}
-          {overall.winner === "team2" && ` — ${team2?.team_name || "Team 2"} wins!`}
-          {overall.winner === "tied" && " — Tied!"}
-        </p>
-      </div>
-
-      {/* Per-group results */}
-      <div className="space-y-2">
-        {foursomes.map((f, i) => {
-          const fr = foursomeResults.find((r) => r.foursomeId === f.id);
-          if (!fr) return null;
-
-          return (
-            <GroupResultCard
-              key={f.id}
-              groupNum={i + 1}
-              label={getFoursomeLabel(f)}
-              result={fr}
-              team1Name={team1?.team_name || "T1"}
-              team2Name={team2?.team_name || "T2"}
-              team1Color={t1Color}
-              team2Color={t2Color}
-            />
-          );
-        })}
-      </div>
+      <KgbCupScoreboard
+        team1={{ team_number: 1, team_name: team1?.team_name || "Team 1", team_color: t1Color }}
+        team2={{ team_number: 2, team_name: team2?.team_name || "Team 2", team_color: t2Color }}
+        overall={overall}
+      />
+      <KgbCupGroupResults groups={groups} team1Color={t1Color} team2Color={t2Color} />
     </div>
   );
 }
 
-function GroupResultCard({
-  groupNum,
-  label,
-  result,
-  team1Name,
-  team2Name,
-  team1Color,
-  team2Color,
-}: {
-  groupNum: number;
-  label: string;
-  result: FoursomeResult;
-  team1Name: string;
-  team2Name: string;
-  team1Color: string;
-  team2Color: string;
-}) {
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-3 py-2.5 text-left active:bg-gray-50"
-      >
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-bold text-gray-500">Group {groupNum}</p>
-          <p className="text-[11px] text-gray-400 truncate">{label}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-bold">
-            <span style={{ color: team1Color }}>{result.team1TotalPoints}</span>
-            {" — "}
-            <span style={{ color: team2Color }}>{result.team2TotalPoints}</span>
-          </span>
-          <svg
-            className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? "rotate-180" : ""}`}
-            fill="none" stroke="currentColor" viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
-      </button>
-
-      {expanded && (
-        <div className="border-t border-gray-100 divide-y divide-gray-50">
-          {result.matches.map((m) => (
-            <MatchResultRow key={m.matchIndex} match={m} team1Name={team1Name} team2Name={team2Name} team1Color={team1Color} team2Color={team2Color} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MatchResultRow({
-  match,
-  team1Name,
-  team2Name,
-  team1Color,
-  team2Color,
-}: {
-  match: MatchResult;
-  team1Name: string;
-  team2Name: string;
-  team1Color: string;
-  team2Color: string;
-}) {
-  const statusColor =
-    match.sectionWinner === "team1" ? team1Color :
-    match.sectionWinner === "team2" ? team2Color :
-    match.sectionWinner === "halved" ? "#6b7280" :
-    "#9ca3af";
-
-  return (
-    <div className="flex items-center justify-between px-3 py-2">
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-gray-600">{match.label}</p>
-        <p className="text-[10px] text-gray-400">
-          Sec {match.section} · {match.scorerType === "pair" ? "Scramble" : "Individual"}
-        </p>
-      </div>
-      <p className="text-xs font-semibold" style={{ color: statusColor }}>
-        {formatMatchStatus(match).replace("T1", team1Name.slice(0, 8)).replace("T2", team2Name.slice(0, 8))}
-      </p>
-    </div>
-  );
-}

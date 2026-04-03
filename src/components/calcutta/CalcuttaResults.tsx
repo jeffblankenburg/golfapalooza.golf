@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 interface ResultUser {
@@ -125,6 +126,7 @@ export function CalcuttaResults({ contestId, userId }: { contestId: string; user
   const [expandedBuyers, setExpandedBuyers] = useState<Set<string>>(new Set());
   const [resultsSort, setResultsSort] = useState<"order" | "name" | "amount">("order");
   const [summarySort, setSummarySort] = useState<"name" | "count" | "amount">("name");
+  const [randyAvatar, setRandyAvatar] = useState<string | null>(null);
 
   const [pool, setPool] = useState(0);
   const [buyerPaid, setBuyerPaid] = useState(true);
@@ -152,6 +154,10 @@ export function CalcuttaResults({ contestId, userId }: { contestId: string; user
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 5000);
+    fetch("/api/loozers/539feb9d-eb8d-4dfe-88d3-7d0bc89c7154")
+      .then((r) => r.json())
+      .then((d) => setRandyAvatar(d.profile?.avatar_url || null))
+      .catch(() => {});
     return () => clearInterval(interval);
   }, [fetchData]);
 
@@ -218,7 +224,21 @@ export function CalcuttaResults({ contestId, userId }: { contestId: string; user
               <img src="/Venmo.png" alt="Venmo" className="w-8 h-8 object-contain relative" />
               <span className="relative">Pay Randy Watson ${buyerOwes.toFixed(2)}</span>
             </a>
-            <p className="text-xs text-gray-400 text-center">You can also give Randy Watson cash.</p>
+            <p className="text-xs text-gray-400 text-center">
+              For other payment options, please contact{" "}
+              <Link
+                href="/loozers/539feb9d-eb8d-4dfe-88d3-7d0bc89c7154"
+                className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 font-medium pl-0.5 pr-2 py-0.5 rounded-full hover:bg-gray-200 transition-colors align-middle"
+              >
+                {randyAvatar ? (
+                  <img src={randyAvatar} alt="" className="w-4 h-4 rounded-full object-cover" />
+                ) : (
+                  <span className="w-4 h-4 rounded-full bg-green-700 text-white text-[8px] font-bold flex items-center justify-center">R</span>
+                )}
+                Randy Watson
+              </Link>
+              {" "}directly.
+            </p>
           </div>
         );
       })()}

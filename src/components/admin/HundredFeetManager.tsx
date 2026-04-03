@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ConfirmModal } from "./ConfirmModal";
+import { ContestParticipantsAccordion } from "./ContestParticipantsAccordion";
 
 interface Participant {
   id: string;
@@ -35,6 +36,7 @@ function formatTotalInches(totalInches: number): string {
 
 export function HundredFeetManager({ tripId }: { tripId: string }) {
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [contestId, setContestId] = useState<string | null>(null);
   const [scores, setScores] = useState<Record<string, Score>>({});
   const [scrambleDayNumbers, setScrambleDayNumbers] = useState<number[]>([]);
   const [startDate, setStartDate] = useState<string | null>(null);
@@ -135,6 +137,7 @@ export function HundredFeetManager({ tripId }: { tripId: string }) {
     const data = await res.json();
 
     setParticipants(data.participants || []);
+    setContestId(data.contest_id || null);
 
     const scoreMap: Record<string, Score> = {};
     for (const s of data.scores || []) {
@@ -331,6 +334,15 @@ export function HundredFeetManager({ tripId }: { tripId: string }) {
 
   return (
     <div className="space-y-4">
+      {/* ── Participants Accordion ── */}
+      {contestId && (
+        <ContestParticipantsAccordion
+          tripId={tripId}
+          contestName="100 Feet!"
+          contestId={contestId}
+        />
+      )}
+
       {/* ── Data Entry Accordion ── */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <button

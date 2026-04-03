@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { checkIsAdmin } from "@/lib/permissions-server";
+import { checkIsAdmin, checkPermissionAccess } from "@/lib/permissions-server";
 
 export async function GET(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_notebook");
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_notebook");
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { trip_id, name, sort_order } = await request.json();
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_notebook");
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id, name, sort_order } = await request.json();
@@ -74,7 +74,7 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_notebook");
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await request.json();

@@ -20,6 +20,8 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",
+    "rehype-raw": "^7.0.0",
+    "remark-breaks": "^4.0.0",
     "swagger-ui-react": "^5.31.0",
     "web-push": "^3.6.7"
   },

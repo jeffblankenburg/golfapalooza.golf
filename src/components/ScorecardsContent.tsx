@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 interface Contest {
   id: string;
@@ -287,7 +288,10 @@ export function ScorecardsContent({
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Scrambles</h1>
+      <div className="flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-gray-900">Scrambles</h1>
+        <PinnedNoteButton pinnedTo="scramble" />
+      </div>
 
       {/* Day tabs */}
       <div className="flex gap-2">

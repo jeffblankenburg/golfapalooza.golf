@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 import {
   formatMatchStatus,
   type FoursomeResult,
@@ -94,6 +94,7 @@ export function KgbCupResults({ contestId }: { contestId: string }) {
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-center">
         <div className="flex items-center justify-center gap-2 mb-4">
           <h1 className="text-lg font-bold text-gray-900">KGB Cup</h1>
+          <PinnedNoteButton pinnedTo="kgb_cup" />
           {data.verified && (
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-semibold">
               <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

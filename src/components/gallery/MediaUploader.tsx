@@ -132,44 +132,60 @@ export function MediaUploader({
       setProgress("Uploading...");
       setUploadPct(0);
 
-      const data = await new Promise<{ item: Record<string, unknown> }>((resolve, reject) => {
+      // Get the file and thumbnail from formData
+      const uploadFile = formData.get("file") as File;
+      const uploadThumb = formData.get("thumbnailFile") as File | null;
+
+      // Step 1: Get signed upload URL
+      const urlRes = await fetch("/api/gallery/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tripId,
+          mediaType,
+          fileName: uploadFile.name,
+        }),
+      });
+      if (!urlRes.ok) {
+        const err = await urlRes.json();
+        throw new Error(err.error || "Failed to get upload URL");
+      }
+      const { signedUrl, token, publicUrl, thumbSignedUrl, thumbPublicUrl } = await urlRes.json();
+
+      // Step 2: Upload file directly to Supabase Storage with progress tracking
+      await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open("POST", "/api/gallery");
+        xhr.open("PUT", signedUrl);
+        xhr.setRequestHeader("x-upsert", "false");
+        if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+        const contentType = uploadFile.type || (mediaType === "video" ? "video/mp4" : "image/jpeg");
+        xhr.setRequestHeader("Content-Type", contentType);
 
         let gotProgress = false;
         xhr.upload.addEventListener("progress", (e) => {
           if (e.lengthComputable) {
             gotProgress = true;
-            // Cap at 95% — the last 5% is server processing time
             setUploadPct(Math.min(95, Math.round((e.loaded / e.total) * 100)));
           } else if (e.loaded > 0) {
-            // iOS Safari may not set lengthComputable — show indeterminate
             gotProgress = true;
             setUploadPct(null);
           }
         });
 
-        // When upload bytes are fully sent, show "Saving..." while server processes
         xhr.upload.addEventListener("load", () => {
-          setProgress("Saving...");
-          setUploadPct(null);
+          setUploadPct(95);
         });
 
-        // Fallback: if no progress events after 3s, go indeterminate
         const fallbackTimer = setTimeout(() => {
           if (!gotProgress) setUploadPct(null);
         }, 3000);
 
         xhr.onload = () => {
           clearTimeout(fallbackTimer);
-          try {
-            const json = JSON.parse(xhr.responseText);
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(json);
-            } else {
-              reject(new Error(json.error || `Upload failed (${xhr.status})`));
-            }
-          } catch {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
             reject(new Error(`Upload failed (${xhr.status})`));
           }
         };
@@ -178,9 +194,54 @@ export function MediaUploader({
           clearTimeout(fallbackTimer);
           reject(new Error("Network error during upload"));
         };
-        xhr.send(formData);
+        xhr.send(uploadFile);
       });
 
+      // Step 2b: Upload thumbnail directly if available
+      let finalThumbUrl = thumbPublicUrl;
+      if (uploadThumb && thumbSignedUrl) {
+        try {
+          const thumbRes = await fetch(thumbSignedUrl, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "image/jpeg",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: uploadThumb,
+          });
+          if (!thumbRes.ok) finalThumbUrl = null;
+        } catch {
+          finalThumbUrl = null;
+        }
+      } else {
+        finalThumbUrl = null;
+      }
+
+      // Step 3: Save metadata via API (JSON, no file — bypasses body limit)
+      setProgress("Saving...");
+      setUploadPct(null);
+
+      const metaRes = await fetch("/api/gallery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mediaUrl: publicUrl,
+          thumbnailUrl: finalThumbUrl,
+          mediaType,
+          tripId,
+          caption: caption.trim() || null,
+          takenAt: formData.get("takenAt") || null,
+          width: formData.get("width") ? parseInt(formData.get("width") as string, 10) : null,
+          height: formData.get("height") ? parseInt(formData.get("height") as string, 10) : null,
+        }),
+      });
+
+      if (!metaRes.ok) {
+        const err = await metaRes.json();
+        throw new Error(err.error || "Failed to save media");
+      }
+
+      const data = await metaRes.json();
       setUploadPct(null);
       const itemId = data.item.id;
 

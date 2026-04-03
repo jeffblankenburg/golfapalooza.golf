@@ -273,6 +273,53 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // Check Content-Type to determine if this is a direct upload (formData with file)
+    // or a metadata-only request (JSON with pre-uploaded file URLs)
+    const contentType = request.headers.get("content-type") || "";
+
+    if (contentType.includes("application/json")) {
+      // Metadata-only mode: file was already uploaded directly to Supabase Storage
+      const body = await request.json();
+      const { mediaUrl, thumbnailUrl: thumbUrl, mediaType: mt, tripId: tid, caption: cap, takenAt: taStr, width: w, height: h } = body;
+
+      if (!mediaUrl || !mt) {
+        return NextResponse.json({ error: "mediaUrl and mediaType are required" }, { status: 400 });
+      }
+
+      const effectiveUserId = await getEffectiveUserId(user.id);
+      const simulating = await isSimulating();
+      const client = simulating ? createAdminClient() : supabase;
+
+      const takenAt = taStr ? new Date(taStr) : null;
+      const insertData: Record<string, unknown> = {
+        uploader_id: effectiveUserId,
+        media_url: mediaUrl,
+        thumbnail_url: thumbUrl || null,
+        media_type: mt,
+        caption: cap || null,
+        width: w || null,
+        height: h || null,
+      };
+      if (tid) insertData.trip_id = tid;
+      if (takenAt && !isNaN(takenAt.getTime())) insertData.taken_at = takenAt.toISOString();
+
+      const { data: item, error: insertError } = await client
+        .from("gallery_items")
+        .insert(insertData)
+        .select(
+          `id, media_url, thumbnail_url, media_type, caption, width, height, created_at, taken_at, sort_date, trip_id, uploader_id,
+          uploader:users!gallery_items_uploader_public_user_fk(id, display_name, avatar_url)`
+        )
+        .single();
+
+      if (insertError) {
+        return NextResponse.json({ error: insertError.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ item }, { status: 201 });
+    }
+
+    // Original formData upload path (for small files / backwards compatibility)
     const formData = await request.formData();
     const file = formData.get("file") as File;
     const tripId = (formData.get("tripId") as string) || null;

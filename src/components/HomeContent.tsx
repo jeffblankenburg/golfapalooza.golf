@@ -61,30 +61,12 @@ function SvgIcon({ src, className = "w-8 h-8" }: { src: string; className?: stri
 // null = always show.
 const allQuickLinks = [
   {
-    href: "/bspitw",
-    label: "BSPITW",
-    color: "bg-amber-50 text-amber-700",
-    requiresContest: "scramble" as const,
-    icon: (
-      <SvgIcon src="/noun-trophy-8286316.svg" />
-    ),
-  },
-  {
     href: "/kgb-cup",
     label: "KGB Cup",
     color: "bg-indigo-50 text-indigo-700",
     requiresContest: "ryder_cup" as const,
     icon: (
       <SvgIcon src="/noun-trophy-8286316.svg" />
-    ),
-  },
-  {
-    href: "/scorecards",
-    label: "Scrambles",
-    color: "bg-sky-50 text-sky-700",
-    requiresContest: "scramble" as const,
-    icon: (
-      <SvgIcon src="/noun-golf-tee-3895707.svg" className="w-7 h-7" />
     ),
   },
   {
@@ -119,30 +101,43 @@ const allQuickLinks = [
     ),
   },
   {
-    href: "/cornhole",
-    label: "Cornhole",
-    color: "bg-orange-50 text-orange-700",
-    requiresContest: ["cornhole_singles", "cornhole_doubles"] as string[],
-    icon: (
-      <SvgIcon src="/noun-cornhole-6941307.svg" />
-    ),
-  },
-  {
-    href: "/calcutta",
-    label: "Calcutta",
-    color: "bg-purple-50 text-purple-700",
-    requiresContest: "calcutta" as const,
-    icon: (
-      <SvgIcon src="/noun-gavel-auction.svg" />
-    ),
-  },
-  {
     href: "/pickem",
     label: "Pick'em",
     color: "bg-amber-50 text-amber-700",
     requiresContest: "pickem" as const,
     icon: (
       <SvgIcon src="/noun-american-football-2591628.svg" className="w-7 h-7" />
+    ),
+  },
+  {
+    href: "/schedule",
+    label: "Schedule",
+    color: "bg-sky-50 text-sky-700",
+    requiresContest: null,
+    icon: (
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/course",
+    label: "Course",
+    color: "bg-green-50 text-green-700",
+    requiresContest: null,
+    icon: (
+      <SvgIcon src="/noun-golf-flag-5010192.svg" />
+    ),
+  },
+  {
+    href: "/info",
+    label: "Info",
+    color: "bg-gray-50 text-gray-700",
+    requiresContest: null,
+    icon: (
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
     ),
   },
   {

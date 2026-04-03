@@ -60,6 +60,14 @@ export default async function AdminLayout({
   const effectiveDisplayName = simUserName || profile?.display_name || "";
   const effectiveAvatarUrl = simUserId ? simAvatarUrl : (profile?.avatar_url || null);
 
+  // Get active trip for bottom nav
+  const adminClient2 = createAdminClient();
+  const { data: activeTrip } = await adminClient2
+    .from("trip_settings")
+    .select("id, trip_year")
+    .eq("status", "active")
+    .single();
+
   // Get unread notification count (exclude chat_message, same as app layout)
   const { count: unreadCount } = await supabase
     .from("notifications")
@@ -84,7 +92,7 @@ export default async function AdminLayout({
         avatarUrl={effectiveAvatarUrl}
       />
       <main>{children}</main>
-      <AdminNav isAdmin={isAdmin} permissions={permissions} />
+      <AdminNav isAdmin={isAdmin} permissions={permissions} activeTripId={activeTrip?.id || null} activeTripYear={activeTrip?.trip_year || null} />
     </div>
   );
 }

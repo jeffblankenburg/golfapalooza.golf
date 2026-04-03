@@ -418,7 +418,7 @@ export default function EventDetailPage() {
         </CollapsibleSection>
       )}
 
-      {can("manage_schedule") && (
+      {can("manage_notebook") && (
         <CollapsibleSection
           title="Notebook"
           summary="Notes & rules for players"

@@ -275,9 +275,9 @@ export async function POST(request: NextRequest) {
   try {
     // Check Content-Type to determine if this is a direct upload (formData with file)
     // or a metadata-only request (JSON with pre-uploaded file URLs)
-    const contentType = request.headers.get("content-type") || "";
+    const reqContentType = request.headers.get("content-type") || "";
 
-    if (contentType.includes("application/json")) {
+    if (reqContentType.includes("application/json")) {
       // Metadata-only mode: file was already uploaded directly to Supabase Storage
       const body = await request.json();
       const { mediaUrl, thumbnailUrl: thumbUrl, mediaType: mt, tripId: tid, caption: cap, takenAt: taStr, width: w, height: h } = body;
@@ -366,10 +366,10 @@ export async function POST(request: NextRequest) {
     const filePath = `${pathPrefix}/${timestamp}-${effectiveUserId}.${ext}`;
 
     // Upload main file — set explicit content type for proper browser playback
-    const contentType = file.type || (mediaType === "video" ? "video/mp4" : "image/jpeg");
+    const fileContentType = file.type || (mediaType === "video" ? "video/mp4" : "image/jpeg");
     const { data: uploadData, error: uploadError } = await client.storage
       .from("gallery-media")
-      .upload(filePath, file, { cacheControl: "31536000", upsert: false, contentType });
+      .upload(filePath, file, { cacheControl: "31536000", upsert: false, contentType: fileContentType });
 
     if (uploadError) {
       return NextResponse.json(

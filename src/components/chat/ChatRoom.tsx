@@ -48,6 +48,8 @@ export function ChatRoom({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldScrollRef = useRef(true);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const presenceChannelRef = useRef<any>(null);
 
   const scrollToBottom = useCallback(() => {
     if (shouldScrollRef.current) {
@@ -174,7 +176,10 @@ export function ChatRoom({
       })
       .subscribe();
 
+    presenceChannelRef.current = presenceChannel;
+
     return () => {
+      presenceChannelRef.current = null;
       supabase.removeChannel(messagesChannel);
       supabase.removeChannel(reactionsChannel);
       supabase.removeChannel(presenceChannel);
@@ -216,17 +221,17 @@ export function ChatRoom({
     }
   };
 
-  // Send typing indicator
+  // Send typing indicator using the existing subscribed presence channel
   const handleTyping = useCallback(() => {
-    const supabase = createClient();
-    const channel = supabase.channel(`typing-${roomId}`, {
-      config: { presence: { key: currentUserId } },
-    });
+    const channel = presenceChannelRef.current;
+    if (!channel) return;
     channel.track({ typing: true, name: "User" });
     setTimeout(() => {
-      channel.track({ typing: false });
+      if (presenceChannelRef.current) {
+        presenceChannelRef.current.track({ typing: false });
+      }
     }, 3000);
-  }, [roomId, currentUserId]);
+  }, []);
 
   const handleSend = async (content: string, imageUrl?: string) => {
     const currentReplyTo = replyTo;

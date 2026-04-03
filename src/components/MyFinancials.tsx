@@ -47,17 +47,25 @@ export default function MyFinancials({ userId }: { userId: string }) {
   const [data, setData] = useState<FinancialData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sheikerAvatar, setSheikerAvatar] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/financials/me");
+      const [res, profileRes] = await Promise.all([
+        fetch("/api/financials/me"),
+        fetch("/api/loozers/eeaee876-c596-4cc7-91c3-e96b63ecad0c"),
+      ]);
       if (!res.ok) {
         const body = await res.json();
         throw new Error(body.error || "Failed to load financials");
       }
       const json: FinancialData = await res.json();
       setData(json);
+      if (profileRes.ok) {
+        const profileData = await profileRes.json();
+        setSheikerAvatar(profileData.profile?.avatar_url || null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -158,8 +166,13 @@ export default function MyFinancials({ userId }: { userId: string }) {
               For other payment options, please contact{" "}
               <Link
                 href="/loozers/eeaee876-c596-4cc7-91c3-e96b63ecad0c"
-                className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 font-medium px-2 py-0.5 rounded-full hover:bg-gray-200 transition-colors"
+                className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 font-medium pl-0.5 pr-2 py-0.5 rounded-full hover:bg-gray-200 transition-colors align-middle"
               >
+                {sheikerAvatar ? (
+                  <img src={sheikerAvatar} alt="" className="w-4 h-4 rounded-full object-cover" />
+                ) : (
+                  <span className="w-4 h-4 rounded-full bg-green-700 text-white text-[8px] font-bold flex items-center justify-center">S</span>
+                )}
                 Sheiker
               </Link>
               {" "}directly.

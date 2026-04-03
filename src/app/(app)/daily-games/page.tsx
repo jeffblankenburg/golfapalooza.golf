@@ -1,6 +1,7 @@
 import { getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 
 export default async function DailyGamesPage() {
@@ -62,7 +63,10 @@ export default async function DailyGamesPage() {
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Daily Games</h1>
+      <div className="flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-gray-900">Daily Games</h1>
+        <PinnedNoteButton pinnedTo="daily_games" />
+      </div>
 
       {days.map((dayNum) => {
         const dayWinners = (winners || []).filter((w) => w.day_number === dayNum);

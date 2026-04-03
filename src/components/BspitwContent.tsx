@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 interface DayPoints {
   under_par: number;
@@ -162,7 +163,10 @@ export function BspitwContent({
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">BSPITW</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900">BSPITW</h1>
+          <PinnedNoteButton pinnedTo="bspitw" />
+        </div>
         <p className="text-sm text-gray-500 mt-1">
           Best Scramble Partner In The World. Points from net under par, on-green tee shots, and holed-out shots.
         </p>

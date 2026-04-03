@@ -57,6 +57,7 @@ export default async function HomePage() {
     contestTypesResult,
     eventDaysResult,
     pickemGamesResult,
+    financialsResult,
   ] = await Promise.all([
     // Course info
     trip.course_id
@@ -84,6 +85,8 @@ export default async function HomePage() {
     supabase.from("event_days").select("day_number, name").eq("trip_id", trip.id).order("day_number"),
     // Earliest pickem game time
     supabase.from("pickem_games").select("game_time, contest:contests!pickem_games_contest_id_fkey(trip_id)").order("game_time").limit(1),
+    // Financial transactions for balance card
+    queryClient.from("financial_transactions").select("type, amount").eq("user_id", effectiveUserId),
   ]);
 
   // ── Process Phase 2 results ──
@@ -502,6 +505,18 @@ export default async function HomePage() {
     }
   }
 
+  // Process financial balance
+  const financialTxns = financialsResult.data || [];
+  const totalCharges = financialTxns
+    .filter((t: { type: string; amount: number }) => t.type === "charge")
+    .reduce((sum: number, t: { amount: number }) => sum + Number(t.amount), 0);
+  const totalPayments = financialTxns
+    .filter((t: { type: string; amount: number }) => t.type === "payment")
+    .reduce((sum: number, t: { amount: number }) => sum + Number(t.amount), 0);
+  const myBalance = financialTxns.length > 0
+    ? { charges: totalCharges, payments: totalPayments, balance: totalPayments - totalCharges }
+    : null;
+
   // Check if pickem picks are urgent (within 3 hours of first game)
   const pickemFirstGame = (pickemGamesResult.data || []).find(
     (g) => {
@@ -542,6 +557,7 @@ export default async function HomePage() {
       calcuttaAuctionActive={calcuttaContest?.calcutta_active_order != null && calcuttaContest.calcutta_active_order > 0}
       pickemUrgent={pickemUrgent}
       myWinnings={myWinnings}
+      myBalance={myBalance}
     />
   );
 }

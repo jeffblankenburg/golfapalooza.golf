@@ -43,7 +43,7 @@ export async function GET(
   const { data: profile, error: profileError } = await queryClient
     .from("users")
     .select(
-      "id, display_name, full_name, avatar_url, city, state, playing_since, swings, typical_shot, fun_fact, best_shot, occupation"
+      "id, display_name, full_name, avatar_url, phone, city, state, playing_since, swings, typical_shot, fun_fact, best_shot, occupation"
     )
     .eq("id", userId)
     .single();

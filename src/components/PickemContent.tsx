@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 interface Game {
   id: string;
@@ -180,7 +181,10 @@ export function PickemContent({
 
   return (
     <div className="px-4 pt-6 pb-24">
-      <h1 className="text-2xl font-bold text-gray-900">{contestName}</h1>
+      <div className="flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-gray-900">{contestName}</h1>
+        <PinnedNoteButton pinnedTo="pickem" />
+      </div>
 
       {/* Stats bar */}
       <div className="flex items-center gap-3 mt-2 mb-4">

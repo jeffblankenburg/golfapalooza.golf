@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 interface DayScore {
   feet: number;
@@ -99,7 +100,10 @@ export function HundredFeetContent({
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">100 Feet!</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900">100 Feet!</h1>
+          <PinnedNoteButton pinnedTo="hundred_feet" />
+        </div>
         <p className="text-sm text-gray-500 mt-1">
           Distance from the pin on #18. Miss the green? 100 feet!
         </p>

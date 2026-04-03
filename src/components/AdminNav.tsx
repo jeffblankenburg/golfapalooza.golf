@@ -33,8 +33,13 @@ export function AdminNav({ isAdmin, permissions, activeTripId, activeTripYear }:
       ? [
           {
             href: `/admin/events/${activeTripId}`,
-            label: String(activeTripYear),
+            label: "Event",
             exact: false,
+            matchPrefix: `/admin/events/${activeTripId}`,
+            excludePrefixes: [
+              `/admin/events/${activeTripId}/options`,
+              `/admin/events/${activeTripId}/financials`,
+            ],
             icon: (
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -46,11 +51,41 @@ export function AdminNav({ isAdmin, permissions, activeTripId, activeTripYear }:
               </svg>
             ),
           },
+          {
+            href: `/admin/events/${activeTripId}/options`,
+            label: "Options",
+            exact: false,
+            icon: (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                />
+              </svg>
+            ),
+          },
+          {
+            href: `/admin/events/${activeTripId}/financials`,
+            label: "Financials",
+            exact: false,
+            icon: (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            ),
+          },
         ]
       : []),
     {
       href: "/admin/announcements",
-      label: "Announcements",
+      label: "Notify",
       exact: false,
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -89,9 +124,16 @@ export function AdminNav({ isAdmin, permissions, activeTripId, activeTripYear }:
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 pb-safe z-40">
       <div className="flex justify-around items-center h-16">
         {items.map((item) => {
-          const isActive = item.exact
-            ? pathname === item.href
-            : pathname.startsWith(item.href);
+          let isActive: boolean;
+          if (item.exact) {
+            isActive = pathname === item.href;
+          } else if ("excludePrefixes" in item && item.excludePrefixes) {
+            isActive =
+              pathname.startsWith(item.matchPrefix || item.href) &&
+              !(item.excludePrefixes as string[]).some((p) => pathname.startsWith(p));
+          } else {
+            isActive = pathname.startsWith(item.href);
+          }
           return (
             <Link
               key={item.href}

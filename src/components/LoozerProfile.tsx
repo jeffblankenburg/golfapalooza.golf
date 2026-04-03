@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface ProfileData {
   id: string;
   display_name: string;
   full_name: string | null;
   avatar_url: string | null;
+  phone: string | null;
   city: string | null;
   state: string | null;
   playing_since: number | null;
@@ -40,6 +42,14 @@ function getInitials(name: string): string {
   return (name[0] || "?").toUpperCase();
 }
 
+function formatPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  return phone;
+}
+
 export function LoozerProfile({
   userId,
   isOwnProfile,
@@ -47,10 +57,12 @@ export function LoozerProfile({
   userId: string;
   isOwnProfile: boolean;
 }) {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [accolades, setAccolades] = useState<AccoladeData[]>([]);
   const [taggedPhotos, setTaggedPhotos] = useState<TaggedPhoto[]>([]);
+  const [startingChat, setStartingChat] = useState(false);
 
   useEffect(() => {
     fetch(`/api/loozers/${userId}`)
@@ -82,6 +94,24 @@ export function LoozerProfile({
 
   const location = [profile.city, profile.state].filter(Boolean).join(", ");
 
+  const openChat = async () => {
+    setStartingChat(true);
+    try {
+      const res = await fetch("/api/chat/rooms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userIds: [userId] }),
+      });
+      const data = await res.json();
+      if (data.room?.id) {
+        router.push(`/chat/${data.room.id}`);
+      }
+    } catch {
+      // ignore
+    }
+    setStartingChat(false);
+  };
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -108,14 +138,40 @@ export function LoozerProfile({
         {location && (
           <p className="text-sm text-gray-500 mt-0.5">{location}</p>
         )}
-        {isOwnProfile && (
-          <Link
-            href="/profile"
-            className="mt-2 text-sm font-medium text-green-600"
+        {profile.phone && (
+          <a
+            href={`tel:+1${profile.phone.replace(/\D/g, "")}`}
+            className="text-sm text-gray-500 mt-0.5 flex items-center gap-1 hover:text-green-600 transition-colors"
           >
-            Edit Profile
-          </Link>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+            </svg>
+            {formatPhone(profile.phone)}
+          </a>
         )}
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-3 mt-3">
+          {isOwnProfile ? (
+            <Link
+              href="/profile"
+              className="text-sm font-medium text-green-600"
+            >
+              Edit Profile
+            </Link>
+          ) : (
+            <button
+              onClick={openChat}
+              disabled={startingChat}
+              className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-xl active:bg-green-700 transition-colors disabled:opacity-50"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              {startingChat ? "Opening..." : "Message"}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Accolades */}

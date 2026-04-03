@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { BracketView, BracketMatchData, computeChampionId } from "@/components/BracketView";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 const POLL_INTERVAL = 5000; // 5 seconds
 
@@ -79,7 +80,10 @@ export function CornholeBrackets({
   return (
     <div className="px-4 pt-6 pb-8 space-y-3">
       <div className="flex items-center justify-between mb-1">
-        <h1 className="text-lg font-bold text-gray-900">Cornhole</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-bold text-gray-900">Cornhole</h1>
+          <PinnedNoteButton pinnedTo="cornhole" />
+        </div>
         <button
           onClick={() => setShowRealNames(!showRealNames)}
           className="text-xs text-orange-700 font-medium"

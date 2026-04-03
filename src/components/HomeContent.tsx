@@ -141,6 +141,17 @@ const allQuickLinks = [
     ),
   },
   {
+    href: "/options",
+    label: "My Options",
+    color: "bg-indigo-50 text-indigo-700",
+    requiresContest: null,
+    icon: (
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+      </svg>
+    ),
+  },
+  {
     href: "/notebook",
     label: "Notebook",
     color: "bg-emerald-50 text-emerald-700",
@@ -177,6 +188,7 @@ export function HomeContent({
   calcuttaAuctionActive = false,
   pickemUrgent = false,
   myWinnings = null,
+  myBalance = null,
 }: {
   displayName: string;
   trip: TripData | null;
@@ -201,6 +213,7 @@ export function HomeContent({
   calcuttaAuctionActive?: boolean;
   pickemUrgent?: boolean;
   myWinnings?: { total: number; breakdown: { prizeName: string; amount: number }[] } | null;
+  myBalance?: { charges: number; payments: number; balance: number } | null;
 }) {
   const router = useRouter();
 
@@ -630,6 +643,46 @@ export function HomeContent({
             )}
           </div>
           <svg className="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+      )}
+
+      {/* Balance Card */}
+      {myBalance && (
+        <Link
+          href="/financials"
+          className={`flex items-center gap-4 p-4 rounded-2xl border shadow-sm active:scale-95 transition-transform ${
+            myBalance.balance < 0
+              ? "bg-red-50 border-red-200"
+              : "bg-green-50 border-green-200"
+          }`}
+        >
+          <div
+            className={`flex items-center justify-center w-12 h-12 rounded-full flex-shrink-0 ${
+              myBalance.balance < 0
+                ? "bg-red-100 text-red-600"
+                : "bg-green-100 text-green-600"
+            }`}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm font-medium ${myBalance.balance < 0 ? "text-red-600" : "text-green-600"}`}>
+              {myBalance.balance < 0 ? "Balance Due" : "Account Balance"}
+            </p>
+            <p className={`text-2xl font-bold ${myBalance.balance < 0 ? "text-red-700" : "text-green-700"}`}>
+              {Math.abs(myBalance.balance).toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: myBalance.balance % 1 === 0 ? 0 : 2 })}
+            </p>
+            {myBalance.balance < 0 && myBalance.payments > 0 && (
+              <p className="text-xs text-red-500 mt-0.5">
+                {myBalance.payments.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 })} paid of {myBalance.charges.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 })}
+              </p>
+            )}
+          </div>
+          <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </Link>

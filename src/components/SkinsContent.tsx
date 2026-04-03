@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 interface Contest {
   id: string;
@@ -124,7 +125,10 @@ export function SkinsContent({
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Skins</h1>
+      <div className="flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-gray-900">Skins</h1>
+        <PinnedNoteButton pinnedTo="skins" />
+      </div>
 
       {/* Day tabs */}
       <div className="flex gap-2">

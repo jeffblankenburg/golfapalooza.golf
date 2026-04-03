@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 interface ResultUser {
   id: string;
@@ -222,7 +223,12 @@ export function CalcuttaResults({ contestId, userId }: { contestId: string; user
         );
       })()}
 
-      {!auctionStarted && <h1 className="text-2xl font-bold text-gray-900">Calcutta</h1>}
+      {!auctionStarted && (
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900">Calcutta</h1>
+          <PinnedNoteButton pinnedTo="calcutta" />
+        </div>
+      )}
 
       {participants.length === 0 && (
         <p className="text-gray-500 text-center py-8">Auction not set up yet.</p>

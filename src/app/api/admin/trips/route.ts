@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { checkIsAdmin } from "@/lib/permissions-server";
+import { checkIsAdmin, checkAnyEventAccess } from "@/lib/permissions-server";
 
 /**
  * @swagger
@@ -22,7 +22,8 @@ import { checkIsAdmin } from "@/lib/permissions-server";
  *         description: Unauthorized
  */
 export async function GET(request: Request) {
-  const admin = await checkIsAdmin();
+  // Allow any user with event permissions to list trips (read-only)
+  const admin = await checkAnyEventAccess();
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

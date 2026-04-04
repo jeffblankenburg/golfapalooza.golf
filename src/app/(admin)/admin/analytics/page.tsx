@@ -387,9 +387,9 @@ export default function AnalyticsPage() {
                     {event.page_path && (
                       <p className="text-xs text-gray-500 font-mono truncate mt-0.5">{event.page_path}</p>
                     )}
-                    {event.event_type === "error" && event.metadata?.message && (
+                    {event.event_type === "error" && event.metadata?.message ? (
                       <p className="text-xs text-red-500 mt-1 truncate">{String(event.metadata.message)}</p>
-                    )}
+                    ) : null}
                   </div>
                 ))}
               </div>

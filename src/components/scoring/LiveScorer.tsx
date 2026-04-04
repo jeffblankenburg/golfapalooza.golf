@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { logActivity } from "@/components/ActivityTracker";
 
 type ImageView = "overhead" | "green";
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -348,6 +349,11 @@ export function LiveScorer({
         setSaveStatus("saved");
         if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
         savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+        logActivity("score_save", "/scoring", {
+          team_id: team.id,
+          holes: scoresToSave.map((s) => s.hole_number),
+          bonuses: bonusesToSave.length,
+        });
       } else {
         setSaveStatus("error");
         for (const s of scoresToSave) {
@@ -760,7 +766,7 @@ export function LiveScorer({
           )}
           {/* Leaderboard */}
           <button
-            onClick={() => setShowLeaderboard(true)}
+            onClick={() => { setShowLeaderboard(true); logActivity("leaderboard_view", "/scoring", { contest_id: contestId }); }}
             className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 active:bg-gray-200"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

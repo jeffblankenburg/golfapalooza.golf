@@ -51,10 +51,22 @@ self.addEventListener("notificationclick", (event) => {
     return;
   }
 
-  const urlToOpen = new URL(
-    event.notification.data?.url || "/",
-    self.location.origin
-  ).href;
+  const targetPath = event.notification.data?.url || "/";
+  const urlToOpen = new URL(targetPath, self.location.origin).href;
+
+  // Log notification click (fire-and-forget)
+  fetch(new URL("/api/activity", self.location.origin).href, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      event_type: "notification_click",
+      page_path: targetPath,
+      metadata: {
+        notification_title: event.notification.title || null,
+        notification_tag: event.notification.tag || null,
+      },
+    }),
+  }).catch(() => {});
 
   event.waitUntil(
     clients

@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { logActivity } from "@/components/ActivityTracker";
 import {
   formatMatchStatus,
   type FoursomeResult,
@@ -495,6 +496,10 @@ export function KgbCupLiveScorer({
         setSaveStatus("saved");
         if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
         savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+        logActivity("score_save", "/kgb-cup/scoring", {
+          foursome_id: toSave[0]?.foursome_id,
+          holes: toSave.map((s) => s.hole_number),
+        });
       } else {
         setSaveStatus("error");
         for (const s of toSave) dirtyRef.current.set(getScorerKey(s.scorer_type, s.scorer_id, s.hole_number), s);

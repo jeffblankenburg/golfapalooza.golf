@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
+import { logActivity } from "@/components/ActivityTracker";
 
 interface Game {
   id: string;
@@ -119,6 +120,7 @@ export function PickemContent({
     });
 
     if (res.ok) {
+      logActivity("pickem_pick", "/pickem", { game_id: gameId, picked_team: pickedTeam });
       // Show saved indicator briefly
       setSavedIndicator(gameId);
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);

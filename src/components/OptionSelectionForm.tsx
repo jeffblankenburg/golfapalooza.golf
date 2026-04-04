@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { OptionIcon } from "@/lib/option-icons";
+import { logActivity } from "@/components/ActivityTracker";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 
@@ -108,6 +109,7 @@ export default function OptionSelectionForm({ tripId }: OptionSelectionFormProps
         throw new Error(data.error || "Save failed");
       }
 
+      logActivity("option_selection", "/options", { option_id: optionId });
       setSavingOptions((prev) => ({ ...prev, [optionId]: "saved" }));
       setTimeout(() => {
         setSavingOptions((prev) => {

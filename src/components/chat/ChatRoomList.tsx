@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { logActivity } from "@/components/ActivityTracker";
 
 interface RoomMember {
   user: { id: string; display_name: string; avatar_url: string | null } | null;
@@ -226,7 +227,7 @@ export function ChatRoomList({
           {sortedRooms.map((room) => (
             <button
               key={room.id}
-              onClick={() => router.push(`/chat/${room.id}`)}
+              onClick={() => { logActivity("chat_open", `/chat/${room.id}`, { room_id: room.id, room_type: room.type }); router.push(`/chat/${room.id}`); }}
               className="flex items-center gap-3 w-full px-4 py-3 text-left active:bg-gray-50 border-b border-gray-50"
             >
               {/* Avatar */}

@@ -8,6 +8,7 @@ import {
   validateVideo,
   isVideoFile,
 } from "@/lib/gallery/compress";
+import { logActivity } from "@/components/ActivityTracker";
 import { extractExifDate, extractVideoDate } from "@/lib/gallery/exif";
 
 interface GalleryUser {
@@ -270,6 +271,11 @@ export function MediaUploader({
         commentCount: 0,
       };
 
+      logActivity("gallery_upload", "/gallery", {
+        media_type: mediaType,
+        tagged_users: taggedUserIds.size,
+        has_caption: !!caption.trim(),
+      });
       onUploadComplete(enrichedItem);
       onClose();
     } catch (err) {

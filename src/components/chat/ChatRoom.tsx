@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { MessageBubble } from "./MessageBubble";
 import { MessageInput } from "./MessageInput";
 import { TypingIndicator } from "./TypingIndicator";
+import { logActivity } from "@/components/ActivityTracker";
 
 interface Message {
   id: string;
@@ -248,6 +249,11 @@ export function ChatRoom({
     });
 
     if (res.ok) {
+      logActivity("chat_message", `/chat/${roomId}`, {
+        room_id: roomId,
+        has_image: !!imageUrl,
+        is_reply: !!currentReplyTo,
+      });
       const { message: sent } = await res.json();
       const optimistic: Message = {
         id: sent.id,

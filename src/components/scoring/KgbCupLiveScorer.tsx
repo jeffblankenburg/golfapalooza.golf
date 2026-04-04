@@ -546,8 +546,8 @@ export function KgbCupLiveScorer({
     const holeNum = hole.hole_number;
     const key = getScorerKey(scorerType, scorerId, holeNum);
     const current = scores[key];
-    if (current === undefined || current <= 1) return;
-    const newVal = current - 1;
+    if (current !== undefined && current <= 1) return;
+    const newVal = current !== undefined ? current - 1 : Math.max(hole.par - 1, 1);
     setScores((prev) => ({ ...prev, [key]: newVal }));
     dirtyRef.current.set(key, { foursome_id: foursomeId, hole_number: holeNum, scorer_type: scorerType, scorer_id: scorerId, strokes: newVal });
     scheduleSave();
@@ -703,7 +703,7 @@ export function KgbCupLiveScorer({
             onMouseDown={() => handleDecrementStart(side.type, side.id)}
             onMouseUp={handleDecrementEnd}
             onMouseLeave={handleDecrementEnd}
-            disabled={isLocked || !hasValue}
+            disabled={isLocked || (hasValue && side.score! <= 1)}
             className="w-7 h-7 flex items-center justify-center rounded-full text-white text-sm font-bold disabled:opacity-30"
             style={{ backgroundColor: color }}
           >

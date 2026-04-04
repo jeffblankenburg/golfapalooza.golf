@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getEffectiveUserId } from "@/lib/simulator";
 
 export async function PUT(request: Request) {
   const supabase = await createClient();
@@ -11,6 +12,8 @@ export async function PUT(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const effectiveUserId = await getEffectiveUserId(user.id);
 
   try {
     const { foursome_id, hole_number, scorer_type, scorer_id, strokes } =
@@ -70,7 +73,7 @@ export async function PUT(request: Request) {
     if (team2Pair?.player_a_id) playerIds.add(team2Pair.player_a_id);
     if (team2Pair?.player_b_id) playerIds.add(team2Pair.player_b_id);
 
-    if (!playerIds.has(user.id)) {
+    if (!playerIds.has(effectiveUserId)) {
       return NextResponse.json(
         { error: "Not a member of this foursome" },
         { status: 403 }
@@ -91,8 +94,8 @@ export async function PUT(request: Request) {
       );
     }
 
-    // Upsert score via authenticated client (RLS applies)
-    const { error: upsertError } = await supabase
+    // Upsert score via admin client (supports simulator mode)
+    const { error: upsertError } = await adminClient
       .from("kgb_cup_hole_scores")
       .upsert(
         { foursome_id, hole_number, scorer_type, scorer_id, strokes },

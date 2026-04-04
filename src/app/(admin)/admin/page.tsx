@@ -13,9 +13,12 @@ interface TripSummary {
 }
 
 interface UserAccess {
+  id: string | null;
   isAdmin: boolean;
   permissions: Record<string, boolean> | null;
 }
+
+const DEV_USER_ID = "fd9c3a4b-e728-4e28-ac12-ed9099e389b5";
 
 // Map card labels to the permission key required (if not is_admin)
 const cardPermissionMap: Record<string, string> = {
@@ -23,7 +26,7 @@ const cardPermissionMap: Record<string, string> = {
   Facilities: "manage_facilities",
   Courses: "manage_facilities",
   Announcements: "send_announcements",
-  Gallery: "manage_event_settings",
+  Gallery: "manage_gallery",
   Music: "manage_music",
 };
 
@@ -114,7 +117,7 @@ const dataActions = [
 export default function AdminPage() {
   const [events, setEvents] = useState<TripSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [access, setAccess] = useState<UserAccess>({ isAdmin: false, permissions: null });
+  const [access, setAccess] = useState<UserAccess>({ id: null, isAdmin: false, permissions: null });
   const [accessLoading, setAccessLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [pushTest, setPushTest] = useState<{ loading: boolean; result: null | { success: boolean; error?: string; diagnostics?: Record<string, unknown> } }>({ loading: false, result: null });
@@ -140,6 +143,7 @@ export default function AdminPage() {
       .then((data) => {
         if (data.user) {
           setAccess({
+            id: data.user.id ?? null,
             isAdmin: data.user.is_admin ?? false,
             permissions: data.user.permissions ?? null,
           });
@@ -378,6 +382,34 @@ export default function AdminPage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Dev Analytics — dev only */}
+      {access.id === DEV_USER_ID && (
+        <div>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Developer
+          </h2>
+          <Link
+            href="/admin/analytics"
+            className="flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-200 shadow-sm active:scale-[0.98] transition-transform"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-50 text-purple-700">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Dev Analytics</p>
+                <p className="text-xs text-gray-500">User activity & page views</p>
+              </div>
+            </div>
+            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
         </div>
       )}
 

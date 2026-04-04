@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getEffectiveUserId } from "@/lib/simulator";
 
 export async function PUT(request: Request) {
   const supabase = await createClient();
@@ -11,6 +12,8 @@ export async function PUT(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const effectiveUserId = await getEffectiveUserId(user.id);
 
   try {
     const { team_id, hole_number, strokes } = await request.json();
@@ -29,7 +32,7 @@ export async function PUT(request: Request) {
       .from("scramble_team_members")
       .select("id, team:scramble_teams(verified_at)")
       .eq("team_id", team_id)
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .maybeSingle();
 
     if (!membership) {
@@ -66,8 +69,8 @@ export async function PUT(request: Request) {
       );
     }
 
-    // Upsert score via authenticated client (RLS applies)
-    const { error: upsertError } = await supabase
+    // Upsert score via admin client (supports simulator mode)
+    const { error: upsertError } = await adminClient
       .from("scramble_hole_scores")
       .upsert(
         { team_id, hole_number, strokes },

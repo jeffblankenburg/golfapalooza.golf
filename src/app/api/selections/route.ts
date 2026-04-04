@@ -2,21 +2,25 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncContestEnrollment } from "@/lib/option-contest-sync";
+import { getEffectiveUserId } from "@/lib/simulator";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const effectiveUserId = await getEffectiveUserId(user.id);
+
   const { searchParams } = new URL(request.url);
   const tripId = searchParams.get("trip_id");
   if (!tripId) return NextResponse.json({ error: "trip_id is required" }, { status: 400 });
 
-  const { data, error } = await supabase
+  const adminClient = createAdminClient();
+  const { data, error } = await adminClient
     .from("user_option_selections")
     .select("*")
     .eq("trip_id", tripId)
-    .eq("user_id", user.id);
+    .eq("user_id", effectiveUserId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -33,6 +37,8 @@ export async function PUT(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const effectiveUserId = await getEffectiveUserId(user.id);
 
   const { trip_id, option_id, value } = await request.json();
   if (!trip_id || !option_id) {
@@ -64,14 +70,14 @@ export async function PUT(request: Request) {
     const { error: delError } = await adminClient
       .from("user_option_selections")
       .delete()
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .eq("option_id", option_id);
     if (delError) return NextResponse.json({ error: delError.message }, { status: 500 });
   } else {
     const { error: upsertError } = await adminClient
       .from("user_option_selections")
       .upsert(
-        { trip_id, user_id: user.id, option_id, value },
+        { trip_id, user_id: effectiveUserId, option_id, value },
         { onConflict: "user_id,option_id" }
       );
     if (upsertError) return NextResponse.json({ error: upsertError.message }, { status: 500 });
@@ -81,7 +87,7 @@ export async function PUT(request: Request) {
   const { error: deleteChargeError } = await adminClient
     .from("financial_transactions")
     .delete()
-    .eq("user_id", user.id)
+    .eq("user_id", effectiveUserId)
     .eq("option_id", option_id)
     .eq("source", "option");
   if (deleteChargeError) return NextResponse.json({ error: deleteChargeError.message }, { status: 500 });
@@ -96,7 +102,7 @@ export async function PUT(request: Request) {
 
   // If value is null (deletion), sync contest enrollment (unenroll) and we're done
   if (value === null || value === undefined) {
-    await syncContestEnrollment(adminClient, user.id, option, null);
+    await syncContestEnrollment(adminClient, effectiveUserId, option, null);
     return NextResponse.json({ success: true });
   }
 
@@ -138,7 +144,7 @@ export async function PUT(request: Request) {
     const { error: chargeError } = await adminClient
       .from("financial_transactions")
       .insert({
-        user_id: user.id,
+        user_id: effectiveUserId,
         trip_id,
         type: "charge",
         source: "option",
@@ -151,7 +157,7 @@ export async function PUT(request: Request) {
   }
 
   // 4. Sync contest enrollment
-  await syncContestEnrollment(adminClient, user.id, option, value);
+  await syncContestEnrollment(adminClient, effectiveUserId, option, value);
 
   return NextResponse.json({ success: true });
 }

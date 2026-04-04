@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { logLogin } from "@/components/ActivityTracker";
 
 export default function VerifyPage() {
   const [code, setCode] = useState(["", "", "", "", "", ""]);
@@ -85,6 +86,7 @@ export default function VerifyPage() {
       }
 
       sessionStorage.removeItem("pendingPhone");
+      logLogin();
       // Redirect to home page
       window.location.href = "/";
     } catch {

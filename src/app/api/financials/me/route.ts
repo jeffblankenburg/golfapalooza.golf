@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getEffectiveUserId } from "@/lib/simulator";
 
 /**
  * @swagger
@@ -22,6 +23,8 @@ export async function GET() {
   if (!user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const effectiveUserId = await getEffectiveUserId(user.id);
+
   try {
     const adminClient = createAdminClient();
 
@@ -30,7 +33,7 @@ export async function GET() {
       .select(
         "id, trip_id, type, source, description, amount, method, notes, created_at, trip:trip_settings!financial_transactions_trip_id_fkey(trip_name, trip_year)"
       )
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .order("created_at", { ascending: false });
 
     if (error) {

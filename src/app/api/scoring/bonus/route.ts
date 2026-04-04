@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getEffectiveUserId } from "@/lib/simulator";
 
 export async function PUT(request: Request) {
   const supabase = await createClient();
@@ -11,6 +12,8 @@ export async function PUT(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const effectiveUserId = await getEffectiveUserId(user.id);
 
   try {
     const { team_id, hole_number, user_id, on_green, holed_out } =
@@ -30,7 +33,7 @@ export async function PUT(request: Request) {
       .from("scramble_team_members")
       .select("id, team:scramble_teams(verified_at)")
       .eq("team_id", team_id)
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .maybeSingle();
 
     if (!membership) {
@@ -68,7 +71,7 @@ export async function PUT(request: Request) {
     }
 
     // Verify the target user is also a member of this team
-    if (user_id !== user.id) {
+    if (user_id !== effectiveUserId) {
       const { data: targetMembership } = await adminClient
         .from("scramble_team_members")
         .select("id")

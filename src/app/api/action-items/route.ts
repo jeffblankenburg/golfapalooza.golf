@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getEffectiveUserId } from "@/lib/simulator";
 
 /**
  * @swagger
@@ -23,6 +25,8 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const effectiveUserId = await getEffectiveUserId(user.id);
+
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id")
@@ -33,16 +37,17 @@ export async function GET() {
     return NextResponse.json({ items: [], completions: [] });
   }
 
+  const adminClient = createAdminClient();
   const [itemsResult, completionsResult] = await Promise.all([
     supabase
       .from("action_items")
       .select("*")
       .eq("trip_id", trip.id)
       .order("sort_order"),
-    supabase
+    adminClient
       .from("user_action_completions")
       .select("action_item_id, completed_at")
-      .eq("user_id", user.id),
+      .eq("user_id", effectiveUserId),
   ]);
 
   return NextResponse.json({
@@ -73,6 +78,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const effectiveUserId = await getEffectiveUserId(user.id);
+
   try {
     const { action_item_id, completed } = await request.json();
 
@@ -83,11 +90,13 @@ export async function POST(request: Request) {
       );
     }
 
+    const adminClient = createAdminClient();
+
     if (completed) {
-      const { error } = await supabase
+      const { error } = await adminClient
         .from("user_action_completions")
         .upsert(
-          { action_item_id, user_id: user.id },
+          { action_item_id, user_id: effectiveUserId },
           { onConflict: "action_item_id,user_id" }
         );
 
@@ -95,11 +104,11 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
     } else {
-      const { error } = await supabase
+      const { error } = await adminClient
         .from("user_action_completions")
         .delete()
         .eq("action_item_id", action_item_id)
-        .eq("user_id", user.id);
+        .eq("user_id", effectiveUserId);
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getEffectiveUserId } from "@/lib/simulator";
 
 // GET - Public display data for the Calcutta auction
 export async function GET(request: Request) {
@@ -12,6 +13,8 @@ export async function GET(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const effectiveUserId = await getEffectiveUserId(user.id);
 
   const { searchParams } = new URL(request.url);
   const contestId = searchParams.get("contest_id");
@@ -292,7 +295,7 @@ export async function GET(request: Request) {
       .from("calcutta_buyer_paid")
       .select("id")
       .eq("contest_id", contestId)
-      .eq("user_id", user.id)
+      .eq("user_id", effectiveUserId)
       .maybeSingle();
 
     // Calculate total amount this user owes as a buyer
@@ -301,11 +304,11 @@ export async function GET(request: Request) {
       for (const p of normalizedParticipants) {
         if (p.ownerships && p.ownerships.length > 0) {
           for (const o of p.ownerships) {
-            if (o.owner_id === user.id) {
+            if (o.owner_id === effectiveUserId) {
               buyerOwes += Number(o.amount_paid) || 0;
             }
           }
-        } else if (p.owner_id === user.id) {
+        } else if (p.owner_id === effectiveUserId) {
           buyerOwes += Number(p.bid_amount) || 0;
         }
       }

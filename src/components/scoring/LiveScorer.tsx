@@ -428,9 +428,8 @@ export function LiveScorer({
     if (isLocked) return;
     const holeNum = hole.hole_number;
     const current = scores[holeNum];
-    if (current === undefined) return;
-    if (current <= 1) return;
-    const newVal = current - 1;
+    if (current !== undefined && current <= 1) return;
+    const newVal = current !== undefined ? current - 1 : Math.max(hole.par - 1, 1);
     setScores((prev) => ({ ...prev, [holeNum]: newVal }));
     dirtyScoresRef.current.set(holeNum, {
       hole_number: holeNum,
@@ -1056,7 +1055,7 @@ export function LiveScorer({
             onMouseDown={handleDecrementStart}
             onMouseUp={handleDecrementEnd}
             onMouseLeave={handleDecrementEnd}
-            disabled={isLocked || currentScore === undefined}
+            disabled={isLocked || (currentScore !== undefined && currentScore <= 1)}
             className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 text-gray-700 text-xl font-bold active:bg-gray-200 disabled:opacity-30"
           >
             −

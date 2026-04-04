@@ -3,12 +3,10 @@
 import { useState, useEffect } from "react";
 import {
   compressImage,
-  compressVideo,
   generateThumbnail,
   extractVideoFrame,
   validateVideo,
   isVideoFile,
-  getExtFromMime,
 } from "@/lib/gallery/compress";
 import { extractExifDate, extractVideoDate } from "@/lib/gallery/exif";
 
@@ -99,28 +97,34 @@ export function MediaUploader({
         const thumbBlob = await generateThumbnail(initialFile);
         formData.set("thumbnailFile", thumbBlob, "thumb.jpg");
       } else {
-        // Video path — extract date from MP4/MOV header, then compress
+        // Video path — upload original file (no compression, preserves audio)
         setProgress("Reading video date...");
         const videoDate = await extractVideoDate(initialFile);
         if (videoDate) {
           formData.set("takenAt", videoDate.toISOString());
         }
 
-        setProgress("Compressing video...");
-        setUploadPct(0);
-        const compressed = await compressVideo(initialFile, {
-          maxHeight: 720,
-          bitrate: 2_500_000,
-          onProgress: (pct) => {
-            setUploadPct(Math.round(pct));
-          },
+        // Get video dimensions from the file
+        setProgress("Reading video...");
+        const video = document.createElement("video");
+        video.preload = "metadata";
+        video.muted = true;
+        const videoUrl = URL.createObjectURL(initialFile);
+        video.src = videoUrl;
+        await new Promise<void>((resolve) => {
+          video.onloadedmetadata = () => resolve();
+          video.onerror = () => resolve();
+          video.load();
         });
-        formData.set("file", compressed.blob, `video.${getExtFromMime(compressed.blob.type)}`);
-        formData.set("width", String(compressed.width));
-        formData.set("height", String(compressed.height));
+        const vw = video.videoWidth || 0;
+        const vh = video.videoHeight || 0;
+        URL.revokeObjectURL(videoUrl);
+
+        formData.set("file", initialFile, initialFile.name);
+        if (vw > 0) formData.set("width", String(vw));
+        if (vh > 0) formData.set("height", String(vh));
 
         setProgress("Generating thumbnail...");
-        setUploadPct(null);
         try {
           const frameBlob = await extractVideoFrame(initialFile);
           formData.set("thumbnailFile", frameBlob, "thumb.jpg");

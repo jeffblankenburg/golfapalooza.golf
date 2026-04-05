@@ -5,6 +5,21 @@ import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { OPTION_ICONS, ICON_CATEGORIES, OptionIcon } from "@/lib/option-icons";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface OptionGroup {
   id: string;
@@ -32,6 +47,7 @@ interface Option {
   choices?: OptionChoice[];
   is_required: boolean;
   sort_order: number;
+  depends_on_option_id?: string | null;
 }
 
 interface OptionSettings {
@@ -100,6 +116,30 @@ const TYPE_META: Record<string, { label: string; color: string; bg: string; icon
   },
 };
 
+// ---------------------------------------------------------------------------
+// Drag handle icon
+// ---------------------------------------------------------------------------
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function DragHandle({ listeners, attributes }: { listeners?: any; attributes?: any }) {
+  return (
+    <button
+      type="button"
+      className="touch-none p-1.5 -ml-1 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing flex-shrink-0"
+      {...listeners}
+      {...attributes}
+    >
+      <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+        <circle cx="5" cy="3" r="1.5" />
+        <circle cx="11" cy="3" r="1.5" />
+        <circle cx="5" cy="8" r="1.5" />
+        <circle cx="11" cy="8" r="1.5" />
+        <circle cx="5" cy="13" r="1.5" />
+        <circle cx="11" cy="13" r="1.5" />
+      </svg>
+    </button>
+  );
+}
+
 function slugify(str: string): string {
   return str
     .toLowerCase()
@@ -144,6 +184,8 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
   const [optionChoices, setOptionChoices] = useState<OptionChoice[]>([]);
   const [optionIsRequired, setOptionIsRequired] = useState(false);
   const [optionIcon, setOptionIcon] = useState<string | null>(null);
+  const [optionDependsOn, setOptionDependsOn] = useState<string | null>(null);
+  const [showDependsPicker, setShowDependsPicker] = useState(false);
 
   // Icon picker open state
   const [iconPickerOpen, setIconPickerOpen] = useState<string | null>(null); // "new-group" | "edit-group" | "option" | null
@@ -267,26 +309,67 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
     });
   };
 
-  // ── Group Reorder ──
+  // ── Drag sensors (touch + pointer) ──
 
-  const moveGroup = async (groupId: string, direction: "up" | "down") => {
-    const idx = groups.findIndex((g) => g.id === groupId);
-    if (idx < 0) return;
-    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= groups.length) return;
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
+  );
 
-    // Optimistic reorder
+  // ── Group Reorder (drag-end) ──
+
+  const handleGroupDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIdx = groups.findIndex((g) => g.id === active.id);
+    const newIdx = groups.findIndex((g) => g.id === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+
     const reordered = [...groups];
-    [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
+    const [moved] = reordered.splice(oldIdx, 1);
+    reordered.splice(newIdx, 0, moved);
     setGroups(reordered);
 
-    // Persist both sort_order changes
     await Promise.all(
       reordered.map((g, i) =>
         fetch("/api/admin/options/groups", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: g.id, sort_order: i }),
+        })
+      )
+    );
+  };
+
+  // ── Option Reorder (drag-end) ──
+
+  const handleOptionDragEnd = async (groupId: string, event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const groupOptions = options.filter((o) => o.group_id === groupId);
+    const oldIdx = groupOptions.findIndex((o) => o.id === active.id);
+    const newIdx = groupOptions.findIndex((o) => o.id === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+
+    const reordered = [...groupOptions];
+    const [moved] = reordered.splice(oldIdx, 1);
+    reordered.splice(newIdx, 0, moved);
+
+    const updatedOptions = options.map((o) => {
+      if (o.group_id !== groupId) return o;
+      const idx = reordered.findIndex((r) => r.id === o.id);
+      return { ...o, sort_order: idx };
+    }).sort((a, b) => a.sort_order - b.sort_order);
+    setOptions(updatedOptions);
+
+    await Promise.all(
+      reordered.map((o, i) =>
+        fetch("/api/admin/options", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: o.id, sort_order: i }),
         })
       )
     );
@@ -302,6 +385,8 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
     setOptionChoices([]);
     setOptionIsRequired(false);
     setOptionIcon(null);
+    setOptionDependsOn(null);
+    setShowDependsPicker(false);
     setEditingOptionId(null);
     setShowOptionFormForGroup(null);
     setIconPickerOpen(null);
@@ -322,6 +407,8 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
     setOptionChoices(option.choices || []);
     setOptionIsRequired(option.is_required);
     setOptionIcon(option.icon || null);
+    setOptionDependsOn(option.depends_on_option_id || null);
+    setShowDependsPicker(false);
     setIconPickerOpen(null);
   };
 
@@ -341,6 +428,7 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
           ? optionChoices
           : null,
       is_required: optionIsRequired,
+      depends_on_option_id: optionDependsOn,
     };
 
     if (editingOptionId) {
@@ -618,15 +706,61 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
           </div>
         )}
 
-        <label className="flex items-center gap-2 text-sm text-gray-700">
-          <input
-            type="checkbox"
-            checked={optionIsRequired}
-            onChange={(e) => setOptionIsRequired(e.target.checked)}
-            className="rounded border-gray-300 text-green-600 focus:ring-green-500"
-          />
-          Required
-        </label>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={optionIsRequired}
+              onChange={(e) => setOptionIsRequired(e.target.checked)}
+              className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+            />
+            Required
+          </label>
+
+          {/* Depends on picker */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowDependsPicker(!showDependsPicker)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 border rounded-lg text-xs font-medium transition-colors ${
+                optionDependsOn
+                  ? "border-amber-300 bg-amber-50 text-amber-700"
+                  : "border-gray-300 text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+              </svg>
+              {optionDependsOn
+                ? `Requires: ${options.find((o) => o.id === optionDependsOn)?.name || "..."}`
+                : "Depends on..."}
+            </button>
+            {showDependsPicker && (
+              <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-xl shadow-lg w-56 max-h-48 overflow-y-auto">
+                <button
+                  onClick={() => { setOptionDependsOn(null); setShowDependsPicker(false); }}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${!optionDependsOn ? "text-green-600 font-medium" : "text-gray-500"}`}
+                >
+                  None (independent)
+                </button>
+                {options
+                  .filter((o) => o.id !== editingOptionId)
+                  .map((o) => (
+                    <button
+                      key={o.id}
+                      onClick={() => { setOptionDependsOn(o.id); setShowDependsPicker(false); }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-t border-gray-50 ${
+                        optionDependsOn === o.id ? "text-green-600 font-medium bg-green-50" : "text-gray-700"
+                      }`}
+                    >
+                      {o.icon && <OptionIcon iconKey={o.icon} className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />}
+                      {o.name}
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
 
         <div className="flex gap-2 pt-1">
           <button
@@ -696,243 +830,44 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
       </div>
 
       {/* ── Option Groups ── */}
-      {groups.map((group, groupIndex) => {
-        const groupOptions = options.filter((o) => o.group_id === group.id);
-        const isCollapsed = collapsedGroups.has(group.id);
-        const groupCostOptions = groupOptions.filter((o) => {
-          if (o.option_type === "checkbox" && o.cost) return true;
-          if ((o.option_type === "select" || o.option_type === "multi_select") && o.choices?.some((c) => c.cost && c.cost > 0)) return true;
-          return false;
-        });
-
-        return (
-          <div
-            key={group.id}
-            className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
-          >
-            {/* Group header */}
-            <div
-              className="flex items-center gap-3 px-4 py-3.5 cursor-pointer active:bg-gray-50 transition-colors"
-              onClick={() => toggleCollapse(group.id)}
-            >
-              <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
-                {group.icon ? (
-                  <OptionIcon iconKey={group.icon} className="w-4 h-4" />
-                ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                )}
-              </div>
-
-              {editingGroupId === group.id ? (
-                <div className="flex-1" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center gap-2">
-                    <input
-                      autoFocus
-                      type="text"
-                      value={editingGroupName}
-                      onChange={(e) => setEditingGroupName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveGroupName();
-                        if (e.key === "Escape") {
-                          setEditingGroupId(null);
-                          setEditingGroupName("");
-                          setEditingGroupIcon(null);
-                          setIconPickerOpen(null);
-                        }
-                      }}
-                      className="flex-1 px-2 py-1 border border-gray-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    />
-                    {renderIconPickerButton("edit-group", editingGroupIcon, "Icon")}
-                    <button
-                      onClick={saveGroupName}
-                      disabled={saving === "group"}
-                      className="text-xs text-green-600 font-semibold hover:underline"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => { setEditingGroupId(null); setEditingGroupName(""); setEditingGroupIcon(null); setIconPickerOpen(null); }}
-                      className="text-xs text-gray-400 hover:underline"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                  {renderIconPicker("edit-group", editingGroupIcon, setEditingGroupIcon)}
-                </div>
-              ) : (
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-gray-900">{group.name}</span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); startEditGroupName(group); }}
-                      className="p-0.5 text-gray-300 hover:text-gray-500 rounded"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                      </svg>
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-gray-400">
-                      {groupOptions.length} option{groupOptions.length !== 1 ? "s" : ""}
-                    </span>
-                    {groupCostOptions.length > 0 && (
-                      <span className="text-xs text-gray-400">
-                        &middot; {groupCostOptions.length} with cost
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Reorder buttons */}
-              <div className="flex flex-col flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                <button
-                  onClick={() => moveGroup(group.id, "up")}
-                  disabled={groupIndex === 0}
-                  className="p-0.5 text-gray-300 hover:text-gray-600 disabled:opacity-20 disabled:cursor-default transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => moveGroup(group.id, "down")}
-                  disabled={groupIndex === groups.length - 1}
-                  className="p-0.5 text-gray-300 hover:text-gray-600 disabled:opacity-20 disabled:cursor-default transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-              </div>
-
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteGroup(group); }}
-                className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-
-              <svg
-                className={`w-5 h-5 text-gray-400 flex-shrink-0 transition-transform ${isCollapsed ? "" : "rotate-180"}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
-
-            {/* Group body */}
-            {!isCollapsed && (
-              <div className="border-t border-gray-100">
-                {groupOptions.length === 0 && showOptionFormForGroup !== group.id && (
-                  <button
-                    onClick={() => startNewOption(group.id)}
-                    className="w-full px-4 py-6 text-center hover:bg-gray-50 transition-colors cursor-pointer"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-green-50 mx-auto mb-2 flex items-center justify-center text-green-500">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                    </div>
-                    <p className="text-sm text-gray-400">Add first option</p>
-                  </button>
-                )}
-
-                {groupOptions.map((option) => {
-                  if (editingOptionId === option.id && showOptionFormForGroup === group.id) {
-                    return (
-                      <div key={option.id} className="px-4 py-2">
-                        {renderOptionForm(group.id)}
-                      </div>
-                    );
-                  }
-
-                  const meta = TYPE_META[option.option_type];
-                  const costStr = getOptionCostSummary(option);
-                  const choiceSummary = getOptionChoiceSummary(option);
-
-                  return (
-                    <div
-                      key={option.id}
-                      className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-b-0 hover:bg-gray-50 cursor-pointer transition-colors"
-                      onClick={() => startEditOption(option)}
-                    >
-                      <div className={`w-7 h-7 rounded-lg ${meta.bg} ${meta.color} flex items-center justify-center flex-shrink-0`}>
-                        {option.icon ? (
-                          <OptionIcon iconKey={option.icon} className="w-4 h-4" />
-                        ) : (
-                          meta.icon
-                        )}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-gray-900">{option.name}</span>
-                          {option.is_required && (
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-red-500 bg-red-50 px-1.5 py-0.5 rounded">
-                              Req
-                            </span>
-                          )}
-                        </div>
-                        {(option.description || choiceSummary) && (
-                          <div className="text-xs text-gray-400 mt-0.5 line-clamp-1 prose prose-xs prose-gray max-w-none [&_p]:m-0 [&_p]:inline">
-                            {option.description ? (
-                              <ReactMarkdown remarkPlugins={[remarkBreaks]}>{option.description}</ReactMarkdown>
-                            ) : choiceSummary}
-                          </div>
-                        )}
-                      </div>
-
-                      {costStr && (
-                        <span className="text-sm font-semibold text-green-700 flex-shrink-0">
-                          {costStr}
-                        </span>
-                      )}
-
-                      <button
-                        onClick={(e) => { e.stopPropagation(); deleteOption(option); }}
-                        className="p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  );
-                })}
-
-                {/* New option form (not editing an existing one) */}
-                {!editingOptionId && showOptionFormForGroup === group.id && (
-                  <div className="px-4 py-2">
-                    {renderOptionForm(group.id)}
-                  </div>
-                )}
-
-                {showOptionFormForGroup !== group.id && (
-                  <div className="px-4 py-2.5">
-                    <button
-                      onClick={() => startNewOption(group.id)}
-                      className="flex items-center gap-1.5 text-sm text-green-600 font-medium hover:text-green-700"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                      </svg>
-                      Add Option
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleGroupDragEnd}>
+        <SortableContext items={groups.map((g) => g.id)} strategy={verticalListSortingStrategy}>
+          {groups.map((group) => (
+            <SortableGroupCard
+              key={group.id}
+              group={group}
+              options={options}
+              collapsedGroups={collapsedGroups}
+              toggleCollapse={toggleCollapse}
+              editingGroupId={editingGroupId}
+              editingGroupName={editingGroupName}
+              setEditingGroupName={setEditingGroupName}
+              editingGroupIcon={editingGroupIcon}
+              saveGroupName={saveGroupName}
+              setEditingGroupId={setEditingGroupId}
+              setEditingGroupIcon={setEditingGroupIcon}
+              setIconPickerOpen={setIconPickerOpen}
+              startEditGroupName={startEditGroupName}
+              deleteGroup={deleteGroup}
+              saving={saving}
+              renderIconPickerButton={renderIconPickerButton}
+              renderIconPicker={renderIconPicker}
+              // Option props
+              sensors={sensors}
+              handleOptionDragEnd={handleOptionDragEnd}
+              editingOptionId={editingOptionId}
+              showOptionFormForGroup={showOptionFormForGroup}
+              renderOptionForm={renderOptionForm}
+              startEditOption={startEditOption}
+              deleteOption={deleteOption}
+              startNewOption={startNewOption}
+              getOptionCostSummary={getOptionCostSummary}
+              getOptionChoiceSummary={getOptionChoiceSummary}
+              allOptions={options}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
 
       {/* ── Add Group ── */}
       {showNewGroupForm ? (
@@ -999,6 +934,403 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
         onConfirm={() => confirmModal?.onConfirm()}
         onCancel={() => setConfirmModal(null)}
       />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sortable group card (wraps each group with drag behavior)
+// ---------------------------------------------------------------------------
+
+interface SortableGroupCardProps {
+  group: OptionGroup;
+  options: Option[];
+  collapsedGroups: Set<string>;
+  toggleCollapse: (id: string) => void;
+  editingGroupId: string | null;
+  editingGroupName: string;
+  setEditingGroupName: (v: string) => void;
+  editingGroupIcon: string | null;
+  saveGroupName: () => void;
+  setEditingGroupId: (v: string | null) => void;
+  setEditingGroupIcon: (v: string | null) => void;
+  setIconPickerOpen: (v: string | null) => void;
+  startEditGroupName: (g: OptionGroup) => void;
+  deleteGroup: (g: OptionGroup) => void;
+  saving: string | null;
+  renderIconPickerButton: (id: string, icon: string | null, label: string) => React.ReactNode;
+  renderIconPicker: (id: string, icon: string | null, onSelect: (k: string | null) => void) => React.ReactNode;
+  sensors: ReturnType<typeof useSensors>;
+  handleOptionDragEnd: (groupId: string, event: DragEndEvent) => void;
+  editingOptionId: string | null;
+  showOptionFormForGroup: string | null;
+  renderOptionForm: (groupId: string) => React.ReactNode;
+  startEditOption: (o: Option) => void;
+  deleteOption: (o: Option) => void;
+  startNewOption: (groupId: string) => void;
+  getOptionCostSummary: (o: Option) => string | null;
+  getOptionChoiceSummary: (o: Option) => string | null;
+  allOptions: Option[];
+}
+
+function SortableGroupCard({
+  group,
+  options,
+  collapsedGroups,
+  toggleCollapse,
+  editingGroupId,
+  editingGroupName,
+  setEditingGroupName,
+  editingGroupIcon,
+  saveGroupName,
+  setEditingGroupId,
+  setEditingGroupIcon,
+  setIconPickerOpen,
+  startEditGroupName,
+  deleteGroup,
+  saving,
+  renderIconPickerButton,
+  renderIconPicker,
+  sensors,
+  handleOptionDragEnd,
+  editingOptionId,
+  showOptionFormForGroup,
+  renderOptionForm,
+  startEditOption,
+  deleteOption,
+  startNewOption,
+  getOptionCostSummary,
+  getOptionChoiceSummary,
+  allOptions,
+}: SortableGroupCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const groupOptions = options.filter((o) => o.group_id === group.id).sort((a, b) => a.sort_order - b.sort_order);
+  const isCollapsed = collapsedGroups.has(group.id);
+  const groupCostOptions = groupOptions.filter((o) => {
+    if (o.option_type === "checkbox" && o.cost) return true;
+    if ((o.option_type === "select" || o.option_type === "multi_select") && o.choices?.some((c) => c.cost && c.cost > 0)) return true;
+    return false;
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
+    >
+      {/* Group header */}
+      <div
+        className="flex items-center gap-3 px-4 py-3.5 cursor-pointer active:bg-gray-50 transition-colors"
+        onClick={() => toggleCollapse(group.id)}
+      >
+        <DragHandle listeners={listeners} attributes={attributes} />
+
+        <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+          {group.icon ? (
+            <OptionIcon iconKey={group.icon} className="w-4 h-4" />
+          ) : (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          )}
+        </div>
+
+        {editingGroupId === group.id ? (
+          <div className="flex-1" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                type="text"
+                value={editingGroupName}
+                onChange={(e) => setEditingGroupName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveGroupName();
+                  if (e.key === "Escape") {
+                    setEditingGroupId(null);
+                    setEditingGroupName("");
+                    setEditingGroupIcon(null);
+                    setIconPickerOpen(null);
+                  }
+                }}
+                className="flex-1 px-2 py-1 border border-gray-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              />
+              {renderIconPickerButton("edit-group", editingGroupIcon, "Icon")}
+              <button
+                onClick={saveGroupName}
+                disabled={saving === "group"}
+                className="text-xs text-green-600 font-semibold hover:underline"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => { setEditingGroupId(null); setEditingGroupName(""); setEditingGroupIcon(null); setIconPickerOpen(null); }}
+                className="text-xs text-gray-400 hover:underline"
+              >
+                Cancel
+              </button>
+            </div>
+            {renderIconPicker("edit-group", editingGroupIcon, setEditingGroupIcon)}
+          </div>
+        ) : (
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-gray-900">{group.name}</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); startEditGroupName(group); }}
+                className="p-0.5 text-gray-300 hover:text-gray-500 rounded"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs text-gray-400">
+                {groupOptions.length} option{groupOptions.length !== 1 ? "s" : ""}
+              </span>
+              {groupCostOptions.length > 0 && (
+                <span className="text-xs text-gray-400">
+                  &middot; {groupCostOptions.length} with cost
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        <button
+          onClick={(e) => { e.stopPropagation(); deleteGroup(group); }}
+          className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+
+        <svg
+          className={`w-5 h-5 text-gray-400 flex-shrink-0 transition-transform ${isCollapsed ? "" : "rotate-180"}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+
+      {/* Group body */}
+      {!isCollapsed && (
+        <div className="border-t border-gray-100">
+          {groupOptions.length === 0 && showOptionFormForGroup !== group.id && (
+            <button
+              onClick={() => startNewOption(group.id)}
+              className="w-full px-4 py-6 text-center hover:bg-gray-50 transition-colors cursor-pointer"
+            >
+              <div className="w-10 h-10 rounded-full bg-green-50 mx-auto mb-2 flex items-center justify-center text-green-500">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+              </div>
+              <p className="text-sm text-gray-400">Add first option</p>
+            </button>
+          )}
+
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleOptionDragEnd(group.id, e)}>
+            <SortableContext items={groupOptions.map((o) => o.id)} strategy={verticalListSortingStrategy}>
+              {groupOptions.map((option) => {
+                if (editingOptionId === option.id && showOptionFormForGroup === group.id) {
+                  return (
+                    <div key={option.id} className="px-4 py-2">
+                      {renderOptionForm(group.id)}
+                    </div>
+                  );
+                }
+
+                return (
+                  <SortableOptionRow
+                    key={option.id}
+                    option={option}
+                    allOptions={allOptions}
+                    startEditOption={startEditOption}
+                    deleteOption={deleteOption}
+                    getOptionCostSummary={getOptionCostSummary}
+                    getOptionChoiceSummary={getOptionChoiceSummary}
+                  />
+                );
+              })}
+            </SortableContext>
+          </DndContext>
+
+          {/* New option form (not editing an existing one) */}
+          {!editingOptionId && showOptionFormForGroup === group.id && (
+            <div className="px-4 py-2">
+              {renderOptionForm(group.id)}
+            </div>
+          )}
+
+          {showOptionFormForGroup !== group.id && (
+            <div className="px-4 py-2.5">
+              <button
+                onClick={() => startNewOption(group.id)}
+                className="flex items-center gap-1.5 text-sm text-green-600 font-medium hover:text-green-700"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Add Option
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sortable option row
+// ---------------------------------------------------------------------------
+
+const TYPE_META_LOOKUP: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
+  checkbox: {
+    label: "Checkbox",
+    color: "text-blue-600",
+    bg: "bg-blue-50",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  select: {
+    label: "Select",
+    color: "text-purple-600",
+    bg: "bg-purple-50",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+      </svg>
+    ),
+  },
+  multi_select: {
+    label: "Multi",
+    color: "text-indigo-600",
+    bg: "bg-indigo-50",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+      </svg>
+    ),
+  },
+  text: {
+    label: "Text",
+    color: "text-gray-600",
+    bg: "bg-gray-100",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+      </svg>
+    ),
+  },
+  number: {
+    label: "Number",
+    color: "text-amber-600",
+    bg: "bg-amber-50",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+      </svg>
+    ),
+  },
+};
+
+function SortableOptionRow({
+  option,
+  allOptions,
+  startEditOption,
+  deleteOption,
+  getOptionCostSummary,
+  getOptionChoiceSummary,
+}: {
+  option: Option;
+  allOptions: Option[];
+  startEditOption: (o: Option) => void;
+  deleteOption: (o: Option) => void;
+  getOptionCostSummary: (o: Option) => string | null;
+  getOptionChoiceSummary: (o: Option) => string | null;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: option.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const meta = TYPE_META_LOOKUP[option.option_type] || TYPE_META_LOOKUP.text;
+  const costStr = getOptionCostSummary(option);
+  const choiceSummary = getOptionChoiceSummary(option);
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-b-0 hover:bg-gray-50 cursor-pointer transition-colors"
+      onClick={() => startEditOption(option)}
+    >
+      <DragHandle listeners={listeners} attributes={attributes} />
+
+      <div className={`w-7 h-7 rounded-lg ${meta.bg} ${meta.color} flex items-center justify-center flex-shrink-0`}>
+        {option.icon ? (
+          <OptionIcon iconKey={option.icon} className="w-4 h-4" />
+        ) : (
+          meta.icon
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-900">{option.name}</span>
+          {option.is_required && (
+            <span className="text-[10px] font-bold uppercase tracking-wider text-red-500 bg-red-50 px-1.5 py-0.5 rounded">
+              Req
+            </span>
+          )}
+        </div>
+        {option.depends_on_option_id && (
+          <span className="text-[10px] text-amber-600 flex items-center gap-0.5 mt-0.5">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+            Requires {allOptions.find((o) => o.id === option.depends_on_option_id)?.name || "..."}
+          </span>
+        )}
+        {!option.depends_on_option_id && (option.description || choiceSummary) && (
+          <div className="text-xs text-gray-400 mt-0.5 line-clamp-1 prose prose-xs prose-gray max-w-none [&_p]:m-0 [&_p]:inline">
+            {option.description ? (
+              <ReactMarkdown remarkPlugins={[remarkBreaks]}>{option.description}</ReactMarkdown>
+            ) : choiceSummary}
+          </div>
+        )}
+      </div>
+
+      {costStr && (
+        <span className="text-sm font-semibold text-green-700 flex-shrink-0">
+          {costStr}
+        </span>
+      )}
+
+      <button
+        onClick={(e) => { e.stopPropagation(); deleteOption(option); }}
+        className="p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+      </button>
     </div>
   );
 }

@@ -293,11 +293,6 @@ export function PickemContent({
                     )}
                   </div>
                   <div className="flex items-center gap-1.5">
-                    {game.is_tiebreaker && (
-                      <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
-                        Tiebreaker
-                      </span>
-                    )}
                     {game.is_locked && (
                       <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -351,22 +346,71 @@ export function PickemContent({
                   })()}
                 </div>
 
-                {/* Tiebreaker input */}
-                {game.is_tiebreaker && pick && !game.is_locked && (
-                  <TiebreakerInput
-                    gameId={game.id}
-                    initialValue={pick.tiebreaker_total}
-                    onSubmit={(total) => submitTiebreaker(game.id, total)}
-                  />
-                )}
-                {game.is_tiebreaker && pick && game.is_locked && pick.tiebreaker_total !== null && (
-                  <div className="text-center py-2 border-t border-gray-100 bg-amber-50">
-                    <span className="text-xs text-amber-700">Your tiebreaker: {pick.tiebreaker_total} total points</span>
-                  </div>
-                )}
               </div>
             );
           })}
+
+          {/* Tiebreaker section at bottom — styled like a game card */}
+          {(() => {
+            const tiebreakerGame = games.find((g) => g.is_tiebreaker);
+            if (!tiebreakerGame) return null;
+            const pick = getMyPick(tiebreakerGame.id);
+            const isLocked = tiebreakerGame.is_locked;
+
+            return (
+              <div
+                className={`mt-1 rounded-2xl border overflow-hidden transition-all ${
+                  isLocked ? "border-gray-200 bg-gray-50" : "border-gray-200 bg-white shadow-sm"
+                }`}
+              >
+                {/* Header */}
+                <div className="px-3 pt-2.5 pb-1.5">
+                  <p className="text-xs font-bold text-gray-900 uppercase tracking-wide">
+                    Tiebreaker: <span className="font-normal normal-case tracking-normal text-gray-500">Closest to total points scored in {tiebreakerGame.away_team}/{tiebreakerGame.home_team} game</span>
+                  </p>
+                </div>
+
+                {/* Teams + score input area */}
+                <div className="flex items-center border-t border-gray-100">
+                  {/* Away team */}
+                  <div className="flex-1 py-3 px-3 text-center">
+                    <span className="text-[10px] uppercase tracking-wider text-gray-400">Away</span>
+                    {tiebreakerGame.away_logo_url && (
+                      <img src={tiebreakerGame.away_logo_url} alt="" className="w-10 h-10 mx-auto my-1 object-contain" />
+                    )}
+                    <p className="text-sm font-semibold text-gray-900">{tiebreakerGame.away_team}</p>
+                  </div>
+
+                  {/* Score input in the middle */}
+                  <div className="flex-1 py-3 px-2 text-center border-x border-gray-100">
+                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Total Score</p>
+                    {!isLocked && pick ? (
+                      <TiebreakerInput
+                        gameId={tiebreakerGame.id}
+                        initialValue={pick.tiebreaker_total}
+                        onSubmit={(total) => submitTiebreaker(tiebreakerGame.id, total)}
+                      />
+                    ) : !isLocked && !pick ? (
+                      <p className="text-xs text-gray-400 italic mt-2">Pick a team above first</p>
+                    ) : isLocked && pick && pick.tiebreaker_total !== null ? (
+                      <p className="text-2xl font-bold text-gray-900 mt-1">{pick.tiebreaker_total}</p>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic mt-2">Not submitted</p>
+                    )}
+                  </div>
+
+                  {/* Home team */}
+                  <div className="flex-1 py-3 px-3 text-center">
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Home</span>
+                    {tiebreakerGame.home_logo_url && (
+                      <img src={tiebreakerGame.home_logo_url} alt="" className="w-10 h-10 mx-auto my-1 object-contain" />
+                    )}
+                    <p className="text-sm font-bold text-gray-900">{tiebreakerGame.home_team}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       ) : (
         /* Leaderboard tab */
@@ -433,7 +477,7 @@ export function PickemContent({
                         </p>
                         <p className="text-xs text-gray-400">
                           {entry.picks_count}/{totalGames} picked
-                          {entry.tiebreaker_total !== null && ` · TB: ${entry.tiebreaker_total}`}
+                          {games.some((g) => g.is_locked) && entry.tiebreaker_total !== null && ` · TB: ${entry.tiebreaker_total}`}
                         </p>
                       </div>
                       <span className="text-2xl font-bold text-green-700">{entry.correct}</span>
@@ -472,18 +516,17 @@ function TiebreakerInput({
   };
 
   return (
-    <div className="flex items-center justify-center gap-2 py-2 border-t border-gray-100 bg-amber-50">
-      <label className="text-xs text-amber-700 font-medium" htmlFor={`tb-${gameId}`}>
-        Total Points:
-      </label>
+    <div className="flex justify-center">
       <input
         id={`tb-${gameId}`}
-        type="number"
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
         value={value}
-        onChange={(e) => handleChange(e.target.value)}
-        className="w-20 border border-amber-300 rounded-lg px-2 py-1 text-sm text-center bg-white"
+        onChange={(e) => handleChange(e.target.value.replace(/[^0-9]/g, ""))}
+        autoFocus
+        className="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-xl font-bold text-center bg-white focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none"
         placeholder="0"
-        min="0"
       />
     </div>
   );

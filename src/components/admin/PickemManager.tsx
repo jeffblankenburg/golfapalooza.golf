@@ -241,6 +241,8 @@ export function PickemManager({ tripId }: { tripId: string }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [standings, setStandings] = useState<Standing[]>([]);
+  const [winnerPayouts, setWinnerPayouts] = useState<Array<{ user_id: string; paid_out: boolean }>>([]);
+  const [allGamesDecided, setAllGamesDecided] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [editingGame, setEditingGame] = useState<string | null>(null);
@@ -338,9 +340,15 @@ export function PickemManager({ tripId }: { tripId: string }) {
 
   const fetchStandings = useCallback(async () => {
     if (!contestId) return;
-    const res = await fetch(`/api/admin/pickem/results?contest_id=${contestId}`);
-    const data = await res.json();
-    setStandings(data.standings || []);
+    const [resultsRes, payoutsRes] = await Promise.all([
+      fetch(`/api/admin/pickem/results?contest_id=${contestId}`),
+      fetch(`/api/admin/pickem/payouts?contest_id=${contestId}`),
+    ]);
+    const resultsData = await resultsRes.json();
+    const payoutsData = await payoutsRes.json();
+    setStandings(resultsData.standings || []);
+    setAllGamesDecided(resultsData.games_total > 0 && resultsData.games_decided === resultsData.games_total);
+    setWinnerPayouts(payoutsData.payouts || []);
   }, [contestId]);
 
   useEffect(() => {
@@ -385,13 +393,30 @@ export function PickemManager({ tripId }: { tripId: string }) {
   };
 
   const updateGame = async (id: string, updates: Partial<Game>) => {
+    // Optimistic update for tiebreaker toggle
+    if ("is_tiebreaker" in updates) {
+      setGames((prev) =>
+        prev.map((g) => {
+          if (g.id === id) return { ...g, is_tiebreaker: !!updates.is_tiebreaker };
+          // Clear tiebreaker from other games if setting one
+          if (updates.is_tiebreaker) return { ...g, is_tiebreaker: false };
+          return g;
+        })
+      );
+    }
+
     setSaving(id);
-    await fetch("/api/admin/pickem", {
+    const res = await fetch("/api/admin/pickem", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, ...updates }),
     });
-    await fetchData();
+    if (!res.ok) {
+      // Revert on failure
+      await fetchData();
+    } else {
+      await fetchData();
+    }
     setSaving(null);
   };
 
@@ -493,6 +518,27 @@ export function PickemManager({ tripId }: { tripId: string }) {
     });
 
     if (!res.ok) await fetchData(); // revert on failure
+  };
+
+  const toggleWinnerPayout = async (userId: string, paidOut: boolean) => {
+    if (!contestId) return;
+
+    // Optimistic update
+    setWinnerPayouts((prev) => {
+      const existing = prev.find((p) => p.user_id === userId);
+      if (existing) {
+        return prev.map((p) => p.user_id === userId ? { ...p, paid_out: paidOut } : p);
+      }
+      return [...prev, { user_id: userId, paid_out: paidOut }];
+    });
+
+    const res = await fetch("/api/admin/pickem/payouts", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contest_id: contestId, user_id: userId, paid_out: paidOut }),
+    });
+
+    if (!res.ok) await fetchStandings(); // revert on failure
   };
 
   const formatSpread = (game: Game) => {
@@ -773,28 +819,55 @@ export function PickemManager({ tripId }: { tripId: string }) {
           <p className="text-sm text-gray-400 text-center py-4">No picks yet.</p>
         ) : (
           <div className="divide-y divide-gray-100">
-            {standings.map((s) => (
-              <div key={s.user_id} className="flex items-center gap-3 py-2">
-                <span className="w-6 text-center text-sm font-bold text-gray-400">
-                  {s.rank}
-                </span>
-                {s.avatar_url ? (
-                  <img src={s.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-500">
-                    {s.display_name[0]?.toUpperCase()}
+            {standings.map((s) => {
+              const prizeCount = payouts.length;
+              const isWinner = s.rank <= prizeCount;
+              const payout = winnerPayouts.find((p) => p.user_id === s.user_id);
+              const isPaidOut = payout?.paid_out || false;
+
+              return (
+                <div key={s.user_id} className={`flex items-center gap-3 py-2 ${isWinner && allGamesDecided ? "bg-green-50" : ""}`}>
+                  <span className="w-6 text-center text-sm font-bold text-gray-400">
+                    {s.rank}
+                  </span>
+                  {s.avatar_url ? (
+                    <img src={s.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-500">
+                      {s.display_name[0]?.toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{s.display_name}</p>
+                    <p className="text-xs text-gray-400">
+                      {s.correct}/{s.decided} correct
+                      {s.tiebreaker_total !== null && ` · TB: ${s.tiebreaker_total}`}
+                      {s.tiebreaker_diff !== null && ` (off by ${s.tiebreaker_diff})`}
+                    </p>
                   </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{s.display_name}</p>
-                  <p className="text-xs text-gray-400">
-                    {s.correct}/{s.decided} correct
-                    {s.tiebreaker_total !== null && ` · TB: ${s.tiebreaker_total}`}
-                  </p>
+                  <span className="text-lg font-bold text-green-700">{s.correct}</span>
+                  {isWinner && allGamesDecided && (
+                    <button
+                      onClick={() => toggleWinnerPayout(s.user_id, !isPaidOut)}
+                      className="flex items-center ml-1"
+                      title={isPaidOut ? "Paid" : "Mark as paid"}
+                    >
+                      <div
+                        className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
+                          isPaidOut ? "bg-green-600 border-green-600" : "border-gray-300"
+                        }`}
+                      >
+                        {isPaidOut && (
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+                    </button>
+                  )}
                 </div>
-                <span className="text-lg font-bold text-green-700">{s.correct}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CollapsibleSection>
@@ -1098,11 +1171,6 @@ function GameCard({
             {game.home_logo_url && (
               <img src={game.home_logo_url} alt="" className="w-6 h-6 object-contain" />
             )}
-            {game.is_tiebreaker && (
-              <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
-                TB
-              </span>
-            )}
             {game.winning_team && (
               <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-medium">
                 {game.winning_team === "away" ? game.away_team : game.home_team}
@@ -1116,20 +1184,20 @@ function GameCard({
 
         {/* Action buttons */}
         <div className="flex gap-2 mt-2">
-          <button onClick={() => onEdit(game.id)} className="text-xs text-blue-600 font-medium">
+          <button onClick={() => onEdit(game.id)} className="flex-1 py-2 rounded-lg text-sm font-medium bg-blue-50 text-blue-700 active:bg-blue-100">
             {isEditing ? "Cancel" : "Edit"}
           </button>
-          <button onClick={() => onResult(game.id)} className="text-xs text-purple-600 font-medium">
+          <button onClick={() => onResult(game.id)} className="flex-1 py-2 rounded-lg text-sm font-medium bg-purple-50 text-purple-700 active:bg-purple-100">
             {isResult ? "Cancel" : "Result"}
           </button>
           <button
             onClick={() => onUpdate(game.id, { is_tiebreaker: !game.is_tiebreaker })}
             disabled={saving === game.id}
-            className={`text-xs font-medium ${game.is_tiebreaker ? "text-amber-600" : "text-gray-400"}`}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium ${game.is_tiebreaker ? "bg-amber-100 text-amber-700 active:bg-amber-200" : "bg-gray-100 text-gray-500 active:bg-gray-200"}`}
           >
-            {game.is_tiebreaker ? "★ Tiebreaker" : "☆ Tiebreaker"}
+            {game.is_tiebreaker ? "★ TB" : "☆ TB"}
           </button>
-          <button onClick={onDelete} className="text-xs text-red-500 font-medium ml-auto">
+          <button onClick={onDelete} className="py-2 px-3 rounded-lg text-sm font-medium bg-red-50 text-red-600 active:bg-red-100">
             Delete
           </button>
         </div>

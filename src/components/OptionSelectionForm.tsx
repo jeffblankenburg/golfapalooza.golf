@@ -23,6 +23,7 @@ interface Option {
   choices?: OptionChoice[];
   is_required: boolean;
   sort_order: number;
+  depends_on_option_id?: string | null;
 }
 
 interface OptionGroup {
@@ -140,10 +141,39 @@ export default function OptionSelectionForm({ tripId }: OptionSelectionFormProps
     }
   }, [tripId]);
 
+  // Check if a dependency is satisfied (parent option is selected)
+  const isDependencySatisfied = useCallback((option: Option): boolean => {
+    if (!option.depends_on_option_id) return true;
+    const parentVal = selections[option.depends_on_option_id];
+    if (parentVal === null || parentVal === undefined || parentVal === false) return false;
+    if (Array.isArray(parentVal) && parentVal.length === 0) return false;
+    return true;
+  }, [selections]);
+
+  // Get the name of the parent option for hint text
+  const getDependencyName = useCallback((option: Option): string | null => {
+    if (!option.depends_on_option_id) return null;
+    const parent = options.find((o) => o.id === option.depends_on_option_id);
+    return parent?.name || null;
+  }, [options]);
+
   const handleChange = useCallback((optionId: string, value: SelectionValue, debounce = false) => {
     if (isLocked()) return;
 
     setSelections((prev) => ({ ...prev, [optionId]: value }));
+
+    // If deselecting, cascade-clear any dependent options
+    const isDeselecting = value === null || value === false || value === undefined || (Array.isArray(value) && value.length === 0);
+    if (isDeselecting) {
+      const dependents = options.filter((o) => o.depends_on_option_id === optionId);
+      for (const dep of dependents) {
+        const depVal = selections[dep.id];
+        if (depVal !== null && depVal !== undefined && depVal !== false) {
+          setSelections((prev) => ({ ...prev, [dep.id]: null }));
+          saveSelection(dep.id, null);
+        }
+      }
+    }
 
     if (debounce) {
       if (debounceTimers.current[optionId]) {
@@ -155,7 +185,7 @@ export default function OptionSelectionForm({ tripId }: OptionSelectionFormProps
     } else {
       saveSelection(optionId, value);
     }
-  }, [isLocked, saveSelection]);
+  }, [isLocked, saveSelection, options, selections]);
 
   // Cost calculation
   const calculateCost = useCallback(() => {
@@ -291,7 +321,8 @@ export default function OptionSelectionForm({ tripId }: OptionSelectionFormProps
                 value={selections[opt.id] ?? null}
                 onChange={handleChange}
                 saveStatus={savingOptions[opt.id]}
-                disabled={locked}
+                disabled={locked || !isDependencySatisfied(opt)}
+                dependencyName={!isDependencySatisfied(opt) ? getDependencyName(opt) : null}
               />
             ))}
           </div>
@@ -308,7 +339,8 @@ export default function OptionSelectionForm({ tripId }: OptionSelectionFormProps
               value={selections[opt.id] ?? null}
               onChange={handleChange}
               saveStatus={savingOptions[opt.id]}
-              disabled={locked}
+              disabled={locked || !isDependencySatisfied(opt)}
+              dependencyName={!isDependencySatisfied(opt) ? getDependencyName(opt) : null}
             />
           ))}
         </div>
@@ -327,15 +359,17 @@ function OptionField({
   onChange,
   saveStatus,
   disabled,
+  dependencyName,
 }: {
   option: Option;
   value: SelectionValue;
   onChange: (optionId: string, value: SelectionValue, debounce?: boolean) => void;
   saveStatus?: "saving" | "saved" | "error";
   disabled: boolean;
+  dependencyName?: string | null;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+    <div className={`bg-white rounded-2xl border shadow-sm p-4 transition-opacity ${dependencyName ? "border-gray-100 opacity-50" : "border-gray-200"}`}>
       {/* Save indicator */}
       <div className="flex items-start justify-between mb-1">
         <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -354,7 +388,10 @@ function OptionField({
               </span>
             ) : null}
           </div>
-          {option.description && (
+          {dependencyName && (
+            <p className="text-xs text-gray-400 mt-0.5">Requires {dependencyName}</p>
+          )}
+          {option.description && !dependencyName && (
             <div className="text-sm text-gray-500 mt-0.5 prose prose-sm prose-gray max-w-none">
               <ReactMarkdown remarkPlugins={[remarkBreaks]}>{option.description}</ReactMarkdown>
             </div>

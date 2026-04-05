@@ -100,9 +100,36 @@ export async function PUT(request: Request) {
     .single();
   if (optionError) return NextResponse.json({ error: optionError.message }, { status: 500 });
 
-  // If value is null (deletion), sync contest enrollment (unenroll) and we're done
+  // If value is null (deletion), cascade-clear dependent options, sync contest enrollment, and we're done
   if (value === null || value === undefined) {
     await syncContestEnrollment(adminClient, effectiveUserId, option, null);
+
+    // Find options that depend on this one and clear their selections too
+    const { data: dependents } = await adminClient
+      .from("trip_options")
+      .select("id, option_type, linked_contest_id, choices")
+      .eq("depends_on_option_id", option_id);
+
+    if (dependents && dependents.length > 0) {
+      for (const dep of dependents) {
+        // Delete the dependent selection
+        await adminClient
+          .from("user_option_selections")
+          .delete()
+          .eq("user_id", effectiveUserId)
+          .eq("option_id", dep.id);
+        // Remove associated charges
+        await adminClient
+          .from("financial_transactions")
+          .delete()
+          .eq("user_id", effectiveUserId)
+          .eq("option_id", dep.id)
+          .eq("source", "option");
+        // Unenroll from contest
+        await syncContestEnrollment(adminClient, effectiveUserId, dep, null);
+      }
+    }
+
     return NextResponse.json({ success: true });
   }
 

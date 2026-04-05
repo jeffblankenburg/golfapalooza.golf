@@ -1,15 +1,21 @@
 "use client";
 
 import { UserManager } from "@/components/admin/UserManager";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
 export default function AdminUsersPage() {
   const managerRef = useRef<{ openAdd: () => void }>(null);
+  const [userCount, setUserCount] = useState<number | null>(null);
 
   return (
     <div className="px-4 py-4">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Manage Loozers</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900">Manage Loozers</h1>
+          {userCount !== null && (
+            <span className="text-sm text-gray-400 font-medium">({userCount})</span>
+          )}
+        </div>
         <button
           onClick={() => managerRef.current?.openAdd()}
           className="w-9 h-9 rounded-full bg-green-600 text-white flex items-center justify-center shadow active:scale-95 transition-transform"
@@ -19,7 +25,7 @@ export default function AdminUsersPage() {
           </svg>
         </button>
       </div>
-      <UserManager ref={managerRef} />
+      <UserManager ref={managerRef} onCountChange={setUserCount} />
     </div>
   );
 }

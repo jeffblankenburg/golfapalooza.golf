@@ -815,6 +815,9 @@ export function PickemManager({ tripId }: { tripId: string }) {
           </svg>
         }
       >
+        {allGamesDecided && payouts.length > 0 && (
+          <p className="text-xs text-gray-500 mb-2">Check the box to mark winners as paid out.</p>
+        )}
         {standings.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-4">No picks yet.</p>
         ) : (

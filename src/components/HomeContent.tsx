@@ -189,6 +189,8 @@ export function HomeContent({
   pickemUrgent = false,
   myWinnings = null,
   myBalance = null,
+  optionsDeadline = null,
+  hasSubmittedOptions = false,
 }: {
   displayName: string;
   trip: TripData | null;
@@ -214,6 +216,8 @@ export function HomeContent({
   pickemUrgent?: boolean;
   myWinnings?: { total: number; breakdown: { prizeName: string; amount: number }[] } | null;
   myBalance?: { charges: number; payments: number; balance: number } | null;
+  optionsDeadline?: string | null;
+  hasSubmittedOptions?: boolean;
 }) {
   const router = useRouter();
 
@@ -687,6 +691,33 @@ export function HomeContent({
           </svg>
         </Link>
       )}
+
+      {/* Options Action Card */}
+      {optionsDeadline && (() => {
+        const deadline = new Date(optionsDeadline);
+        const formatted = deadline.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+        return (
+          <Link
+            href="/options"
+            className="flex items-center gap-4 p-4 bg-green-600 rounded-2xl shadow-lg shadow-green-600/25 active:scale-95 transition-transform"
+          >
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-white/20 text-white">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-white text-lg">Choose your trip options</p>
+              <p className="text-white/70 text-sm">
+                by {formatted}!
+              </p>
+            </div>
+            <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        );
+      })()}
 
       {/* Action Items Card */}
       {totalActionCount > 0 && (

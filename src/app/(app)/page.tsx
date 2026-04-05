@@ -58,6 +58,8 @@ export default async function HomePage() {
     eventDaysResult,
     pickemGamesResult,
     financialsResult,
+    optionSettingsResult,
+    optionSelectionsResult,
   ] = await Promise.all([
     // Course info
     trip.course_id
@@ -87,6 +89,10 @@ export default async function HomePage() {
     supabase.from("pickem_games").select("game_time, contest:contests!pickem_games_contest_id_fkey(trip_id)").order("game_time").limit(1),
     // Financial transactions for balance card
     queryClient.from("financial_transactions").select("type, amount").eq("user_id", effectiveUserId),
+    // Options settings (deadline)
+    supabase.from("trip_option_settings").select("selection_deadline, is_open").eq("trip_id", trip.id).maybeSingle(),
+    // User's option selections count
+    queryClient.from("user_option_selections").select("id", { count: "exact", head: true }).eq("trip_id", trip.id).eq("user_id", effectiveUserId),
   ]);
 
   // ── Process Phase 2 results ──
@@ -517,6 +523,13 @@ export default async function HomePage() {
     ? { charges: totalCharges, payments: totalPayments, balance: totalPayments - totalCharges }
     : null;
 
+  // Options deadline
+  const optionSettings = optionSettingsResult.data as { selection_deadline: string | null; is_open: boolean } | null;
+  const optionsDeadline = optionSettings?.is_open && optionSettings.selection_deadline
+    ? optionSettings.selection_deadline
+    : null;
+  const hasSubmittedOptions = (optionSelectionsResult.count || 0) > 0;
+
   // Check if pickem picks are urgent (within 3 hours of first game)
   const pickemFirstGame = (pickemGamesResult.data || []).find(
     (g) => {
@@ -558,6 +571,8 @@ export default async function HomePage() {
       pickemUrgent={pickemUrgent}
       myWinnings={myWinnings}
       myBalance={myBalance}
+      optionsDeadline={optionsDeadline}
+      hasSubmittedOptions={hasSubmittedOptions}
     />
   );
 }

@@ -23,7 +23,7 @@ function formatPhone(phone: string): string {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
-export function UserManager({ ref }: { ref?: Ref<{ openAdd: () => void }> }) {
+export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () => void }>; onCountChange?: (count: number) => void }) {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -61,6 +61,7 @@ export function UserManager({ ref }: { ref?: Ref<{ openAdd: () => void }> }) {
         return;
       }
       setUsers(data.users);
+      onCountChange?.(data.users.length);
     } catch {
       setError("Failed to load users");
     } finally {

@@ -21,6 +21,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 GOLF_COURSE_API_KEY=your-golfcourseapi-key  # Optional, for external course search
 NEXT_PUBLIC_GIPHY_API_KEY=your-giphy-api-key  # For GIF search in chat
+NEXT_PUBLIC_MAPBOX_TOKEN=your-mapbox-token    # For satellite maps in scoring
 ```
 
 ## API Documentation
@@ -148,7 +149,8 @@ src/
 
 When adding new API routes, always:
 
-1. Add JSDoc comments with OpenAPI annotations for Swagger
+1. **Use `getEffectiveUserId(user.id)` instead of `user.id`** for all user-specific queries. This supports the admin simulator feature. Import from `@/lib/simulator`. Server component pages must do the same.
+2. Add JSDoc comments with OpenAPI annotations for Swagger
 2. Update this CLAUDE.md file with the new endpoint
 3. Add appropriate TypeScript types to `src/types/golf.ts`
 4. Include proper error handling and auth checks
@@ -225,6 +227,20 @@ When implementing any delete, remove, or reassign operation:
 2. Handle cleanup in the same operation (not as an afterthought)
 3. Use optimistic UI updates that can be reverted if the API fails
 4. Notify sibling components if they might be displaying stale data
+
+## API & Database Performance
+
+**IMPORTANT: Always minimize the number of database round-trips and HTTP requests.**
+
+When writing API routes that create or modify multiple related records:
+
+1. **Batch inserts/upserts** — Use Supabase's array insert (`.insert([...rows])`) instead of looping with individual inserts. One call for N rows, not N calls for 1 row each.
+2. **Batch updates** — When updating multiple rows with the same value, use a single `.update()` with `.in("id", [...ids])` instead of looping.
+3. **Combine related operations into one API call** — If the client needs to create a parent record and its children (e.g., a round + players + scores), do it all in one POST handler, not 3 sequential API calls from the client.
+4. **Parallel fetches** — When fetching independent data on the server or client, use `Promise.all()` instead of sequential awaits.
+5. **Select only what you need** — Use `.select("id, name")` not `.select("*")` when you only need a few columns.
+
+**Before writing any API route, ask: "How many database calls will this make for a typical request?" If the answer is more than 5, look for batch opportunities.**
 
 ## Verification Checklist
 

@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { TEE_COLOR_OPTIONS, isHexColor, getContrastText, getTeeColorClasses } from "@/lib/tee-colors";
+import dynamic from "next/dynamic";
+
+const HoleMapEditor = dynamic(() => import("@/components/admin/HoleMapEditor"), { ssr: false });
 
 interface TeeData {
   id: string;
@@ -21,6 +24,10 @@ interface HoleData {
   yards: number;
   overhead_image_url: string | null;
   green_image_url: string | null;
+  tee_latitude: number | null;
+  tee_longitude: number | null;
+  green_latitude: number | null;
+  green_longitude: number | null;
 }
 
 interface CourseInfo {
@@ -28,6 +35,12 @@ interface CourseInfo {
   name: string;
   city: string | null;
   state: string | null;
+  address: string | null;
+  phone: string | null;
+  website: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  locked: boolean;
 }
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -45,6 +58,9 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
   const [courseName, setCourseName] = useState("");
   const [courseCity, setCourseCity] = useState("");
   const [courseState, setCourseState] = useState("");
+  const [courseAddress, setCourseAddress] = useState("");
+  const [coursePhone, setCoursePhone] = useState("");
+  const [courseWebsite, setCourseWebsite] = useState("");
   const [infoStatus, setInfoStatus] = useState<SaveStatus>("idle");
 
   // Tee editing
@@ -104,6 +120,9 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
         setCourseName(data.course.name || "");
         setCourseCity(data.course.city || "");
         setCourseState(data.course.state || "");
+        setCourseAddress(data.course.address || "");
+        setCoursePhone(data.course.phone || "");
+        setCourseWebsite(data.course.website || "");
       }
     } catch {
       setError("Failed to load course data");
@@ -169,6 +188,9 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
           name: courseName,
           city: courseCity || null,
           state: courseState || null,
+          address: courseAddress || null,
+          phone: coursePhone || null,
+          website: courseWebsite || null,
         }),
       });
       const data = await res.json();
@@ -527,6 +549,11 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
             <Field label="City" value={courseCity} onChange={setCourseCity} />
             <Field label="State" value={courseState} onChange={setCourseState} />
           </div>
+          <Field label="Address" value={courseAddress} onChange={setCourseAddress} />
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Phone" value={coursePhone} onChange={setCoursePhone} />
+            <Field label="Website" value={courseWebsite} onChange={setCourseWebsite} />
+          </div>
           <button
             onClick={saveCourseInfo}
             disabled={infoStatus === "saving"}
@@ -538,6 +565,36 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
                 ? "Saved!"
                 : "Save Course Info"}
           </button>
+          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+            <div>
+              <div className="text-sm font-medium text-gray-700">
+                {course?.locked ? "Course locked" : "Course unlocked"}
+              </div>
+              <div className="text-xs text-gray-500">
+                {course?.locked ? "Only admins can edit" : "Any user can edit"}
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                if (!course) return;
+                const res = await fetch(`/api/courses/${course.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ locked: !course.locked }),
+                });
+                if (res.ok) {
+                  setCourse({ ...course, locked: !course.locked });
+                }
+              }}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                course?.locked
+                  ? "bg-green-600 text-white hover:bg-green-700"
+                  : "bg-amber-500 text-white hover:bg-amber-600"
+              }`}
+            >
+              {course?.locked ? "Unlock" : "Lock"}
+            </button>
+          </div>
         </div>
       </section>
 
@@ -809,7 +866,23 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
                 triggerUpload(hole.id, hole.hole_number, imageType)
               }
               onDelete={(imageType) => deleteImage(hole.id, imageType)}
+              onMapSave={async (holeId, coords) => {
+                await fetch("/api/admin/course/holes/coordinates", {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ hole_id: holeId, ...coords }),
+                });
+                // Update local state
+                setHoles((prev) => prev.map((h) =>
+                  h.id === holeId ? { ...h, ...coords } : h
+                ));
+              }}
               uploadingKey={uploadingHole}
+              courseLatitude={course.latitude}
+              courseLongitude={course.longitude}
+              courseAddress={course.address}
+              courseCity={course.city}
+              courseState={course.state}
             />
           ))}
         </div>
@@ -878,7 +951,13 @@ function HoleRow({
   onUpdate,
   onUpload,
   onDelete,
+  onMapSave,
   uploadingKey,
+  courseLatitude,
+  courseLongitude,
+  courseAddress,
+  courseCity,
+  courseState,
 }: {
   hole: HoleData;
   courseId: string;
@@ -888,11 +967,19 @@ function HoleRow({
   onUpdate: (field: "par" | "handicap_index" | "yards", value: string) => void;
   onUpload: (imageType: "overhead" | "green") => void;
   onDelete: (imageType: "overhead" | "green") => void;
+  onMapSave: (holeId: string, coords: { tee_latitude: number | null; tee_longitude: number | null; green_latitude: number | null; green_longitude: number | null }) => void;
   uploadingKey: string | null;
+  courseLatitude: number | null;
+  courseLongitude: number | null;
+  courseAddress: string | null;
+  courseCity: string | null;
+  courseState: string | null;
 }) {
+  const [showMap, setShowMap] = useState(false);
   const isUploadingOverhead = uploadingKey === `${hole.id}-overhead`;
   const isUploadingGreen = uploadingKey === `${hole.id}-green`;
   const modalSubtitle = `${courseName} · ${teeName} · Hole ${hole.hole_number}`;
+  const hasCoordinates = hole.tee_latitude != null || hole.green_latitude != null;
 
   return (
     <div className="px-4 py-3">
@@ -951,7 +1038,49 @@ function HoleRow({
             onUpload={() => onUpload("green")}
             onDelete={() => onDelete("green")}
           />
+          <button
+            onClick={() => setShowMap(true)}
+            className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-lg text-xs active:bg-gray-50 transition-colors"
+          >
+            {hasCoordinates ? (
+              <div className="w-4 h-4 rounded bg-green-100 flex items-center justify-center">
+                <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            ) : (
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            )}
+            <span className="text-gray-600">Map</span>
+          </button>
         </div>
+      )}
+
+      {showMap && (
+        <HoleMapEditor
+          holeNumber={hole.hole_number}
+          courseId={courseId}
+          courseLatitude={courseLatitude}
+          courseLongitude={courseLongitude}
+          courseAddress={courseAddress}
+          courseName={courseName}
+          courseCity={courseCity}
+          courseState={courseState}
+          coordinates={{
+            tee_latitude: hole.tee_latitude,
+            tee_longitude: hole.tee_longitude,
+            green_latitude: hole.green_latitude,
+            green_longitude: hole.green_longitude,
+          }}
+          onSave={(coords) => {
+            onMapSave(hole.id, coords);
+            setShowMap(false);
+          }}
+          onClose={() => setShowMap(false)}
+        />
       )}
     </div>
   );

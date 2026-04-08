@@ -45,6 +45,14 @@ function notificationIcon(type: string) {
           </svg>
         </div>
       );
+    case "gallery_comment":
+      return (
+        <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+          <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+          </svg>
+        </div>
+      );
     case "announcement":
       return (
         <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
@@ -75,6 +83,9 @@ function notificationIcon(type: string) {
 function getNotificationLink(notification: Notification): string | null {
   if (notification.type === "gallery_tag" && notification.data?.itemId) {
     return `/gallery?item=${notification.data.itemId}`;
+  }
+  if (notification.type === "gallery_comment" && notification.data?.itemId) {
+    return `/gallery?item=${notification.data.itemId}&comments=1`;
   }
   return null;
 }

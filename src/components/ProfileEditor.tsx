@@ -50,10 +50,14 @@ export function ProfileEditor({
   profile,
   accolades,
   handicapIndex,
+  eightBagAverage,
+  avgScrambleScore,
 }: {
   profile: ProfileData;
   accolades: AccoladeData[];
   handicapIndex: number | null;
+  eightBagAverage?: number | null;
+  avgScrambleScore?: number | null;
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -247,11 +251,25 @@ export function ProfileEditor({
             {form.display_name}
           </h2>
           <p className="text-sm text-gray-500 mb-2">Tap photo to change</p>
-          <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-1.5">
-            <span className="text-xs font-medium text-blue-600 uppercase tracking-wide">Handicap</span>
-            <span className="text-sm font-bold text-blue-900">
-              {handicapIndex !== null ? handicapIndex : "N/A"}
-            </span>
+          <div className="flex flex-wrap gap-2">
+            <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-xl px-3 py-1.5">
+              <span className="text-xs font-medium text-blue-600 uppercase tracking-wide">Handicap</span>
+              <span className="text-sm font-bold text-blue-900">
+                {handicapIndex !== null ? handicapIndex : "N/A"}
+              </span>
+            </div>
+            {eightBagAverage != null && (
+              <div className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5">
+                <span className="text-xs font-medium text-emerald-600 uppercase tracking-wide">8 Bag Avg</span>
+                <span className="text-sm font-bold text-emerald-900">{eightBagAverage}</span>
+              </div>
+            )}
+            {avgScrambleScore != null && (
+              <div className="inline-flex items-center gap-1.5 bg-purple-50 border border-purple-200 rounded-xl px-3 py-1.5">
+                <span className="text-xs font-medium text-purple-600 uppercase tracking-wide">Avg Scramble</span>
+                <span className="text-sm font-bold text-purple-900">{avgScrambleScore}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

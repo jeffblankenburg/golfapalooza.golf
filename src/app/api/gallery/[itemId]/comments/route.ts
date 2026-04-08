@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
+import { sendBulkNotifications } from "@/lib/notifications/service";
 
 /**
  * @swagger
@@ -150,6 +151,54 @@ export async function POST(
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Send push notifications to the photo uploader + other commenters
+  const admin = createAdminClient();
+
+  // Fetch the gallery item owner and commenter's display name in parallel
+  const [{ data: galleryItem }, { data: commenter }, { data: otherCommenters }] =
+    await Promise.all([
+      admin
+        .from("gallery_items")
+        .select("uploader_id")
+        .eq("id", itemId)
+        .single(),
+      admin
+        .from("users")
+        .select("display_name")
+        .eq("id", effectiveUserId)
+        .single(),
+      admin
+        .from("gallery_comments")
+        .select("sender_id")
+        .eq("item_id", itemId)
+        .neq("sender_id", effectiveUserId),
+    ]);
+
+  if (galleryItem) {
+    const commenterName = commenter?.display_name || "Someone";
+    const preview =
+      content.trim().length > 80
+        ? content.trim().slice(0, 80) + "..."
+        : content.trim();
+
+    // Collect unique user IDs: uploader + other commenters, excluding the commenter
+    const notifyIds = [
+      ...new Set([
+        galleryItem.uploader_id,
+        ...(otherCommenters || []).map((c) => c.sender_id),
+      ]),
+    ].filter((id) => id !== effectiveUserId);
+
+    if (notifyIds.length > 0) {
+      await sendBulkNotifications(notifyIds, {
+        type: "gallery_comment",
+        title: commenterName,
+        body: preview,
+        data: { itemId, url: `/gallery?item=${itemId}&comments=1` },
+      }).catch(console.error);
+    }
   }
 
   return NextResponse.json(

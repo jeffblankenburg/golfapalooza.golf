@@ -18,16 +18,20 @@ export async function PUT(request: Request) {
 
     const adminClient = createAdminClient();
 
-    // For any entry with holed_out: true, clear holed_out on all other players for that (team_id, hole_number)
-    for (const b of bonuses as { team_id: string; hole_number: number; user_id: string; holed_out: boolean }[]) {
-      if (b.holed_out) {
-        await adminClient
-          .from("bspitw_bonus_points")
-          .update({ holed_out: false })
-          .eq("team_id", b.team_id)
-          .eq("hole_number", b.hole_number)
-          .neq("user_id", b.user_id);
-      }
+    // For any entry with holed_out: true, clear holed_out on all other players — parallel
+    const holedOutEntries = (bonuses as { team_id: string; hole_number: number; user_id: string; holed_out: boolean }[])
+      .filter((b) => b.holed_out);
+    if (holedOutEntries.length > 0) {
+      await Promise.all(
+        holedOutEntries.map((b) =>
+          adminClient
+            .from("bspitw_bonus_points")
+            .update({ holed_out: false })
+            .eq("team_id", b.team_id)
+            .eq("hole_number", b.hole_number)
+            .neq("user_id", b.user_id)
+        )
+      );
     }
 
     // Upsert all bonus entries

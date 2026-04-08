@@ -58,6 +58,7 @@ export function GalleryPage({
   const [hasMore, setHasMore] = useState(true);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [deepLinkShowComments, setDeepLinkShowComments] = useState(false);
   const [sortBy, setSortBy] = useState<"taken" | "uploaded">("taken");
   const [filterUserIds, setFilterUserIds] = useState<Set<string>>(new Set());
   const [filterYear, setFilterYear] = useState<string>("all");
@@ -107,11 +108,14 @@ export function GalleryPage({
     });
   }, [fetchItems]);
 
-  // Deep link: open viewer to a specific item via ?item=<id>
+  // Deep link: open viewer to a specific item via ?item=<id>&comments=1
   useEffect(() => {
     if (deepLinkHandled.current || loading || items.length === 0) return;
     const itemId = searchParams.get("item");
     if (!itemId) return;
+
+    const wantComments = searchParams.get("comments") === "1";
+    if (wantComments) setDeepLinkShowComments(true);
 
     const index = items.findIndex((i) => i.id === itemId);
     if (index >= 0) {
@@ -480,8 +484,12 @@ export function GalleryPage({
           currentUserId={userId}
           isAdmin={isAdmin}
           allUsers={allUsers}
-          onClose={() => setViewerIndex(null)}
+          onClose={() => {
+            setViewerIndex(null);
+            setDeepLinkShowComments(false);
+          }}
           onDelete={handleDelete}
+          initialShowComments={deepLinkShowComments}
         />
       )}
     </>

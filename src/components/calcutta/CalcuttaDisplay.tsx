@@ -64,6 +64,9 @@ interface SpotlightData {
   teamPartners: TeamPartner[];
   accolades: Accolade[];
   cornholeSinglesIn: boolean | null;
+  eightBagAverage: number | null;
+  avgScrambleScore: number | null;
+  handicapIndex: number | null;
 }
 
 function calculateAge(birthday: string): number | null {
@@ -88,18 +91,6 @@ function fakeBspitwStanding(displayName: string): { place: number; points: numbe
   const place = Math.max(1, 16 - points);
   return { place, points };
 }
-
-// Fake 40-yard dash time — replace with real data when available
-function fake40YardDash(displayName: string): string {
-  let hash = 0;
-  for (let i = 0; i < displayName.length; i++) {
-    hash = ((hash << 5) - hash) + displayName.charCodeAt(i);
-    hash |= 0;
-  }
-  const seconds = 5.0 + (Math.abs(hash) % 30) / 10;
-  return seconds.toFixed(1);
-}
-
 
 function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
@@ -297,11 +288,14 @@ export function CalcuttaDisplay({ contestId }: { contestId: string }) {
                         </h1>
                         {current.user?.birthday && (
                           <p className="text-xl text-gray-400 font-medium mt-1">
-                            Age {calculateAge(current.user.birthday)} &middot; #{current.auction_order} of {participants.length}
+                            Age {calculateAge(current.user.birthday)}
                           </p>
                         )}
                       </div>
                     </div>
+                    <p className="text-xl text-gray-400 font-bold uppercase tracking-wide mt-2">
+                      #{current.auction_order} of {participants.length}
+                    </p>
                   </div>
                 </div>
 
@@ -416,13 +410,33 @@ export function CalcuttaDisplay({ contestId }: { contestId: string }) {
                     </div>
                   ))}
 
-                  {/* 40-Yard Dash */}
+                  {/* Handicap */}
                   <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex items-center justify-between">
                     <h3 className="text-lg font-bold text-gray-500 uppercase tracking-wide">
-                      40-Yard Dash
+                      Handicap
                     </h3>
                     <span className="text-4xl font-black text-gray-700 flex-shrink-0 ml-4">
-                      {current.user ? fake40YardDash(current.user.display_name) + "s" : "—"}
+                      {spotlight?.handicapIndex != null ? spotlight.handicapIndex : "—"}
+                    </span>
+                  </div>
+
+                  {/* 8 Bag Average */}
+                  <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-gray-500 uppercase tracking-wide">
+                      8 Bag Average
+                    </h3>
+                    <span className="text-4xl font-black text-gray-700 flex-shrink-0 ml-4">
+                      {spotlight?.eightBagAverage != null ? spotlight.eightBagAverage : "—"}
+                    </span>
+                  </div>
+
+                  {/* Average Scramble Score */}
+                  <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-gray-500 uppercase tracking-wide">
+                      Avg Scramble
+                    </h3>
+                    <span className="text-4xl font-black text-gray-700 flex-shrink-0 ml-4">
+                      {spotlight?.avgScrambleScore != null ? spotlight.avgScrambleScore : "—"}
                     </span>
                   </div>
 

@@ -176,6 +176,10 @@ export default async function KgbCupScoringPage() {
     tee_color: string | null;
     overhead_image_url: string | null;
     green_image_url: string | null;
+    tee_latitude: number | null;
+    tee_longitude: number | null;
+    green_latitude: number | null;
+    green_longitude: number | null;
   }[] = [];
 
   if (trip.course_id) {
@@ -187,7 +191,7 @@ export default async function KgbCupScoringPage() {
         .order("hole_number"),
       adminClient
         .from("course_holes")
-        .select("tee_id, hole_number, par, yards, handicap_index, overhead_image_url, green_image_url")
+        .select("tee_id, hole_number, par, yards, handicap_index, overhead_image_url, green_image_url, tee_latitude, tee_longitude, green_latitude, green_longitude")
         .eq("course_id", trip.course_id),
       adminClient
         .from("course_tees")
@@ -206,6 +210,8 @@ export default async function KgbCupScoringPage() {
       const holeMap = new Map<string, {
         par: number; yards: number; handicap_index: number;
         overhead_image_url: string | null; green_image_url: string | null;
+        tee_latitude: number | null; tee_longitude: number | null;
+        green_latitude: number | null; green_longitude: number | null;
       }>();
       for (const h of courseHoles) {
         holeMap.set(`${h.tee_id}-${h.hole_number}`, {
@@ -214,6 +220,10 @@ export default async function KgbCupScoringPage() {
           handicap_index: h.handicap_index || 0,
           overhead_image_url: h.overhead_image_url || null,
           green_image_url: h.green_image_url || null,
+          tee_latitude: h.tee_latitude ?? null,
+          tee_longitude: h.tee_longitude ?? null,
+          green_latitude: h.green_latitude ?? null,
+          green_longitude: h.green_longitude ?? null,
         });
       }
 
@@ -227,6 +237,10 @@ export default async function KgbCupScoringPage() {
           tee_color: teeColorMap.get(ta.tee_id) ?? null,
           overhead_image_url: data?.overhead_image_url ?? null,
           green_image_url: data?.green_image_url ?? null,
+          tee_latitude: data?.tee_latitude ?? null,
+          tee_longitude: data?.tee_longitude ?? null,
+          green_latitude: data?.green_latitude ?? null,
+          green_longitude: data?.green_longitude ?? null,
         };
       });
     }

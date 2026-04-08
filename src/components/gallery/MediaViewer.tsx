@@ -212,6 +212,7 @@ export function MediaViewer({
   allUsers,
   onClose,
   onDelete,
+  initialShowComments = false,
 }: {
   items: GalleryItem[];
   initialIndex: number;
@@ -220,10 +221,11 @@ export function MediaViewer({
   allUsers: GalleryUser[];
   onClose: () => void;
   onDelete: (itemId: string) => void;
+  initialShowComments?: boolean;
 }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [showOverlay, setShowOverlay] = useState(true);
-  const [showComments, setShowComments] = useState(false);
+  const [showComments, setShowComments] = useState(initialShowComments);
   const [showReactions, setShowReactions] = useState(false);
   const [showTags, setShowTags] = useState(false);
   const [showMenu, setShowMenu] = useState(false);

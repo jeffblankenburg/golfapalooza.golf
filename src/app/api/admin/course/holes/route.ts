@@ -22,22 +22,24 @@ export async function PUT(request: Request) {
 
     const adminClient = createAdminClient();
 
-    for (const hole of holes) {
-      const { id, par, handicap_index, yards } = hole;
-      if (!id) continue;
+    const results = await Promise.all(
+      holes
+        .filter((hole: { id?: string }) => hole.id)
+        .map((hole: { id: string; par?: number; handicap_index?: number; yards?: number }) =>
+          adminClient
+            .from("course_holes")
+            .update({
+              par: hole.par ?? 4,
+              handicap_index: hole.handicap_index ?? 1,
+              yards: hole.yards ?? 0,
+            })
+            .eq("id", hole.id)
+        )
+    );
 
-      const { error } = await adminClient
-        .from("course_holes")
-        .update({
-          par: par ?? 4,
-          handicap_index: handicap_index ?? 1,
-          yards: yards ?? 0,
-        })
-        .eq("id", id);
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
-      }
+    const failed = results.find((r) => r.error);
+    if (failed?.error) {
+      return NextResponse.json({ error: failed.error.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

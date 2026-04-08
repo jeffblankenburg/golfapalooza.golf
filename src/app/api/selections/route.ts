@@ -111,23 +111,25 @@ export async function PUT(request: Request) {
       .eq("depends_on_option_id", option_id);
 
     if (dependents && dependents.length > 0) {
-      for (const dep of dependents) {
-        // Delete the dependent selection
-        await adminClient
+      const depIds = dependents.map((d) => d.id);
+      // Batch delete selections and charges for all dependents
+      await Promise.all([
+        adminClient
           .from("user_option_selections")
           .delete()
           .eq("user_id", effectiveUserId)
-          .eq("option_id", dep.id);
-        // Remove associated charges
-        await adminClient
+          .in("option_id", depIds),
+        adminClient
           .from("financial_transactions")
           .delete()
           .eq("user_id", effectiveUserId)
-          .eq("option_id", dep.id)
-          .eq("source", "option");
-        // Unenroll from contest
-        await syncContestEnrollment(adminClient, effectiveUserId, dep, null);
-      }
+          .in("option_id", depIds)
+          .eq("source", "option"),
+        // Unenroll from each dependent's contest (can't batch — each has different contest_id)
+        ...dependents.map((dep) =>
+          syncContestEnrollment(adminClient, effectiveUserId, dep, null)
+        ),
+      ]);
     }
 
     return NextResponse.json({ success: true });

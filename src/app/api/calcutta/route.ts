@@ -72,6 +72,9 @@ export async function GET(request: Request) {
     let teamPartners: { contest_name: string; partners: string[]; day_number: number | null; score: number | null; course_par: number | null; is_participant: boolean }[] = [];
     let accolades: { title: string; trip_name?: string }[] = [];
     let cornholeSinglesIn: boolean | null = null;
+    let eightBagAverage: number | null = null;
+    let avgScrambleScore: number | null = null;
+    let handicapIndex: number | null = null;
 
     if (activeParticipant) {
       // Get all scramble + cornhole_doubles contests for this trip (always show all boxes)
@@ -201,6 +204,27 @@ export async function GET(request: Request) {
           };
         });
       }
+
+      // Fetch handicap and admin-entered scramble stats in parallel
+      const [{ data: handicapRow }, { data: scrambleStats }] = await Promise.all([
+        adminClient
+          .from("player_handicaps")
+          .select("handicap_index")
+          .eq("user_id", activeParticipant.user_id)
+          .maybeSingle(),
+        adminClient
+          .from("user_scramble_stats")
+          .select("eight_bag_average, avg_scramble_score")
+          .eq("user_id", activeParticipant.user_id)
+          .eq("trip_id", contest.trip_id)
+          .maybeSingle(),
+      ]);
+
+      handicapIndex = handicapRow?.handicap_index ?? null;
+      if (scrambleStats) {
+        eightBagAverage = scrambleStats.eight_bag_average;
+        avgScrambleScore = scrambleStats.avg_scramble_score;
+      }
     }
 
     // Fetch ownership records
@@ -314,13 +338,36 @@ export async function GET(request: Request) {
       }
     }
 
+    // Bulk fetch handicaps + scramble stats for all participants (for Loozers table)
+    const allUserIds = (participants || []).map((p) => p.user_id).filter(Boolean);
+    const [{ data: allHandicaps }, { data: allScrambleStats }] = await Promise.all([
+      allUserIds.length > 0
+        ? adminClient.from("player_handicaps").select("user_id, handicap_index").in("user_id", allUserIds)
+        : { data: [] },
+      allUserIds.length > 0
+        ? adminClient.from("user_scramble_stats").select("user_id, eight_bag_average, avg_scramble_score").eq("trip_id", contest.trip_id).in("user_id", allUserIds)
+        : { data: [] },
+    ]);
+
+    const loozerStats: Record<string, { handicap: number | null; eightBag: number | null; avgScramble: number | null }> = {};
+    for (const uid of allUserIds) {
+      const h = (allHandicaps || []).find((r) => r.user_id === uid);
+      const s = (allScrambleStats || []).find((r) => r.user_id === uid);
+      loozerStats[uid] = {
+        handicap: h?.handicap_index ?? null,
+        eightBag: s?.eight_bag_average ?? null,
+        avgScramble: s?.avg_scramble_score ?? null,
+      };
+    }
+
     return NextResponse.json({
       contest_name: contest.name,
       active_order: contest.calcutta_active_order,
       participants: normalizedParticipants,
       prizes: enrichedPrizes,
       pool,
-      spotlight: activeParticipant ? { teamPartners, accolades, cornholeSinglesIn } : null,
+      spotlight: activeParticipant ? { teamPartners, accolades, cornholeSinglesIn, eightBagAverage, avgScrambleScore, handicapIndex } : null,
+      loozerStats,
       buyer_paid: !!buyerPaidRow,
       buyer_owes: buyerOwes,
     });

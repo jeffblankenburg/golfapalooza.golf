@@ -10,6 +10,7 @@ interface CourseOption {
   city: string | null;
   state: string | null;
   hole_count: number;
+  locked: boolean;
 }
 
 export function CourseListManager() {
@@ -175,8 +176,13 @@ export function CourseListManager() {
               className="w-full flex items-center px-4 py-3 text-left active:bg-gray-50"
             >
               <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900">
                   {course.name}
+                  {course.locked && (
+                    <svg className="w-3.5 h-3.5 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
                 </div>
                 <div className="text-xs text-gray-500">
                   {[course.city, course.state].filter(Boolean).join(", ") ||

@@ -144,24 +144,24 @@ export async function DELETE(request: Request) {
 
     if (teamsToDelete && teamsToDelete.length > 0) {
       const teamIds = teamsToDelete.map((t) => t.id);
-      // Clear bracket slots that reference these teams
-      for (const tid of teamIds) {
-        await adminClient
+      // Clear bracket slots that reference these teams — 3 batch updates instead of 3*N
+      await Promise.all([
+        adminClient
           .from("cornhole_bracket_matches")
           .update({ slot1_participant_id: null })
           .eq("contest_id", contestId)
-          .eq("slot1_participant_id", tid);
-        await adminClient
+          .in("slot1_participant_id", teamIds),
+        adminClient
           .from("cornhole_bracket_matches")
           .update({ slot2_participant_id: null })
           .eq("contest_id", contestId)
-          .eq("slot2_participant_id", tid);
-        await adminClient
+          .in("slot2_participant_id", teamIds),
+        adminClient
           .from("cornhole_bracket_matches")
           .update({ winner_participant_id: null })
           .eq("contest_id", contestId)
-          .eq("winner_participant_id", tid);
-      }
+          .in("winner_participant_id", teamIds),
+      ]);
     }
 
     const { error } = await adminClient
@@ -194,22 +194,24 @@ export async function DELETE(request: Request) {
       .single();
 
     if (team) {
-      // Clear bracket slots that reference this team
-      await adminClient
-        .from("cornhole_bracket_matches")
-        .update({ slot1_participant_id: null })
-        .eq("contest_id", team.contest_id)
-        .eq("slot1_participant_id", team_id);
-      await adminClient
-        .from("cornhole_bracket_matches")
-        .update({ slot2_participant_id: null })
-        .eq("contest_id", team.contest_id)
-        .eq("slot2_participant_id", team_id);
-      await adminClient
-        .from("cornhole_bracket_matches")
-        .update({ winner_participant_id: null })
-        .eq("contest_id", team.contest_id)
-        .eq("winner_participant_id", team_id);
+      // Clear bracket slots that reference this team — parallel
+      await Promise.all([
+        adminClient
+          .from("cornhole_bracket_matches")
+          .update({ slot1_participant_id: null })
+          .eq("contest_id", team.contest_id)
+          .eq("slot1_participant_id", team_id),
+        adminClient
+          .from("cornhole_bracket_matches")
+          .update({ slot2_participant_id: null })
+          .eq("contest_id", team.contest_id)
+          .eq("slot2_participant_id", team_id),
+        adminClient
+          .from("cornhole_bracket_matches")
+          .update({ winner_participant_id: null })
+          .eq("contest_id", team.contest_id)
+          .eq("winner_participant_id", team_id),
+      ]);
     }
 
     const { error } = await adminClient

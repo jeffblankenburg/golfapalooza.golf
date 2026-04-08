@@ -1,22 +1,11 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { logActivity } from "@/components/ActivityTracker";
+import ScoringShell, { type HoleInfo } from "@/components/scoring/ScoringShell";
 
-type ImageView = "overhead" | "green";
 type SaveStatus = "idle" | "saving" | "saved" | "error";
-
-interface HoleInfo {
-  hole_number: number;
-  par: number;
-  handicap_index: number;
-  yards: number;
-  tee_color: string | null;
-  overhead_image_url: string | null;
-  green_image_url: string | null;
-}
 
 interface TeamInfo {
   id: string;
@@ -64,10 +53,6 @@ interface Props {
   currentUserId: string;
   scoringClosed?: boolean;
   contestVerified?: boolean;
-}
-
-function getDistance(t1: React.Touch, t2: React.Touch) {
-  return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
 }
 
 function formatRelPar(relPar: number): string {
@@ -168,7 +153,7 @@ function LeaderboardPopup({
                   >
                     {entry.holes_completed > 0
                       ? formatRelPar(entry.rel_par)
-                      : "·"}
+                      : "\u00b7"}
                   </span>
                 </div>
               );
@@ -197,16 +182,13 @@ export function LiveScorer({
   const isVerified = !!team.verified_at;
   const isLocked = scoringClosed || isVerified;
 
-  // Determine initial hole index based on starting hole
-  const initialIndex = Math.max(
-    0,
-    holes.findIndex((h) => h.hole_number === startingHole)
-  );
-  const [currentHoleIndex, setCurrentHoleIndex] = useState(initialIndex);
-
-  const [imageView, setImageView] = useState<ImageView>("overhead");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+
+  // Track current hole via ref so score panel always has access without re-rendering the shell
+  const currentHoleRef = useRef<HoleInfo>(
+    holes[Math.max(0, holes.findIndex((h) => h.hole_number === startingHole))]
+  );
 
   // Scores: hole_number -> strokes
   const [scores, setScores] = useState<Record<number, number>>(() => {
@@ -238,63 +220,6 @@ export function LiveScorer({
   >(new Map());
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Swipe state
-  const touchStartX = useRef(0);
-  const touchStartY = useRef(0);
-  const isHorizontalSwipe = useRef<boolean | null>(null);
-  const [dragOffset, setDragOffset] = useState(0);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const SWIPE_THRESHOLD = 50;
-
-  // Pinch-to-zoom state
-  const [scale, setScale] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [isSnapBack, setIsSnapBack] = useState(false);
-  const gestureRef = useRef({
-    isPinching: false,
-    isPanning: false,
-    initialDist: 0,
-    initialScale: 1,
-    initialOffset: { x: 0, y: 0 },
-    initialMid: { x: 0, y: 0 },
-    panStart: { x: 0, y: 0 },
-    panStartOffset: { x: 0, y: 0 },
-  });
-
-  // Mini scorecard scroll ref
-  const scorecardRef = useRef<HTMLDivElement>(null);
-
-  const hole = holes[currentHoleIndex];
-
-  // Reset zoom on hole change
-  useEffect(() => {
-    setScale(1);
-    setOffset({ x: 0, y: 0 });
-  }, [currentHoleIndex]);
-
-  // Auto-scroll mini scorecard to keep current hole visible
-  useEffect(() => {
-    if (scorecardRef.current) {
-      const container = scorecardRef.current;
-      const activeCell = container.querySelector('[data-active="true"]');
-      if (activeCell) {
-        const cellEl = activeCell as HTMLElement;
-        const containerRect = container.getBoundingClientRect();
-        const cellRect = cellEl.getBoundingClientRect();
-        if (
-          cellRect.left < containerRect.left ||
-          cellRect.right > containerRect.right
-        ) {
-          cellEl.scrollIntoView({
-            behavior: "smooth",
-            block: "nearest",
-            inline: "center",
-          });
-        }
-      }
-    }
-  }, [currentHoleIndex]);
 
   // ── Save Logic ──
 
@@ -419,9 +344,9 @@ export function LiveScorer({
 
   const handleIncrement = () => {
     if (isLocked) return;
-    const holeNum = hole.hole_number;
+    const holeNum = currentHoleRef.current.hole_number;
     const current = scores[holeNum];
-    const newVal = current !== undefined ? Math.min(current + 1, 20) : hole.par;
+    const newVal = current !== undefined ? Math.min(current + 1, 20) : currentHoleRef.current.par;
     setScores((prev) => ({ ...prev, [holeNum]: newVal }));
     dirtyScoresRef.current.set(holeNum, {
       hole_number: holeNum,
@@ -432,10 +357,10 @@ export function LiveScorer({
 
   const handleDecrement = () => {
     if (isLocked) return;
-    const holeNum = hole.hole_number;
+    const holeNum = currentHoleRef.current.hole_number;
     const current = scores[holeNum];
     if (current !== undefined && current <= 1) return;
-    const newVal = current !== undefined ? current - 1 : Math.max(hole.par - 1, 1);
+    const newVal = current !== undefined ? current - 1 : Math.max(currentHoleRef.current.par - 1, 1);
     setScores((prev) => ({ ...prev, [holeNum]: newVal }));
     dirtyScoresRef.current.set(holeNum, {
       hole_number: holeNum,
@@ -449,7 +374,7 @@ export function LiveScorer({
   const handleDecrementStart = () => {
     longPressTimer.current = setTimeout(() => {
       if (isLocked) return;
-      const holeNum = hole.hole_number;
+      const holeNum = currentHoleRef.current.hole_number;
       setScores((prev) => {
         const next = { ...prev };
         delete next[holeNum];
@@ -466,7 +391,7 @@ export function LiveScorer({
 
   const handleOnGreenChange = (userId: string, checked: boolean) => {
     if (isLocked) return;
-    const holeNum = hole.hole_number;
+    const holeNum = currentHoleRef.current.hole_number;
     const key = `${holeNum}-${userId}`;
     const existing = bonuses[key];
     const updated = {
@@ -484,7 +409,7 @@ export function LiveScorer({
 
   const handleHoledOutChange = (userId: string) => {
     if (isLocked) return;
-    const holeNum = hole.hole_number;
+    const holeNum = currentHoleRef.current.hole_number;
 
     // Check if this user already has holed_out — toggle off
     const currentKey = `${holeNum}-${userId}`;
@@ -540,167 +465,7 @@ export function LiveScorer({
     scheduleSave();
   };
 
-  // ── Navigation ──
-
-  const goToHole = useCallback(
-    (index: number) => {
-      if (index >= 0 && index < holes.length) {
-        setIsAnimating(true);
-        setCurrentHoleIndex(index);
-        setDragOffset(0);
-        setTimeout(() => setIsAnimating(false), 300);
-      }
-    },
-    [holes.length]
-  );
-
-  // ── Touch Handlers (combined swipe + pinch-to-zoom) ──
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const g = gestureRef.current;
-
-    if (e.touches.length === 2) {
-      // Start pinch
-      g.isPinching = true;
-      g.isPanning = false;
-      g.initialDist = getDistance(e.touches[0], e.touches[1]);
-      g.initialScale = scale;
-      g.initialOffset = { x: offset.x, y: offset.y };
-      g.initialMid = {
-        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-        y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
-      };
-      setIsSnapBack(false);
-      isHorizontalSwipe.current = null;
-    } else if (e.touches.length === 1 && scale > 1) {
-      // Start pan (when zoomed)
-      g.isPanning = true;
-      g.panStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      g.panStartOffset = { x: offset.x, y: offset.y };
-    } else if (e.touches.length === 1 && scale === 1) {
-      // Start swipe (existing behavior)
-      touchStartX.current = e.touches[0].clientX;
-      touchStartY.current = e.touches[0].clientY;
-      isHorizontalSwipe.current = null;
-      setIsAnimating(false);
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    const g = gestureRef.current;
-
-    if (g.isPinching && e.touches.length >= 2) {
-      e.preventDefault();
-      const dist = getDistance(e.touches[0], e.touches[1]);
-      const newScale = Math.min(
-        4,
-        Math.max(1, g.initialScale * (dist / g.initialDist))
-      );
-      const mid = {
-        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-        y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
-      };
-      setScale(newScale);
-      setOffset({
-        x: g.initialOffset.x + (mid.x - g.initialMid.x),
-        y: g.initialOffset.y + (mid.y - g.initialMid.y),
-      });
-      return;
-    }
-
-    if (g.isPanning && e.touches.length === 1) {
-      e.preventDefault();
-      setOffset({
-        x: g.panStartOffset.x + (e.touches[0].clientX - g.panStart.x),
-        y: g.panStartOffset.y + (e.touches[0].clientY - g.panStart.y),
-      });
-      return;
-    }
-
-    // Swipe logic (only when scale === 1)
-    if (scale === 1) {
-      const deltaX = e.touches[0].clientX - touchStartX.current;
-      const deltaY = e.touches[0].clientY - touchStartY.current;
-
-      if (isHorizontalSwipe.current === null) {
-        if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
-          isHorizontalSwipe.current = Math.abs(deltaX) > Math.abs(deltaY);
-        }
-      }
-
-      if (isHorizontalSwipe.current) {
-        e.preventDefault();
-        setDragOffset(deltaX);
-      }
-    }
-  };
-
-  const handleTouchEnd = () => {
-    const g = gestureRef.current;
-
-    if (g.isPinching) {
-      g.isPinching = false;
-      if (scale < 1.1) {
-        setIsSnapBack(true);
-        setScale(1);
-        setOffset({ x: 0, y: 0 });
-        setTimeout(() => setIsSnapBack(false), 200);
-      }
-      return;
-    }
-
-    if (g.isPanning) {
-      g.isPanning = false;
-      return;
-    }
-
-    // Swipe logic (only when scale === 1)
-    if (scale === 1) {
-      if (Math.abs(dragOffset) > SWIPE_THRESHOLD) {
-        if (dragOffset < 0 && currentHoleIndex < holes.length - 1) {
-          goToHole(currentHoleIndex + 1);
-        } else if (dragOffset > 0 && currentHoleIndex > 0) {
-          goToHole(currentHoleIndex - 1);
-        } else {
-          setDragOffset(0);
-        }
-      } else {
-        setDragOffset(0);
-      }
-      isHorizontalSwipe.current = null;
-    }
-  };
-
-  // ── Derived Values ──
-
-  const currentImageUrl =
-    imageView === "overhead"
-      ? hole?.overhead_image_url
-      : hole?.green_image_url;
-
-  const hasOverhead = !!hole?.overhead_image_url;
-  const hasGreen = !!hole?.green_image_url;
-  const hasAnyImage = hasOverhead || hasGreen;
-
-  const currentScore = hole ? scores[hole.hole_number] : undefined;
-
-  // Mini scorecard computations
-  const front9 = holes.filter((h) => h.hole_number <= 9);
-  const back9 = holes.filter((h) => h.hole_number > 9);
-  const front9Par = front9.reduce((s, h) => s + h.par, 0);
-  const back9Par = back9.reduce((s, h) => s + h.par, 0);
-  const front9Total = front9.reduce(
-    (s, h) => s + (scores[h.hole_number] || 0),
-    0
-  );
-  const back9Total = back9.reduce(
-    (s, h) => s + (scores[h.hole_number] || 0),
-    0
-  );
-  const hasFront = front9.some((h) => scores[h.hole_number] !== undefined);
-  const hasBack = back9.some((h) => scores[h.hole_number] !== undefined);
-  const totalScore = hasFront || hasBack ? front9Total + back9Total : null;
-  const totalPar = front9Par + back9Par;
+  // ── Helpers ──
 
   const scoreColor = (strokes: number | undefined, par: number): string => {
     if (strokes === undefined) return "text-gray-400";
@@ -709,439 +474,188 @@ export function LiveScorer({
     return "text-gray-900";
   };
 
-  if (!hole) return null;
+  // ── onHoleChange callback ──
+
+  const handleHoleChange = useCallback((_holeIndex: number, hole: HoleInfo) => {
+    currentHoleRef.current = hole;
+  }, []);
+
+  // ── Render ──
 
   return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-white shrink-0">
-        <button
-          onClick={() => router.push("/")}
-          className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 active:bg-gray-200"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-
-        <h1 className="text-lg font-bold text-gray-900">
-          Hole {hole.hole_number}
-        </h1>
-
-        <div className="flex items-center gap-2">
-          {/* View Toggle */}
-          {hasAnyImage && (
-            <div className="flex bg-gray-100 rounded-lg p-0.5">
-              <button
-                onClick={() => setImageView("overhead")}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                  imageView === "overhead"
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500"
-                }`}
-              >
-                Overhead
-              </button>
-              <button
-                onClick={() => setImageView("green")}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                  imageView === "green"
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500"
-                }`}
-              >
-                Green
-              </button>
-            </div>
-          )}
-          {/* Leaderboard */}
+    <>
+      <ScoringShell
+        holes={holes}
+        startingHole={startingHole}
+        onClose={() => router.push("/")}
+        saveStatus={saveStatus}
+        onHoleChange={handleHoleChange}
+        headerRight={
           <button
             onClick={() => { setShowLeaderboard(true); logActivity("leaderboard_view", "/scoring", { contest_id: team.contest_id }); }}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 active:bg-gray-200"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-600 active:bg-gray-200 shrink-0"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
           </button>
-        </div>
-      </div>
-
-      {/* Hole stats */}
-      <div className="flex items-center justify-center gap-4 px-4 py-1.5 text-sm text-gray-500 bg-gray-50 shrink-0">
-        <span>
-          Par <span className="font-bold text-gray-900">{hole.par}</span>
-        </span>
-        <span className="w-px h-4 bg-gray-200" />
-        <span>
-          <span className="font-bold text-gray-900">{hole.yards}</span> yds
-        </span>
-        <span className="w-px h-4 bg-gray-200" />
-        <span>
-          Hdcp <span className="font-bold text-gray-900">{hole.handicap_index}</span>
-        </span>
-      </div>
-
-      {/* Mini Scorecard (moved up) */}
-      <div
-        ref={scorecardRef}
-        className="overflow-x-auto border-t border-gray-200 bg-white shrink-0"
-      >
-        <table className="w-full text-[10px]" style={{ tableLayout: "fixed", minWidth: "600px" }}>
-          <colgroup>
-            {front9.map((h) => (
-              <col key={h.hole_number} />
-            ))}
-            <col style={{ width: "32px" }} />
-            {back9.map((h) => (
-              <col key={h.hole_number} />
-            ))}
-            <col style={{ width: "32px" }} />
-            <col style={{ width: "36px" }} />
-          </colgroup>
-          {/* Hole numbers */}
-          <thead>
-            <tr className="bg-gray-50">
-              {front9.map((h) => (
-                <th
-                  key={h.hole_number}
-                  data-active={h.hole_number === hole.hole_number}
-                  onClick={() =>
-                    goToHole(holes.findIndex((x) => x.hole_number === h.hole_number))
-                  }
-                  className={`px-0 py-1 text-center font-bold cursor-pointer ${
-                    h.hole_number === hole.hole_number
-                      ? "bg-green-600 text-white"
-                      : "text-gray-500"
-                  }`}
-                >
-                  {h.hole_number}
-                </th>
-              ))}
-              <th className="px-0 py-1 text-center text-gray-500 font-bold bg-gray-100">
-                OUT
-              </th>
-              {back9.map((h) => (
-                <th
-                  key={h.hole_number}
-                  data-active={h.hole_number === hole.hole_number}
-                  onClick={() =>
-                    goToHole(holes.findIndex((x) => x.hole_number === h.hole_number))
-                  }
-                  className={`px-0 py-1 text-center font-bold cursor-pointer ${
-                    h.hole_number === hole.hole_number
-                      ? "bg-green-600 text-white"
-                      : "text-gray-500"
-                  }`}
-                >
-                  {h.hole_number}
-                </th>
-              ))}
-              <th className="px-0 py-1 text-center text-gray-500 font-bold bg-gray-100">
-                IN
-              </th>
-              <th className="px-0 py-1 text-center text-gray-500 font-bold bg-gray-200">
-                TOT
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* Handicap row */}
-            <tr className="border-t border-gray-100">
-              {front9.map((h) => (
-                <td key={h.hole_number} className="px-0 py-0.5 text-center text-gray-300">
-                  {h.handicap_index}
-                </td>
-              ))}
-              <td className="px-0 py-0.5 text-center text-gray-300 bg-gray-50">
-                Hdcp
-              </td>
-              {back9.map((h) => (
-                <td key={h.hole_number} className="px-0 py-0.5 text-center text-gray-300">
-                  {h.handicap_index}
-                </td>
-              ))}
-              <td className="px-0 py-0.5 text-center text-gray-300 bg-gray-50" />
-              <td className="px-0 py-0.5 text-center text-gray-300 bg-gray-100" />
-            </tr>
-            {/* Par row */}
-            <tr className="border-t border-gray-100">
-              {front9.map((h) => (
-                <td key={h.hole_number} className="px-0 py-0.5 text-center text-gray-400">
-                  {h.par}
-                </td>
-              ))}
-              <td className="px-0 py-0.5 text-center text-gray-500 font-semibold bg-gray-50">
-                {front9Par}
-              </td>
-              {back9.map((h) => (
-                <td key={h.hole_number} className="px-0 py-0.5 text-center text-gray-400">
-                  {h.par}
-                </td>
-              ))}
-              <td className="px-0 py-0.5 text-center text-gray-500 font-semibold bg-gray-50">
-                {back9Par}
-              </td>
-              <td className="px-0 py-0.5 text-center text-gray-500 font-bold bg-gray-100">
-                {totalPar}
-              </td>
-            </tr>
-            {/* Score row */}
-            <tr className="border-t border-gray-100">
-              {front9.map((h) => (
-                <td
-                  key={h.hole_number}
-                  className={`px-0 py-0.5 text-center ${scoreColor(
-                    scores[h.hole_number],
-                    h.par
-                  )}`}
-                >
-                  {scores[h.hole_number] ?? "·"}
-                </td>
-              ))}
-              <td className="px-0 py-0.5 text-center text-gray-900 font-semibold bg-gray-50">
-                {hasFront ? front9Total : "·"}
-              </td>
-              {back9.map((h) => (
-                <td
-                  key={h.hole_number}
-                  className={`px-0 py-0.5 text-center ${scoreColor(
-                    scores[h.hole_number],
-                    h.par
-                  )}`}
-                >
-                  {scores[h.hole_number] ?? "·"}
-                </td>
-              ))}
-              <td className="px-0 py-0.5 text-center text-gray-900 font-semibold bg-gray-50">
-                {hasBack ? back9Total : "·"}
-              </td>
-              <td className="px-0 py-0.5 text-center text-gray-900 font-bold bg-gray-100">
-                {totalScore ?? "·"}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {/* Scoring status banner */}
-      {(contestVerified || isVerified) && (
-        <div className="flex items-center justify-center gap-1.5 py-1.5 bg-green-50 text-green-700 text-xs font-medium shrink-0">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-          Verified — Scores Official
-        </div>
-      )}
-      {scoringClosed && !contestVerified && !isVerified && (
-        <div className="flex items-center justify-center gap-1.5 py-1.5 bg-gray-100 text-gray-600 text-xs font-medium shrink-0">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
-          Scoring Closed — Under Review
-        </div>
-      )}
-      {!isLocked && Object.keys(scores).length > 0 && (
-        <div className="flex items-center justify-center gap-1.5 py-1 bg-amber-50 text-amber-700 text-xs font-medium shrink-0">
-          Unofficial
-        </div>
-      )}
-
-      {/* Swipeable Image Area with Pinch-to-Zoom */}
-      <div
-        className="flex-1 min-h-0 overflow-hidden bg-white relative touch-none"
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
-        {/* Save status overlay */}
-        {saveStatus !== "idle" && (
-          <div
-            className={`absolute top-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium shadow-md transition-opacity duration-300 ${
-              saveStatus === "saving"
-                ? "bg-blue-50 text-blue-600"
-                : saveStatus === "saved"
-                ? "bg-green-50 text-green-600"
-                : "bg-red-50 text-red-600"
-            }`}
-          >
-            {saveStatus === "saving" && (
-              <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        }
+        statusBanner={
+          <>
+            {(contestVerified || isVerified) && (
+              <div className="flex items-center justify-center gap-1.5 py-1.5 bg-green-50 text-green-700 text-xs font-medium shrink-0">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Verified — Scores Official
+              </div>
             )}
-            {saveStatus === "saving" && "Saving..."}
-            {saveStatus === "saved" && "Saved"}
-            {saveStatus === "error" && "Save failed — will retry"}
-          </div>
-        )}
-
-        {/* Prev/Next arrows */}
-        {currentHoleIndex > 0 && (
-          <button
-            onClick={() => goToHole(currentHoleIndex - 1)}
-            className="absolute left-2 top-1/2 -translate-y-1/2 z-[5] w-10 h-10 flex items-center justify-center rounded-full bg-black/20 text-white active:bg-black/40"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-        )}
-        {currentHoleIndex < holes.length - 1 && (
-          <button
-            onClick={() => goToHole(currentHoleIndex + 1)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 z-[5] w-10 h-10 flex items-center justify-center rounded-full bg-black/20 text-white active:bg-black/40"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        )}
-
-        <div
-          className="w-full h-full relative"
-          style={{
-            transform: scale === 1
-              ? `translateX(${dragOffset}px)`
-              : `scale(${scale}) translate(${offset.x / scale}px, ${offset.y / scale}px)`,
-            transition: isSnapBack
-              ? "transform 0.2s ease-out"
-              : isAnimating
-              ? "transform 0.3s ease-out"
-              : "none",
-          }}
-        >
-          {currentImageUrl ? (
-            <Image
-              key={`${hole.hole_number}-${imageView}`}
-              src={currentImageUrl}
-              alt={`Hole ${hole.hole_number} ${imageView} view`}
-              fill
-              className="object-contain animate-fade-in"
-              priority
-              sizes="(max-width: 768px) 100vw, 512px"
-              unoptimized
-            />
-          ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
-              <svg
-                className="w-16 h-16 mb-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1}
-                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-              </svg>
-              <p className="text-sm">No {imageView} image</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Score Entry Row */}
-      <div className="flex items-center justify-center gap-6 px-4 py-3 bg-white border-t border-gray-100 shrink-0">
-        <span className="text-sm font-medium text-gray-500">Team Score:</span>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleDecrement}
-            onTouchStart={handleDecrementStart}
-            onTouchEnd={handleDecrementEnd}
-            onMouseDown={handleDecrementStart}
-            onMouseUp={handleDecrementEnd}
-            onMouseLeave={handleDecrementEnd}
-            disabled={isLocked || (currentScore !== undefined && currentScore <= 1)}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 text-gray-700 text-xl font-bold active:bg-gray-200 disabled:opacity-30"
-          >
-            −
-          </button>
-          <span
-            className={`text-3xl font-bold w-12 text-center ${
-              currentScore !== undefined
-                ? scoreColor(currentScore, hole.par)
-                : "text-gray-300"
-            }`}
-          >
-            {currentScore ?? "·"}
-          </span>
-          <button
-            onClick={handleIncrement}
-            disabled={isLocked}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-green-600 text-white text-xl font-bold active:bg-green-700 disabled:opacity-30"
-          >
-            +
-          </button>
-        </div>
-      </div>
-
-      {/* BSPITW Section */}
-      <div className="px-4 py-2 pb-7 bg-amber-50 border-t border-amber-200 shrink-0" style={{ paddingBottom: `max(1.75rem, calc(0.5rem + env(safe-area-inset-bottom)))` }}>
-        <div className="flex items-start gap-4">
-          {/* On Green */}
-          <div className="flex-1">
-            <p className="text-[10px] text-amber-600 font-medium uppercase tracking-wide mb-1">
-              On Green
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {members.map((m) => {
-                const key = `${hole.hole_number}-${m.user_id}`;
-                const isChecked = bonuses[key]?.on_green || false;
-                return (
-                  <button
-                    key={m.user_id}
-                    onClick={() => handleOnGreenChange(m.user_id, !isChecked)}
-                    disabled={isLocked}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
-                      isChecked
-                        ? "bg-green-600 text-white"
-                        : "bg-white text-gray-600 border border-gray-200"
-                    } ${isLocked ? "opacity-60" : "active:scale-95"}`}
+            {scoringClosed && !contestVerified && !isVerified && (
+              <div className="flex items-center justify-center gap-1.5 py-1.5 bg-gray-100 text-gray-600 text-xs font-medium shrink-0">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Scoring Closed — Under Review
+              </div>
+            )}
+          </>
+        }
+        renderScorecardRows={(holeList) => {
+          return (
+            <>
+              {/* Par row */}
+              <tr className="border-t border-gray-100">
+                {holeList.map((h) => (
+                  <td key={h.hole_number} className="px-0 py-0.5 text-center text-gray-400">
+                    {h.par}
+                  </td>
+                ))}
+              </tr>
+              {/* Handicap row */}
+              <tr className="border-t border-gray-100">
+                {holeList.map((h) => (
+                  <td key={h.hole_number} className="px-0 py-0.5 text-center text-gray-300">
+                    {h.handicap_index}
+                  </td>
+                ))}
+              </tr>
+              {/* Score row */}
+              <tr className="border-t border-gray-100">
+                {holeList.map((h) => (
+                  <td
+                    key={h.hole_number}
+                    className={`px-0 py-0.5 text-center ${scoreColor(
+                      scores[h.hole_number],
+                      h.par
+                    )}`}
                   >
-                    {m.display_name}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          {/* Holed Out */}
-          <div className="flex-1">
-            <p className="text-[10px] text-amber-600 font-medium uppercase tracking-wide mb-1">
-              Holed Out
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {members.map((m) => {
-                const key = `${hole.hole_number}-${m.user_id}`;
-                const isHoled = bonuses[key]?.holed_out || false;
-                return (
+                    {scores[h.hole_number] ?? "\u00b7"}
+                  </td>
+                ))}
+              </tr>
+            </>
+          );
+        }}
+        renderScorePanel={(hole) => {
+          const currentScore = scores[hole.hole_number];
+          return (
+            <>
+              {/* Score Entry Row */}
+              <div className="flex items-center justify-center gap-6 px-4 py-3 bg-white">
+                <span className="text-sm font-medium text-gray-500">Team Score:</span>
+                <div className="flex items-center gap-3">
                   <button
-                    key={m.user_id}
-                    onClick={() => handleHoledOutChange(m.user_id)}
-                    disabled={isLocked}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
-                      isHoled
-                        ? "bg-amber-600 text-white"
-                        : "bg-white text-gray-600 border border-gray-200"
-                    } ${isLocked ? "opacity-60" : "active:scale-95"}`}
+                    onClick={handleDecrement}
+                    onTouchStart={handleDecrementStart}
+                    onTouchEnd={handleDecrementEnd}
+                    onMouseDown={handleDecrementStart}
+                    onMouseUp={handleDecrementEnd}
+                    onMouseLeave={handleDecrementEnd}
+                    disabled={isLocked || (currentScore !== undefined && currentScore <= 1)}
+                    className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 text-gray-700 text-xl font-bold active:bg-gray-200 disabled:opacity-30"
                   >
-                    {m.display_name}
+                    −
                   </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
+                  <span
+                    className={`text-3xl font-bold w-12 text-center ${
+                      currentScore !== undefined
+                        ? scoreColor(currentScore, hole.par)
+                        : "text-gray-300"
+                    }`}
+                  >
+                    {currentScore ?? "\u00b7"}
+                  </span>
+                  <button
+                    onClick={handleIncrement}
+                    disabled={isLocked}
+                    className="w-10 h-10 flex items-center justify-center rounded-full bg-green-600 text-white text-xl font-bold active:bg-green-700 disabled:opacity-30"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* BSPITW Section */}
+              <div className="px-4 py-2 bg-amber-50 border-t border-amber-200">
+                <div className="flex items-start gap-4">
+                  {/* On Green */}
+                  <div className="flex-1">
+                    <p className="text-[10px] text-amber-600 font-medium uppercase tracking-wide mb-1">
+                      On Green
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {members.map((m) => {
+                        const key = `${hole.hole_number}-${m.user_id}`;
+                        const isChecked = bonuses[key]?.on_green || false;
+                        return (
+                          <button
+                            key={m.user_id}
+                            onClick={() => handleOnGreenChange(m.user_id, !isChecked)}
+                            disabled={isLocked}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+                              isChecked
+                                ? "bg-green-600 text-white"
+                                : "bg-white text-gray-600 border border-gray-200"
+                            } ${isLocked ? "opacity-60" : "active:scale-95"}`}
+                          >
+                            {m.display_name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {/* Holed Out */}
+                  <div className="flex-1">
+                    <p className="text-[10px] text-amber-600 font-medium uppercase tracking-wide mb-1">
+                      Holed Out
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {members.map((m) => {
+                        const key = `${hole.hole_number}-${m.user_id}`;
+                        const isHoled = bonuses[key]?.holed_out || false;
+                        return (
+                          <button
+                            key={m.user_id}
+                            onClick={() => handleHoledOutChange(m.user_id)}
+                            disabled={isLocked}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+                              isHoled
+                                ? "bg-amber-600 text-white"
+                                : "bg-white text-gray-600 border border-gray-200"
+                            } ${isLocked ? "opacity-60" : "active:scale-95"}`}
+                          >
+                            {m.display_name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          );
+        }}
+      />
 
       {/* Leaderboard Popup */}
       {showLeaderboard && (
@@ -1151,6 +665,6 @@ export function LiveScorer({
           onClose={() => setShowLeaderboard(false)}
         />
       )}
-    </div>
+    </>
   );
 }

@@ -32,16 +32,44 @@ export default async function ProfilePage() {
   const ph = Array.isArray(profile.player_handicaps) ? profile.player_handicaps[0] : profile.player_handicaps;
   const handicapIndex: number | null = ph?.handicap_index ?? null;
 
-  // Fetch user's accolades across all events
-  const { data: accolades } = await queryClient
-    .from("accolades")
-    .select("id, title, trip:trip_settings(trip_year)")
-    .eq("user_id", effectiveUserId)
-    .order("created_at", { ascending: false });
+  // Fetch accolades and scramble stats in parallel
+  const adminClient = createAdminClient();
+  const [{ data: accolades }, { data: activeTrip }] = await Promise.all([
+    queryClient
+      .from("accolades")
+      .select("id, title, trip:trip_settings(trip_year)")
+      .eq("user_id", effectiveUserId)
+      .order("created_at", { ascending: false }),
+    adminClient
+      .from("trip_settings")
+      .select("id")
+      .eq("status", "active")
+      .maybeSingle(),
+  ]);
+
+  let eightBagAverage: number | null = null;
+  let avgScrambleScore: number | null = null;
+
+  if (activeTrip) {
+    const { data: stats } = await adminClient
+      .from("user_scramble_stats")
+      .select("eight_bag_average, avg_scramble_score")
+      .eq("user_id", effectiveUserId)
+      .eq("trip_id", activeTrip.id)
+      .maybeSingle();
+    eightBagAverage = stats?.eight_bag_average ?? null;
+    avgScrambleScore = stats?.avg_scramble_score ?? null;
+  }
 
   return (
     <div className="px-4 pt-6 pb-8">
-      <ProfileEditor profile={profile} accolades={accolades || []} handicapIndex={handicapIndex} />
+      <ProfileEditor
+        profile={profile}
+        accolades={accolades || []}
+        handicapIndex={handicapIndex}
+        eightBagAverage={eightBagAverage}
+        avgScrambleScore={avgScrambleScore}
+      />
     </div>
   );
 }

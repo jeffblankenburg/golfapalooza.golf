@@ -62,6 +62,9 @@ export function LoozerProfile({
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [accolades, setAccolades] = useState<AccoladeData[]>([]);
   const [taggedPhotos, setTaggedPhotos] = useState<TaggedPhoto[]>([]);
+  const [handicapIndex, setHandicapIndex] = useState<number | null>(null);
+  const [eightBagAverage, setEightBagAverage] = useState<number | null>(null);
+  const [avgScrambleScore, setAvgScrambleScore] = useState<number | null>(null);
   const [startingChat, setStartingChat] = useState(false);
 
   useEffect(() => {
@@ -71,6 +74,9 @@ export function LoozerProfile({
         setProfile(data.profile);
         setAccolades(data.accolades || []);
         setTaggedPhotos(data.taggedPhotos || []);
+        setHandicapIndex(data.handicapIndex ?? null);
+        setEightBagAverage(data.eightBagAverage ?? null);
+        setAvgScrambleScore(data.avgScrambleScore ?? null);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -148,6 +154,30 @@ export function LoozerProfile({
             </svg>
             {formatPhone(profile.phone)}
           </a>
+        )}
+
+        {/* Stats badges */}
+        {(handicapIndex != null || eightBagAverage != null || avgScrambleScore != null) && (
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-3">
+            {handicapIndex != null && (
+              <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-xl px-3 py-1.5">
+                <span className="text-xs font-medium text-blue-600 uppercase tracking-wide">Handicap</span>
+                <span className="text-sm font-bold text-blue-900">{handicapIndex}</span>
+              </div>
+            )}
+            {eightBagAverage != null && (
+              <div className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5">
+                <span className="text-xs font-medium text-emerald-600 uppercase tracking-wide">8 Bag Avg</span>
+                <span className="text-sm font-bold text-emerald-900">{eightBagAverage}</span>
+              </div>
+            )}
+            {avgScrambleScore != null && (
+              <div className="inline-flex items-center gap-1.5 bg-purple-50 border border-purple-200 rounded-xl px-3 py-1.5">
+                <span className="text-xs font-medium text-purple-600 uppercase tracking-wide">Avg Scramble</span>
+                <span className="text-sm font-bold text-purple-900">{avgScrambleScore}</span>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Action buttons */}

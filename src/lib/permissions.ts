@@ -32,6 +32,7 @@ export const EVENT_PERMISSIONS: PermissionDef[] = [
   { key: "manage_pickem", label: "Pick'em", description: "Football pick'em games & results" },
   { key: "manage_notebook", label: "Notebook", description: "Notes & rules for players" },
   { key: "manage_options", label: "Trip Options", description: "Option builder & selections" },
+  { key: "manage_loozer_metrics", label: "Loozer Metrics", description: "8 Bag Avg & Avg Scramble Score" },
 ];
 
 // Combined list for backwards compatibility

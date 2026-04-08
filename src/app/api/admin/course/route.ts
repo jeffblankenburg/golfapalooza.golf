@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkIsAdmin } from "@/lib/permissions-server";
+import { geocodeAddress } from "@/lib/geocode";
 
 // GET - Fetch course for the active trip with all tees
 export async function GET(request: Request) {
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
   if (listAll === "true") {
     const { data: courses, error } = await adminClient
       .from("courses")
-      .select("id, name, city, state, hole_count")
+      .select("id, name, city, state, hole_count, locked")
       .order("name");
 
     if (error) {
@@ -190,6 +191,9 @@ export async function PUT(request: Request) {
       name,
       city,
       state,
+      address,
+      phone,
+      website,
       tee_name,
       course_rating,
       slope_rating,
@@ -205,6 +209,9 @@ export async function PUT(request: Request) {
 
     const adminClient = createAdminClient();
 
+    // Auto-geocode when saving course info
+    const coords = await geocodeAddress({ address, city, state, name });
+
     // Update course
     const { error: courseError } = await adminClient
       .from("courses")
@@ -212,6 +219,11 @@ export async function PUT(request: Request) {
         name,
         city: city || null,
         state: state || null,
+        address: address || null,
+        phone: phone || null,
+        website: website || null,
+        latitude: coords ? coords[0] : undefined,
+        longitude: coords ? coords[1] : undefined,
         updated_at: new Date().toISOString(),
       })
       .eq("id", course_id);

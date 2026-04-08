@@ -52,22 +52,50 @@ export async function GET(
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  // Get accolades
-  const { data: accolades } = await queryClient
-    .from("accolades")
-    .select("id, title, trip:trip_settings(trip_year)")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
+  // Get accolades, tagged photos, handicap, and scramble stats in parallel
+  const adminClient = createAdminClient();
+  const [
+    { data: accolades },
+    { data: taggedRows },
+    { data: handicapRow },
+    { data: activeTrip },
+  ] = await Promise.all([
+    queryClient
+      .from("accolades")
+      .select("id, title, trip:trip_settings(trip_year)")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false }),
+    queryClient
+      .from("gallery_tags")
+      .select(
+        "item:gallery_items(id, media_url, thumbnail_url, media_type, created_at)"
+      )
+      .eq("tagged_user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(12),
+    adminClient
+      .from("player_handicaps")
+      .select("handicap_index")
+      .eq("user_id", userId)
+      .maybeSingle(),
+    adminClient
+      .from("trip_settings")
+      .select("id")
+      .eq("status", "active")
+      .maybeSingle(),
+  ]);
 
-  // Get tagged photos (latest 12)
-  const { data: taggedRows } = await queryClient
-    .from("gallery_tags")
-    .select(
-      "item:gallery_items(id, media_url, thumbnail_url, media_type, created_at)"
-    )
-    .eq("tagged_user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(12);
+  // Fetch scramble stats for active trip
+  let scrambleStats: { eight_bag_average: number | null; avg_scramble_score: number | null } | null = null;
+  if (activeTrip) {
+    const { data } = await adminClient
+      .from("user_scramble_stats")
+      .select("eight_bag_average, avg_scramble_score")
+      .eq("user_id", userId)
+      .eq("trip_id", activeTrip.id)
+      .maybeSingle();
+    scrambleStats = data;
+  }
 
   const taggedPhotos = (taggedRows || [])
     .map((row) => {
@@ -80,6 +108,9 @@ export async function GET(
     profile,
     accolades: accolades || [],
     taggedPhotos,
+    handicapIndex: handicapRow?.handicap_index ?? null,
+    eightBagAverage: scrambleStats?.eight_bag_average ?? null,
+    avgScrambleScore: scrambleStats?.avg_scramble_score ?? null,
     // Stubs for future
     standings: [],
     scorecards: [],

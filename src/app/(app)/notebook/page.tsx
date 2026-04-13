@@ -26,6 +26,7 @@ export default async function NotebookPage() {
       .from("notebook_categories")
       .select("id, name, sort_order")
       .eq("trip_id", trip.id)
+      .eq("is_system", false)
       .order("sort_order"),
     supabase
       .from("notebook_notes")

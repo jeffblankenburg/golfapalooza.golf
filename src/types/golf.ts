@@ -249,3 +249,22 @@ export interface HandicapCalculation {
   differentials: RoundDifferential[];
   low_handicap_index: number;
 }
+
+// ===========================================
+// Rookie Nomination Types
+// ===========================================
+
+export interface RookieNomination {
+  id: string;
+  nominator_id: string;
+  phone: string;
+  first_name: string;
+  last_name: string;
+  status: "pending" | "approved" | "rejected";
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  rejection_reason: string | null;
+  created_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+}

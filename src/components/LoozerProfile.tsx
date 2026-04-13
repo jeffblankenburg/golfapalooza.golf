@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
+import rehypeRaw from "rehype-raw";
 
 interface ProfileData {
   id: string;
@@ -65,6 +68,7 @@ export function LoozerProfile({
   const [handicapIndex, setHandicapIndex] = useState<number | null>(null);
   const [eightBagAverage, setEightBagAverage] = useState<number | null>(null);
   const [avgScrambleScore, setAvgScrambleScore] = useState<number | null>(null);
+  const [bio, setBio] = useState<{ title: string; content: string } | null>(null);
   const [startingChat, setStartingChat] = useState(false);
 
   useEffect(() => {
@@ -77,6 +81,7 @@ export function LoozerProfile({
         setHandicapIndex(data.handicapIndex ?? null);
         setEightBagAverage(data.eightBagAverage ?? null);
         setAvgScrambleScore(data.avgScrambleScore ?? null);
+        setBio(data.bio ?? null);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -203,6 +208,39 @@ export function LoozerProfile({
           )}
         </div>
       </div>
+
+      {/* Biography */}
+      {bio && bio.content && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Biography
+          </h3>
+          <div className="prose prose-sm max-w-none text-gray-700">
+            <ReactMarkdown
+              remarkPlugins={[remarkBreaks]}
+              rehypePlugins={[rehypeRaw]}
+              components={{
+                a: ({ href, children }) => {
+                  if (href?.startsWith("/")) {
+                    return (
+                      <Link href={href} className="text-green-700 underline font-medium">
+                        {children}
+                      </Link>
+                    );
+                  }
+                  return (
+                    <a href={href} target="_blank" rel="noopener noreferrer" className="text-green-700 underline font-medium">
+                      {children}
+                    </a>
+                  );
+                },
+              }}
+            >
+              {bio.content}
+            </ReactMarkdown>
+          </div>
+        </div>
+      )}
 
       {/* Accolades */}
       {accolades.length > 0 && (

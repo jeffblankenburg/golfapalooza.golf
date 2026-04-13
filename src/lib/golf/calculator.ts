@@ -75,10 +75,15 @@ export function calculateAdjustedGrossScore(
 }
 
 /**
- * Calculate Handicap Index from differentials
+ * Calculate Handicap Index from differentials (USGA World Handicap System)
+ *
+ * @param differentials - The player's most recent round differentials (up to 20)
+ * @param currentLowHandicapIndex - The player's lowest Handicap Index in the past 12 months
+ *   (from player_handicaps.low_handicap_index). Pass null for first-time calculations.
  */
 export function calculateHandicapIndex(
-  differentials: RoundDifferential[]
+  differentials: RoundDifferential[],
+  currentLowHandicapIndex?: number | null
 ): HandicapCalculation | null {
   const count = differentials.length;
   if (count < 3) return null;
@@ -91,12 +96,29 @@ export function calculateHandicapIndex(
   const sum = used.reduce((acc, d) => acc + d.differential, 0);
   const average = sum / rule.use;
 
-  let handicapIndex = Math.round((average + rule.adjustment) * 10) / 10;
+  // Truncate to 1 decimal (WHS truncates, not rounds)
+  let handicapIndex = Math.floor((average + rule.adjustment) * 10) / 10;
   handicapIndex = Math.max(0, handicapIndex);
-  handicapIndex = Math.min(54.0, handicapIndex);
 
-  const lowestDifferential = sorted[0]?.differential || 0;
-  const lowHandicapIndex = Math.max(0, Math.round(lowestDifferential * 10) / 10);
+  // Determine the low handicap index (lowest calculated HI in last 12 months)
+  const lowHI = currentLowHandicapIndex != null
+    ? Math.min(currentLowHandicapIndex, handicapIndex)
+    : handicapIndex;
+
+  // Soft cap: if HI exceeds low HI by more than 3.0, reduce excess by 50%
+  if (currentLowHandicapIndex != null && handicapIndex > currentLowHandicapIndex + 3.0) {
+    const excess = handicapIndex - (currentLowHandicapIndex + 3.0);
+    handicapIndex = currentLowHandicapIndex + 3.0 + excess * 0.5;
+    handicapIndex = Math.floor(handicapIndex * 10) / 10;
+  }
+
+  // Hard cap: HI cannot exceed low HI + 5.0
+  if (currentLowHandicapIndex != null && handicapIndex > currentLowHandicapIndex + 5.0) {
+    handicapIndex = currentLowHandicapIndex + 5.0;
+  }
+
+  // Absolute maximum
+  handicapIndex = Math.min(54.0, handicapIndex);
 
   return {
     handicap_index: handicapIndex,
@@ -104,7 +126,7 @@ export function calculateHandicapIndex(
     total_rounds: count,
     calculation_method: `${rule.use} of ${Math.min(count, 20)}`,
     differentials: used,
-    low_handicap_index: lowHandicapIndex,
+    low_handicap_index: lowHI,
   };
 }
 

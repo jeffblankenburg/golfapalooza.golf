@@ -130,9 +130,19 @@ export async function GET(request: Request) {
       .select("pair_id, scramble_handicap")
       .eq("contest_id", contestId);
 
-    const pairHandicaps = new Map<string, number>();
+    // Build adjusted pair handicaps — offset per-foursome so the lower pair is 0
+    const rawPairHC = new Map<string, number>();
     for (const ph of pairHandicapData || []) {
-      pairHandicaps.set(ph.pair_id, ph.scramble_handicap);
+      rawPairHC.set(ph.pair_id, ph.scramble_handicap);
+    }
+
+    const pairHandicaps = new Map<string, number>();
+    for (const f of foursomes) {
+      const hc1 = rawPairHC.get(f.pair_team1_id) ?? 0;
+      const hc2 = rawPairHC.get(f.pair_team2_id) ?? 0;
+      const lowest = Math.min(hc1, hc2);
+      pairHandicaps.set(f.pair_team1_id, Math.round(hc1 - lowest));
+      pairHandicaps.set(f.pair_team2_id, Math.round(hc2 - lowest));
     }
 
     // Fetch hole info

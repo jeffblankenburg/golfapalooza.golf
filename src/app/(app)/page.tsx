@@ -60,6 +60,7 @@ export default async function HomePage() {
     financialsResult,
     optionSettingsResult,
     optionSelectionsResult,
+    latestArticleResult,
   ] = await Promise.all([
     // Course info
     trip.course_id
@@ -93,6 +94,17 @@ export default async function HomePage() {
     supabase.from("trip_option_settings").select("selection_deadline, is_open").eq("trip_id", trip.id).maybeSingle(),
     // User's option selections count
     queryClient.from("user_option_selections").select("id", { count: "exact", head: true }).eq("trip_id", trip.id).eq("user_id", effectiveUserId),
+    // Latest published article (within last 14 days)
+    supabase
+      .from("articles")
+      .select("id, title, publish_at")
+      .eq("trip_id", trip.id)
+      .not("publish_at", "is", null)
+      .lte("publish_at", new Date().toISOString())
+      .gte("publish_at", new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
+      .order("publish_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   // ── Process Phase 2 results ──
@@ -573,6 +585,11 @@ export default async function HomePage() {
       myBalance={myBalance}
       optionsDeadline={optionsDeadline}
       hasSubmittedOptions={hasSubmittedOptions}
+      latestArticle={latestArticleResult.data ? {
+        id: latestArticleResult.data.id,
+        title: latestArticleResult.data.title,
+        publishAt: latestArticleResult.data.publish_at,
+      } : null}
     />
   );
 }

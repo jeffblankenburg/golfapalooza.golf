@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { calculateDifferential } from "@/lib/golf/calculator";
+import { calculateDifferential, calculateAdjustedGrossScore, calculateCourseHandicap } from "@/lib/golf/calculator";
+import { recalculateHandicap } from "@/lib/golf/handicap";
 import { getEffectiveUserId } from "@/lib/simulator";
 
 // GET - List user's rounds
@@ -108,7 +109,7 @@ export async function POST(request: Request) {
     const allTeeIds = [...new Set([tee_id, ...allPlayers.map((p) => p.tee_id).filter(Boolean)])];
     const { data: teesData } = await supabase
       .from("course_tees")
-      .select("id, course_rating, slope_rating")
+      .select("id, course_rating, slope_rating, par")
       .in("id", allTeeIds);
     const teeMap = new Map((teesData || []).map((t) => [t.id, t]));
 
@@ -193,6 +194,78 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: scoresError.message }, { status: 500 });
         }
       }
+    }
+
+    // If completed, calculate adjusted scores (when hole data exists) and recalculate handicaps
+    if (isComplete && roundPlayers) {
+      const playerUserIds = new Set<string>();
+
+      if (hasHoleScores) {
+        // Fetch course holes for adjusted gross score calculation
+        const { data: courseHoles } = await supabase
+          .from("course_holes")
+          .select("hole_number, par, handicap_index, tee_id")
+          .in("tee_id", allTeeIds);
+
+        if (courseHoles && courseHoles.length > 0) {
+          const holesByTee = new Map<string, { hole_number: number; par: number; handicap_index: number }[]>();
+          for (const h of courseHoles) {
+            const arr = holesByTee.get(h.tee_id) || [];
+            arr.push({ hole_number: h.hole_number, par: h.par, handicap_index: h.handicap_index });
+            holesByTee.set(h.tee_id, arr);
+          }
+
+          for (const rp of roundPlayers) {
+            if (rp.final_gross_score == null) continue;
+            const playerTeeId = allPlayers.find((p) => p.user_id === rp.user_id)?.tee_id || tee_id;
+            const tee = teeMap.get(playerTeeId);
+            const holes = holesByTee.get(playerTeeId);
+            const playerHoles = hole_scores[rp.user_id];
+            if (!tee || !holes || !playerHoles) continue;
+
+            // Get player's current handicap for NDB calculation
+            const { data: playerHcp } = await supabase
+              .from("player_handicaps")
+              .select("handicap_index")
+              .eq("user_id", rp.user_id)
+              .maybeSingle();
+            const hi = playerHcp?.handicap_index ?? 0;
+            const courseHandicap = calculateCourseHandicap(hi, tee.slope_rating, tee.course_rating, tee.par);
+
+            const holeMap = new Map(holes.map((h) => [h.hole_number, h]));
+            const holeScoreData = Object.entries(playerHoles)
+              .filter(([hNum]) => holeMap.has(parseInt(hNum)))
+              .map(([hNum, strokes]) => ({
+                strokes: strokes as number,
+                par: holeMap.get(parseInt(hNum))!.par,
+                handicap_index: holeMap.get(parseInt(hNum))!.handicap_index,
+              }));
+
+            if (holeScoreData.length > 0) {
+              const adjustedGross = calculateAdjustedGrossScore(holeScoreData, courseHandicap);
+              const differential = calculateDifferential(adjustedGross, tee.course_rating, tee.slope_rating);
+              await supabase
+                .from("round_players")
+                .update({ final_adjusted_score: adjustedGross, score_differential: differential })
+                .eq("id", rp.id);
+            }
+
+            playerUserIds.add(rp.user_id);
+          }
+        }
+      }
+
+      // If no hole scores (Quick Entry), still recalculate handicaps
+      if (!hasHoleScores) {
+        for (const rp of roundPlayers) {
+          playerUserIds.add(rp.user_id);
+        }
+      }
+
+      // Recalculate handicap for all players
+      await Promise.all(
+        [...playerUserIds].map((uid) => recalculateHandicap(supabase, uid))
+      );
     }
 
     return NextResponse.json({ round, round_players: roundPlayers });

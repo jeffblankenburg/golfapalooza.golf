@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { calculateDifferential } from "@/lib/golf/calculator";
+import { calculateDifferential, calculateAdjustedGrossScore, calculateCourseHandicap } from "@/lib/golf/calculator";
+import { recalculateHandicap } from "@/lib/golf/handicap";
 import { getEffectiveUserId } from "@/lib/simulator";
 
 // GET - Fetch round with full details
@@ -92,7 +93,7 @@ export async function PUT(
       updateData.status = "completed";
       updateData.completed_at = new Date().toISOString();
 
-      // Get the round player and tee info
+      // Get the round and all player info
       const { data: round } = await supabase
         .from("rounds")
         .select("tee_id, created_by")
@@ -100,54 +101,127 @@ export async function PUT(
         .single();
 
       if (round) {
-        const { data: tee } = await supabase
-          .from("course_tees")
-          .select("course_rating, slope_rating")
-          .eq("id", round.tee_id)
-          .single();
-
-        // Calculate differential for ALL players in the round
+        // Fetch all players and their tee data
         const { data: allPlayers } = await supabase
           .from("round_players")
-          .select("id, final_gross_score")
+          .select("id, user_id, tee_id, final_gross_score")
           .eq("round_id", id);
 
-        if (tee && allPlayers) {
-          const updates = allPlayers
-            .filter((p) => p.final_gross_score != null)
-            .map((p) => {
-              const differential = calculateDifferential(
-                p.final_gross_score!,
-                tee.course_rating,
-                tee.slope_rating
-              );
-              return supabase
-                .from("round_players")
-                .update({ score_differential: differential })
-                .eq("id", p.id);
-            });
-
-          await Promise.all(updates);
-        }
-
-        // Update creator's gross score if provided
+        // Update creator's gross score if provided (Quick Entry from live scoring)
         if (final_gross_score != null) {
-          const { data: creator } = await supabase
-            .from("round_players")
-            .select("id")
-            .eq("round_id", id)
-            .eq("user_id", round.created_by)
-            .single();
-
+          const creator = (allPlayers || []).find((p) => p.user_id === round.created_by);
           if (creator) {
-            const differential = tee
-              ? calculateDifferential(final_gross_score, tee.course_rating, tee.slope_rating)
-              : null;
+            creator.final_gross_score = final_gross_score;
             await supabase
               .from("round_players")
-              .update({ final_gross_score, score_differential: differential })
+              .update({ final_gross_score })
               .eq("id", creator.id);
           }
+        }
+
+        if (allPlayers) {
+          // Fetch all tee data needed
+          const teeIds = [...new Set(allPlayers.map((p) => p.tee_id).filter(Boolean))];
+          const { data: teesData } = await supabase
+            .from("course_tees")
+            .select("id, course_rating, slope_rating, par")
+            .in("id", teeIds);
+          const teeMap = new Map((teesData || []).map((t) => [t.id, t]));
+
+          // Fetch hole scores for all players in one query
+          const { data: allScores } = await supabase
+            .from("round_scores")
+            .select("round_player_id, hole_number, strokes")
+            .eq("round_id", id);
+
+          // Group scores by round_player_id
+          const scoresByPlayer = new Map<string, { hole_number: number; strokes: number }[]>();
+          for (const s of allScores || []) {
+            const arr = scoresByPlayer.get(s.round_player_id) || [];
+            arr.push({ hole_number: s.hole_number, strokes: s.strokes });
+            scoresByPlayer.set(s.round_player_id, arr);
+          }
+
+          // Fetch course holes for tees that have hole scores
+          const teeIdsWithScores = [...new Set(
+            allPlayers
+              .filter((p) => scoresByPlayer.has(p.id))
+              .map((p) => p.tee_id)
+              .filter(Boolean)
+          )];
+          const holeDataMap = new Map<string, { hole_number: number; par: number; handicap_index: number }[]>();
+          if (teeIdsWithScores.length > 0) {
+            const { data: holes } = await supabase
+              .from("course_holes")
+              .select("tee_id, hole_number, par, handicap_index")
+              .in("tee_id", teeIdsWithScores);
+            for (const h of holes || []) {
+              const arr = holeDataMap.get(h.tee_id) || [];
+              arr.push({ hole_number: h.hole_number, par: h.par, handicap_index: h.handicap_index });
+              holeDataMap.set(h.tee_id, arr);
+            }
+          }
+
+          // Calculate adjusted score and differential for each player
+          const playerUserIds = new Set<string>();
+          for (const p of allPlayers) {
+            if (p.final_gross_score == null) continue;
+            const tee = teeMap.get(p.tee_id);
+            if (!tee) continue;
+
+            let scoreForDifferential = p.final_gross_score;
+            let adjustedGrossScore: number | null = null;
+
+            // If hole-by-hole scores exist, apply Net Double Bogey adjustment
+            const playerScores = scoresByPlayer.get(p.id);
+            const courseHoles = holeDataMap.get(p.tee_id);
+            if (playerScores && courseHoles && playerScores.length >= 9) {
+              // Get player's current handicap for NDB calculation (default 0 if none)
+              const { data: playerHcp } = await supabase
+                .from("player_handicaps")
+                .select("handicap_index")
+                .eq("user_id", p.user_id)
+                .maybeSingle();
+              const hi = playerHcp?.handicap_index ?? 0;
+              const courseHandicap = calculateCourseHandicap(hi, tee.slope_rating, tee.course_rating, tee.par);
+
+              // Build hole score array with course data
+              const holeMap = new Map(courseHoles.map((h) => [h.hole_number, h]));
+              const holeScoreData = playerScores
+                .filter((s) => holeMap.has(s.hole_number))
+                .map((s) => ({
+                  strokes: s.strokes,
+                  par: holeMap.get(s.hole_number)!.par,
+                  handicap_index: holeMap.get(s.hole_number)!.handicap_index,
+                }));
+
+              if (holeScoreData.length > 0) {
+                adjustedGrossScore = calculateAdjustedGrossScore(holeScoreData, courseHandicap);
+                scoreForDifferential = adjustedGrossScore;
+              }
+            }
+
+            const differential = calculateDifferential(
+              scoreForDifferential,
+              tee.course_rating,
+              tee.slope_rating
+            );
+
+            await supabase
+              .from("round_players")
+              .update({
+                final_adjusted_score: adjustedGrossScore,
+                score_differential: differential,
+              })
+              .eq("id", p.id);
+
+            playerUserIds.add(p.user_id);
+          }
+
+          // Recalculate handicap for all players in the round
+          await Promise.all(
+            [...playerUserIds].map((uid) => recalculateHandicap(supabase, uid))
+          );
         }
       }
     } else if (status) {

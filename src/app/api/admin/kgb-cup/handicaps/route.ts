@@ -28,18 +28,38 @@ export async function GET(request: Request) {
       )
       .eq("contest_id", contestId);
 
-    // Fetch current handicap_index for each participant
+    // Fetch current handicap — prefer event-locked snapshots, fall back to live
     const playerIds = (participants || []).map((p) => p.user_id);
-    const { data: handicaps } = playerIds.length > 0
-      ? await adminClient
-          .from("player_handicaps")
-          .select("user_id, handicap_index")
-          .in("user_id", playerIds)
-      : { data: [] };
+
+    // Get the trip_id for this contest
+    const { data: contestData } = await adminClient
+      .from("contests")
+      .select("trip_id")
+      .eq("id", contestId)
+      .single();
 
     const handicapMap = new Map<string, number | null>();
-    for (const h of handicaps || []) {
-      handicapMap.set(h.user_id, h.handicap_index);
+
+    if (contestData?.trip_id && playerIds.length > 0) {
+      const { data: eventSnaps } = await adminClient
+        .from("event_player_handicaps")
+        .select("user_id, handicap_index")
+        .eq("trip_id", contestData.trip_id)
+        .in("user_id", playerIds);
+      for (const s of eventSnaps || []) {
+        handicapMap.set(s.user_id, s.handicap_index);
+      }
+    }
+
+    const missingIds = playerIds.filter((id) => !handicapMap.has(id));
+    if (missingIds.length > 0) {
+      const { data: handicaps } = await adminClient
+        .from("player_handicaps")
+        .select("user_id, handicap_index")
+        .in("user_id", missingIds);
+      for (const h of handicaps || []) {
+        handicapMap.set(h.user_id, h.handicap_index);
+      }
     }
 
     // Fetch existing snapshots
@@ -152,15 +172,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No participants found" }, { status: 400 });
     }
 
-    // Fetch current handicaps
-    const { data: handicaps } = await adminClient
-      .from("player_handicaps")
-      .select("user_id, handicap_index")
-      .in("user_id", playerIds);
+    // Fetch the trip_id for this contest
+    const { data: contest } = await adminClient
+      .from("contests")
+      .select("trip_id")
+      .eq("id", contest_id)
+      .single();
 
-    const handicapMap = new Map<string, number | null>();
-    for (const h of handicaps || []) {
-      handicapMap.set(h.user_id, h.handicap_index);
+    // Try event-locked handicaps first, fall back to live handicaps
+    let handicapMap = new Map<string, number | null>();
+
+    if (contest?.trip_id) {
+      const { data: eventSnaps } = await adminClient
+        .from("event_player_handicaps")
+        .select("user_id, handicap_index")
+        .eq("trip_id", contest.trip_id)
+        .in("user_id", playerIds);
+
+      if (eventSnaps && eventSnaps.length > 0) {
+        for (const s of eventSnaps) {
+          handicapMap.set(s.user_id, s.handicap_index);
+        }
+      }
+    }
+
+    // Fill in any missing players from live handicaps
+    const missingIds = playerIds.filter((id) => !handicapMap.has(id));
+    if (missingIds.length > 0) {
+      const { data: liveHandicaps } = await adminClient
+        .from("player_handicaps")
+        .select("user_id, handicap_index")
+        .in("user_id", missingIds);
+      for (const h of liveHandicaps || []) {
+        handicapMap.set(h.user_id, h.handicap_index);
+      }
     }
 
     // Compute adjusted handicaps

@@ -85,16 +85,26 @@ export async function GET(
       .maybeSingle(),
   ]);
 
-  // Fetch scramble stats for active trip
+  // Fetch scramble stats and bio note for active trip
   let scrambleStats: { eight_bag_average: number | null; avg_scramble_score: number | null } | null = null;
+  let bioNote: { title: string; content: string } | null = null;
   if (activeTrip) {
-    const { data } = await adminClient
-      .from("user_scramble_stats")
-      .select("eight_bag_average, avg_scramble_score")
-      .eq("user_id", userId)
-      .eq("trip_id", activeTrip.id)
-      .maybeSingle();
-    scrambleStats = data;
+    const [scrambleData, bioData] = await Promise.all([
+      adminClient
+        .from("user_scramble_stats")
+        .select("eight_bag_average, avg_scramble_score")
+        .eq("user_id", userId)
+        .eq("trip_id", activeTrip.id)
+        .maybeSingle(),
+      adminClient
+        .from("notebook_notes")
+        .select("title, content")
+        .eq("trip_id", activeTrip.id)
+        .eq("pinned_to", `user:${userId}`)
+        .maybeSingle(),
+    ]);
+    scrambleStats = scrambleData.data;
+    bioNote = bioData.data;
   }
 
   const taggedPhotos = (taggedRows || [])
@@ -111,6 +121,7 @@ export async function GET(
     handicapIndex: handicapRow?.handicap_index ?? null,
     eightBagAverage: scrambleStats?.eight_bag_average ?? null,
     avgScrambleScore: scrambleStats?.avg_scramble_score ?? null,
+    bio: bioNote,
     // Stubs for future
     standings: [],
     scorecards: [],

@@ -291,10 +291,22 @@ export default async function KgbCupScoringPage() {
       holes={sortedHoles}
       initialScores={existingScores || []}
       playerHandicaps={adjustedPlayerHandicaps}
-      pairHandicaps={(pairHandicapsResult.data || []).map((h) => ({
-        pairId: h.pair_id,
-        scrambleHandicap: h.scramble_handicap,
-      }))}
+      pairHandicaps={(() => {
+        const allPairs = (pairHandicapsResult.data || []).map((h) => ({
+          pairId: h.pair_id,
+          scrambleHandicap: h.scramble_handicap as number,
+        }));
+        // Only offset the two pairs in this foursome against each other
+        const foursomePairIds = new Set([myFoursome.pair_team1_id, myFoursome.pair_team2_id]);
+        const foursomePairs = allPairs.filter((p) => foursomePairIds.has(p.pairId));
+        const lowestPair = foursomePairs.length > 0 ? Math.min(...foursomePairs.map((p) => p.scrambleHandicap)) : 0;
+        return allPairs.map((p) => ({
+          pairId: p.pairId,
+          scrambleHandicap: foursomePairIds.has(p.pairId)
+            ? Math.round(p.scrambleHandicap - lowestPair)
+            : p.scrambleHandicap,
+        }));
+      })()}
       scoringClosed={!!contest.scoring_closed_at}
       contestVerified={!!contest.verified_at}
     />

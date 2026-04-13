@@ -1,0 +1,104 @@
+"use client";
+
+import Link from "next/link";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
+
+interface Article {
+  id: string;
+  title: string;
+  content: string;
+  publish_at: string | null;
+  created_at: string;
+  author: { id: string; display_name: string; avatar_url: string | null } | null;
+  featured_image: { id: string; media_url: string; thumbnail_url: string | null } | null;
+}
+
+function timeAgo(date: string): string {
+  const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+  if (seconds < 60) return "Just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(date).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function getPreview(content: string, maxLen = 150): string {
+  // Strip markdown formatting for preview
+  const stripped = content
+    .replace(/[#*_~`>]/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\n+/g, " ")
+    .trim();
+  return stripped.length > maxLen ? stripped.slice(0, maxLen) + "..." : stripped;
+}
+
+export function ArticleList({ articles }: { articles: Article[] }) {
+  return (
+    <div className="px-4 pt-6 pb-8 space-y-4">
+      <div className="flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-gray-900">Articles</h1>
+        <PinnedNoteButton pinnedTo="articles" />
+      </div>
+
+      {articles.length === 0 ? (
+        <div className="text-center py-12">
+          <svg className="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+          </svg>
+          <p className="text-gray-400 text-sm">No articles published yet.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {articles.map((article) => (
+            <Link
+              key={article.id}
+              href={`/articles/${article.id}`}
+              className="block bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden active:bg-gray-50 transition-colors"
+            >
+              {article.featured_image && (
+                <img
+                  src={article.featured_image.thumbnail_url || article.featured_image.media_url}
+                  alt=""
+                  className="w-full h-44 object-cover"
+                />
+              )}
+              <div className="p-4">
+                <h2 className="text-lg font-bold text-gray-900 leading-snug">
+                  {article.title}
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {getPreview(article.content)}
+                </p>
+                <div className="flex items-center gap-2 mt-3">
+                  {article.author?.avatar_url ? (
+                    <img
+                      src={article.author.avatar_url}
+                      alt=""
+                      className="w-5 h-5 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-5 h-5 rounded-full bg-gray-200" />
+                  )}
+                  <span className="text-xs text-gray-400">
+                    {article.author?.display_name || "Unknown"}
+                  </span>
+                  <span className="text-xs text-gray-300">-</span>
+                  <span className="text-xs text-gray-400">
+                    {timeAgo(article.publish_at || article.created_at)}
+                  </span>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

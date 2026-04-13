@@ -26,8 +26,10 @@ const cardPermissionMap: Record<string, string> = {
   Facilities: "manage_facilities",
   Courses: "manage_facilities",
   Announcements: "send_announcements",
+  Articles: "manage_notebook",
   Gallery: "manage_gallery",
   Music: "manage_music",
+  Nominations: "manage_loozers",
 };
 
 const dataActions = [
@@ -82,6 +84,16 @@ const dataActions = [
     ),
   },
   {
+    href: "/admin/articles",
+    label: "Articles",
+    description: "News & announcements",
+    icon: (
+      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+      </svg>
+    ),
+  },
+  {
     href: "/admin/gallery",
     label: "Gallery",
     description: "Manage images & videos",
@@ -109,6 +121,16 @@ const dataActions = [
     icon: (
       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/admin/nominations",
+    label: "Nominations",
+    description: "Review rookie nominations",
+    icon: (
+      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
       </svg>
     ),
   },

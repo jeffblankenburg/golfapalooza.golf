@@ -64,6 +64,13 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 | POST | `/api/auth/send-otp` | Send SMS verification code |
 | POST | `/api/auth/signout` | Sign out current user |
 
+#### Nominations (`/api/nominations`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/nominations` | List current user's rookie nominations |
+| POST | `/api/nominations` | Submit a new rookie nomination |
+
 #### Admin (`/api/admin`)
 
 | Method | Endpoint | Description |
@@ -71,6 +78,8 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 | GET | `/api/admin/users` | List all users (includes current_user) |
 | POST | `/api/admin/users` | Create a new user |
 | DELETE | `/api/admin/users?id={userId}` | Delete a user |
+| GET | `/api/admin/nominations` | List all rookie nominations |
+| PATCH | `/api/admin/nominations` | Approve or reject a nomination |
 
 ## Database Schema
 
@@ -85,6 +94,7 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 - `round_scores` - Hole-by-hole scores
 - `player_handicaps` - Current handicap data
 - `handicap_history` - Handicap changes over time
+- `rookie_nominations` - Peer-nominated rookies pending admin approval
 
 ### Migrations
 

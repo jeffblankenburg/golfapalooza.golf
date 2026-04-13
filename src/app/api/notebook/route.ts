@@ -34,12 +34,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ note });
   }
 
-  // Otherwise return all categories with notes
+  // Otherwise return all non-system categories with notes (biographies are shown on profiles, not here)
   const [categoriesResult, notesResult] = await Promise.all([
     supabase
       .from("notebook_categories")
       .select("id, name, sort_order")
       .eq("trip_id", tripId)
+      .eq("is_system", false)
       .order("sort_order"),
     supabase
       .from("notebook_notes")

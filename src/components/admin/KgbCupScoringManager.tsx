@@ -159,9 +159,19 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
     }
     setPlayerHandicapMap(phMap);
 
-    const prMap = new Map<string, number>();
+    // Build adjusted pair handicap map — offset per-foursome so the lower pair is 0
+    const rawPrMap = new Map<string, number>();
     for (const ph of data.pair_handicaps || []) {
-      prMap.set(ph.pair_id, ph.scramble_handicap);
+      rawPrMap.set(ph.pair_id, ph.scramble_handicap);
+    }
+
+    const prMap = new Map<string, number>();
+    for (const f of foursomeList) {
+      const hc1 = rawPrMap.get(f.pair_team1_id) ?? 0;
+      const hc2 = rawPrMap.get(f.pair_team2_id) ?? 0;
+      const lowest = Math.min(hc1, hc2);
+      prMap.set(f.pair_team1_id, Math.round(hc1 - lowest));
+      prMap.set(f.pair_team2_id, Math.round(hc2 - lowest));
     }
     setPairHandicapMap(prMap);
 
@@ -291,6 +301,9 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
         scramble_handicap: scrambleHandicap,
       }),
     });
+
+    // Refresh scoring data so the offset pair handicap map stays in sync
+    fetchScoringData(contestId);
   };
 
   // Close/open/verify/unverify contest scoring lifecycle
@@ -478,7 +491,14 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
         <HandicapsTab
           pairHandicaps={pairHandicaps}
           teams={teams}
+          contestId={contestId}
           onPairChange={handlePairHandicapChange}
+          onRecalculated={() => {
+            if (contestId) {
+              fetchHandicaps(contestId);
+              fetchScoringData(contestId);
+            }
+          }}
         />
       )}
 
@@ -520,12 +540,36 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
 function HandicapsTab({
   pairHandicaps,
   teams,
+  contestId,
   onPairChange,
+  onRecalculated,
 }: {
   pairHandicaps: PairHandicapRow[];
   teams: TeamInfo[];
+  contestId: string | null;
   onPairChange: (pairId: string, handicap: number) => void;
+  onRecalculated: () => void;
 }) {
+  const [calculating, setCalculating] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
+
+  const calculatePairHandicaps = async () => {
+    if (!contestId) return;
+    setCalculating(true);
+    try {
+      const res = await fetch("/api/admin/kgb-cup/handicaps/calculate-pairs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contest_id: contestId }),
+      });
+      if (res.ok) {
+        onRecalculated();
+      }
+    } finally {
+      setCalculating(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <p className="text-xs text-gray-400 text-center">
@@ -535,11 +579,52 @@ function HandicapsTab({
       {/* Pair scramble handicaps */}
       {pairHandicaps.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Pair Scramble Handicaps (Section 3)
-            </p>
+          <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Pair Scramble Handicaps (Section 3)
+              </p>
+              <button
+                onClick={() => setShowInfo(!showInfo)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+            <button
+              onClick={calculatePairHandicaps}
+              disabled={calculating}
+              className="px-3 py-1 text-xs font-medium text-white bg-green-600 rounded-lg active:bg-green-700 disabled:opacity-50"
+            >
+              {calculating ? "Calculating..." : "Calculate Two-Man Handicaps"}
+            </button>
           </div>
+
+          {showInfo && (
+            <div className="px-3 py-2.5 bg-blue-50 border-b border-blue-100 text-xs text-blue-800 space-y-1.5">
+              <p className="font-semibold">Two-Man Scramble Handicap Formula</p>
+              <p>
+                Each player&apos;s Handicap Index is converted to a <strong>Course Handicap</strong> for the assigned tee:
+              </p>
+              <p className="font-mono text-[11px] bg-blue-100/50 rounded px-2 py-1 inline-block">
+                Course HC = HI &times; (Slope / 113) + (Rating &minus; Par)
+              </p>
+              <p>
+                Then the pair scramble handicap is calculated using the USGA-recommended formula:
+              </p>
+              <p className="font-mono text-[11px] bg-blue-100/50 rounded px-2 py-1 inline-block">
+                Team HC = round(35% &times; Lower CH + 15% &times; Higher CH)
+              </p>
+              <p className="text-blue-600">
+                The better player is weighted more heavily because they contribute more shots in a scramble.
+                Uses event-locked handicaps when available, otherwise live handicaps.
+                You can still manually override any value after calculating.
+              </p>
+            </div>
+          )}
+
           <div className="divide-y divide-gray-100">
             {teams.map((team) => {
               const teamPairs = pairHandicaps.filter((p) => p.team_id === team.id);

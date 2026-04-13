@@ -168,6 +168,17 @@ export default async function ContestsPage() {
     scrambleTeamMembersMap[team.id] = members;
   }
 
+  // Offset team handicaps per contest so the lowest team plays at 0
+  for (const contestId of Object.keys(scrambleTeamsByContest)) {
+    const teams = scrambleTeamsByContest[contestId];
+    if (teams.length > 0) {
+      const lowestHC = Math.min(...teams.map((t) => t.team_handicap));
+      for (const t of teams) {
+        t.team_handicap = Math.max(0, t.team_handicap - lowestHC);
+      }
+    }
+  }
+
   // Fetch KGB Cup scoring summaries for ryder cup contests
   const kgbCupScoresByContest: Record<
     string,

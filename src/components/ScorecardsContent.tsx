@@ -205,6 +205,15 @@ export function ScorecardsContent({
     setLoading(true);
     const res = await fetch(`/api/scorecards?contest_id=${selectedContest.id}`);
     const json = await res.json();
+
+    // Offset team handicaps so the lowest team plays at 0
+    if (json.teams && json.teams.length > 0) {
+      const lowestHC = Math.min(...json.teams.map((t: Team) => t.team_handicap));
+      for (const t of json.teams) {
+        t.team_handicap = Math.max(0, t.team_handicap - lowestHC);
+      }
+    }
+
     setData(json);
     setLoading(false);
   }, [selectedContest]);

@@ -648,6 +648,20 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
               : "+ New Team"}
         </button>}
 
+        {/* Calculate Handicaps */}
+        {teams.length > 0 && teams.some((t) => t.members.length > 0) && (
+          <CalculateHandicapsButton
+            contestId={selectedContest!.id}
+            onCalculated={async () => {
+              if (selectedContest) {
+                const res = await fetch(`/api/admin/scramble?contest_id=${selectedContest.id}`);
+                const data = await res.json();
+                setTeams(data.teams || []);
+              }
+            }}
+          />
+        )}
+
         {/* Teams */}
         <div className="space-y-3">
           {teams.map((team, index) => {
@@ -899,4 +913,89 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
   }
 
   return null;
+}
+
+// ── Calculate Handicaps Button ──
+
+function CalculateHandicapsButton({
+  contestId,
+  onCalculated,
+}: {
+  contestId: string;
+  onCalculated: () => void;
+}) {
+  const [calculating, setCalculating] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
+
+  const calculate = async () => {
+    setCalculating(true);
+    try {
+      const res = await fetch("/api/admin/scramble/calculate-handicaps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contest_id: contestId }),
+      });
+      if (res.ok) {
+        onCalculated();
+      }
+    } finally {
+      setCalculating(false);
+    }
+  };
+
+  return (
+    <div className="mb-3">
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Team Handicaps
+          </span>
+          <button
+            onClick={() => setShowInfo(!showInfo)}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+        <button
+          onClick={calculate}
+          disabled={calculating}
+          className="px-3 py-1 text-xs font-medium text-white bg-green-600 rounded-lg active:bg-green-700 disabled:opacity-50"
+        >
+          {calculating ? "Calculating..." : "Calculate Team Handicaps"}
+        </button>
+      </div>
+      {showInfo && (
+        <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5 text-xs text-blue-800 space-y-1.5 mb-2">
+          <p className="font-semibold">Scramble Team Handicap Formula</p>
+          <p>
+            Each player&apos;s Handicap Index is converted to a <strong>Course Handicap</strong>:
+          </p>
+          <p className="font-mono text-[11px] bg-blue-100/50 rounded px-2 py-1 inline-block">
+            Course HC = HI &times; (Slope / 113) + (Rating &minus; Par)
+          </p>
+          <p>
+            Course Handicaps are sorted lowest to highest, then weighted by team size:
+          </p>
+          <table className="text-[11px] mt-1">
+            <tbody>
+              <tr><td className="pr-3 text-blue-600 font-medium">2-man:</td><td className="font-mono">35% &times; A + 15% &times; B</td></tr>
+              <tr><td className="pr-3 text-blue-600 font-medium">3-man:</td><td className="font-mono">25% &times; A + 15% &times; B + 10% &times; C</td></tr>
+              <tr><td className="pr-3 text-blue-600 font-medium">4-man:</td><td className="font-mono">20% &times; A + 15% &times; B + 10% &times; C + 5% &times; D</td></tr>
+              <tr><td className="pr-3 text-blue-600 font-medium">5-man:</td><td className="font-mono">18% &times; A + 14% &times; B + 10% &times; C + 5% &times; D + 3% &times; E</td></tr>
+            </tbody>
+          </table>
+          <p className="text-blue-600 mt-1">
+            The best player is weighted most heavily because they contribute the most shots.
+            All weight sets sum to 50% of combined Course Handicaps.
+            Uses event-locked handicaps when available, otherwise live handicaps.
+            On the Scorecards page, handicaps are shown offset so the lowest team plays at 0.
+            You can still manually override any value after calculating.
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }

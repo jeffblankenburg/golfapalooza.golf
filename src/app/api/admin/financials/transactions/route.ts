@@ -76,6 +76,81 @@ export async function POST(request: Request) {
   }
 }
 
+// PUT - Update a transaction (manual: all fields; option-derived: amount only)
+export async function PUT(request: Request) {
+  const admin = await checkPermissionAccess("manage_finances");
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { id, type, description, amount, method, notes } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: "id is required" }, { status: 400 });
+    }
+
+    const adminClient = createAdminClient();
+
+    const { data: existing, error: fetchError } = await adminClient
+      .from("financial_transactions")
+      .select("id, source")
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !existing) {
+      return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
+    }
+
+    const isOption = existing.source === "option";
+
+    // Build update object from provided fields
+    const updates: Record<string, unknown> = {};
+
+    // Amount is editable for all transactions
+    if (amount !== undefined) {
+      if (typeof amount !== "number" || amount <= 0) {
+        return NextResponse.json({ error: "amount must be a number greater than 0" }, { status: 400 });
+      }
+      updates.amount = amount;
+    }
+
+    // Other fields only editable on manual transactions
+    if (!isOption) {
+      if (type !== undefined) {
+        if (type !== "charge" && type !== "payment") {
+          return NextResponse.json({ error: "type must be 'charge' or 'payment'" }, { status: 400 });
+        }
+        updates.type = type;
+      }
+      if (description !== undefined) updates.description = description;
+      if (method !== undefined) updates.method = method || null;
+      if (notes !== undefined) updates.notes = notes || null;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+    }
+
+    const { data: transaction, error } = await adminClient
+      .from("financial_transactions")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(transaction);
+  } catch (error) {
+    console.error("Update transaction error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
 // DELETE - Delete a manual transaction (cannot delete option-derived)
 export async function DELETE(request: Request) {
   const admin = await checkPermissionAccess("manage_finances");

@@ -69,6 +69,15 @@ export function FinancialDashboard({ tripId }: { tripId: string }) {
   const [formChargeType, setFormChargeType] = useState<"charge" | "credit">("charge");
   const [formSaving, setFormSaving] = useState(false);
 
+  // Edit state
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  const [editDescription, setEditDescription] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+  const [editType, setEditType] = useState<"charge" | "payment">("charge");
+  const [editMethod, setEditMethod] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
   // Delete confirm
   const [deleteConfirm, setDeleteConfirm] = useState<{
     id: string;
@@ -188,6 +197,46 @@ export function FinancialDashboard({ tripId }: { tripId: string }) {
     setDeleteConfirm(null);
     if (userId) {
       await Promise.all([fetchSummary(), fetchLedger(userId)]);
+    }
+  };
+
+  const startEdit = (tx: Transaction) => {
+    setEditingTx(tx);
+    setEditDescription(tx.description);
+    setEditAmount(String(tx.amount));
+    setEditType(tx.type);
+    setEditMethod(tx.method || "");
+    setEditNotes(tx.notes || "");
+  };
+
+  const cancelEdit = () => {
+    setEditingTx(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingTx) return;
+    const amount = parseFloat(editAmount);
+    if (!amount || amount <= 0) return;
+    if (editingTx.source === "manual" && !editDescription.trim()) return;
+    setEditSaving(true);
+
+    const payload: Record<string, unknown> = { id: editingTx.id, amount };
+    if (editingTx.source === "manual") {
+      payload.type = editType;
+      payload.description = editDescription.trim();
+      payload.method = editMethod || null;
+      payload.notes = editNotes || null;
+    }
+
+    await fetch("/api/admin/financials/transactions", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    setEditSaving(false);
+    setEditingTx(null);
+    if (expandedUserId) {
+      await Promise.all([fetchSummary(), fetchLedger(expandedUserId)]);
     }
   };
 
@@ -341,80 +390,201 @@ export function FinancialDashboard({ tripId }: { tripId: string }) {
                     ) : (
                       <div className="space-y-0 rounded-xl overflow-hidden border border-gray-100">
                         {ledger.map((tx, i) => (
-                          <div
-                            key={tx.id}
-                            className={`flex items-center justify-between px-3 py-2 text-sm ${
-                              i % 2 === 0 ? "bg-gray-50" : "bg-white"
-                            }`}
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-xs text-gray-400">
-                                  {new Date(tx.created_at).toLocaleDateString()}
-                                </span>
-                                <span
-                                  className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                    tx.type === "charge"
-                                      ? "bg-red-100 text-red-700"
-                                      : "bg-green-100 text-green-700"
-                                  }`}
-                                >
-                                  {tx.type}
-                                </span>
-                                <span
-                                  className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                    tx.source === "manual"
-                                      ? "bg-gray-100 text-gray-600"
-                                      : "bg-blue-100 text-blue-700"
-                                  }`}
-                                >
-                                  {tx.source}
-                                </span>
+                          <div key={tx.id}>
+                            {editingTx?.id === tx.id ? (
+                              /* Inline Edit Form */
+                              <div className="px-3 py-3 bg-yellow-50 border-y border-yellow-200 space-y-2">
+                                {tx.source === "manual" ? (
+                                  /* Full edit for manual transactions */
+                                  <>
+                                    <input
+                                      type="text"
+                                      value={editDescription}
+                                      onChange={(e) => setEditDescription(e.target.value)}
+                                      autoFocus
+                                      placeholder="Description"
+                                      className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
+                                    />
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="number"
+                                        value={editAmount}
+                                        onChange={(e) => setEditAmount(e.target.value)}
+                                        placeholder="Amount"
+                                        min="0"
+                                        step="0.01"
+                                        className="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
+                                      />
+                                      <select
+                                        value={editType}
+                                        onChange={(e) => setEditType(e.target.value as "charge" | "payment")}
+                                        className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
+                                      >
+                                        <option value="charge">Charge</option>
+                                        <option value="payment">Payment</option>
+                                      </select>
+                                    </div>
+                                    {tx.method != null && (
+                                      <select
+                                        value={editMethod}
+                                        onChange={(e) => setEditMethod(e.target.value)}
+                                        className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
+                                      >
+                                        <option value="">No method</option>
+                                        <option>Cash</option>
+                                        <option>G Credit</option>
+                                        <option>Venmo</option>
+                                        <option>Zelle</option>
+                                        <option>Check</option>
+                                        <option>Other</option>
+                                      </select>
+                                    )}
+                                    <input
+                                      type="text"
+                                      value={editNotes}
+                                      onChange={(e) => setEditNotes(e.target.value)}
+                                      placeholder="Notes (optional)"
+                                      className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
+                                    />
+                                  </>
+                                ) : (
+                                  /* Amount-only edit for option-derived transactions */
+                                  <>
+                                    <div className="text-xs text-gray-500">
+                                      {tx.description}
+                                    </div>
+                                    <input
+                                      type="number"
+                                      value={editAmount}
+                                      onChange={(e) => setEditAmount(e.target.value)}
+                                      autoFocus
+                                      placeholder="Amount"
+                                      min="0"
+                                      step="0.01"
+                                      className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
+                                    />
+                                  </>
+                                )}
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={editSaving}
+                                    onClick={handleSaveEdit}
+                                    className="flex-1 py-1.5 bg-green-600 text-white rounded-lg text-sm font-semibold active:opacity-80 disabled:opacity-50"
+                                  >
+                                    {editSaving ? "Saving..." : "Save"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={cancelEdit}
+                                    className="flex-1 py-1.5 border border-gray-300 text-gray-600 rounded-lg text-sm font-semibold active:bg-gray-50"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
                               </div>
-                              <div className="text-gray-700 truncate">
-                                {tx.description}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 ml-2">
-                              <span
-                                className={`font-semibold whitespace-nowrap ${
-                                  tx.type === "charge"
-                                    ? "text-red-600"
-                                    : "text-green-600"
+                            ) : (
+                              /* Normal Row */
+                              <div
+                                className={`flex items-center justify-between px-3 py-2 text-sm ${
+                                  i % 2 === 0 ? "bg-gray-50" : "bg-white"
                                 }`}
                               >
-                                {tx.type === "charge" ? "-" : "+"}
-                                {fmt(tx.amount)}
-                              </span>
-                              {tx.source === "manual" && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setDeleteConfirm({
-                                      id: tx.id,
-                                      description: tx.description,
-                                    });
-                                  }}
-                                  className="text-gray-400 hover:text-red-500 p-1"
-                                >
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="h-4 w-4"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    strokeWidth={2}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-xs text-gray-400">
+                                      {new Date(tx.created_at).toLocaleDateString()}
+                                    </span>
+                                    <span
+                                      className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                        tx.type === "charge"
+                                          ? "bg-red-100 text-red-700"
+                                          : "bg-green-100 text-green-700"
+                                      }`}
+                                    >
+                                      {tx.type}
+                                    </span>
+                                    <span
+                                      className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                        tx.source === "manual"
+                                          ? "bg-gray-100 text-gray-600"
+                                          : "bg-blue-100 text-blue-700"
+                                      }`}
+                                    >
+                                      {tx.source}
+                                    </span>
+                                  </div>
+                                  <div className="text-gray-700 truncate">
+                                    {tx.description}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1 ml-2">
+                                  {/* Edit button — all transactions */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      startEdit(tx);
+                                    }}
+                                    className="text-gray-400 hover:text-blue-500 p-1"
                                   >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                    />
-                                  </svg>
-                                </button>
-                              )}
-                            </div>
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      className="h-4 w-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      strokeWidth={2}
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                      />
+                                    </svg>
+                                  </button>
+                                  {/* Delete button — manual only */}
+                                  {tx.source === "manual" && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeleteConfirm({
+                                          id: tx.id,
+                                          description: tx.description,
+                                        });
+                                      }}
+                                      className="text-gray-400 hover:text-red-500 p-1"
+                                    >
+                                      <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        className="h-4 w-4"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={2}
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                        />
+                                      </svg>
+                                    </button>
+                                  )}
+                                  <span
+                                    className={`font-semibold whitespace-nowrap ${
+                                      tx.type === "charge"
+                                        ? "text-red-600"
+                                        : "text-green-600"
+                                    }`}
+                                  >
+                                    {tx.type === "charge" ? "-" : "+"}
+                                    {fmt(tx.amount)}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -481,6 +651,7 @@ export function FinancialDashboard({ tripId }: { tripId: string }) {
                             className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
                           >
                             <option>Cash</option>
+                            <option>G Credit</option>
                             <option>Venmo</option>
                             <option>Zelle</option>
                             <option>Check</option>

@@ -94,55 +94,46 @@ export async function GET(request: Request) {
       .select("pair_id, scramble_handicap")
       .eq("contest_id", contestId);
 
-    // Fetch hole info (contest_hole_tees + course_holes)
-    const { data: contest } = await adminClient
-      .from("contests")
-      .select("trip_id")
-      .eq("id", contestId)
-      .single();
+    // Fetch hole info — contest + tee assignments + course holes in parallel where possible
+    const [contestResult, teeAssignmentsResult] = await Promise.all([
+      adminClient.from("contests").select("trip_id").eq("id", contestId).single(),
+      adminClient.from("contest_hole_tees").select("hole_number, tee_id").eq("contest_id", contestId).order("hole_number"),
+    ]);
 
     let holes: { hole_number: number; par: number; yards: number; handicap_index: number }[] = [];
 
-    if (contest) {
+    if (contestResult.data && teeAssignmentsResult.data && teeAssignmentsResult.data.length > 0) {
       const { data: trip } = await adminClient
         .from("trip_settings")
         .select("course_id")
-        .eq("id", contest.trip_id)
+        .eq("id", contestResult.data.trip_id)
         .single();
 
       if (trip?.course_id) {
-        const { data: teeAssignments } = await adminClient
-          .from("contest_hole_tees")
-          .select("hole_number, tee_id")
-          .eq("contest_id", contestId)
-          .order("hole_number");
+        const { data: courseHoles } = await adminClient
+          .from("course_holes")
+          .select("tee_id, hole_number, par, yards, handicap_index")
+          .eq("course_id", trip.course_id);
 
-        if (teeAssignments && teeAssignments.length > 0) {
-          const { data: courseHoles } = await adminClient
-            .from("course_holes")
-            .select("tee_id, hole_number, par, yards, handicap_index")
-            .eq("course_id", trip.course_id);
-
-          if (courseHoles) {
-            const holeMap = new Map<string, { par: number; yards: number; handicap_index: number }>();
-            for (const h of courseHoles) {
-              holeMap.set(`${h.tee_id}-${h.hole_number}`, {
-                par: h.par,
-                yards: h.yards || 0,
-                handicap_index: h.handicap_index || 0,
-              });
-            }
-
-            holes = teeAssignments.map((ta) => {
-              const data = holeMap.get(`${ta.tee_id}-${ta.hole_number}`);
-              return {
-                hole_number: ta.hole_number,
-                par: data?.par || 4,
-                yards: data?.yards || 0,
-                handicap_index: data?.handicap_index || 0,
-              };
+        if (courseHoles) {
+          const holeMap = new Map<string, { par: number; yards: number; handicap_index: number }>();
+          for (const h of courseHoles) {
+            holeMap.set(`${h.tee_id}-${h.hole_number}`, {
+              par: h.par,
+              yards: h.yards || 0,
+              handicap_index: h.handicap_index || 0,
             });
           }
+
+          holes = teeAssignmentsResult.data.map((ta) => {
+            const data = holeMap.get(`${ta.tee_id}-${ta.hole_number}`);
+            return {
+              hole_number: ta.hole_number,
+              par: data?.par || 4,
+              yards: data?.yards || 0,
+              handicap_index: data?.handicap_index || 0,
+            };
+          });
         }
       }
     }

@@ -37,23 +37,26 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: groupsError.message }, { status: 500 });
     }
 
-    // Check if this day has a scramble contest
-    const { data: scrambleContest } = await adminClient
-      .from("contests")
-      .select("id")
-      .eq("trip_id", tripId)
-      .eq("day_number", dayNum)
-      .eq("contest_type", "scramble")
-      .maybeSingle();
+    // Check if this day has scramble or ryder_cup contests — parallel
+    const [scrambleContestResult, ryderCupContestResult] = await Promise.all([
+      adminClient
+        .from("contests")
+        .select("id")
+        .eq("trip_id", tripId)
+        .eq("day_number", dayNum)
+        .eq("contest_type", "scramble")
+        .maybeSingle(),
+      adminClient
+        .from("contests")
+        .select("id")
+        .eq("trip_id", tripId)
+        .eq("day_number", dayNum)
+        .eq("contest_type", "ryder_cup")
+        .maybeSingle(),
+    ]);
 
-    // Check if this day has a ryder_cup contest (KGB Cup)
-    const { data: ryderCupContest } = await adminClient
-      .from("contests")
-      .select("id")
-      .eq("trip_id", tripId)
-      .eq("day_number", dayNum)
-      .eq("contest_type", "ryder_cup")
-      .maybeSingle();
+    const scrambleContest = scrambleContestResult.data;
+    const ryderCupContest = ryderCupContestResult.data;
 
     // If scramble day, fetch scramble teams with members
     let scrambleTeams: Array<{
@@ -228,40 +231,37 @@ export async function POST(request: Request) {
     }
 
     // If kgb_foursome_id provided (= team1 pair ID), auto-populate tee_time_players
-    // from the pair and its matching opposing pair (same sort_order)
     if (kgb_foursome_id && group) {
+      // Fetch pair + its team info in one query (join)
       const { data: team1Pair } = await adminClient
         .from("ryder_cup_pairs")
-        .select("id, team_id, sort_order, player_a_id, player_b_id")
+        .select("id, team_id, sort_order, player_a_id, player_b_id, team:ryder_cup_teams!inner(id, contest_id)")
         .eq("id", kgb_foursome_id)
         .single();
 
       if (team1Pair) {
-        // Find the opposing team's pair with the same sort_order
-        const { data: team1Info } = await adminClient
-          .from("ryder_cup_teams")
-          .select("id, contest_id")
-          .eq("id", team1Pair.team_id)
-          .single();
+        const team1Info = Array.isArray(team1Pair.team) ? team1Pair.team[0] : team1Pair.team;
 
-        let team2Pair: { player_a_id: string | null; player_b_id: string | null } | null = null;
-        if (team1Info) {
-          const { data: team2 } = await adminClient
+        // Fetch opposing team + matching pair in parallel
+        const [team2Result, _] = await Promise.all([
+          adminClient
             .from("ryder_cup_teams")
             .select("id")
             .eq("contest_id", team1Info.contest_id)
             .neq("id", team1Info.id)
-            .single();
+            .single(),
+          Promise.resolve(null),
+        ]);
 
-          if (team2) {
-            const { data: p2 } = await adminClient
-              .from("ryder_cup_pairs")
-              .select("player_a_id, player_b_id")
-              .eq("team_id", team2.id)
-              .eq("sort_order", team1Pair.sort_order)
-              .single();
-            team2Pair = p2;
-          }
+        let team2Pair: { player_a_id: string | null; player_b_id: string | null } | null = null;
+        if (team2Result.data) {
+          const { data: p2 } = await adminClient
+            .from("ryder_cup_pairs")
+            .select("player_a_id, player_b_id")
+            .eq("team_id", team2Result.data.id)
+            .eq("sort_order", team1Pair.sort_order)
+            .single();
+          team2Pair = p2;
         }
 
         const playerIds: string[] = [];

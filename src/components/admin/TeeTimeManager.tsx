@@ -101,21 +101,12 @@ export function TeeTimeManager({ tripId, dayNumber, contestType }: { tripId: str
     if (data.days) setEventDays(data.days);
   }, [tripId]);
 
-  // Fetch tee time counts per day
+  // Fetch tee time counts per day — single query
   const fetchDayCounts = useCallback(async () => {
     if (eventDays.length === 0) return;
-    const counts: Record<number, number> = {};
-    const results = await Promise.all(
-      eventDays.map((day) =>
-        fetch(`/api/admin/tee-times?trip_id=${tripId}&day_number=${day.day_number}`)
-          .then((res) => res.json())
-          .then((data) => ({ day: day.day_number, count: (data.groups || []).length }))
-      )
-    );
-    for (const r of results) {
-      counts[r.day] = r.count;
-    }
-    setDayCounts(counts);
+    const res = await fetch(`/api/admin/tee-times/counts?trip_id=${tripId}`);
+    const data = await res.json();
+    setDayCounts(data.counts || {});
   }, [tripId, eventDays]);
 
   useEffect(() => {

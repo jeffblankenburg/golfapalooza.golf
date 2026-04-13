@@ -302,29 +302,35 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: upsertError.message }, { status: 500 });
     }
 
-    // Recalculate gross_score for affected teams
+    // Recalculate gross_score for affected teams — batch fetch all scores at once
     const affectedTeamIds = [...new Set(scores.map((s: { team_id: string }) => s.team_id))];
 
-    for (const teamId of affectedTeamIds) {
-      const { data: allScores } = await adminClient
-        .from("scramble_hole_scores")
-        .select("strokes")
-        .eq("team_id", teamId);
+    const { data: allTeamScores } = await adminClient
+      .from("scramble_hole_scores")
+      .select("team_id, strokes")
+      .in("team_id", affectedTeamIds);
 
-      if (allScores && allScores.length === 18) {
-        const grossScore = allScores.reduce((sum, s) => sum + s.strokes, 0);
-        await adminClient
+    // Group by team and calculate
+    const scoresByTeam = new Map<string, number[]>();
+    for (const s of allTeamScores || []) {
+      const arr = scoresByTeam.get(s.team_id) || [];
+      arr.push(s.strokes);
+      scoresByTeam.set(s.team_id, arr);
+    }
+
+    // Batch update all teams in parallel
+    await Promise.all(
+      affectedTeamIds.map((teamId) => {
+        const teamScores = scoresByTeam.get(teamId) || [];
+        const grossScore = teamScores.length === 18
+          ? teamScores.reduce((sum, s) => sum + s, 0)
+          : null;
+        return adminClient
           .from("scramble_teams")
           .update({ gross_score: grossScore })
           .eq("id", teamId);
-      } else {
-        // Incomplete — set to null
-        await adminClient
-          .from("scramble_teams")
-          .update({ gross_score: null })
-          .eq("id", teamId);
-      }
-    }
+      })
+    );
 
     return NextResponse.json({ success: true });
   } catch (error) {

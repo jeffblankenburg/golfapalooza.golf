@@ -47,36 +47,50 @@ export async function GET(request: Request) {
 
     const userIds = Array.from(userMap.keys());
 
-    // 2. Get ALL financial_transactions for these users (for lifetime calcs)
-    const { data: transactions, error: txnError } = await adminClient
-      .from("financial_transactions")
-      .select("user_id, trip_id, type, amount")
-      .in("user_id", userIds);
+    // 2. Get trip + lifetime transactions in parallel
+    const [tripTxnResult, lifetimeTxnResult] = await Promise.all([
+      adminClient
+        .from("financial_transactions")
+        .select("user_id, type, amount")
+        .in("user_id", userIds)
+        .eq("trip_id", tripId),
+      adminClient
+        .from("financial_transactions")
+        .select("user_id, type, amount")
+        .in("user_id", userIds),
+    ]);
 
-    if (txnError) {
-      return NextResponse.json({ error: txnError.message }, { status: 500 });
+    if (tripTxnResult.error) {
+      return NextResponse.json({ error: tripTxnResult.error.message }, { status: 500 });
+    }
+
+    // Build per-user aggregates
+    const tripAgg = new Map<string, { charges: number; payments: number }>();
+    for (const t of tripTxnResult.data || []) {
+      const agg = tripAgg.get(t.user_id) || { charges: 0, payments: 0 };
+      if (t.type === "charge") agg.charges += Number(t.amount);
+      else agg.payments += Number(t.amount);
+      tripAgg.set(t.user_id, agg);
+    }
+
+    const lifeAgg = new Map<string, { charges: number; payments: number }>();
+    for (const t of lifetimeTxnResult.data || []) {
+      const agg = lifeAgg.get(t.user_id) || { charges: 0, payments: 0 };
+      if (t.type === "charge") agg.charges += Number(t.amount);
+      else agg.payments += Number(t.amount);
+      lifeAgg.set(t.user_id, agg);
     }
 
     // 3. Calculate per-user summaries
     const loozers = userIds.map((userId) => {
       const user = userMap.get(userId)!;
-      const userTxns = (transactions || []).filter((t) => t.user_id === userId);
+      const trip = tripAgg.get(userId) || { charges: 0, payments: 0 };
+      const life = lifeAgg.get(userId) || { charges: 0, payments: 0 };
 
-      const tripCharges = userTxns
-        .filter((t) => t.type === "charge" && t.trip_id === tripId)
-        .reduce((sum, t) => sum + Number(t.amount), 0);
-
-      const tripPayments = userTxns
-        .filter((t) => t.type === "payment" && t.trip_id === tripId)
-        .reduce((sum, t) => sum + Number(t.amount), 0);
-
-      const lifetimeCharges = userTxns
-        .filter((t) => t.type === "charge")
-        .reduce((sum, t) => sum + Number(t.amount), 0);
-
-      const lifetimePayments = userTxns
-        .filter((t) => t.type === "payment")
-        .reduce((sum, t) => sum + Number(t.amount), 0);
+      const tripCharges = trip.charges;
+      const tripPayments = trip.payments;
+      const lifetimeCharges = life.charges;
+      const lifetimePayments = life.payments;
 
       return {
         user_id: userId,

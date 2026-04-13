@@ -621,7 +621,7 @@ export default async function HomePage() {
           .replace(/[#*_~`>\[\]()!|\\-]/g, "")
           .replace(/\n+/g, " ")
           .trim()
-          .slice(0, 150);
+          .slice(0, 300);
         return {
           id: d.id,
           title: d.title,

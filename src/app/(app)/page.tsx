@@ -98,7 +98,7 @@ export default async function HomePage() {
     // Latest published article (within last 14 days)
     supabase
       .from("articles")
-      .select("id, title, publish_at")
+      .select("id, title, content, publish_at, featured_image:gallery_items!articles_featured_image_id_fkey(media_url, thumbnail_url)")
       .eq("trip_id", trip.id)
       .not("publish_at", "is", null)
       .lte("publish_at", new Date().toISOString())
@@ -613,11 +613,23 @@ export default async function HomePage() {
       myBalance={myBalance}
       optionsDeadline={optionsDeadline}
       hasSubmittedOptions={hasSubmittedOptions}
-      latestArticle={latestArticleResult.data ? {
-        id: latestArticleResult.data.id,
-        title: latestArticleResult.data.title,
-        publishAt: latestArticleResult.data.publish_at,
-      } : null}
+      latestArticle={latestArticleResult.data ? (() => {
+        const d = latestArticleResult.data;
+        const img = Array.isArray(d.featured_image) ? d.featured_image[0] : d.featured_image;
+        // Extract first ~150 chars of content as preview, strip markdown
+        const preview = (d.content || "")
+          .replace(/[#*_~`>\[\]()!|\\-]/g, "")
+          .replace(/\n+/g, " ")
+          .trim()
+          .slice(0, 150);
+        return {
+          id: d.id,
+          title: d.title,
+          publishAt: d.publish_at,
+          imageUrl: img?.media_url || img?.thumbnail_url || null,
+          preview: preview || null,
+        };
+      })() : null}
       hiddenQuickLinks={hiddenQuickLinks}
     />
   );

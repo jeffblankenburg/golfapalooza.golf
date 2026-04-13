@@ -434,8 +434,8 @@ export function HomeContent({
             </div>
           )}
           {latestArticle.preview && (
-            <p className="px-4 py-3 text-sm text-gray-600 leading-relaxed line-clamp-2">
-              {latestArticle.preview}...
+            <p className="px-4 py-3 text-sm text-gray-600 line-clamp-2">
+              {latestArticle.preview}
             </p>
           )}
         </Link>

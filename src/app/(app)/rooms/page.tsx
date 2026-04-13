@@ -1,6 +1,8 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { RoomList } from "@/components/RoomList";
 import { getEffectiveUserId } from "@/lib/simulator";
+import { getEffectiveDate } from "@/lib/simulator";
+import { isFeatureVisible } from "@/lib/visibility";
 
 export default async function RoomsPage() {
   const user = await getAuthUser();
@@ -10,7 +12,7 @@ export default async function RoomsPage() {
 
   const { data: trip } = await supabase
     .from("trip_settings")
-    .select("id, show_rooms")
+    .select("id, start_date, visibility_overrides")
     .eq("status", "active")
     .single();
 
@@ -25,7 +27,13 @@ export default async function RoomsPage() {
     );
   }
 
-  if (!trip.show_rooms) {
+  const now = await getEffectiveDate();
+  const visible = isFeatureVisible("rooms", {
+    start_date: trip.start_date,
+    visibility_overrides: (trip.visibility_overrides as Record<string, boolean>) || {},
+  }, now);
+
+  if (!visible) {
     return (
       <div className="px-4 pt-6">
         <h1 className="text-2xl font-bold text-gray-900">Rooms</h1>

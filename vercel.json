@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/send-scheduled",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/tee-time-reminders",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

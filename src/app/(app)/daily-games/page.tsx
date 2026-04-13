@@ -2,6 +2,8 @@ import { getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
+import { getEffectiveDate } from "@/lib/simulator";
+import { isFeatureVisible } from "@/lib/visibility";
 
 
 export default async function DailyGamesPage() {
@@ -12,7 +14,7 @@ export default async function DailyGamesPage() {
   const adminClient = createAdminClient();
   const { data: trip } = await adminClient
     .from("trip_settings")
-    .select("id, start_date")
+    .select("id, start_date, visibility_overrides")
     .eq("status", "active")
     .single();
 
@@ -21,6 +23,16 @@ export default async function DailyGamesPage() {
       <div className="px-4 pt-6">
         <h1 className="text-2xl font-bold text-gray-900">Daily Games</h1>
         <p className="text-gray-500 text-center py-8">No active event.</p>
+      </div>
+    );
+  }
+
+  const now = await getEffectiveDate();
+  if (!isFeatureVisible("daily_games", { start_date: trip.start_date, visibility_overrides: (trip.visibility_overrides as Record<string, boolean>) || {} }, now)) {
+    return (
+      <div className="px-4 pt-6">
+        <h1 className="text-2xl font-bold text-gray-900">Daily Games</h1>
+        <p className="text-gray-500 text-center py-8">Daily game results will be available once the event begins.</p>
       </div>
     );
   }

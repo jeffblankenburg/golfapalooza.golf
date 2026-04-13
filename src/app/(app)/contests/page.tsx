@@ -1,7 +1,8 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
-import { getEffectiveUserId } from "@/lib/simulator";
+import { getEffectiveUserId, getEffectiveDate } from "@/lib/simulator";
 import { ContestList } from "@/components/ContestList";
 import { deriveFoursomes } from "@/lib/kgb-cup/derive-foursomes";
+import { isFeatureVisible } from "@/lib/visibility";
 
 export default async function ContestsPage() {
   const user = await getAuthUser();
@@ -11,7 +12,7 @@ export default async function ContestsPage() {
 
   const { data: trip } = await supabase
     .from("trip_settings")
-    .select("id, trip_name, start_date, show_teams")
+    .select("id, trip_name, start_date, show_teams, visibility_overrides")
     .eq("status", "active")
     .single();
 
@@ -25,6 +26,10 @@ export default async function ContestsPage() {
       </div>
     );
   }
+
+  const effectiveDate = await getEffectiveDate();
+  const visCtx = { start_date: trip.start_date, visibility_overrides: (trip.visibility_overrides as Record<string, boolean>) || {} };
+  const showTeams = isFeatureVisible("teams", visCtx, effectiveDate);
 
   // Fetch all contests for the trip
   const { data: contests } = await supabase
@@ -80,7 +85,7 @@ export default async function ContestsPage() {
   const [teamsResult, ryderTeamsResult, ryderPairsResult, teeTimesResult] =
     await Promise.all([
       // Scramble teams
-      scrambleContestIds.length > 0 && trip.show_teams
+      scrambleContestIds.length > 0 && showTeams
         ? supabase
             .from("scramble_teams")
             .select(
@@ -90,7 +95,7 @@ export default async function ContestsPage() {
         : Promise.resolve({ data: [] }),
 
       // Ryder cup teams
-      ryderContestIds.length > 0 && trip.show_teams
+      ryderContestIds.length > 0 && showTeams
         ? supabase
             .from("ryder_cup_teams")
             .select("id, contest_id, team_number, team_name, team_color")
@@ -98,7 +103,7 @@ export default async function ContestsPage() {
         : Promise.resolve({ data: [] }),
 
       // Ryder cup pairs
-      ryderContestIds.length > 0 && trip.show_teams
+      ryderContestIds.length > 0 && showTeams
         ? supabase
             .from("ryder_cup_pairs")
             .select(
@@ -108,7 +113,7 @@ export default async function ContestsPage() {
         : Promise.resolve({ data: [] }),
 
       // Tee times
-      trip.show_teams
+      showTeams
         ? supabase
             .from("tee_times")
             .select(
@@ -195,76 +200,68 @@ export default async function ContestsPage() {
     }
   > = {};
 
-  if (ryderContestIds.length > 0 && trip.show_teams) {
-    // Check if there are any KGB Cup scores
-    const { data: kgbScoresExist } = await supabase
-      .from("kgb_cup_hole_scores")
-      .select("foursome_id")
-      .limit(1);
+  if (ryderContestIds.length > 0 && showTeams) {
+    // Batch fetch ALL ryder cup data at once instead of per-contest loop
+    const allRcTeamIds = ryderTeamsResult.data?.map((t) => t.id) || [];
 
-    if (kgbScoresExist && kgbScoresExist.length > 0) {
-      // Fetch foursomes per contest to count total sections
+    const [allRcPairsResult, allKgbScoresResult] = await Promise.all([
+      allRcTeamIds.length > 0
+        ? supabase
+            .from("ryder_cup_pairs")
+            .select("id, team_id, sort_order")
+            .in("team_id", allRcTeamIds)
+            .gt("sort_order", 0)
+        : Promise.resolve({ data: [] as { id: string; team_id: string; sort_order: number }[] }),
+      supabase
+        .from("kgb_cup_hole_scores")
+        .select("foursome_id, hole_number, scorer_type, scorer_id")
+        .limit(5000),
+    ]);
+
+    if (allKgbScoresResult.data && allKgbScoresResult.data.length > 0) {
+      // Group teams by contest
+      const teamsByContest = new Map<string, typeof ryderTeamsResult.data>();
+      for (const t of ryderTeamsResult.data || []) {
+        const arr = teamsByContest.get(t.contest_id) || [];
+        arr.push(t);
+        teamsByContest.set(t.contest_id, arr);
+      }
+
       for (const cId of ryderContestIds) {
-        const { data: rcTeams } = await supabase
-          .from("ryder_cup_teams")
-          .select("id, team_number, team_name, team_color")
-          .eq("contest_id", cId);
+        const rcTeams = teamsByContest.get(cId) || [];
+        const rcTeamIds = rcTeams.map((t) => t.id);
+        const rcPairs = (allRcPairsResult.data || []).filter((p) => rcTeamIds.includes(p.team_id));
+        const rcFoursomes = deriveFoursomes(rcPairs, rcTeams);
 
-        // Derive foursomes from pairs
-        const rcTeamIds = (rcTeams || []).map((t) => t.id);
-        const { data: rcPairsData } = rcTeamIds.length > 0
-          ? await supabase
-              .from("ryder_cup_pairs")
-              .select("id, team_id, sort_order")
-              .in("team_id", rcTeamIds)
-              .gt("sort_order", 0)
-          : { data: [] };
+        if (rcTeams.length === 2 && rcFoursomes.length > 0) {
+          const foursomeIds = new Set(rcFoursomes.map((f) => f.id));
+          const allScores = (allKgbScoresResult.data || []).filter((s) => foursomeIds.has(s.foursome_id));
 
-        const rcFoursomes = deriveFoursomes(rcPairsData || [], rcTeams || []);
-
-        if (rcTeams && rcTeams.length === 2 && rcFoursomes.length > 0) {
-          const foursomeIds = rcFoursomes.map((f) => f.id);
-          const { data: allScores } = await supabase
-            .from("kgb_cup_hole_scores")
-            .select("foursome_id, hole_number, scorer_type, scorer_id")
-            .in("foursome_id", foursomeIds);
-
-          if (allScores && allScores.length > 0) {
-            // Count completed sections (each section = 6 holes per match scorer)
-            // Simple heuristic: count foursomes with any scores
-            const totalSections = foursomeIds.length * 5; // 5 matches per foursome
-            // Count scored sections by checking which foursome+section combinations have 6 scored holes
+          if (allScores.length > 0) {
+            const totalSections = rcFoursomes.length * 5;
             let completedSections = 0;
             for (const fId of foursomeIds) {
               const fScores = allScores.filter((s) => s.foursome_id === fId);
-              // Check each section for completeness
               for (const section of [1, 2, 3] as const) {
                 const startHole = (section - 1) * 6 + 1;
                 const endHole = section * 6;
                 if (section < 3) {
-                  // Individual sections: need unique scorer_ids per hole for player type
                   const sectionScores = fScores.filter(
                     (s) => s.scorer_type === "player" && s.hole_number >= startHole && s.hole_number <= endHole
                   );
-                  // Get unique scorer IDs
                   const scorerIds = new Set(sectionScores.map((s) => s.scorer_id));
-                  // For each scorer, check if all 6 holes are complete
                   for (const sid of scorerIds) {
                     const holesScored = new Set(
                       sectionScores.filter((s) => s.scorer_id === sid).map((s) => s.hole_number)
                     );
-                    // This scorer's match is complete if they have all 6 holes
-                    // But we need opponent too - simplify: if any scorer has 6 holes, count a section
                     if (holesScored.size === 6) completedSections++;
                   }
                 } else {
-                  // Scramble section: pair type
                   const sectionScores = fScores.filter(
                     (s) => s.scorer_type === "pair" && s.hole_number >= startHole && s.hole_number <= endHole
                   );
                   const scorerIds = new Set(sectionScores.map((s) => s.scorer_id));
                   if (scorerIds.size >= 2) {
-                    // Both pairs have scores
                     const allComplete = [...scorerIds].every((sid) => {
                       const holesScored = new Set(
                         sectionScores.filter((s) => s.scorer_id === sid).map((s) => s.hole_number)
@@ -277,8 +274,6 @@ export default async function ContestsPage() {
               }
             }
 
-            // Rough point calculation: use results API for accuracy
-            // For the summary, just show basic info
             const team1 = rcTeams.find((t) => t.team_number === 1);
             const team2 = rcTeams.find((t) => t.team_number === 2);
 
@@ -444,7 +439,7 @@ export default async function ContestsPage() {
     <ContestList
       contests={contestsWithMeta}
       startDate={trip.start_date}
-      showTeams={trip.show_teams ?? false}
+      showTeams={showTeams ?? false}
       detailData={detailData}
     />
   );

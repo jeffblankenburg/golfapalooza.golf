@@ -2,6 +2,7 @@ import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { HomeContent } from "@/components/HomeContent";
 import { getEffectiveUserId, getEffectiveDate, getSimDate, isSimulating } from "@/lib/simulator";
+import { isFeatureVisible } from "@/lib/visibility";
 
 export default async function HomePage() {
   const user = await getAuthUser();
@@ -166,14 +167,22 @@ export default async function HomePage() {
   const calcuttaContest = calcuttaResult.data;
   const needCalcuttaSold = calcuttaContest && calcuttaContest.calcutta_active_order === null;
 
+  // Prepare KGB Cup inputs
+  const hasRyderCup = (contestTypesResult.data || []).some(
+    (c: { contest_type: string }) => c.contest_type === "ryder_cup"
+  );
+
   // ── Phase 3: conditional follow-ups in parallel ──
-  const [teamTeeTimesResult, calcuttaSoldResult] = await Promise.all([
+  const [teamTeeTimesResult, calcuttaSoldResult, ryderCupContestsResult] = await Promise.all([
     scrambleTeamIds.length > 0
       ? queryClient.from("tee_times").select("id, trip_id, day_number, tee_time, starting_hole, scramble_team_id").eq("trip_id", trip.id).in("scramble_team_id", scrambleTeamIds)
       : Promise.resolve({ data: null as null }),
     needCalcuttaSold
       ? queryClient.from("contest_participants").select("id", { count: "exact", head: true }).eq("contest_id", calcuttaContest!.id).not("sold_at", "is", null)
       : Promise.resolve({ count: 0 as number | null }),
+    hasRyderCup
+      ? queryClient.from("contests").select("id, day_number, scoring_closed_at").eq("trip_id", trip.id).eq("contest_type", "ryder_cup")
+      : Promise.resolve({ data: null as null }),
   ]);
 
   // Source 2: Scramble teams linked to tee times
@@ -196,31 +205,24 @@ export default async function HomePage() {
   const diffForActiveRound = Math.floor((todayForActiveRound.getTime() - startForActiveRound.getTime()) / (1000 * 60 * 60 * 24));
   const todayDayNumber = diffForActiveRound + 1;
 
-  // Derive active scramble rounds — all scramble tee times the user has (any day)
-  // Look up contest_id for each scramble team
+  // Derive active scramble rounds — look up contest_id and scoring state in one pass
+  // Fetch scramble teams and their contest state in parallel
   const scrambleTeamContestMap = new Map<string, string>();
+  const scrambleContestDayMap = new Map<string, number>();
+  const scrambleContestScoringOpen = new Set<string>();
+
   if (scrambleTeamIds.length > 0) {
     const { data: teamContests } = await queryClient
       .from("scramble_teams")
-      .select("id, contest_id")
+      .select("id, contest_id, contest:contests!inner(id, day_number, scoring_closed_at)")
       .in("id", scrambleTeamIds);
     for (const tc of teamContests || []) {
       scrambleTeamContestMap.set(tc.id, tc.contest_id);
-    }
-  }
-
-  // Look up day labels and scoring state for scramble contests
-  const scrambleContestDayMap = new Map<string, number>();
-  const scrambleContestScoringOpen = new Set<string>();
-  if (scrambleTeamContestMap.size > 0) {
-    const contestIds = [...new Set(scrambleTeamContestMap.values())];
-    const { data: contestDays } = await queryClient
-      .from("contests")
-      .select("id, day_number, scoring_closed_at")
-      .in("id", contestIds);
-    for (const cd of contestDays || []) {
-      if (cd.day_number) scrambleContestDayMap.set(cd.id, cd.day_number);
-      if (!cd.scoring_closed_at) scrambleContestScoringOpen.add(cd.id);
+      const contest = Array.isArray(tc.contest) ? tc.contest[0] : tc.contest;
+      if (contest) {
+        if (contest.day_number) scrambleContestDayMap.set(contest.id, contest.day_number);
+        if (!contest.scoring_closed_at) scrambleContestScoringOpen.add(contest.id);
+      }
     }
   }
 
@@ -242,23 +244,15 @@ export default async function HomePage() {
   // Sort by day number
   activeRounds.sort((a, b) => a.dayNumber - b.dayNumber);
 
-  // Derive KGB Cup active round — any ryder_cup contest the user has a tee time for
+  // Derive KGB Cup active round — use pre-fetched ryder cup contests
   let kgbCupActiveRound: { teeTime: string; startingHole: number | null } | null = null;
-  const hasRyderCup = (contestTypesResult.data || []).some(
-    (c: { contest_type: string }) => c.contest_type === "ryder_cup"
-  );
   if (hasRyderCup) {
-    // Find any player tee time on a ryder_cup day (not restricted to today)
     const playerTeeTime = allMatches.find((tt) => tt.source === "player");
     if (playerTeeTime?.teeTime) {
       const dayNum = playerTeeTime.dayNumber;
-      const { data: rcContest } = await queryClient
-        .from("contests")
-        .select("id, scoring_closed_at")
-        .eq("trip_id", trip.id)
-        .eq("contest_type", "ryder_cup")
-        .eq("day_number", dayNum)
-        .maybeSingle();
+      const rcContest = (ryderCupContestsResult.data || []).find(
+        (c: { day_number: number | null }) => c.day_number === dayNum
+      );
       if (rcContest && !rcContest.scoring_closed_at) {
         kgbCupActiveRound = {
           teeTime: playerTeeTime.teeTime,
@@ -356,31 +350,39 @@ export default async function HomePage() {
     });
   }
 
-  // Process buyer paid status — calculate amount owed if not paid
+  // Process calcutta buyer owes + winnings — batch fetch ownership, pool, and prizes
   let calcuttaBuyerOwes = 0;
-  if (!buyerPaidResult.data && calcuttaContest) {
-    const { data: myOwnerships } = await queryClient
-      .from("calcutta_ownership")
-      .select("amount_paid")
-      .eq("owner_id", effectiveUserId);
-    if (myOwnerships) {
-      for (const o of myOwnerships) {
+  let myWinnings: { total: number; breakdown: { prizeName: string; amount: number }[] } | null = null;
+
+  if (calcuttaContest) {
+    // Fetch ownership (with participant data for winnings) + pool + prizes in parallel
+    const [ownershipResult, poolResult, prizesResult] = await Promise.all([
+      queryClient
+        .from("calcutta_ownership")
+        .select("participant_id, share_pct, amount_paid, participant:contest_participants!inner(user_id)")
+        .eq("owner_id", effectiveUserId),
+      queryClient
+        .from("contest_participants")
+        .select("bid_amount")
+        .eq("contest_id", calcuttaContest.id)
+        .not("bid_amount", "is", null),
+      queryClient
+        .from("calcutta_prizes")
+        .select("id, prize_name, percentage, linked_contest:contests!calcutta_prizes_linked_contest_id_fkey(name)")
+        .eq("contest_id", calcuttaContest.id),
+    ]);
+
+    const myOwnership = ownershipResult.data || [];
+
+    // Calculate buyer owes (if not already paid)
+    if (!buyerPaidResult.data && myOwnership.length > 0) {
+      for (const o of myOwnership) {
         calcuttaBuyerOwes += Number(o.amount_paid) || 0;
       }
     }
-  }
 
-  // Process winnings
-  let myWinnings: { total: number; breakdown: { prizeName: string; amount: number }[] } | null = null;
-  if (calcuttaContest && winningsResult.data && winningsResult.data.length > 0) {
-    // Get all ownership records for the current user
-    const { data: myOwnership } = await queryClient
-      .from("calcutta_ownership")
-      .select("participant_id, share_pct, participant:contest_participants!inner(user_id)")
-      .eq("owner_id", effectiveUserId);
-
-    if (myOwnership && myOwnership.length > 0) {
-      // Get owned user_ids
+    // Calculate winnings
+    if (winningsResult.data && winningsResult.data.length > 0 && myOwnership.length > 0) {
       const ownedUserIds = new Set(
         myOwnership.map((o) => {
           const p = Array.isArray(o.participant) ? o.participant[0] : o.participant;
@@ -388,7 +390,6 @@ export default async function HomePage() {
         }).filter(Boolean)
       );
 
-      // Build ownership share lookup: user_id -> share_pct
       const shareByUser: Record<string, number> = {};
       for (const o of myOwnership) {
         const p = Array.isArray(o.participant) ? o.participant[0] : o.participant;
@@ -396,19 +397,8 @@ export default async function HomePage() {
         if (uid) shareByUser[uid] = o.share_pct;
       }
 
-      // Get pool
-      const { data: poolParticipants } = await queryClient
-        .from("contest_participants")
-        .select("bid_amount")
-        .eq("contest_id", calcuttaContest.id)
-        .not("bid_amount", "is", null);
-      const pool = (poolParticipants || []).reduce((s, p) => s + (Number(p.bid_amount) || 0), 0);
-
-      // Get prizes
-      const { data: prizes } = await queryClient
-        .from("calcutta_prizes")
-        .select("id, prize_name, percentage, linked_contest:contests!calcutta_prizes_linked_contest_id_fkey(name)")
-        .eq("contest_id", calcuttaContest.id);
+      const pool = (poolResult.data || []).reduce((s, p) => s + (Number(p.bid_amount) || 0), 0);
+      const prizes = prizesResult.data || [];
 
       // Check which contest_winners match owned players
       const winnerRows = winningsResult.data as { prize_id: string; user_id: string }[];
@@ -557,6 +547,44 @@ export default async function HomePage() {
     return now >= gameTime - threeHours && now < gameTime;
   })();
 
+  // Build visibility context
+  const effectiveDate = await getEffectiveDate();
+  const visCtx = {
+    start_date: trip.start_date,
+    visibility_overrides: (trip.visibility_overrides as Record<string, boolean>) || {},
+  };
+
+  // Gate tee time card
+  const teeTimesVisible = isFeatureVisible("tee_times", visCtx, effectiveDate);
+
+  // Gate scoring cards — per-player tee time window
+  const scoringVisible = (teeTime: string | null, dayNumber: number | null) =>
+    isFeatureVisible("scoring", visCtx, effectiveDate, {
+      playerTeeTime: teeTime,
+      teeTimeDayNumber: dayNumber,
+    });
+
+  // Filter active rounds to only those in the scoring window
+  const visibleActiveRounds = activeRounds.filter((r) =>
+    scoringVisible(r.teeTime, r.dayNumber)
+  );
+
+  // Gate KGB Cup scoring card
+  const kgbVisible = kgbCupActiveRound
+    ? scoringVisible(
+        kgbCupActiveRound.teeTime,
+        allMatches.find((m) => m.source === "player")?.dayNumber ?? null
+      )
+    : false;
+
+  // Compute which quick link categories are visible
+  const hiddenQuickLinks: string[] = [];
+  if (!isFeatureVisible("scorecards", visCtx, effectiveDate)) hiddenQuickLinks.push("/scorecards");
+  if (!isFeatureVisible("skins", visCtx, effectiveDate)) hiddenQuickLinks.push("/skins");
+  if (!isFeatureVisible("hundred_feet", visCtx, effectiveDate)) hiddenQuickLinks.push("/hundred-feet");
+  if (!isFeatureVisible("daily_games", visCtx, effectiveDate)) hiddenQuickLinks.push("/daily-games");
+  if (!isFeatureVisible("rooms", visCtx, effectiveDate)) hiddenQuickLinks.push("/rooms");
+
   return (
     <HomeContent
       displayName={profile?.display_name || "Loozer"}
@@ -564,10 +592,10 @@ export default async function HomePage() {
       incompleteActionCount={incompleteActionCount}
       totalActionCount={totalActionCount}
       rsvpLikelihood={rsvpLikelihood}
-      myTeeTime={trip?.show_tee_times ? myTeeTime : null}
-      myStartingHole={trip?.show_tee_times ? myStartingHole : null}
-      myTeammates={trip?.show_tee_times ? myTeammates : []}
-      teeTimeDay={trip?.show_tee_times ? teeTimeDay : null}
+      myTeeTime={teeTimesVisible ? myTeeTime : null}
+      myStartingHole={teeTimesVisible ? myStartingHole : null}
+      myTeammates={teeTimesVisible ? myTeammates : []}
+      teeTimeDay={teeTimesVisible ? teeTimeDay : null}
       teeTimeLinkHref={bestMatch?.source === "player" ? "/kgb-cup" : bestMatch ? `/scorecards?day=${bestMatch.dayNumber}` : "/scorecards"}
       simulatedDate={simDate}
       participants={participants}
@@ -577,8 +605,8 @@ export default async function HomePage() {
       myCalcuttaRoster={myCalcuttaRoster}
       calcuttaBuyerOwes={calcuttaBuyerOwes}
       contestTypes={contestTypes}
-      activeRounds={activeRounds}
-      kgbCupActiveRound={kgbCupActiveRound}
+      activeRounds={visibleActiveRounds}
+      kgbCupActiveRound={kgbVisible ? kgbCupActiveRound : null}
       calcuttaAuctionActive={calcuttaContest?.calcutta_active_order != null && calcuttaContest.calcutta_active_order > 0}
       pickemUrgent={pickemUrgent}
       myWinnings={myWinnings}
@@ -590,6 +618,7 @@ export default async function HomePage() {
         title: latestArticleResult.data.title,
         publishAt: latestArticleResult.data.publish_at,
       } : null}
+      hiddenQuickLinks={hiddenQuickLinks}
     />
   );
 }

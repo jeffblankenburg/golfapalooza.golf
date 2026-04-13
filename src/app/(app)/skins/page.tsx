@@ -1,5 +1,7 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { SkinsContent } from "@/components/SkinsContent";
+import { getEffectiveDate } from "@/lib/simulator";
+import { isFeatureVisible } from "@/lib/visibility";
 
 export default async function SkinsPage() {
   const user = await getAuthUser();
@@ -11,7 +13,7 @@ export default async function SkinsPage() {
   // Get active trip
   const { data: trip } = await supabase
     .from("trip_settings")
-    .select("id, start_date")
+    .select("id, start_date, visibility_overrides")
     .eq("status", "active")
     .single();
 
@@ -19,6 +21,16 @@ export default async function SkinsPage() {
     return (
       <div className="px-4 pt-6 text-center text-gray-500">
         No active event found.
+      </div>
+    );
+  }
+
+  const now = await getEffectiveDate();
+  if (!isFeatureVisible("skins", { start_date: trip.start_date, visibility_overrides: (trip.visibility_overrides as Record<string, boolean>) || {} }, now)) {
+    return (
+      <div className="px-4 pt-6">
+        <h1 className="text-2xl font-bold text-gray-900">Skins</h1>
+        <p className="text-gray-500 text-center py-8">Skins results will be available once the event begins.</p>
       </div>
     );
   }

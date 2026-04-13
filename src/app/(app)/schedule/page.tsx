@@ -1,7 +1,8 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ScheduleView } from "@/components/ScheduleView";
-import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
+import { getEffectiveUserId, getEffectiveDate, isSimulating } from "@/lib/simulator";
+import { isFeatureVisible } from "@/lib/visibility";
 
 export default async function SchedulePage() {
   const user = await getAuthUser();
@@ -13,7 +14,7 @@ export default async function SchedulePage() {
 
   const { data: trip } = await supabase
     .from("trip_settings")
-    .select("id, start_date, show_tee_times, timezone")
+    .select("id, start_date, show_tee_times, timezone, visibility_overrides")
     .eq("status", "active")
     .single();
 
@@ -145,5 +146,8 @@ export default async function SchedulePage() {
     });
   }
 
-  return <ScheduleView items={items || []} startDate={trip.start_date} teeTimesByDay={trip.show_tee_times ? myTeeTimesByDay : {}} timezone={trip.timezone} eventDays={eventDays} />;
+  const effectiveDate = await getEffectiveDate();
+  const teeTimesVisible = isFeatureVisible("tee_times", { start_date: trip.start_date, visibility_overrides: (trip.visibility_overrides as Record<string, boolean>) || {} }, effectiveDate);
+
+  return <ScheduleView items={items || []} startDate={trip.start_date} teeTimesByDay={teeTimesVisible ? myTeeTimesByDay : {}} timezone={trip.timezone} eventDays={eventDays} />;
 }

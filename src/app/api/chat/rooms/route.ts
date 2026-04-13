@@ -63,75 +63,91 @@ export async function GET() {
     return NextResponse.json({ error: roomError.message }, { status: 500 });
   }
 
-  // Get last message for each room and unread counts
-  const roomsWithMeta = await Promise.all(
-    (rooms || []).map(async (room) => {
-      // Last message
-      const { data: lastMessages } = await admin
-        .from("chat_messages")
-        .select("id, content, image_url, created_at, sender:users!chat_messages_sender_public_user_fk(display_name)")
-        .eq("room_id", room.id)
-        .order("created_at", { ascending: false })
-        .limit(1);
+  // Batch fetch last messages, read receipts, and unread counts for ALL rooms at once
+  const [allMessagesResult, allReceiptsResult, allUnreadResult] = await Promise.all([
+    // Fetch recent messages for all rooms (grab a few per room, we'll pick the latest)
+    admin
+      .from("chat_messages")
+      .select("room_id, id, content, image_url, created_at, sender:users!chat_messages_sender_public_user_fk(display_name)")
+      .in("room_id", roomIds)
+      .order("created_at", { ascending: false }),
+    // Fetch all read receipts for this user
+    admin
+      .from("chat_read_receipts")
+      .select("room_id, last_read_at")
+      .in("room_id", roomIds)
+      .eq("user_id", effectiveUserId),
+    // Fetch all messages not sent by user (for unread counting)
+    admin
+      .from("chat_messages")
+      .select("room_id, created_at")
+      .in("room_id", roomIds)
+      .neq("sender_id", effectiveUserId)
+      .order("created_at", { ascending: false }),
+  ]);
 
-      const lastMessage = lastMessages?.[0] || null;
+  // Build last message map (first message per room since ordered desc)
+  type MessageRow = NonNullable<typeof allMessagesResult.data>[number];
+  const lastMessageMap = new Map<string, MessageRow>();
+  for (const msg of allMessagesResult.data || []) {
+    if (!lastMessageMap.has(msg.room_id)) {
+      lastMessageMap.set(msg.room_id, msg);
+    }
+  }
 
-      // Unread count: messages after user's last read receipt
-      const { data: receipt } = await admin
-        .from("chat_read_receipts")
-        .select("last_read_at")
-        .eq("room_id", room.id)
-        .eq("user_id", effectiveUserId)
-        .single();
+  // Build read receipt map
+  const receiptMap = new Map<string, string>();
+  for (const r of allReceiptsResult.data || []) {
+    receiptMap.set(r.room_id, r.last_read_at);
+  }
 
-      let unreadCount = 0;
-      if (lastMessage) {
-        const lastReadAt = receipt?.last_read_at || "1970-01-01T00:00:00Z";
-        const { count } = await admin
-          .from("chat_messages")
-          .select("id", { count: "exact", head: true })
-          .eq("room_id", room.id)
-          .gt("created_at", lastReadAt)
-          .neq("sender_id", effectiveUserId);
+  // Build unread count map
+  const unreadMap = new Map<string, number>();
+  for (const msg of allUnreadResult.data || []) {
+    const lastReadAt = receiptMap.get(msg.room_id) || "1970-01-01T00:00:00Z";
+    if (msg.created_at > lastReadAt) {
+      unreadMap.set(msg.room_id, (unreadMap.get(msg.room_id) || 0) + 1);
+    }
+  }
 
-        unreadCount = count || 0;
-      }
+  // Build room list without any per-room queries
+  const roomsWithMeta = (rooms || []).map((room) => {
+    const lastMessage = lastMessageMap.get(room.id) || null;
+    const unreadCount = unreadMap.get(room.id) || 0;
 
-      // Set display name based on room type
-      let displayName = room.name;
-      if (room.type === "dm") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const otherMember = (room.members as any[])?.find(
-          (m) => m.user?.id !== effectiveUserId
-        );
-        displayName = otherMember?.user?.display_name || "Direct Message";
-      } else if (!displayName) {
-        // Unnamed group — show member names
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const otherNames = (room.members as any[])
-          ?.filter((m) => m.user?.id !== effectiveUserId)
-          .map((m) => m.user?.display_name)
-          .filter(Boolean);
-        displayName = otherNames?.join(", ") || "Group Chat";
-      }
+    // Set display name based on room type
+    let displayName = room.name;
+    if (room.type === "dm") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const otherMember = (room.members as any[])?.find(
+        (m) => m.user?.id !== effectiveUserId
+      );
+      displayName = otherMember?.user?.display_name || "Direct Message";
+    } else if (!displayName) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const otherNames = (room.members as any[])
+        ?.filter((m) => m.user?.id !== effectiveUserId)
+        .map((m) => m.user?.display_name)
+        .filter(Boolean);
+      displayName = otherNames?.join(", ") || "Group Chat";
+    }
 
-      const meta = membershipMap.get(room.id);
+    const meta = membershipMap.get(room.id);
 
-      return {
-        id: room.id,
-        type: room.type,
-        name: displayName,
-        raw_name: room.name,
-        created_by: room.created_by,
-        members: room.members,
-        lastMessage,
-        unreadCount,
-        is_pinned: meta?.is_pinned || false,
-        role: meta?.role || "member",
-        created_at: room.created_at,
-      };
-    })
-  );
+    return {
+      id: room.id,
+      type: room.type,
+      name: displayName,
+      raw_name: room.name,
+      created_by: room.created_by,
+      members: room.members,
+      lastMessage,
+      unreadCount,
+      is_pinned: meta?.is_pinned || false,
+      role: meta?.role || "member",
+      created_at: room.created_at,
+    };
+  });
 
   // Sort: pinned first, then by recency
   roomsWithMeta.sort((a, b) => {

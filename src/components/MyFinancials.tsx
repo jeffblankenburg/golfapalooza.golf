@@ -193,45 +193,6 @@ export default function MyFinancials({ userId }: { userId: string }) {
                 key={t.id}
                 className="flex items-center gap-3 py-3 border-b border-gray-100 last:border-b-0"
               >
-                {/* Icon */}
-                <div
-                  className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${
-                    t.type === "charge"
-                      ? "bg-red-50 text-red-500"
-                      : "bg-green-50 text-green-500"
-                  }`}
-                >
-                  {t.type === "charge" ? (
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M19 14l-7 7m0 0l-7-7m7 7V3"
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5 10l7-7m0 0l7 7m-7-7v18"
-                      />
-                    </svg>
-                  )}
-                </div>
-
                 {/* Description + date */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">

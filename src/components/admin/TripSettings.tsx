@@ -16,6 +16,7 @@ interface TripData {
   hotel_address: string | null;
   notes: string | null;
   status: string;
+  tee_time_reminder_minutes: number;
 }
 
 interface TripSummary {
@@ -284,6 +285,21 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
                 <option key={tz.value} value={tz.value}>{tz.label}</option>
               ))}
             </select>
+          </Field>
+          <Field label="Tee Time Reminder">
+            <div className="flex items-center gap-2 justify-end">
+              <input
+                type="number"
+                min="0"
+                max="120"
+                value={trip.tee_time_reminder_minutes ?? 30}
+                onChange={(e) =>
+                  setTrip({ ...trip, tee_time_reminder_minutes: parseInt(e.target.value) || 0 })
+                }
+                className="w-16 text-right text-[16px] text-gray-900 bg-transparent outline-none"
+              />
+              <span className="text-sm text-gray-500">min before</span>
+            </div>
           </Field>
         </div>
 

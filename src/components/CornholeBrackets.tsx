@@ -84,12 +84,14 @@ export function CornholeBrackets({
           <h1 className="text-lg font-bold text-gray-900">Cornhole</h1>
           <PinnedNoteButton pinnedTo="cornhole" />
         </div>
-        <button
-          onClick={() => setShowRealNames(!showRealNames)}
-          className="text-xs text-orange-700 font-medium"
-        >
-          Show {showRealNames ? "nicknames" : "real names"}
-        </button>
+        {Object.values({ ...singles.nameMap, ...doubles.nameMap }).some((n) => n.full_name) && (
+          <button
+            onClick={() => setShowRealNames(!showRealNames)}
+            className="text-xs text-orange-700 font-medium"
+          >
+            Show {showRealNames ? "nicknames" : "real names"}
+          </button>
+        )}
       </div>
 
       {hasSingles && (

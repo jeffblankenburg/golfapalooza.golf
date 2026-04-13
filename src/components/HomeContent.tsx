@@ -225,6 +225,7 @@ export function HomeContent({
   optionsDeadline = null,
   hasSubmittedOptions = false,
   latestArticle = null,
+  hiddenQuickLinks = [],
 }: {
   displayName: string;
   trip: TripData | null;
@@ -253,11 +254,14 @@ export function HomeContent({
   optionsDeadline?: string | null;
   hasSubmittedOptions?: boolean;
   latestArticle?: { id: string; title: string; publishAt: string } | null;
+  hiddenQuickLinks?: string[];
 }) {
   const router = useRouter();
 
-  // Filter quick links based on which contest types exist
+  // Filter quick links based on which contest types exist and visibility
   const quickLinks = allQuickLinks.filter((link) => {
+    // Hide if visibility says so
+    if (hiddenQuickLinks && hiddenQuickLinks.includes(link.href)) return false;
     if (link.requiresContest === null) return true;
     if (!contestTypes || contestTypes.length === 0) return true; // show all if no data yet
     if (Array.isArray(link.requiresContest)) {

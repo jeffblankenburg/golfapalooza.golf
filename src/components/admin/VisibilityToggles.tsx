@@ -1,75 +1,74 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { VISIBILITY_FEATURES, isFeatureVisible, type VisibilityFeature } from "@/lib/visibility";
 
-interface VisibilityState {
-  show_tee_times: boolean;
-  show_teams: boolean;
-  show_rooms: boolean;
+interface TripData {
+  id: string;
+  start_date: string;
+  visibility_overrides: Record<string, boolean>;
 }
 
-const toggles: { key: keyof VisibilityState; label: string; description: string }[] = [
-  { key: "show_tee_times", label: "Tee Times", description: "Show tee times on schedule and home page" },
-  { key: "show_teams", label: "Teams", description: "Show scramble teams and scores" },
-  { key: "show_rooms", label: "Rooms", description: "Show room assignments" },
-];
-
 export function VisibilityToggles({ tripId }: { tripId: string }) {
-  const [state, setState] = useState<VisibilityState>({
-    show_tee_times: false,
-    show_teams: false,
-    show_rooms: false,
-  });
+  const [trip, setTrip] = useState<TripData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
 
-  const fetchState = useCallback(async () => {
+  const fetchTrip = useCallback(async () => {
     const res = await fetch(`/api/admin/trips?id=${tripId}`);
     const data = await res.json();
     if (data.trip) {
-      setState({
-        show_tee_times: data.trip.show_tee_times ?? false,
-        show_teams: data.trip.show_teams ?? false,
-        show_rooms: data.trip.show_rooms ?? false,
+      setTrip({
+        id: data.trip.id,
+        start_date: data.trip.start_date,
+        visibility_overrides: data.trip.visibility_overrides || {},
       });
     }
     setLoading(false);
   }, [tripId]);
 
   useEffect(() => {
-    fetchState();
-  }, [fetchState]);
+    fetchTrip();
+  }, [fetchTrip]);
 
-  const toggle = async (key: keyof VisibilityState) => {
-    const newValue = !state[key];
-    setState((prev) => ({ ...prev, [key]: newValue }));
-    setSaving(key);
+  const toggleOverride = async (feature: VisibilityFeature) => {
+    if (!trip) return;
+    setSaving(feature);
 
-    // Fetch full trip data first (PUT requires start_date)
+    const newOverrides = { ...trip.visibility_overrides };
+    if (newOverrides[feature]) {
+      delete newOverrides[feature];
+    } else {
+      newOverrides[feature] = true;
+    }
+
+    setTrip({ ...trip, visibility_overrides: newOverrides });
+
+    // Fetch full trip data for PUT (requires start_date)
     const tripRes = await fetch(`/api/admin/trips?id=${tripId}`);
     const tripData = await tripRes.json();
-    const trip = tripData.trip;
+    const fullTrip = tripData.trip;
 
     await fetch("/api/admin/trips", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         id: tripId,
-        trip_name: trip.trip_name,
-        trip_year: trip.trip_year,
-        start_date: trip.start_date,
-        location: trip.location,
-        hotel_name: trip.hotel_name,
-        hotel_address: trip.hotel_address,
-        notes: trip.notes,
-        [key]: newValue,
+        trip_name: fullTrip.trip_name,
+        trip_year: fullTrip.trip_year,
+        start_date: fullTrip.start_date,
+        location: fullTrip.location,
+        hotel_name: fullTrip.hotel_name,
+        hotel_address: fullTrip.hotel_address,
+        notes: fullTrip.notes,
+        visibility_overrides: newOverrides,
       }),
     });
 
     setSaving(null);
   };
 
-  if (loading) {
+  if (loading || !trip) {
     return (
       <div className="flex justify-center py-4">
         <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
@@ -77,35 +76,57 @@ export function VisibilityToggles({ tripId }: { tripId: string }) {
     );
   }
 
+  const now = new Date();
+
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-gray-500">
-        Control what Loozers can see. Hidden sections show a &quot;coming soon&quot; message.
+    <div className="space-y-2">
+      <p className="text-xs text-gray-400 text-center mb-3">
+        Features auto-show based on time rules. Use &quot;Force&quot; to override for demos or testing.
       </p>
-      {toggles.map((t) => (
-        <button
-          key={t.key}
-          onClick={() => toggle(t.key)}
-          disabled={saving === t.key}
-          className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-xl"
-        >
-          <div className="text-left">
-            <p className="font-medium text-gray-900">{t.label}</p>
-            <p className="text-sm text-gray-500">{t.description}</p>
-          </div>
+      {VISIBILITY_FEATURES.map((f) => {
+        const autoVisible = isFeatureVisible(f.key, trip, now);
+        const isForced = trip.visibility_overrides[f.key] === true;
+        const effectivelyVisible = autoVisible || isForced;
+
+        return (
           <div
-            className={`relative w-11 h-6 rounded-full transition-colors ${
-              state[t.key] ? "bg-green-600" : "bg-gray-300"
-            }`}
+            key={f.key}
+            className="flex items-center justify-between p-3 bg-gray-50 rounded-xl"
           >
-            <div
-              className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                state[t.key] ? "translate-x-[22px]" : "translate-x-0.5"
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="font-medium text-gray-900 text-sm">{f.label}</p>
+                <span
+                  className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${
+                    effectivelyVisible
+                      ? "bg-green-100 text-green-700"
+                      : "bg-gray-200 text-gray-500"
+                  }`}
+                >
+                  {effectivelyVisible ? "Visible" : "Hidden"}
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Auto: {f.autoDescription}
+                {isForced && !autoVisible && (
+                  <span className="text-amber-600 font-medium"> · Forced on</span>
+                )}
+              </p>
+            </div>
+            <button
+              onClick={() => toggleOverride(f.key)}
+              disabled={saving === f.key}
+              className={`ml-3 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                isForced
+                  ? "bg-amber-100 text-amber-700 border border-amber-200"
+                  : "bg-white text-gray-500 border border-gray-200"
               }`}
-            />
+            >
+              {saving === f.key ? "..." : isForced ? "Forced" : "Force"}
+            </button>
           </div>
-        </button>
-      ))}
+        );
+      })}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { MessageBubble } from "./MessageBubble";
 import { MessageInput } from "./MessageInput";
 import { TypingIndicator } from "./TypingIndicator";
+import { ChatRoomSettings } from "./ChatRoomSettings";
 import { logActivity } from "@/components/ActivityTracker";
 
 interface Message {
@@ -24,20 +25,35 @@ interface Message {
   } | null;
 }
 
+export interface ChatMember {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+  role: string;
+}
+
 export function ChatRoom({
   roomId,
   roomName,
+  rawRoomName,
   roomType,
   currentUserId,
   currentUserName,
   memberCount,
+  currentUserRole = "member",
+  createdBy,
+  members: initialMembers = [],
 }: {
   roomId: string;
   roomName: string;
+  rawRoomName?: string | null;
   roomType: string;
   currentUserId: string;
   currentUserName: string;
   memberCount: number;
+  currentUserRole?: string;
+  createdBy?: string | null;
+  members?: ChatMember[];
 }) {
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -46,6 +62,9 @@ export function ChatRoom({
   const [hasMore, setHasMore] = useState(true);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [showSettings, setShowSettings] = useState(false);
+  const [displayName, setDisplayName] = useState(roomName);
+  const [chatMembers, setChatMembers] = useState<ChatMember[]>(initialMembers);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldScrollRef = useRef(true);
@@ -304,6 +323,22 @@ export function ChatRoom({
     }
   };
 
+  const handleDeleteMessage = async (messageId: string) => {
+    // Optimistic removal
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    await fetch(`/api/chat/rooms/${roomId}/messages/${messageId}`, {
+      method: "DELETE",
+    });
+  };
+
+  const handleRename = (newName: string) => {
+    setDisplayName(newName);
+  };
+
+  const handleMembersChanged = (newMembers: ChatMember[]) => {
+    setChatMembers(newMembers);
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       {/* Chat header */}
@@ -318,12 +353,22 @@ export function ChatRoom({
         </button>
         <div className="flex-1 min-w-0">
           <h2 className="text-[17px] font-semibold text-gray-900 truncate">
-            {roomName}
+            {displayName}
           </h2>
           {roomType === "group" && (
-            <p className="text-xs text-gray-500">{memberCount} members</p>
+            <p className="text-xs text-gray-500">{chatMembers.length} members</p>
           )}
         </div>
+        {roomType === "group" && (
+          <button
+            onClick={() => setShowSettings(true)}
+            className="flex items-center justify-center w-10 h-10 -mr-2"
+          >
+            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Messages area */}
@@ -383,6 +428,7 @@ export function ChatRoom({
                     currentUserId={currentUserId}
                     onReply={() => setReplyTo(message)}
                     onReaction={(emoji) => handleReaction(message.id, emoji)}
+                    onDelete={() => handleDeleteMessage(message.id)}
                   />
                 </div>
               );
@@ -403,6 +449,21 @@ export function ChatRoom({
         onCancelReply={() => setReplyTo(null)}
         roomId={roomId}
       />
+
+      {/* Settings sheet */}
+      {showSettings && (
+        <ChatRoomSettings
+          roomId={roomId}
+          roomName={rawRoomName || ""}
+          currentUserId={currentUserId}
+          currentUserRole={currentUserRole}
+          members={chatMembers}
+          onClose={() => setShowSettings(false)}
+          onRename={handleRename}
+          onMembersChanged={handleMembersChanged}
+          onLeft={() => router.push("/chat")}
+        />
+      )}
     </div>
   );
 }

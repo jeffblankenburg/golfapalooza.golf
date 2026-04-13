@@ -22,9 +22,10 @@ export default async function ChatRoomPage({
   const { data: room } = await supabase
     .from("chat_rooms")
     .select(`
-      id, type, name,
+      id, type, name, created_by,
       members:chat_room_members(
-        user:users!chat_room_members_public_user_fk(id, display_name)
+        role,
+        user:users!chat_room_members_public_user_fk(id, display_name, avatar_url)
       )
     `)
     .eq("id", roomId)
@@ -59,14 +60,36 @@ export default async function ChatRoomPage({
     displayName = otherNames?.join(", ") || "Group Chat";
   }
 
+  // Get current user's role
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const currentMemberWithRole = (room.members as any[])?.find(
+    (m) => m.user?.id === effectiveUserId
+  );
+  const currentUserRole = currentMemberWithRole?.role || "member";
+
+  // Build members list with roles for settings
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const membersList = (room.members as any[])
+    ?.filter((m) => m.user)
+    .map((m) => ({
+      id: m.user.id,
+      display_name: m.user.display_name,
+      avatar_url: m.user.avatar_url,
+      role: m.role || "member",
+    })) || [];
+
   return (
     <ChatRoom
       roomId={roomId}
       roomName={displayName || "Chat"}
+      rawRoomName={room.name}
       roomType={room.type}
       currentUserId={effectiveUserId}
       currentUserName={currentUserName}
       memberCount={room.members?.length || 0}
+      currentUserRole={currentUserRole}
+      createdBy={room.created_by}
+      members={membersList}
     />
   );
 }

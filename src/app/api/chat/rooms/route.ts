@@ -24,12 +24,13 @@ export async function GET() {
 
   const effectiveUserId = await getEffectiveUserId(user.id);
 
-  // Get rooms the user is a member of
+  // Get rooms the user is a member of (exclude hidden rooms)
   const admin = createAdminClient();
   const { data: memberships, error: memError } = await admin
     .from("chat_room_members")
-    .select("room_id")
-    .eq("user_id", effectiveUserId);
+    .select("room_id, is_pinned, role, hidden_at")
+    .eq("user_id", effectiveUserId)
+    .is("hidden_at", null);
 
   if (memError) {
     return NextResponse.json({ error: memError.message }, { status: 500 });
@@ -41,13 +42,19 @@ export async function GET() {
 
   const roomIds = memberships.map((m) => m.room_id);
 
+  // Build lookup for current user's membership metadata
+  const membershipMap = new Map(
+    memberships.map((m) => [m.room_id, { is_pinned: m.is_pinned, role: m.role }])
+  );
+
   // Get rooms with members
   const { data: rooms, error: roomError } = await admin
     .from("chat_rooms")
     .select(`
-      id, type, name, created_at,
+      id, type, name, created_by, created_at,
       members:chat_room_members(
-        user:users!chat_room_members_public_user_fk(id, display_name, avatar_url)
+        user:users!chat_room_members_public_user_fk(id, display_name, avatar_url),
+        role
       )
     `)
     .in("id", roomIds);
@@ -108,20 +115,29 @@ export async function GET() {
         displayName = otherNames?.join(", ") || "Group Chat";
       }
 
+      const meta = membershipMap.get(room.id);
+
       return {
         id: room.id,
         type: room.type,
         name: displayName,
+        raw_name: room.name,
+        created_by: room.created_by,
         members: room.members,
         lastMessage,
         unreadCount,
+        is_pinned: meta?.is_pinned || false,
+        role: meta?.role || "member",
         created_at: room.created_at,
       };
     })
   );
 
-  // Sort: rooms with recent messages first
+  // Sort: pinned first, then by recency
   roomsWithMeta.sort((a, b) => {
+    // Pinned rooms first
+    if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
+    // Then by most recent message
     const aTime = a.lastMessage?.created_at || a.created_at;
     const bTime = b.lastMessage?.created_at || b.created_at;
     return new Date(bTime).getTime() - new Date(aTime).getTime();
@@ -239,11 +255,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: roomError.message }, { status: 500 });
   }
 
-  // Add all members
+  // Add all members (creator gets 'creator' role)
   const { error: memberError } = await admin
     .from("chat_room_members")
     .insert(
-      allMemberIds.map((uid) => ({ room_id: newRoom.id, user_id: uid }))
+      allMemberIds.map((uid) => ({
+        room_id: newRoom.id,
+        user_id: uid,
+        role: uid === effectiveUserId ? "creator" : "member",
+      }))
     );
 
   if (memberError) {

@@ -55,6 +55,7 @@ export function MessageBubble({
   currentUserId,
   onReply,
   onReaction,
+  onDelete,
 }: {
   message: Message;
   isSent: boolean;
@@ -64,6 +65,7 @@ export function MessageBubble({
   currentUserId: string;
   onReply: () => void;
   onReaction: (emoji: string) => void;
+  onDelete?: () => void;
 }) {
   const [showTapback, setShowTapback] = useState(false);
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
@@ -263,6 +265,10 @@ export function MessageBubble({
             setShowTapback(false);
           }}
           onClose={() => setShowTapback(false)}
+          onDelete={onDelete ? () => {
+            setShowTapback(false);
+            onDelete();
+          } : undefined}
         />
       )}
     </div>

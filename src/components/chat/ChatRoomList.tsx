@@ -1,18 +1,21 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { logActivity } from "@/components/ActivityTracker";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 interface RoomMember {
   user: { id: string; display_name: string; avatar_url: string | null } | null;
+  role?: string;
 }
 
 interface ChatRoom {
   id: string;
   type: "group" | "dm";
   name: string;
+  raw_name?: string | null;
+  created_by?: string | null;
   members: RoomMember[];
   lastMessage: {
     content: string | null;
@@ -21,6 +24,8 @@ interface ChatRoom {
     sender: { display_name: string } | null;
   } | null;
   unreadCount: number;
+  is_pinned: boolean;
+  role: string;
 }
 
 interface User {
@@ -60,6 +65,55 @@ export function ChatRoomList({
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
+  const [actionRoom, setActionRoom] = useState<ChatRoom | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTriggered = useRef(false);
+
+  const handleLongPressStart = useCallback((room: ChatRoom) => {
+    longPressTriggered.current = false;
+    longPressTimer.current = setTimeout(() => {
+      longPressTriggered.current = true;
+      setActionRoom(room);
+    }, 500);
+  }, []);
+
+  const handleLongPressEnd = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  const handlePin = async (room: ChatRoom) => {
+    // Optimistic update
+    setRooms((prev) =>
+      prev.map((r) =>
+        r.id === room.id ? { ...r, is_pinned: !r.is_pinned } : r
+      )
+    );
+    setActionRoom(null);
+    await fetch(`/api/chat/rooms/${room.id}/pin`, { method: "PATCH" });
+  };
+
+  const handleHideChat = async (room: ChatRoom) => {
+    setRooms((prev) => prev.filter((r) => r.id !== room.id));
+    setActionRoom(null);
+    await fetch(`/api/chat/rooms/${room.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "hide" }),
+    });
+  };
+
+  const handleLeaveChat = async (room: ChatRoom) => {
+    setRooms((prev) => prev.filter((r) => r.id !== room.id));
+    setActionRoom(null);
+    await fetch(`/api/chat/rooms/${room.id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "leave" }),
+    });
+  };
 
   useEffect(() => {
     fetch("/api/chat/rooms")
@@ -195,10 +249,8 @@ export function ChatRoomList({
     );
   }
 
-  // Pin main group chat at top
-  const groupRooms = rooms.filter((r) => r.type === "group");
-  const dmRooms = rooms.filter((r) => r.type === "dm");
-  const sortedRooms = [...groupRooms, ...dmRooms];
+  // Rooms are already sorted by API (pinned first, then by recency)
+  const sortedRooms = rooms;
 
   return (
     <div className="flex flex-col h-full">
@@ -231,7 +283,15 @@ export function ChatRoomList({
           {sortedRooms.map((room) => (
             <button
               key={room.id}
-              onClick={() => { logActivity("chat_open", `/chat/${room.id}`, { room_id: room.id, room_type: room.type }); router.push(`/chat/${room.id}`); }}
+              onClick={() => {
+                if (longPressTriggered.current) return;
+                logActivity("chat_open", `/chat/${room.id}`, { room_id: room.id, room_type: room.type });
+                router.push(`/chat/${room.id}`);
+              }}
+              onTouchStart={() => handleLongPressStart(room)}
+              onTouchEnd={handleLongPressEnd}
+              onTouchCancel={handleLongPressEnd}
+              onContextMenu={(e) => { e.preventDefault(); setActionRoom(room); }}
               className="flex items-center gap-3 w-full px-4 py-3 text-left active:bg-gray-50 border-b border-gray-50"
             >
               {/* Avatar */}
@@ -264,11 +324,18 @@ export function ChatRoomList({
                   <span className={`text-[15px] truncate ${room.unreadCount > 0 ? "font-semibold text-gray-900" : "font-medium text-gray-900"}`}>
                     {room.name}
                   </span>
-                  {room.lastMessage && (
-                    <span className={`text-xs flex-shrink-0 ml-2 ${room.unreadCount > 0 ? "text-green-600 font-medium" : "text-gray-400"}`}>
-                      {timeAgo(room.lastMessage.created_at)}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                    {room.is_pinned && (
+                      <svg className="w-3 h-3 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />
+                      </svg>
+                    )}
+                    {room.lastMessage && (
+                      <span className={`text-xs ${room.unreadCount > 0 ? "text-green-600 font-medium" : "text-gray-400"}`}>
+                        {timeAgo(room.lastMessage.created_at)}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {room.lastMessage && (
                   <p className={`text-sm truncate mt-0.5 ${room.unreadCount > 0 ? "text-gray-800 font-medium" : "text-gray-500"}`}>
@@ -288,6 +355,62 @@ export function ChatRoomList({
               )}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Room action sheet (long-press) */}
+      {actionRoom && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setActionRoom(null)} />
+          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl animate-slide-up safe-area-bottom">
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-gray-300" />
+            </div>
+            <p className="px-4 pb-2 text-sm font-semibold text-gray-900 truncate">
+              {actionRoom.name}
+            </p>
+            <div className="px-2 pb-2">
+              <button
+                onClick={() => handlePin(actionRoom)}
+                className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-left active:bg-gray-50"
+              >
+                <svg className="w-5 h-5 text-gray-500" fill={actionRoom.is_pinned ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />
+                </svg>
+                <span className="text-[15px] text-gray-900">
+                  {actionRoom.is_pinned ? "Unpin Chat" : "Pin Chat"}
+                </span>
+              </button>
+              <button
+                onClick={() => handleHideChat(actionRoom)}
+                className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-left active:bg-gray-50"
+              >
+                <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span className="text-[15px] text-red-600">Delete Chat</span>
+              </button>
+              {actionRoom.type === "group" && (
+                <button
+                  onClick={() => handleLeaveChat(actionRoom)}
+                  className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-left active:bg-gray-50"
+                >
+                  <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  <span className="text-[15px] text-red-600">Leave Group</span>
+                </button>
+              )}
+            </div>
+            <div className="px-4 pb-4">
+              <button
+                onClick={() => setActionRoom(null)}
+                className="w-full py-3 rounded-xl bg-gray-100 text-[15px] font-medium text-gray-700 active:bg-gray-200"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

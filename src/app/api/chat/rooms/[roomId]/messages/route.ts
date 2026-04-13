@@ -68,7 +68,16 @@ export async function GET(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const messages = data || [];
+  // Filter out messages hidden by the current user
+  const effectiveUserId = await getEffectiveUserId(user.id);
+  const admin = createAdminClient();
+  const { data: hiddenMessages } = await admin
+    .from("chat_hidden_messages")
+    .select("message_id")
+    .eq("user_id", effectiveUserId);
+  const hiddenIds = new Set((hiddenMessages || []).map((h) => h.message_id));
+
+  const messages = (data || []).filter((msg) => !hiddenIds.has(msg.id));
 
   // Collect IDs we need to resolve: broken senders + reply_to messages
   const senderIdsToResolve = new Set<string>();
@@ -218,8 +227,15 @@ export async function POST(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Send notifications to other room members
+  // Clear hidden_at for all members so the chat reappears for anyone who hid it
   const admin = createAdminClient();
+  await admin
+    .from("chat_room_members")
+    .update({ hidden_at: null })
+    .eq("room_id", roomId)
+    .not("hidden_at", "is", null);
+
+  // Send notifications to other room members
   const { data: members } = await admin
     .from("chat_room_members")
     .select("user_id")

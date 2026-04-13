@@ -584,6 +584,7 @@ export default async function HomePage() {
   if (!isFeatureVisible("hundred_feet", visCtx, effectiveDate)) hiddenQuickLinks.push("/hundred-feet");
   if (!isFeatureVisible("daily_games", visCtx, effectiveDate)) hiddenQuickLinks.push("/daily-games");
   if (!isFeatureVisible("rooms", visCtx, effectiveDate)) hiddenQuickLinks.push("/rooms");
+  if (!optionsDeadline) hiddenQuickLinks.push("/options");
 
   return (
     <HomeContent

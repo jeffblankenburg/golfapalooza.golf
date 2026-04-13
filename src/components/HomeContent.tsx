@@ -434,9 +434,11 @@ export function HomeContent({
             </div>
           )}
           {latestArticle.preview && (
-            <p className="px-4 py-3 text-sm text-gray-600 overflow-hidden" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-              {latestArticle.preview}
-            </p>
+            <div className="px-4 py-3 overflow-hidden">
+              <p className="text-xs text-gray-600 overflow-hidden" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                {latestArticle.preview}
+              </p>
+            </div>
           )}
         </Link>
       )}

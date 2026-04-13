@@ -15,7 +15,6 @@ import { RoomManager } from "@/components/admin/RoomManager";
 import { ActionItemsManager } from "@/components/admin/ActionItemsManager";
 import { AccoladesManager } from "@/components/admin/AccoladesManager";
 import { NotebookManager } from "@/components/admin/NotebookManager";
-import { TeeTimeManager } from "@/components/admin/TeeTimeManager";
 import { VisibilityToggles } from "@/components/admin/VisibilityToggles";
 import { DailyWinnersManager } from "@/components/admin/DailyWinnersManager";
 import { EventDaysManager } from "@/components/admin/EventDaysManager";
@@ -415,20 +414,6 @@ export default function EventDetailPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </Link>
-      )}
-
-      {can("manage_tee_times") && (
-        <CollapsibleSection
-          title="Tee Times"
-          summary={`${event_days.length} day${event_days.length !== 1 ? "s" : ""}`}
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          }
-        >
-          <TeeTimeManager tripId={tripId} />
-        </CollapsibleSection>
       )}
 
       {can("manage_schedule") && (

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 interface ActionItem {
   id: string;
@@ -92,7 +93,10 @@ export function ActionItemsList({
 
   return (
     <div className="px-4 pt-6 pb-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">Action Items</h1>
+      <div className="flex items-center gap-2 mb-1">
+        <h1 className="text-2xl font-bold text-gray-900">Action Items</h1>
+        <PinnedNoteButton pinnedTo="action_items" />
+      </div>
       <p className="text-sm text-gray-500 mb-6">
         {completedCount} of {totalCount} completed
       </p>

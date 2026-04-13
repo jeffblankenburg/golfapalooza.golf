@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 interface ContestItem {
   id: string;
@@ -551,7 +552,10 @@ export function ContestList({
   if (contests.length === 0) {
     return (
       <div className="px-4 pt-6">
+        <div className="flex items-center gap-2">
         <h1 className="text-2xl font-bold text-gray-900">Contests</h1>
+        <PinnedNoteButton pinnedTo="contests" />
+      </div>
         <p className="text-gray-500 text-center py-8">
           No contests have been set up yet.
         </p>
@@ -575,7 +579,10 @@ export function ContestList({
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Contests</h1>
+      <div className="flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-gray-900">Contests</h1>
+        <PinnedNoteButton pinnedTo="contests" />
+      </div>
 
       {sortedKeys.map((key) => {
         const group = dayGroups[key];

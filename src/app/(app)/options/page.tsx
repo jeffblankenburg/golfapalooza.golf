@@ -1,5 +1,6 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import OptionSelectionForm from "@/components/OptionSelectionForm";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 export default async function OptionsPage() {
   const user = await getAuthUser();
@@ -44,9 +45,12 @@ export default async function OptionsPage() {
 
   return (
     <div className="px-4 pt-6 pb-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">
-        {trip.trip_name} {trip.trip_year}
-      </h1>
+      <div className="flex items-center gap-2 mb-1">
+        <h1 className="text-2xl font-bold text-gray-900">
+          {trip.trip_name} {trip.trip_year}
+        </h1>
+        <PinnedNoteButton pinnedTo="options" />
+      </div>
       <p className="text-sm text-gray-500 mb-4">Select your trip options below</p>
       <OptionSelectionForm tripId={trip.id} />
     </div>

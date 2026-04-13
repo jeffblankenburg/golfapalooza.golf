@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { logActivity } from "@/components/ActivityTracker";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 interface RoomMember {
   user: { id: string; display_name: string; avatar_url: string | null } | null;
@@ -203,7 +204,10 @@ export function ChatRoomList({
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3">
-        <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
+          <PinnedNoteButton pinnedTo="chat" />
+        </div>
         <button
           onClick={openCompose}
           className="flex items-center justify-center w-10 h-10 rounded-full bg-green-600 text-white"

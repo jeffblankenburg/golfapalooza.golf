@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { RsvpStatus } from "./RsvpStatus";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 interface TripData {
   trip_name: string;
@@ -34,7 +35,10 @@ export function TripInfo({
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">{trip.trip_name}</h1>
+      <div className="flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-gray-900">{trip.trip_name}</h1>
+        <PinnedNoteButton pinnedTo="info" />
+      </div>
 
       {/* Overview */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">

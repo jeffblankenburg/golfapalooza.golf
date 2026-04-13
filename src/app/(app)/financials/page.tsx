@@ -1,6 +1,7 @@
 import { getAuthUser } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/simulator";
 import MyFinancials from "@/components/MyFinancials";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 export default async function FinancialsPage() {
   const user = await getAuthUser();
@@ -10,7 +11,10 @@ export default async function FinancialsPage() {
 
   return (
     <div className="px-4 pt-6 pb-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-4">My Financials</h1>
+      <div className="flex items-center gap-2 mb-4">
+        <h1 className="text-2xl font-bold text-gray-900">My Financials</h1>
+        <PinnedNoteButton pinnedTo="financials" />
+      </div>
       <MyFinancials userId={effectiveUserId} />
     </div>
   );

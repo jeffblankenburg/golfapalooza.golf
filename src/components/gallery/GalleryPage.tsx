@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 import { MediaUploader } from "./MediaUploader";
 import { MediaViewer } from "./MediaViewer";
@@ -243,7 +244,10 @@ export function GalleryPage({
     <>
       {/* Header + Filters */}
       <div className="flex items-start justify-between gap-2 mb-4">
-        <h1 className="text-2xl font-bold text-gray-900 flex-shrink-0">Photos</h1>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <h1 className="text-2xl font-bold text-gray-900">Photos</h1>
+          <PinnedNoteButton pinnedTo="gallery" />
+        </div>
         <div className="flex items-center gap-1.5 flex-wrap justify-end">
         {/* Sort toggle — single button, tap to swap */}
         <button

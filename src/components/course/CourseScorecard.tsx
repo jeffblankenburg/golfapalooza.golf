@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 import {
   CourseData,
   HoleData,
@@ -116,7 +117,10 @@ export function CourseScorecard({ course }: { course: CourseData }) {
     <div className="px-4 pt-4 space-y-5">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">{course.name}</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900">{course.name}</h1>
+          <PinnedNoteButton pinnedTo="course" />
+        </div>
         <p className="text-gray-500 mt-1">{course.location}</p>
       </div>
 

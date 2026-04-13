@@ -1,6 +1,7 @@
 "use client";
 
 import { getTimezoneAbbreviation } from "@/lib/utils/timezone";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 interface ItineraryItem {
   id: string;
@@ -66,7 +67,10 @@ export function ScheduleView({
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Schedule</h1>
+      <div className="flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-gray-900">Schedule</h1>
+        <PinnedNoteButton pinnedTo="schedule" />
+      </div>
 
       {/* Pre-Event */}
       {preEvent.length > 0 && (

@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useMusicPlayer, type Song } from "@/contexts/MusicPlayerContext";
 import ReactMarkdown from "react-markdown";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 function formatTime(seconds: number): string {
   if (!seconds || !isFinite(seconds)) return "0:00";
@@ -76,6 +77,10 @@ export function MusicPage({ initialSongs }: { initialSongs: Song[] }) {
 
   return (
     <div className="px-4 pt-4 pb-8">
+      <div className="flex items-center gap-2 mb-4">
+        <h1 className="text-2xl font-bold text-gray-900">Music</h1>
+        <PinnedNoteButton pinnedTo="music" />
+      </div>
       {/* Now Playing */}
       {currentSong && (
         <div className="mb-6">

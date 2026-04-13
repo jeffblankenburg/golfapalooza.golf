@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/simulator";
 import RoundCard from "@/components/my-rounds/RoundCard";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 export default async function MyRoundsPage() {
   const supabase = await createClient();
@@ -65,7 +66,10 @@ export default async function MyRoundsPage() {
   return (
     <div className="px-4 py-6 max-w-lg mx-auto">
       <div className="flex items-center justify-between mb-5">
-        <h1 className="text-2xl font-bold text-gray-900">My Rounds</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900">My Rounds</h1>
+          <PinnedNoteButton pinnedTo="my_rounds" />
+        </div>
         <Link
           href="/my-rounds/rounds/new"
           className="w-10 h-10 bg-green-600 text-white rounded-full flex items-center justify-center hover:bg-green-700 transition-colors shadow-sm shrink-0"

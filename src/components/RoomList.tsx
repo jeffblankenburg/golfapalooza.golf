@@ -1,5 +1,7 @@
 "use client";
 
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
+
 interface Occupant {
   id: string;
   display_name: string;
@@ -68,7 +70,10 @@ export function RoomList({
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Rooms</h1>
+      <div className="flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-gray-900">Rooms</h1>
+        <PinnedNoteButton pinnedTo="rooms" />
+      </div>
 
       {/* Your Room */}
       {myRoom ? (

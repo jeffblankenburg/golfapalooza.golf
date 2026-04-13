@@ -32,10 +32,10 @@ export async function PUT(
     return NextResponse.json({ error: "Not a member of this room" }, { status: 403 });
   }
 
-  // Verify room is a group
+  // Verify room is a group and not a system-managed room
   const { data: room } = await admin
     .from("chat_rooms")
-    .select("id, type")
+    .select("id, type, created_by")
     .eq("id", roomId)
     .single();
 
@@ -45,6 +45,10 @@ export async function PUT(
 
   if (room.type !== "group") {
     return NextResponse.json({ error: "Cannot rename a direct message" }, { status: 400 });
+  }
+
+  if (!room.created_by) {
+    return NextResponse.json({ error: "This chat cannot be renamed" }, { status: 400 });
   }
 
   const body = await request.json();

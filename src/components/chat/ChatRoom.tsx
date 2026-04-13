@@ -455,6 +455,7 @@ export function ChatRoom({
         <ChatRoomSettings
           roomId={roomId}
           roomName={rawRoomName || ""}
+          isSystemRoom={!createdBy}
           currentUserId={currentUserId}
           currentUserRole={currentUserRole}
           members={chatMembers}

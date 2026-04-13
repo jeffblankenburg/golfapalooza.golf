@@ -6,6 +6,7 @@ import type { ChatMember } from "./ChatRoom";
 export function ChatRoomSettings({
   roomId,
   roomName,
+  isSystemRoom = false,
   currentUserId,
   currentUserRole,
   members,
@@ -16,6 +17,7 @@ export function ChatRoomSettings({
 }: {
   roomId: string;
   roomName: string;
+  isSystemRoom?: boolean;
   currentUserId: string;
   currentUserRole: string;
   members: ChatMember[];
@@ -130,31 +132,33 @@ export function ChatRoomSettings({
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-5">
-          {/* Rename section */}
-          <div>
-            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              Group Name
-            </label>
-            <div className="flex items-center gap-2 mt-1">
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Enter group name"
-                maxLength={50}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
-              />
-              {nameChanged && (
-                <button
-                  onClick={handleSaveName}
-                  disabled={saving}
-                  className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-semibold active:opacity-80 disabled:opacity-50"
-                >
-                  {saving ? "..." : "Save"}
-                </button>
-              )}
+          {/* Rename section (hidden for system rooms) */}
+          {!isSystemRoom && (
+            <div>
+              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                Group Name
+              </label>
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter group name"
+                  maxLength={50}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
+                />
+                {nameChanged && (
+                  <button
+                    onClick={handleSaveName}
+                    disabled={saving}
+                    className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-semibold active:opacity-80 disabled:opacity-50"
+                  >
+                    {saving ? "..." : "Save"}
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Members section */}
           <div>
@@ -255,8 +259,8 @@ export function ChatRoomSettings({
             </div>
           </div>
 
-          {/* Leave button */}
-          <div>
+          {/* Leave button (hidden for system rooms) */}
+          {!isSystemRoom && <div>
             {!confirmLeave ? (
               <button
                 onClick={() => setConfirmLeave(true)}
@@ -285,7 +289,7 @@ export function ChatRoomSettings({
                 </div>
               </div>
             )}
-          </div>
+          </div>}
         </div>
       </div>
     </div>

@@ -434,7 +434,7 @@ export function HomeContent({
             </div>
           )}
           {latestArticle.preview && (
-            <p className="px-4 py-3 text-sm text-gray-600 line-clamp-2">
+            <p className="px-4 py-3 text-sm text-gray-600 overflow-hidden" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
               {latestArticle.preview}
             </p>
           )}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
@@ -17,6 +18,11 @@ interface Article {
 
 export function ArticleDetail({ article }: { article: Article }) {
   const publishDate = article.publish_at || article.created_at;
+
+  // Record view (fire-and-forget)
+  useEffect(() => {
+    fetch(`/api/articles/${article.id}/view`, { method: "POST" }).catch(() => {});
+  }, [article.id]);
 
   return (
     <div className="pb-8">

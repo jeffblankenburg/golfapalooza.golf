@@ -29,6 +29,7 @@ function statusLabel(article: Article): { text: string; color: string } {
 
 export function ArticleManager({ tripId }: { tripId: string }) {
   const [articles, setArticles] = useState<Article[]>([]);
+  const [viewCounts, setViewCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<EditorMode>("list");
 
@@ -44,9 +45,14 @@ export function ArticleManager({ tripId }: { tripId: string }) {
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; title: string } | null>(null);
 
   const fetchArticles = useCallback(async () => {
-    const res = await fetch(`/api/admin/articles?trip_id=${tripId}`);
-    const data = await res.json();
-    setArticles(data.articles || []);
+    const [articlesRes, viewsRes] = await Promise.all([
+      fetch(`/api/admin/articles?trip_id=${tripId}`),
+      fetch(`/api/admin/articles/views?trip_id=${tripId}`),
+    ]);
+    const articlesData = await articlesRes.json();
+    const viewsData = await viewsRes.json();
+    setArticles(articlesData.articles || []);
+    setViewCounts(viewsData.counts || {});
   }, [tripId]);
 
   useEffect(() => {
@@ -334,13 +340,24 @@ export function ArticleManager({ tripId }: { tripId: string }) {
                         {status.text}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {article.publish_at
-                        ? new Date(article.publish_at) > new Date()
-                          ? `Scheduled for ${new Date(article.publish_at).toLocaleDateString()}`
-                          : `Published ${new Date(article.publish_at).toLocaleDateString()}`
-                        : `Created ${new Date(article.created_at).toLocaleDateString()}`}
-                    </p>
+                    <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
+                      <span>
+                        {article.publish_at
+                          ? new Date(article.publish_at) > new Date()
+                            ? `Scheduled for ${new Date(article.publish_at).toLocaleDateString()}`
+                            : `Published ${new Date(article.publish_at).toLocaleDateString()}`
+                          : `Created ${new Date(article.created_at).toLocaleDateString()}`}
+                      </span>
+                      {viewCounts[article.id] > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] text-blue-600 font-medium">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          {viewCounts[article.id]}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button

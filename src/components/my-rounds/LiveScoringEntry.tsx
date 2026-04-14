@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, Fragment } from "react";
 import ScoringShell, { type HoleInfo } from "@/components/scoring/ScoringShell";
 import { getScoreDescription } from "@/lib/golf/calculator";
 
@@ -24,6 +24,7 @@ interface LiveScoringEntryProps {
   // For resuming: existing round data
   roundId?: string;
   initialScores?: Record<string, Record<number, number>>;
+  initialPutts?: Record<string, Record<number, number>>;
   initialPlayerMap?: Record<string, string>; // userId -> roundPlayerId
 }
 
@@ -34,6 +35,44 @@ function scoreColorClass(strokes: number | undefined, par: number): string {
   if (strokes < par) return "text-green-700";
   if (strokes > par) return "text-red-600";
   return "text-gray-900";
+}
+
+function MiniScoreCell({ score, par }: { score: number | undefined; par: number }) {
+  if (score == null) return <span className="text-[10px] text-gray-300">·</span>;
+  const diff = score - par;
+  if (diff <= -2) {
+    return (
+      <div className="relative w-[16px] h-[16px] flex items-center justify-center mx-auto">
+        <div className="absolute inset-0 rounded-full border-[1px] border-green-600" />
+        <div className="absolute inset-[2px] rounded-full border-[1px] border-green-600" />
+        <span className="relative z-10 text-[9px] font-bold text-green-700">{score}</span>
+      </div>
+    );
+  }
+  if (diff === -1) {
+    return (
+      <div className="relative w-[14px] h-[14px] flex items-center justify-center mx-auto">
+        <div className="absolute inset-0 rounded-full border-[1px] border-green-600" />
+        <span className="relative z-10 text-[9px] font-bold text-green-700">{score}</span>
+      </div>
+    );
+  }
+  if (diff === 0) return <span className="text-[10px] font-bold text-gray-900">{score}</span>;
+  if (diff === 1) {
+    return (
+      <div className="relative w-[14px] h-[14px] flex items-center justify-center mx-auto">
+        <div className="absolute inset-0 rounded-sm border-[1px] border-gray-900" />
+        <span className="relative z-10 text-[9px] font-bold text-gray-900">{score}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="relative w-[16px] h-[16px] flex items-center justify-center mx-auto">
+      <div className="absolute inset-0 rounded-sm border-[1px] border-gray-900" />
+      <div className="absolute inset-[2px] rounded-sm border-[1px] border-gray-900" />
+      <span className="relative z-10 text-[9px] font-bold text-gray-900">{score}</span>
+    </div>
+  );
 }
 
 export default function LiveScoringEntry({
@@ -47,6 +86,7 @@ export default function LiveScoringEntry({
   roundDate,
   roundId: existingRoundId,
   initialScores,
+  initialPutts,
   initialPlayerMap,
 }: LiveScoringEntryProps) {
   const visibleHoles = allHoles.filter((h) => {
@@ -56,13 +96,14 @@ export default function LiveScoringEntry({
   });
 
   const [scores, setScores] = useState<Record<string, Record<number, number>>>(initialScores || {});
+  const [putts, setPutts] = useState<Record<string, Record<number, number>>>(initialPutts || {});
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [roundId, setRoundId] = useState<string | null>(existingRoundId || null);
   const [playerMap, setPlayerMap] = useState<Record<string, string>>(initialPlayerMap || {});
   const [ready, setReady] = useState(!!existingRoundId);
 
   // Dirty tracking
-  const dirtyRef = useRef<Map<string, { round_player_id: string; hole_number: number; strokes: number }>>(new Map());
+  const dirtyRef = useRef<Map<string, { round_player_id: string; hole_number: number; strokes: number; putts?: number }>>(new Map());
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentHoleRef = useRef<HoleInfo>(visibleHoles[0]);
@@ -109,10 +150,10 @@ export default function LiveScoringEntry({
 
     try {
       // Group by round_player_id for batch upsert
-      const playerScoresMap = new Map<string, { hole_number: number; strokes: number }[]>();
+      const playerScoresMap = new Map<string, { hole_number: number; strokes: number; putts?: number }[]>();
       for (const s of toSave) {
         const existing = playerScoresMap.get(s.round_player_id) || [];
-        existing.push({ hole_number: s.hole_number, strokes: s.strokes });
+        existing.push({ hole_number: s.hole_number, strokes: s.strokes, ...(s.putts !== undefined ? { putts: s.putts } : {}) });
         playerScoresMap.set(s.round_player_id, existing);
       }
 
@@ -187,12 +228,38 @@ export default function LiveScoringEntry({
 
     const rpId = playerMap[playerId];
     if (rpId) {
-      dirtyRef.current.set(`${rpId}-${holeNumber}`, {
+      const key = `${rpId}-${holeNumber}`;
+      const existing = dirtyRef.current.get(key);
+      dirtyRef.current.set(key, {
         round_player_id: rpId,
         hole_number: holeNumber,
         strokes: value,
+        putts: existing?.putts,
       });
       scheduleSave();
+    }
+  }
+
+  function setPuttCount(playerId: string, holeNumber: number, value: number) {
+    setPutts((prev) => ({
+      ...prev,
+      [playerId]: { ...(prev[playerId] || {}), [holeNumber]: value },
+    }));
+
+    const rpId = playerMap[playerId];
+    if (rpId) {
+      const key = `${rpId}-${holeNumber}`;
+      const existing = dirtyRef.current.get(key);
+      const strokes = scores[playerId]?.[holeNumber];
+      if (strokes !== undefined) {
+        dirtyRef.current.set(key, {
+          round_player_id: rpId,
+          hole_number: holeNumber,
+          strokes,
+          putts: value,
+        });
+        scheduleSave();
+      }
     }
   }
 
@@ -205,9 +272,11 @@ export default function LiveScoringEntry({
     }
   }
 
-  function decrement(playerId: string, holeNumber: number) {
+  function decrement(playerId: string, par: number, holeNumber: number) {
     const current = scores[playerId]?.[holeNumber];
-    if (current !== undefined && current > 1) {
+    if (current === undefined) {
+      setScore(playerId, holeNumber, Math.max(1, par - 1));
+    } else if (current > 1) {
       setScore(playerId, holeNumber, current - 1);
     }
   }
@@ -258,27 +327,67 @@ export default function LiveScoringEntry({
           }, 0)}/{visibleHoles.length}
         </span>
       }
-      renderScorecardRows={(holes) => (
-        <>
-          <tr className="border-t border-gray-100">
-            {holes.map((h) => (
-              <td key={h.hole_number} className="px-0 py-0.5 text-center text-gray-400">{h.par}</td>
-            ))}
-          </tr>
-          {initialPlayers.map((p) => (
-            <tr key={p.id} className="border-t border-gray-100">
-              {holes.map((h) => {
-                const s = scores[p.id]?.[h.hole_number];
-                return (
-                  <td key={h.hole_number} className={`px-0 py-0.5 text-center font-bold ${scoreColorClass(s, h.par)}`}>
-                    {s ?? "·"}
-                  </td>
-                );
-              })}
+      renderScorecardRows={(holes) => {
+        const hasBothNines = holes.length > 9 && holes[0]?.hole_number <= 9;
+        const front9 = hasBothNines ? holes.filter((h) => h.hole_number <= 9) : [];
+        const back9 = hasBothNines ? holes.filter((h) => h.hole_number > 9) : [];
+        return (
+          <>
+            <tr className="border-t border-gray-100">
+              {holes.map((h) => (
+                <Fragment key={h.hole_number}>
+                  {h.hole_number === 10 && hasBothNines && (
+                    <td className="px-0 py-0.5 text-center text-gray-400 font-bold border-l border-r border-gray-200">
+                      {front9.reduce((s, fh) => s + fh.par, 0)}
+                    </td>
+                  )}
+                  <td className="px-0 py-0.5 text-center text-gray-400">{h.par}</td>
+                </Fragment>
+              ))}
+              {hasBothNines && (
+                <td className="px-0 py-0.5 text-center text-gray-400 font-bold border-l border-r border-gray-200">
+                  {back9.reduce((s, h) => s + h.par, 0)}
+                </td>
+              )}
+              <td className="px-0 py-0.5 text-center text-gray-400 font-bold border-l border-gray-200">
+                {holes.reduce((s, h) => s + h.par, 0)}
+              </td>
             </tr>
-          ))}
-        </>
-      )}
+            {initialPlayers.map((p) => {
+              const total = holes.reduce((s, h) => s + (scores[p.id]?.[h.hole_number] ?? 0), 0);
+              const front9Total = front9.reduce((s, h) => s + (scores[p.id]?.[h.hole_number] ?? 0), 0);
+              const back9Total = back9.reduce((s, h) => s + (scores[p.id]?.[h.hole_number] ?? 0), 0);
+              const hasAny = holes.some((h) => scores[p.id]?.[h.hole_number] != null);
+              const hasAnyFront = front9.some((h) => scores[p.id]?.[h.hole_number] != null);
+              const hasAnyBack = back9.some((h) => scores[p.id]?.[h.hole_number] != null);
+              return (
+                <tr key={p.id} className="border-t border-gray-100">
+                  {holes.map((h) => (
+                    <Fragment key={h.hole_number}>
+                      {h.hole_number === 10 && hasBothNines && (
+                        <td className="px-0 py-0.5 text-center font-bold text-gray-900 border-l border-r border-gray-200">
+                          {hasAnyFront ? front9Total : "·"}
+                        </td>
+                      )}
+                      <td className="px-0 py-0.5 text-center">
+                        <MiniScoreCell score={scores[p.id]?.[h.hole_number]} par={h.par} />
+                      </td>
+                    </Fragment>
+                  ))}
+                  {hasBothNines && (
+                    <td className="px-0 py-0.5 text-center font-bold text-gray-900 border-l border-r border-gray-200">
+                      {hasAnyBack ? back9Total : "·"}
+                    </td>
+                  )}
+                  <td className="px-0 py-0.5 text-center font-bold text-gray-900 border-l border-gray-200">
+                    {hasAny ? total : "·"}
+                  </td>
+                </tr>
+              );
+            })}
+          </>
+        );
+      }}
       courseStrip={
         <div className="shrink-0 bg-gray-900 px-4 py-1.5 flex items-center justify-center">
           <span className="text-xs font-medium text-white truncate">{courseName}</span>
@@ -292,33 +401,66 @@ export default function LiveScoringEntry({
               const hasValue = current !== undefined;
               const description = hasValue ? getScoreDescription(current, hole.par) : null;
 
+              const currentPutts = putts[p.id]?.[hole.hole_number];
+
+              const roundTotal = visibleHoles.reduce((sum, h) => sum + (scores[p.id]?.[h.hole_number] ?? 0), 0);
+              const holesPlayed = visibleHoles.filter((h) => scores[p.id]?.[h.hole_number] != null).length;
+
               return (
-                <div key={p.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-1.5">
-                  <div className="flex-1 min-w-0">
+                <div key={p.id} className="flex items-center bg-gray-50 rounded-lg px-3 py-1.5">
+                  {/* Player info */}
+                  <div className="w-14 min-w-0 shrink-0">
                     <div className="text-xs font-semibold text-gray-700 truncate">{p.name}</div>
-                    <div className="flex items-center gap-1.5">
-                      {p.teeName && <span className="text-[10px] text-gray-400">{p.teeName}</span>}
-                      {description && (
-                        <span className={`text-[10px] font-medium ${scoreColorClass(current, hole.par)}`}>
-                          {p.teeName ? "·" : ""} {description}
-                        </span>
-                      )}
-                    </div>
+                    {p.teeName && <div className="text-[10px] text-gray-400 truncate">{p.teeName}</div>}
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  {/* Running total */}
+                  <div className="w-10 shrink-0 flex items-center justify-center">
+                    <span className="text-2xl font-bold tabular-nums text-gray-900">
+                      {holesPlayed > 0 ? roundTotal : ""}
+                    </span>
+                  </div>
+                  <div className="flex-1" />
+                  {/* Strokes */}
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
-                      onClick={() => decrement(p.id, hole.hole_number)}
-                      disabled={!hasValue || current <= 1}
+                      onClick={() => decrement(p.id, hole.par, hole.hole_number)}
+                      disabled={hasValue && current <= 1}
                       className="w-9 h-9 flex items-center justify-center rounded-full bg-green-600 text-white text-lg font-bold disabled:opacity-30 active:bg-green-700"
                     >
                       −
                     </button>
-                    <span className={`text-2xl font-bold w-9 text-center tabular-nums ${scoreColorClass(current, hole.par)}`}>
-                      {hasValue ? current : "·"}
-                    </span>
+                    <div className="w-9 flex flex-col items-center leading-none">
+                      <span className={`text-2xl font-bold tabular-nums ${scoreColorClass(current, hole.par)}`}>
+                        {hasValue ? current : "·"}
+                      </span>
+                      <span className="text-[7px] text-gray-400 uppercase -mt-0.5">Strokes</span>
+                    </div>
                     <button
                       onClick={() => increment(p.id, hole.par, hole.hole_number)}
                       className="w-9 h-9 flex items-center justify-center rounded-full bg-green-600 text-white text-lg font-bold active:bg-green-700"
+                    >
+                      +
+                    </button>
+                  </div>
+                  {/* Putts */}
+                  <div className="w-px h-7 bg-gray-200 shrink-0 mx-2" />
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => setPuttCount(p.id, hole.hole_number, currentPutts === undefined ? 0 : Math.max(0, currentPutts - 1))}
+                      disabled={currentPutts !== undefined && currentPutts <= 0}
+                      className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-200 text-gray-600 text-xs font-bold disabled:opacity-30 active:bg-gray-300"
+                    >
+                      −
+                    </button>
+                    <div className="w-5 flex flex-col items-center leading-none">
+                      <span className="text-base font-bold tabular-nums text-gray-700">
+                        {currentPutts ?? "·"}
+                      </span>
+                      <span className="text-[7px] text-gray-400 uppercase -mt-0.5">Putts</span>
+                    </div>
+                    <button
+                      onClick={() => setPuttCount(p.id, hole.hole_number, currentPutts === undefined ? 1 : Math.min(10, currentPutts + 1))}
+                      className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-200 text-gray-600 text-xs font-bold active:bg-gray-300"
                     >
                       +
                     </button>

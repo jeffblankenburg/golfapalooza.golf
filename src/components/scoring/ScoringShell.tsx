@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect, type ReactNode } from "react";
+import { useState, useRef, useCallback, useEffect, Fragment, type ReactNode } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 
@@ -253,23 +253,31 @@ export default function ScoringShell({
 
       {/* Mini Scorecard */}
       <div ref={scorecardRef} className="overflow-x-auto border-t border-gray-200 bg-white shrink-0">
-        <table className="w-full text-[10px]" style={{ tableLayout: "fixed", minWidth: `${holes.length * 34}px` }}>
+        <table className="w-full text-[10px]" style={{ tableLayout: "fixed", minWidth: `${(holes.length + (holes.length > 9 ? 3 : 1)) * 34}px` }}>
           <thead>
             <tr className="bg-gray-50">
               {holes.map((h, i) => (
-                <th
-                  key={h.hole_number}
-                  data-active={h.hole_number === hole.hole_number}
-                  onClick={() => goToHole(i)}
-                  className={`px-0 py-1 text-center font-bold cursor-pointer ${
-                    h.hole_number === hole.hole_number
-                      ? "bg-green-600 text-white"
-                      : "text-gray-500 hover:bg-gray-100"
-                  }`}
-                >
-                  {h.hole_number}
-                </th>
+                <Fragment key={h.hole_number}>
+                  {h.hole_number === 10 && holes[0]?.hole_number <= 9 && (
+                    <th className="px-0 py-1 text-center font-bold text-gray-400 border-l border-r border-gray-200">Out</th>
+                  )}
+                  <th
+                    data-active={h.hole_number === hole.hole_number}
+                    onClick={() => goToHole(i)}
+                    className={`px-0 py-1 text-center font-bold cursor-pointer ${
+                      h.hole_number === hole.hole_number
+                        ? "bg-green-600 text-white"
+                        : "text-gray-500 hover:bg-gray-100"
+                    }`}
+                  >
+                    {h.hole_number}
+                  </th>
+                </Fragment>
               ))}
+              {holes.length > 9 && holes[0]?.hole_number <= 9 && (
+                <th className="px-0 py-1 text-center font-bold text-gray-400 border-l border-r border-gray-200">In</th>
+              )}
+              <th className="px-0 py-1 text-center font-bold text-gray-400 border-l border-gray-200">Tot</th>
             </tr>
           </thead>
           <tbody>
@@ -401,8 +409,8 @@ export default function ScoringShell({
 
       {/* Bottom scoring panel */}
       <div
-        className="shrink-0 bg-white border-t border-gray-200"
-        style={{ paddingBottom: "max(0.5rem, calc(0.5rem + env(safe-area-inset-bottom)))" }}
+        className="shrink min-h-0 bg-white border-t border-gray-200 overflow-y-auto"
+        style={{ paddingBottom: "max(0.5rem, calc(0.5rem + env(safe-area-inset-bottom)))", maxHeight: "45vh" }}
       >
         {renderScorePanel(hole, currentHoleIndex)}
       </div>

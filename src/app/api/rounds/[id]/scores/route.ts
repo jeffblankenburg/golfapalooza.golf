@@ -60,6 +60,8 @@ export async function POST(
 
       const grossUpdates: PromiseLike<unknown>[] = [];
 
+      const affectedPlayerIds: string[] = [];
+
       for (const ps of player_scores) {
         const { round_player_id, scores: playerScores } = ps;
         if (!round_player_id || !playerScores) continue;
@@ -77,25 +79,38 @@ export async function POST(
           });
         }
 
-        const totalStrokes = playerScores.reduce((sum: number, s: { strokes: number }) => sum + s.strokes, 0);
-        grossUpdates.push(
-          supabase
-            .from("round_players")
-            .update({ final_gross_score: totalStrokes })
-            .eq("id", round_player_id)
-        );
+        affectedPlayerIds.push(round_player_id);
       }
 
-      // One batch upsert for all scores, parallel gross score updates
-      const [upsertResult] = await Promise.all([
-        supabase
-          .from("round_scores")
-          .upsert(allRows, { onConflict: "round_player_id,hole_number" }),
-        ...grossUpdates,
-      ]);
+      // Upsert all scores
+      const { error: upsertError } = await supabase
+        .from("round_scores")
+        .upsert(allRows, { onConflict: "round_player_id,hole_number" });
 
-      if (upsertResult.error) {
-        return NextResponse.json({ error: upsertResult.error.message }, { status: 500 });
+      if (upsertError) {
+        return NextResponse.json({ error: upsertError.message }, { status: 500 });
+      }
+
+      // Recalculate gross score from ALL hole scores in DB (not just this batch)
+      if (affectedPlayerIds.length > 0) {
+        const { data: allDbScores } = await supabase
+          .from("round_scores")
+          .select("round_player_id, strokes")
+          .in("round_player_id", affectedPlayerIds);
+
+        const totalsByPlayer = new Map<string, number>();
+        for (const s of allDbScores || []) {
+          totalsByPlayer.set(s.round_player_id, (totalsByPlayer.get(s.round_player_id) || 0) + s.strokes);
+        }
+
+        await Promise.all(
+          affectedPlayerIds.map((rpId) =>
+            supabase
+              .from("round_players")
+              .update({ final_gross_score: totalsByPlayer.get(rpId) || null })
+              .eq("id", rpId)
+          )
+        );
       }
 
       return NextResponse.json({ success: true });
@@ -129,22 +144,26 @@ export async function POST(
       penalty_strokes: score.penalty_strokes ?? 0,
     }));
 
-    const totalStrokes = scores.reduce((sum: number, s: { strokes: number }) => sum + s.strokes, 0);
+    // Upsert scores first
+    const { error: upsertError } = await supabase
+      .from("round_scores")
+      .upsert(rows, { onConflict: "round_player_id,hole_number" });
 
-    // Batch upsert scores + update gross in parallel
-    const [upsertResult] = await Promise.all([
-      supabase
-        .from("round_scores")
-        .upsert(rows, { onConflict: "round_player_id,hole_number" }),
-      supabase
-        .from("round_players")
-        .update({ final_gross_score: totalStrokes })
-        .eq("id", roundPlayer.id),
-    ]);
-
-    if (upsertResult.error) {
-      return NextResponse.json({ error: upsertResult.error.message }, { status: 500 });
+    if (upsertError) {
+      return NextResponse.json({ error: upsertError.message }, { status: 500 });
     }
+
+    // Recalculate gross from ALL scores in DB
+    const { data: allDbScores } = await supabase
+      .from("round_scores")
+      .select("strokes")
+      .eq("round_player_id", roundPlayer.id);
+
+    const totalStrokes = (allDbScores || []).reduce((sum, s) => sum + s.strokes, 0);
+    await supabase
+      .from("round_players")
+      .update({ final_gross_score: totalStrokes || null })
+      .eq("id", roundPlayer.id);
 
     return NextResponse.json({ success: true });
   } catch {

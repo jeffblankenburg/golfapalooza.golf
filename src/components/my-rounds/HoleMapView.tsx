@@ -30,10 +30,18 @@ export default function HoleMapView({
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [loaded, setLoaded] = useState(false);
 
+  // Stable refs to avoid re-creating the map when parent re-renders with same values
+  const teeRef = useRef(teeLatLng);
+  const greenRef = useRef(greenLatLng);
+  teeRef.current = teeLatLng;
+  greenRef.current = greenLatLng;
+
   useEffect(() => {
     if (!containerRef.current) return;
 
     let cancelled = false;
+    const tee = teeRef.current;
+    const green = greenRef.current;
 
     async function init() {
       const mapboxgl = (await import("mapbox-gl")).default;
@@ -44,12 +52,12 @@ export default function HoleMapView({
 
       mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
-      const center: [number, number] = greenLatLng
-        ? [(teeLatLng[1] + greenLatLng[1]) / 2, (teeLatLng[0] + greenLatLng[0]) / 2]
-        : [teeLatLng[1], teeLatLng[0]];
+      const center: [number, number] = green
+        ? [(tee[1] + green[1]) / 2, (tee[0] + green[0]) / 2]
+        : [tee[1], tee[0]];
 
       // Bearing: rotate so green is at top (0° on screen)
-      const bearing = greenLatLng ? getBearing(teeLatLng, greenLatLng) : 0;
+      const bearing = green ? getBearing(tee, green) : 0;
 
       const map = new mapboxgl.Map({
         container: containerRef.current,
@@ -68,10 +76,10 @@ export default function HoleMapView({
         setLoaded(true);
 
         // Fit bounds to show both markers
-        if (greenLatLng) {
+        if (green) {
           const bounds = new mapboxgl.LngLatBounds(
-            [teeLatLng[1], teeLatLng[0]],
-            [greenLatLng[1], greenLatLng[0]]
+            [tee[1], tee[0]],
+            [green[1], green[0]]
           );
           map.fitBounds(bounds, {
             padding: { top: 80, bottom: 80, left: 50, right: 50 },
@@ -93,11 +101,11 @@ export default function HoleMapView({
           </div>`;
         teeEl.style.cursor = "default";
         new mapboxgl.Marker({ element: teeEl, anchor: "bottom" })
-          .setLngLat([teeLatLng[1], teeLatLng[0]])
+          .setLngLat([tee[1], tee[0]])
           .addTo(map);
 
         // Green/flag marker
-        if (greenLatLng) {
+        if (green) {
           const flagEl = document.createElement("div");
           flagEl.innerHTML = `
             <div style="display:flex;flex-direction:column;align-items:center;">
@@ -109,7 +117,7 @@ export default function HoleMapView({
             </div>`;
           flagEl.style.cursor = "default";
           new mapboxgl.Marker({ element: flagEl, anchor: "bottom" })
-            .setLngLat([greenLatLng[1], greenLatLng[0]])
+            .setLngLat([green[1], green[0]])
             .addTo(map);
         }
 
@@ -138,7 +146,9 @@ export default function HoleMapView({
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [teeLatLng, greenLatLng, holeNumber, showUserLocation]);
+  // Only re-create the map when the hole changes — coordinates are read from refs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holeNumber]);
 
   return (
     <div ref={containerRef} className="w-full h-full" style={{ minHeight: "200px" }}>

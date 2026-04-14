@@ -15,7 +15,7 @@ interface RoundData {
     user_id: string;
     user: { display_name: string } | null;
     tee: { tee_name: string } | null;
-    scores: { hole_number: number; strokes: number }[];
+    scores: { hole_number: number; strokes: number; putts: number | null }[];
   }[];
 }
 
@@ -29,6 +29,7 @@ export default function LiveScoringResumePage() {
     holes: HoleInfo[];
     players: { id: string; name: string; teeName?: string; roundPlayerId: string }[];
     initialScores: Record<string, Record<number, number>>;
+    initialPutts: Record<string, Record<number, number>>;
     initialPlayerMap: Record<string, string>;
     courseName: string;
     roundType: string;
@@ -61,8 +62,9 @@ export default function LiveScoringResumePage() {
         };
       });
 
-      // Build initial scores map: userId -> { holeNumber -> strokes }
+      // Build initial scores and putts maps: userId -> { holeNumber -> value }
       const initialScores: Record<string, Record<number, number>> = {};
+      const initialPutts: Record<string, Record<number, number>> = {};
       const initialPlayerMap: Record<string, string> = {};
 
       for (const rp of roundPlayers) {
@@ -71,6 +73,10 @@ export default function LiveScoringResumePage() {
           initialScores[rp.user_id] = {};
           for (const s of rp.scores) {
             initialScores[rp.user_id][s.hole_number] = s.strokes;
+            if (s.putts != null) {
+              if (!initialPutts[rp.user_id]) initialPutts[rp.user_id] = {};
+              initialPutts[rp.user_id][s.hole_number] = s.putts;
+            }
           }
         }
       }
@@ -80,6 +86,7 @@ export default function LiveScoringResumePage() {
         holes,
         players,
         initialScores,
+        initialPutts,
         initialPlayerMap,
         courseName: course?.name || "Unknown Course",
         roundType: round.round_type,
@@ -104,6 +111,7 @@ export default function LiveScoringResumePage() {
       courseName={data.courseName}
       roundId={roundId}
       initialScores={data.initialScores}
+      initialPutts={data.initialPutts}
       initialPlayerMap={data.initialPlayerMap}
       onClose={() => {
         router.push("/my-rounds");

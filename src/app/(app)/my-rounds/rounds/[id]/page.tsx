@@ -21,7 +21,7 @@ interface RoundData {
     final_gross_score: number | null;
     score_differential: number | null;
     user: { id: string; display_name: string; full_name: string | null } | null;
-    scores: { hole_number: number; strokes: number }[];
+    scores: { hole_number: number; strokes: number; putts: number | null }[];
   }[];
 }
 
@@ -186,10 +186,16 @@ export default function RoundDetailPage() {
           const playerScores = player.scores || [];
           const hasScores = playerScores.length > 0;
 
-          // Build scores map for ScorecardView
+          // Build scores and putts maps for ScorecardView
           const scoresMap: Record<number, number> = {};
+          const puttsMap: Record<number, number> = {};
+          let hasPutts = false;
           for (const s of playerScores) {
             scoresMap[s.hole_number] = s.strokes;
+            if (s.putts != null) {
+              puttsMap[s.hole_number] = s.putts;
+              hasPutts = true;
+            }
           }
 
           return (
@@ -209,9 +215,14 @@ export default function RoundDetailPage() {
                           <span className="text-[10px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded-full font-medium">You</span>
                         )}
                       </div>
-                      {player.score_differential != null && (
-                        <div className="text-xs text-gray-400 mt-0.5">
-                          Diff: {player.score_differential.toFixed(1)}
+                      {(player.score_differential != null || playerScores.some((s) => s.putts != null)) && (
+                        <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
+                          {player.score_differential != null && (
+                            <span>Diff: {player.score_differential.toFixed(1)}</span>
+                          )}
+                          {playerScores.some((s) => s.putts != null) && (
+                            <span>Putts: {playerScores.reduce((sum, s) => sum + (s.putts ?? 0), 0)}</span>
+                          )}
                         </div>
                       )}
                     </div>
@@ -245,7 +256,7 @@ export default function RoundDetailPage() {
 
               {isExpanded && hasScores && (
                 <div className="px-4 pb-4 border-t border-gray-100 pt-3">
-                  <ScorecardView holes={holes} scores={scoresMap} roundType={round.round_type} />
+                  <ScorecardView holes={holes} scores={scoresMap} putts={hasPutts ? puttsMap : undefined} roundType={round.round_type} />
                   <div className="mt-3 pt-2 border-t border-gray-100 text-[11px] text-gray-400 italic">
                     Attested by {creatorName || "unknown"} on{" "}
                     {new Date(round.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}

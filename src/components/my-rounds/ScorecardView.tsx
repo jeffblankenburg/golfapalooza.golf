@@ -10,6 +10,7 @@ interface HoleData {
 interface ScorecardViewProps {
   holes: HoleData[];
   scores: Record<number, number>;
+  putts?: Record<number, number>;
   roundType: string;
 }
 
@@ -66,7 +67,7 @@ function ScoreCell({ score, par }: { score: number | undefined; par: number }) {
   );
 }
 
-export default function ScorecardView({ holes, scores, roundType }: ScorecardViewProps) {
+export default function ScorecardView({ holes, scores, putts, roundType }: ScorecardViewProps) {
   const frontNine = holes.filter((h) => h.hole_number <= 9);
   const backNine = holes.filter((h) => h.hole_number > 9);
 
@@ -76,6 +77,8 @@ export default function ScorecardView({ holes, scores, roundType }: ScorecardVie
   function renderNine(nineHoles: HoleData[], label: string) {
     const parTotal = nineHoles.reduce((sum, h) => sum + h.par, 0);
     const scoreTotal = nineHoles.reduce((sum, h) => sum + (scores[h.hole_number] || 0), 0);
+    const hasPutts = putts && nineHoles.some((h) => putts[h.hole_number] != null);
+    const puttsTotal = hasPutts ? nineHoles.reduce((sum, h) => sum + (putts![h.hole_number] ?? 0), 0) : null;
 
     return (
       <div className="mb-3">
@@ -114,6 +117,19 @@ export default function ScorecardView({ holes, scores, roundType }: ScorecardVie
                   {scoreTotal || "–"}
                 </td>
               </tr>
+              {hasPutts && (
+                <tr className="border-t border-gray-100">
+                  <td className="py-1 pr-2 text-gray-400">Putts</td>
+                  {nineHoles.map((h) => (
+                    <td key={h.hole_number} className="text-center py-1 text-gray-400">
+                      {putts![h.hole_number] ?? ""}
+                    </td>
+                  ))}
+                  <td className="text-center py-1 font-medium text-gray-400 border-l border-gray-200">
+                    {puttsTotal}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -121,10 +137,31 @@ export default function ScorecardView({ holes, scores, roundType }: ScorecardVie
     );
   }
 
+  const totalPar = holes.reduce((sum, h) => sum + h.par, 0);
+  const totalScore = holes.reduce((sum, h) => sum + (scores[h.hole_number] || 0), 0);
+  const holesPlayed = holes.filter((h) => scores[h.hole_number] != null).length;
+  const showTotal = showFront && showBack && holesPlayed > 0;
+
   return (
     <div>
       {showFront && frontNine.length > 0 && renderNine(frontNine, "Front 9")}
       {showBack && backNine.length > 0 && renderNine(backNine, "Back 9")}
+      {showTotal && (
+        <div className="flex items-center justify-end gap-3 text-xs px-1 pt-1">
+          <span className="text-gray-500">Total</span>
+          <span className="font-bold text-gray-900">{totalScore}</span>
+          <span className="text-gray-400">/ {totalPar}</span>
+          {(() => {
+            const playedPar = holes.filter((h) => scores[h.hole_number] != null).reduce((sum, h) => sum + h.par, 0);
+            const diff = totalScore - playedPar;
+            return (
+              <span className={`font-bold ${diff < 0 ? "text-green-600" : diff > 0 ? "text-red-500" : "text-gray-500"}`}>
+                ({diff === 0 ? "E" : diff > 0 ? `+${diff}` : diff})
+              </span>
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 }

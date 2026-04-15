@@ -1511,21 +1511,25 @@ function CompositionTeeEditor({
 
       {isComposition && (
         <div className="px-4 py-3">
-          <div className="grid grid-cols-2 gap-2">
-            {Array.from({ length: 18 }, (_, i) => i + 1).map((holeNum) => (
-              <div key={holeNum} className="flex items-center gap-2">
-                <span className="text-xs font-bold text-gray-500 w-5 text-right">{holeNum}</span>
-                <select
-                  value={mappings[holeNum] || ""}
-                  onChange={(e) => updateHole(holeNum, e.target.value)}
-                  className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
-                >
-                  {otherTees.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.tee_name}
-                    </option>
-                  ))}
-                </select>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+            {[Array.from({ length: 9 }, (_, i) => i + 1), Array.from({ length: 9 }, (_, i) => i + 10)].map((col, colIdx) => (
+              <div key={colIdx} className="space-y-2">
+                {col.map((holeNum) => (
+                  <div key={holeNum} className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-gray-500 w-5 text-right">{holeNum}</span>
+                    <select
+                      value={mappings[holeNum] || ""}
+                      onChange={(e) => updateHole(holeNum, e.target.value)}
+                      className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
+                    >
+                      {otherTees.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.tee_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
               </div>
             ))}
           </div>

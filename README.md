@@ -173,7 +173,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Roommate listing
 
 ### Nominations
-- Nominate fellow participants (e.g., Rookie of the Year)
+- Nominate new rookies
 - Admin approval/rejection workflow
 
 ### Notebook

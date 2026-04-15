@@ -263,7 +263,7 @@ export function MessageInput({
         </button>
 
         {/* Text input bubble */}
-        <div className="flex-1 min-w-0 rounded-full border border-gray-300">
+        <div className={`flex-1 min-w-0 border border-gray-300 ${text.includes("\n") || text.length > 60 ? "rounded-2xl" : "rounded-full"}`}>
           <textarea
             ref={textareaRef}
             value={text}

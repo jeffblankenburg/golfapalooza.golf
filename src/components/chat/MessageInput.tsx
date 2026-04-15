@@ -55,14 +55,16 @@ export function MessageInput({
     await onSend(trimmed);
     setText("");
     setSending(false);
-    textareaRef.current?.focus();
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "36px";
+      textareaRef.current.focus();
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit();
-    }
+    // Enter inserts a new line (default textarea behavior)
+    // No keyboard shortcut to send — use the send button
+    void e;
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -268,6 +270,10 @@ export function MessageInput({
             onChange={(e) => {
               setText(e.target.value);
               onTyping();
+              // Auto-grow
+              const el = e.target;
+              el.style.height = "36px";
+              el.style.height = Math.min(el.scrollHeight, 120) + "px";
             }}
             onKeyDown={handleKeyDown}
             onFocus={() => {
@@ -275,8 +281,8 @@ export function MessageInput({
             }}
             placeholder="Message"
             rows={1}
-            style={{ backgroundColor: "transparent" }}
-            className="block w-full m-0 px-4 py-2 text-[16px] text-gray-900 placeholder-gray-400 resize-none outline-none border-none h-[36px] overflow-y-auto"
+            style={{ backgroundColor: "transparent", height: "36px" }}
+            className="block w-full m-0 px-4 py-2 text-[16px] text-gray-900 placeholder-gray-400 resize-none outline-none border-none overflow-y-auto"
           />
         </div>
 

@@ -6,6 +6,8 @@ interface HoleMapViewProps {
   teeLatLng: [number, number];
   greenLatLng: [number, number] | null;
   driveLatLng: [number, number] | null;
+  greenFrontLatLng: [number, number] | null;
+  greenBackLatLng: [number, number] | null;
   holeNumber: number;
   par: number;
   showUserLocation?: boolean;
@@ -36,6 +38,8 @@ export default function HoleMapView({
   teeLatLng,
   greenLatLng,
   driveLatLng,
+  greenFrontLatLng,
+  greenBackLatLng,
   holeNumber,
   par,
   showUserLocation = false,
@@ -49,9 +53,15 @@ export default function HoleMapView({
   const teeRef = useRef(teeLatLng);
   const greenRef = useRef(greenLatLng);
   const driveRef = useRef(driveLatLng);
+  const greenFrontRef = useRef(greenFrontLatLng);
+  const greenBackRef = useRef(greenBackLatLng);
   teeRef.current = teeLatLng;
   greenRef.current = greenLatLng;
   driveRef.current = driveLatLng;
+  greenFrontRef.current = greenFrontLatLng;
+  greenBackRef.current = greenBackLatLng;
+
+  const greenDepth = greenFrontLatLng && greenBackLatLng ? calcYards(greenFrontLatLng, greenBackLatLng) : null;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -265,15 +275,20 @@ export default function HoleMapView({
           Loading map...
         </div>
       )}
-      {loaded && driveYards && (
+      {loaded && (driveYards || greenDepth) && (
         <div className="absolute top-2 left-2 z-10 bg-black/60 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-lg space-y-0.5">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
-            <span>{driveYards.toTee}y</span>
-            <span className="w-2 h-2 rounded-full border-2 border-amber-400 inline-block" />
-            <span>{driveYards.toGreen}y</span>
-            <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-          </div>
+          {driveYards && (
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+              <span>{driveYards.toTee}y</span>
+              <span className="w-2 h-2 rounded-full border-2 border-amber-400 inline-block" />
+              <span>{driveYards.toGreen}y</span>
+              <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+            </div>
+          )}
+          {greenDepth != null && (
+            <div className="text-green-300">Green: {greenDepth}y deep</div>
+          )}
         </div>
       )}
     </div>

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { resolveHolesForTee } from "@/lib/golf/composition-tees";
 
-// GET - Get holes for a specific tee
+// GET - Get holes for a specific tee (handles composition tees transparently)
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string; teeId: string }> }
@@ -14,11 +15,7 @@ export async function GET(
 
   const { teeId } = await params;
 
-  const { data: holes, error } = await supabase
-    .from("course_holes")
-    .select("*")
-    .eq("tee_id", teeId)
-    .order("hole_number");
+  const { data: holes, error } = await resolveHolesForTee(supabase, teeId, "*");
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -9,6 +9,10 @@ interface Coordinates {
   green_longitude: number | null;
   drive_latitude: number | null;
   drive_longitude: number | null;
+  green_front_latitude: number | null;
+  green_front_longitude: number | null;
+  green_back_latitude: number | null;
+  green_back_longitude: number | null;
 }
 
 interface HoleMapEditorProps {
@@ -59,7 +63,7 @@ export default function HoleMapEditor({
   onSave,
   onClose,
 }: HoleMapEditorProps) {
-  const [placing, setPlacing] = useState<"tee" | "green" | "drive" | null>(null);
+  const [placing, setPlacing] = useState<"tee" | "green" | "drive" | "green_front" | "green_back" | null>(null);
   const [tee, setTee] = useState<[number, number] | null>(
     coordinates.tee_latitude != null && coordinates.tee_longitude != null
       ? [coordinates.tee_latitude, coordinates.tee_longitude]
@@ -75,6 +79,16 @@ export default function HoleMapEditor({
       ? [coordinates.drive_latitude, coordinates.drive_longitude]
       : null
   );
+  const [greenFront, setGreenFront] = useState<[number, number] | null>(
+    coordinates.green_front_latitude != null && coordinates.green_front_longitude != null
+      ? [coordinates.green_front_latitude, coordinates.green_front_longitude]
+      : null
+  );
+  const [greenBack, setGreenBack] = useState<[number, number] | null>(
+    coordinates.green_back_latitude != null && coordinates.green_back_longitude != null
+      ? [coordinates.green_back_latitude, coordinates.green_back_longitude]
+      : null
+  );
   const [geocodedCenter, setGeocodedCenter] = useState<[number, number] | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -82,6 +96,8 @@ export default function HoleMapEditor({
   const teeMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const greenMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const driveMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const greenFrontMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const greenBackMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const placingRef = useRef(placing);
   placingRef.current = placing;
 
@@ -124,6 +140,7 @@ export default function HoleMapEditor({
   const teeToGreen = tee && green ? calcYards(tee, green) : null;
   const teeToDrive = tee && drive ? calcYards(tee, drive) : null;
   const driveToGreen = drive && green ? calcYards(drive, green) : null;
+  const greenDepth = greenFront && greenBack ? calcYards(greenFront, greenBack) : null;
 
   const center: [number, number] = tee || green || (
     courseLatitude != null && courseLongitude != null
@@ -175,25 +192,22 @@ export default function HoleMapEditor({
         if (tee) addMarker(mapboxgl, map, tee, "tee");
         if (green) addMarker(mapboxgl, map, green, "green");
         if (drive) addMarker(mapboxgl, map, drive, "drive");
+        if (greenFront) addMarker(mapboxgl, map, greenFront, "green_front");
+        if (greenBack) addMarker(mapboxgl, map, greenBack, "green_back");
 
         map.on("click", (e) => {
           const latLng: [number, number] = [e.lngLat.lat, e.lngLat.lng];
           const mode = placingRef.current;
-          if (mode === "tee") {
-            setTee(latLng);
+          const handlers: Record<string, () => void> = {
+            tee: () => { setTee(latLng); teeMarkerRef.current?.remove(); addMarker(mapboxgl, map, latLng, "tee"); },
+            green: () => { setGreen(latLng); greenMarkerRef.current?.remove(); addMarker(mapboxgl, map, latLng, "green"); },
+            drive: () => { setDrive(latLng); driveMarkerRef.current?.remove(); addMarker(mapboxgl, map, latLng, "drive"); },
+            green_front: () => { setGreenFront(latLng); greenFrontMarkerRef.current?.remove(); addMarker(mapboxgl, map, latLng, "green_front"); },
+            green_back: () => { setGreenBack(latLng); greenBackMarkerRef.current?.remove(); addMarker(mapboxgl, map, latLng, "green_back"); },
+          };
+          if (mode && handlers[mode]) {
+            handlers[mode]();
             setPlacing(null);
-            teeMarkerRef.current?.remove();
-            addMarker(mapboxgl, map, latLng, "tee");
-          } else if (mode === "green") {
-            setGreen(latLng);
-            setPlacing(null);
-            greenMarkerRef.current?.remove();
-            addMarker(mapboxgl, map, latLng, "green");
-          } else if (mode === "drive") {
-            setDrive(latLng);
-            setPlacing(null);
-            driveMarkerRef.current?.remove();
-            addMarker(mapboxgl, map, latLng, "drive");
           }
         });
       });
@@ -209,11 +223,13 @@ export default function HoleMapEditor({
         return el;
       }
 
-      function addMarker(gl: typeof mapboxgl, m: mapboxgl.Map, pos: [number, number], type: "tee" | "green" | "drive") {
+      function addMarker(gl: typeof mapboxgl, m: mapboxgl.Map, pos: [number, number], type: "tee" | "green" | "drive" | "green_front" | "green_back") {
         const configs = {
           tee: { color: "#2563eb", label: "Tee", hollow: false },
           green: { color: "#16a34a", label: "Green", hollow: false },
           drive: { color: "#f59e0b", label: "Drive", hollow: true },
+          green_front: { color: "#16a34a", label: "Front", hollow: true },
+          green_back: { color: "#16a34a", label: "Back", hollow: true },
         };
         const cfg = configs[type];
         const el = makeDotEl(cfg.color, cfg.label, cfg.hollow);
@@ -222,7 +238,9 @@ export default function HoleMapEditor({
           .addTo(m);
         if (type === "tee") teeMarkerRef.current = marker;
         else if (type === "green") greenMarkerRef.current = marker;
-        else driveMarkerRef.current = marker;
+        else if (type === "drive") driveMarkerRef.current = marker;
+        else if (type === "green_front") greenFrontMarkerRef.current = marker;
+        else if (type === "green_back") greenBackMarkerRef.current = marker;
       }
     }
 
@@ -244,6 +262,10 @@ export default function HoleMapEditor({
       green_longitude: green ? green[1] : null,
       drive_latitude: drive ? drive[0] : null,
       drive_longitude: drive ? drive[1] : null,
+      green_front_latitude: greenFront ? greenFront[0] : null,
+      green_front_longitude: greenFront ? greenFront[1] : null,
+      green_back_latitude: greenBack ? greenBack[0] : null,
+      green_back_longitude: greenBack ? greenBack[1] : null,
     });
   }
 
@@ -251,9 +273,13 @@ export default function HoleMapEditor({
     setTee(null);
     setGreen(null);
     setDrive(null);
+    setGreenFront(null);
+    setGreenBack(null);
     teeMarkerRef.current?.remove();
     greenMarkerRef.current?.remove();
     driveMarkerRef.current?.remove();
+    greenFrontMarkerRef.current?.remove();
+    greenBackMarkerRef.current?.remove();
     teeMarkerRef.current = null;
     greenMarkerRef.current = null;
     driveMarkerRef.current = null;
@@ -310,11 +336,39 @@ export default function HoleMapEditor({
               {placing === "drive" ? "Tap map..." : drive ? "Move Drive" : "Place Drive"}
             </button>
           </div>
-          {(teeToGreen != null || teeToDrive != null) && (
-            <div className="flex justify-center gap-4 text-xs text-gray-500 mt-2">
+          {/* Green front/back buttons */}
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={() => setPlacing(placing === "green_front" ? null : "green_front")}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                placing === "green_front"
+                  ? "bg-green-600 text-white ring-2 ring-green-300"
+                  : greenFront
+                    ? "bg-green-50 text-green-700 border border-green-200"
+                    : "bg-gray-100 text-gray-500"
+              }`}
+            >
+              {placing === "green_front" ? "Tap map..." : greenFront ? "Move Front" : "Green Front"}
+            </button>
+            <button
+              onClick={() => setPlacing(placing === "green_back" ? null : "green_back")}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                placing === "green_back"
+                  ? "bg-green-600 text-white ring-2 ring-green-300"
+                  : greenBack
+                    ? "bg-green-50 text-green-700 border border-green-200"
+                    : "bg-gray-100 text-gray-500"
+              }`}
+            >
+              {placing === "green_back" ? "Tap map..." : greenBack ? "Move Back" : "Green Back"}
+            </button>
+          </div>
+          {(teeToGreen != null || teeToDrive != null || greenDepth != null) && (
+            <div className="flex flex-wrap justify-center gap-3 text-xs text-gray-500 mt-2">
               {teeToGreen != null && <span>Tee→Green: {teeToGreen}y</span>}
               {teeToDrive != null && <span>Tee→Drive: {teeToDrive}y</span>}
               {driveToGreen != null && <span>Drive→Green: {driveToGreen}y</span>}
+              {greenDepth != null && <span className="text-green-600 font-medium">Green depth: {greenDepth}y</span>}
             </div>
           )}
         </div>

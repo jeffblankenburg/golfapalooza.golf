@@ -30,6 +30,10 @@ interface HoleData {
   green_longitude: number | null;
   drive_latitude: number | null;
   drive_longitude: number | null;
+  green_front_latitude: number | null;
+  green_front_longitude: number | null;
+  green_back_latitude: number | null;
+  green_back_longitude: number | null;
 }
 
 interface CourseInfo {
@@ -830,6 +834,15 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
         )}
       </section>
 
+      {/* Composition Tee Section */}
+      {selectedTee && tees.length > 1 && (
+        <CompositionTeeEditor
+          teeId={selectedTee.id}
+          teeName={selectedTee.tee_name}
+          otherTees={tees.filter((t) => t.id !== selectedTee.id)}
+        />
+      )}
+
       {/* Holes Section */}
       <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
@@ -969,7 +982,7 @@ function HoleRow({
   onUpdate: (field: "par" | "handicap_index" | "yards", value: string) => void;
   onUpload: (imageType: "overhead" | "green") => void;
   onDelete: (imageType: "overhead" | "green") => void;
-  onMapSave: (holeId: string, coords: { tee_latitude: number | null; tee_longitude: number | null; green_latitude: number | null; green_longitude: number | null; drive_latitude: number | null; drive_longitude: number | null }) => void;
+  onMapSave: (holeId: string, coords: Record<string, number | null>) => void;
   uploadingKey: string | null;
   courseLatitude: number | null;
   courseLongitude: number | null;
@@ -1078,9 +1091,13 @@ function HoleRow({
             green_longitude: hole.green_longitude,
             drive_latitude: hole.drive_latitude,
             drive_longitude: hole.drive_longitude,
+            green_front_latitude: hole.green_front_latitude,
+            green_front_longitude: hole.green_front_longitude,
+            green_back_latitude: hole.green_back_latitude,
+            green_back_longitude: hole.green_back_longitude,
           }}
           onSave={(coords) => {
-            onMapSave(hole.id, coords);
+            onMapSave(hole.id, coords as unknown as Record<string, number | null>);
             setShowMap(false);
           }}
           onClose={() => setShowMap(false)}
@@ -1358,5 +1375,139 @@ function TeeColorModal({
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Composition Tee Editor ──
+
+function CompositionTeeEditor({
+  teeId,
+  teeName,
+  otherTees,
+}: {
+  teeId: string;
+  teeName: string;
+  otherTees: { id: string; tee_name: string }[];
+}) {
+  const [isComposition, setIsComposition] = useState(false);
+  const [mappings, setMappings] = useState<Record<number, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      const res = await fetch(`/api/admin/course/composition-tees?tee_id=${teeId}`);
+      const data = await res.json();
+      const m = data.mappings || [];
+      if (m.length > 0) {
+        setIsComposition(true);
+        const map: Record<number, string> = {};
+        for (const entry of m) {
+          map[entry.hole_number] = entry.source_tee_id;
+        }
+        setMappings(map);
+      } else {
+        setIsComposition(false);
+        setMappings({});
+      }
+      setLoading(false);
+    }
+    load();
+  }, [teeId]);
+
+  const handleToggle = async () => {
+    if (isComposition) {
+      // Remove composition — delete all mappings
+      await fetch("/api/admin/course/composition-tees", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tee_id: teeId }),
+      });
+      setIsComposition(false);
+      setMappings({});
+    } else {
+      // Enable composition — default all holes to first other tee
+      const defaultTeeId = otherTees[0]?.id;
+      if (!defaultTeeId) return;
+      const newMappings: Record<number, string> = {};
+      for (let h = 1; h <= 18; h++) {
+        newMappings[h] = defaultTeeId;
+      }
+      setMappings(newMappings);
+      setIsComposition(true);
+      await saveMappings(newMappings);
+    }
+  };
+
+  const saveMappings = async (m: Record<number, string>) => {
+    setSaving(true);
+    const arr = Object.entries(m).map(([holeNum, sourceTeeId]) => ({
+      hole_number: parseInt(holeNum),
+      source_tee_id: sourceTeeId,
+    }));
+    await fetch("/api/admin/course/composition-tees", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tee_id: teeId, mappings: arr }),
+    });
+    setSaving(false);
+  };
+
+  const updateHole = (holeNumber: number, sourceTeeId: string) => {
+    const updated = { ...mappings, [holeNumber]: sourceTeeId };
+    setMappings(updated);
+    saveMappings(updated);
+  };
+
+  if (loading) return null;
+
+  return (
+    <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-700">Composition Tee</h2>
+          <p className="text-xs text-gray-400">Combine holes from multiple tee boxes</p>
+        </div>
+        <button
+          onClick={handleToggle}
+          className={`relative w-11 h-6 rounded-full transition-colors ${
+            isComposition ? "bg-green-600" : "bg-gray-300"
+          }`}
+        >
+          <div
+            className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+              isComposition ? "translate-x-[22px]" : "translate-x-0.5"
+            }`}
+          />
+        </button>
+      </div>
+
+      {isComposition && (
+        <div className="px-4 py-3">
+          <div className="grid grid-cols-2 gap-2">
+            {Array.from({ length: 18 }, (_, i) => i + 1).map((holeNum) => (
+              <div key={holeNum} className="flex items-center gap-2">
+                <span className="text-xs font-bold text-gray-500 w-5 text-right">{holeNum}</span>
+                <select
+                  value={mappings[holeNum] || ""}
+                  onChange={(e) => updateHole(holeNum, e.target.value)}
+                  className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
+                >
+                  {otherTees.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.tee_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+          {saving && (
+            <p className="text-xs text-gray-400 text-center mt-2">Saving...</p>
+          )}
+        </div>
+      )}
+    </section>
   );
 }

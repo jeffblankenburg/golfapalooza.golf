@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { calculateDifferential, calculateAdjustedGrossScore, calculateCourseHandicap } from "@/lib/golf/calculator";
 import { recalculateHandicap } from "@/lib/golf/handicap";
+import { resolveHolesForTee } from "@/lib/golf/composition-tees";
 import { getEffectiveUserId } from "@/lib/simulator";
 
 // GET - Fetch round with full details
@@ -36,13 +37,9 @@ export async function GET(
     return NextResponse.json({ error: "Round not found" }, { status: 404 });
   }
 
-  // Also fetch hole data for the tee
+  // Fetch hole data for the tee (handles composition tees transparently)
   const teeId = round.tee_id;
-  const { data: holes } = await supabase
-    .from("course_holes")
-    .select("*")
-    .eq("tee_id", teeId)
-    .order("hole_number");
+  const { data: holes } = await resolveHolesForTee(supabase, teeId, "*");
 
   // Backfill missing differentials for any player with a score but no differential
   const tee = Array.isArray(round.tee) ? round.tee[0] : round.tee;

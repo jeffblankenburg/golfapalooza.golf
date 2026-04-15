@@ -26,6 +26,10 @@ export interface HoleInfo {
   green_longitude?: number | null;
   drive_latitude?: number | null;
   drive_longitude?: number | null;
+  green_front_latitude?: number | null;
+  green_front_longitude?: number | null;
+  green_back_latitude?: number | null;
+  green_back_longitude?: number | null;
 }
 
 interface ScoringShellProps {
@@ -383,6 +387,12 @@ export default function ScoringShell({
                   : null}
                 driveLatLng={hole.drive_latitude != null && hole.drive_longitude != null
                   ? [hole.drive_latitude, hole.drive_longitude]
+                  : null}
+                greenFrontLatLng={hole.green_front_latitude != null && hole.green_front_longitude != null
+                  ? [hole.green_front_latitude, hole.green_front_longitude]
+                  : null}
+                greenBackLatLng={hole.green_back_latitude != null && hole.green_back_longitude != null
+                  ? [hole.green_back_latitude, hole.green_back_longitude]
                   : null}
                 holeNumber={hole.hole_number}
                 par={hole.par}

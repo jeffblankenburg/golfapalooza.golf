@@ -28,6 +28,8 @@ interface HoleData {
   tee_longitude: number | null;
   green_latitude: number | null;
   green_longitude: number | null;
+  drive_latitude: number | null;
+  drive_longitude: number | null;
 }
 
 interface CourseInfo {
@@ -967,7 +969,7 @@ function HoleRow({
   onUpdate: (field: "par" | "handicap_index" | "yards", value: string) => void;
   onUpload: (imageType: "overhead" | "green") => void;
   onDelete: (imageType: "overhead" | "green") => void;
-  onMapSave: (holeId: string, coords: { tee_latitude: number | null; tee_longitude: number | null; green_latitude: number | null; green_longitude: number | null }) => void;
+  onMapSave: (holeId: string, coords: { tee_latitude: number | null; tee_longitude: number | null; green_latitude: number | null; green_longitude: number | null; drive_latitude: number | null; drive_longitude: number | null }) => void;
   uploadingKey: string | null;
   courseLatitude: number | null;
   courseLongitude: number | null;
@@ -1074,6 +1076,8 @@ function HoleRow({
             tee_longitude: hole.tee_longitude,
             green_latitude: hole.green_latitude,
             green_longitude: hole.green_longitude,
+            drive_latitude: hole.drive_latitude,
+            drive_longitude: hole.drive_longitude,
           }}
           onSave={(coords) => {
             onMapSave(hole.id, coords);

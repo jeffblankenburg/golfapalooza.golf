@@ -7,6 +7,8 @@ interface Coordinates {
   tee_longitude: number | null;
   green_latitude: number | null;
   green_longitude: number | null;
+  drive_latitude: number | null;
+  drive_longitude: number | null;
 }
 
 interface HoleMapEditorProps {
@@ -23,6 +25,27 @@ interface HoleMapEditorProps {
   onClose: () => void;
 }
 
+function getBearing(from: [number, number], to: [number, number]): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const toDeg = (r: number) => (r * 180) / Math.PI;
+  const lat1 = toRad(from[0]);
+  const lat2 = toRad(to[0]);
+  const dLng = toRad(to[1] - from[1]);
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+function calcYards(a: [number, number], b: [number, number]): number {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(b[0] - a[0]);
+  const dLng = toRad(b[1] - a[1]);
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLng / 2) ** 2;
+  const meters = R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+  return Math.round(meters * 1.09361);
+}
+
 export default function HoleMapEditor({
   holeNumber,
   courseId,
@@ -36,7 +59,7 @@ export default function HoleMapEditor({
   onSave,
   onClose,
 }: HoleMapEditorProps) {
-  const [placing, setPlacing] = useState<"tee" | "green" | null>(null);
+  const [placing, setPlacing] = useState<"tee" | "green" | "drive" | null>(null);
   const [tee, setTee] = useState<[number, number] | null>(
     coordinates.tee_latitude != null && coordinates.tee_longitude != null
       ? [coordinates.tee_latitude, coordinates.tee_longitude]
@@ -47,17 +70,22 @@ export default function HoleMapEditor({
       ? [coordinates.green_latitude, coordinates.green_longitude]
       : null
   );
+  const [drive, setDrive] = useState<[number, number] | null>(
+    coordinates.drive_latitude != null && coordinates.drive_longitude != null
+      ? [coordinates.drive_latitude, coordinates.drive_longitude]
+      : null
+  );
   const [geocodedCenter, setGeocodedCenter] = useState<[number, number] | null>(null);
-  const [distanceYards, setDistanceYards] = useState<number | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const teeMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const greenMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const driveMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const placingRef = useRef(placing);
   placingRef.current = placing;
 
-  // Geocode if no coordinates — use Mapbox Geocoding API
+  // Geocode if no coordinates
   useEffect(() => {
     if (courseLatitude != null && courseLongitude != null) return;
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -79,7 +107,6 @@ export default function HoleMapEditor({
           if (data.features?.length > 0) {
             const [lng, lat] = data.features[0].center;
             setGeocodedCenter([lat, lng]);
-            // Save back to course
             fetch(`/api/courses/${courseId}`, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
@@ -93,20 +120,10 @@ export default function HoleMapEditor({
     tryGeocode();
   }, [courseLatitude, courseLongitude, courseAddress, courseName, courseCity, courseState, courseId]);
 
-  // Calculate distance
-  useEffect(() => {
-    if (tee && green) {
-      const R = 6371000;
-      const toRad = (d: number) => (d * Math.PI) / 180;
-      const dLat = toRad(green[0] - tee[0]);
-      const dLng = toRad(green[1] - tee[1]);
-      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(tee[0])) * Math.cos(toRad(green[0])) * Math.sin(dLng / 2) ** 2;
-      const meters = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      setDistanceYards(Math.round(meters * 1.09361));
-    } else {
-      setDistanceYards(null);
-    }
-  }, [tee, green]);
+  // Calculate distances
+  const teeToGreen = tee && green ? calcYards(tee, green) : null;
+  const teeToDrive = tee && drive ? calcYards(tee, drive) : null;
+  const driveToGreen = drive && green ? calcYards(drive, green) : null;
 
   const center: [number, number] = tee || green || (
     courseLatitude != null && courseLongitude != null
@@ -127,11 +144,14 @@ export default function HoleMapEditor({
 
       mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
+      const bearing = tee && green ? getBearing(tee, green) : 0;
+
       const map = new mapboxgl.Map({
         container: containerRef.current,
         style: "mapbox://styles/mapbox/satellite-streets-v12",
         center: [center[1], center[0]],
         zoom: tee || green ? 17 : 15,
+        bearing,
         attributionControl: false,
       });
       mapRef.current = map;
@@ -139,56 +159,70 @@ export default function HoleMapEditor({
       map.on("load", () => {
         if (cancelled) return;
 
-        // Add existing markers
-        if (tee) addTeeMarker(mapboxgl, map, tee);
-        if (green) addGreenMarker(mapboxgl, map, green);
+        // Fit bounds with same orientation as live scoring
+        if (tee && green) {
+          const bounds = new mapboxgl.LngLatBounds(
+            [tee[1], tee[0]],
+            [green[1], green[0]]
+          );
+          map.fitBounds(bounds, {
+            padding: { top: 80, bottom: 80, left: 50, right: 50 },
+            bearing,
+            maxZoom: 18,
+          });
+        }
 
-        // Click to place
+        if (tee) addMarker(mapboxgl, map, tee, "tee");
+        if (green) addMarker(mapboxgl, map, green, "green");
+        if (drive) addMarker(mapboxgl, map, drive, "drive");
+
         map.on("click", (e) => {
           const latLng: [number, number] = [e.lngLat.lat, e.lngLat.lng];
-          if (placingRef.current === "tee") {
+          const mode = placingRef.current;
+          if (mode === "tee") {
             setTee(latLng);
             setPlacing(null);
             teeMarkerRef.current?.remove();
-            addTeeMarker(mapboxgl, map, latLng);
-          } else if (placingRef.current === "green") {
+            addMarker(mapboxgl, map, latLng, "tee");
+          } else if (mode === "green") {
             setGreen(latLng);
             setPlacing(null);
             greenMarkerRef.current?.remove();
-            addGreenMarker(mapboxgl, map, latLng);
+            addMarker(mapboxgl, map, latLng, "green");
+          } else if (mode === "drive") {
+            setDrive(latLng);
+            setPlacing(null);
+            driveMarkerRef.current?.remove();
+            addMarker(mapboxgl, map, latLng, "drive");
           }
         });
       });
 
-      function makeCrosshairEl(color: string, label: string) {
+      function makeDotEl(color: string, label: string, hollow = false) {
         const el = document.createElement("div");
         el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;">
-          <svg width="36" height="36" viewBox="0 0 36 36">
-            <line x1="18" y1="0" x2="18" y2="14" stroke="${color}" stroke-width="2" stroke-opacity="0.8"/>
-            <line x1="18" y1="22" x2="18" y2="36" stroke="${color}" stroke-width="2" stroke-opacity="0.8"/>
-            <line x1="0" y1="18" x2="14" y2="18" stroke="${color}" stroke-width="2" stroke-opacity="0.8"/>
-            <line x1="22" y1="18" x2="36" y2="18" stroke="${color}" stroke-width="2" stroke-opacity="0.8"/>
-            <circle cx="18" cy="18" r="4" fill="${color}" stroke="white" stroke-width="2"/>
+          <svg width="24" height="24" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="8" fill="${hollow ? "none" : color}" stroke="${hollow ? color : "white"}" stroke-width="${hollow ? "3" : "2.5"}"/>
           </svg>
-          <div style="margin-top:2px;background:${color};color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;white-space:nowrap;">${label}</div>
+          <div style="margin-top:1px;background:rgba(0,0,0,0.7);color:white;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;white-space:nowrap;">${label}</div>
         </div>`;
         return el;
       }
 
-      function addTeeMarker(gl: typeof mapboxgl, m: mapboxgl.Map, pos: [number, number]) {
-        const el = makeCrosshairEl("#2563eb", "Tee");
+      function addMarker(gl: typeof mapboxgl, m: mapboxgl.Map, pos: [number, number], type: "tee" | "green" | "drive") {
+        const configs = {
+          tee: { color: "#2563eb", label: "Tee", hollow: false },
+          green: { color: "#16a34a", label: "Green", hollow: false },
+          drive: { color: "#f59e0b", label: "Drive", hollow: true },
+        };
+        const cfg = configs[type];
+        const el = makeDotEl(cfg.color, cfg.label, cfg.hollow);
         const marker = new gl.Marker({ element: el, anchor: "center" })
           .setLngLat([pos[1], pos[0]])
           .addTo(m);
-        teeMarkerRef.current = marker;
-      }
-
-      function addGreenMarker(gl: typeof mapboxgl, m: mapboxgl.Map, pos: [number, number]) {
-        const el = makeCrosshairEl("#16a34a", "Green");
-        const marker = new gl.Marker({ element: el, anchor: "center" })
-          .setLngLat([pos[1], pos[0]])
-          .addTo(m);
-        greenMarkerRef.current = marker;
+        if (type === "tee") teeMarkerRef.current = marker;
+        else if (type === "green") greenMarkerRef.current = marker;
+        else driveMarkerRef.current = marker;
       }
     }
 
@@ -208,16 +242,21 @@ export default function HoleMapEditor({
       tee_longitude: tee ? tee[1] : null,
       green_latitude: green ? green[0] : null,
       green_longitude: green ? green[1] : null,
+      drive_latitude: drive ? drive[0] : null,
+      drive_longitude: drive ? drive[1] : null,
     });
   }
 
   function handleClear() {
     setTee(null);
     setGreen(null);
+    setDrive(null);
     teeMarkerRef.current?.remove();
     greenMarkerRef.current?.remove();
+    driveMarkerRef.current?.remove();
     teeMarkerRef.current = null;
     greenMarkerRef.current = null;
+    driveMarkerRef.current = null;
   }
 
   return (
@@ -236,7 +275,7 @@ export default function HoleMapEditor({
           <div className="flex gap-2">
             <button
               onClick={() => setPlacing(placing === "tee" ? null : "tee")}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-colors ${
                 placing === "tee"
                   ? "bg-blue-600 text-white ring-2 ring-blue-300"
                   : tee
@@ -248,7 +287,7 @@ export default function HoleMapEditor({
             </button>
             <button
               onClick={() => setPlacing(placing === "green" ? null : "green")}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-colors ${
                 placing === "green"
                   ? "bg-green-600 text-white ring-2 ring-green-300"
                   : green
@@ -258,10 +297,24 @@ export default function HoleMapEditor({
             >
               {placing === "green" ? "Tap map..." : green ? "Move Green" : "Place Green"}
             </button>
+            <button
+              onClick={() => setPlacing(placing === "drive" ? null : "drive")}
+              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-colors ${
+                placing === "drive"
+                  ? "bg-amber-500 text-white ring-2 ring-amber-300"
+                  : drive
+                    ? "bg-amber-50 text-amber-700 border border-amber-200"
+                    : "bg-gray-100 text-gray-600"
+              }`}
+            >
+              {placing === "drive" ? "Tap map..." : drive ? "Move Drive" : "Place Drive"}
+            </button>
           </div>
-          {distanceYards != null && (
-            <div className="text-center text-xs text-gray-500 mt-2">
-              Tee to green: ~{distanceYards} yards
+          {(teeToGreen != null || teeToDrive != null) && (
+            <div className="flex justify-center gap-4 text-xs text-gray-500 mt-2">
+              {teeToGreen != null && <span>Tee→Green: {teeToGreen}y</span>}
+              {teeToDrive != null && <span>Tee→Drive: {teeToDrive}y</span>}
+              {driveToGreen != null && <span>Drive→Green: {driveToGreen}y</span>}
             </div>
           )}
         </div>
@@ -281,7 +334,7 @@ export default function HoleMapEditor({
           >
             Save Markers
           </button>
-          {(tee || green) && (
+          {(tee || green || drive) && (
             <button
               onClick={handleClear}
               className="px-4 py-3 border border-gray-300 rounded-xl font-semibold text-gray-600 active:bg-gray-50"

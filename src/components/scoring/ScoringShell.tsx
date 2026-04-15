@@ -24,6 +24,8 @@ export interface HoleInfo {
   tee_longitude?: number | null;
   green_latitude?: number | null;
   green_longitude?: number | null;
+  drive_latitude?: number | null;
+  drive_longitude?: number | null;
 }
 
 interface ScoringShellProps {
@@ -379,7 +381,11 @@ export default function ScoringShell({
                 greenLatLng={hole.green_latitude != null && hole.green_longitude != null
                   ? [hole.green_latitude, hole.green_longitude]
                   : null}
+                driveLatLng={hole.drive_latitude != null && hole.drive_longitude != null
+                  ? [hole.drive_latitude, hole.drive_longitude]
+                  : null}
                 holeNumber={hole.hole_number}
+                par={hole.par}
               />
             </div>
           ) : currentImageUrl ? (

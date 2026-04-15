@@ -108,9 +108,11 @@ export default function LiveScoringEntry({
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentHoleRef = useRef<HoleInfo>(visibleHoles[0]);
 
-  // Create round on mount if new
+  // Create round on mount if new (guard against StrictMode double-mount)
+  const creatingRef = useRef(false);
   useEffect(() => {
-    if (existingRoundId || !courseId || !teeId) return;
+    if (existingRoundId || !courseId || !teeId || creatingRef.current) return;
+    creatingRef.current = true;
 
     async function createRound() {
       const res = await fetch("/api/rounds", {

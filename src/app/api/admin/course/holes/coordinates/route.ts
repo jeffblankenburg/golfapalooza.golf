@@ -10,7 +10,7 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const { hole_id, tee_latitude, tee_longitude, green_latitude, green_longitude } =
+    const { hole_id, tee_latitude, tee_longitude, green_latitude, green_longitude, drive_latitude, drive_longitude } =
       await request.json();
 
     if (!hole_id) {
@@ -25,6 +25,8 @@ export async function PUT(request: Request) {
         tee_longitude: tee_longitude ?? null,
         green_latitude: green_latitude ?? null,
         green_longitude: green_longitude ?? null,
+        drive_latitude: drive_latitude ?? null,
+        drive_longitude: drive_longitude ?? null,
       })
       .eq("id", hole_id);
 

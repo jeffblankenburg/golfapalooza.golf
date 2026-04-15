@@ -89,21 +89,28 @@ export function ArticleManager({ tripId }: { tripId: string }) {
     if (!title.trim()) return;
     setSaving(true);
 
-    let finalPublishAt: string | null = null;
-    if (publishMode === "now") {
-      finalPublishAt = new Date().toISOString();
-    } else if (publishMode === "schedule" && publishAt) {
-      finalPublishAt = new Date(publishAt).toISOString();
-    }
+    // Check if this is an already-published article being edited
+    const existingArticle = editId ? articles.find((a) => a.id === editId) : null;
+    const isAlreadyPublished = existingArticle?.publish_at && new Date(existingArticle.publish_at) <= new Date();
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       id: editId,
       trip_id: tripId,
       title: title.trim(),
       content,
       featured_image_id: featuredImage?.id || null,
-      publish_at: finalPublishAt,
     };
+
+    // Only change publish_at when explicitly needed
+    if (isAlreadyPublished && publishMode === "now") {
+      // Already published — just save content, keep original publish date
+    } else if (publishMode === "now") {
+      payload.publish_at = new Date().toISOString();
+    } else if (publishMode === "schedule" && publishAt) {
+      payload.publish_at = new Date(publishAt).toISOString();
+    } else if (publishMode === "draft") {
+      payload.publish_at = null;
+    }
 
     await fetch("/api/admin/articles", {
       method: editId ? "PUT" : "POST",
@@ -256,7 +263,7 @@ export function ArticleManager({ tripId }: { tripId: string }) {
             disabled={saving || !title.trim()}
             className="w-full py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold active:opacity-80 disabled:opacity-50"
           >
-            {saving ? "Saving..." : "Publish Now"}
+            {saving ? "Saving..." : editId && articles.find((a) => a.id === editId)?.publish_at && new Date(articles.find((a) => a.id === editId)!.publish_at!) <= new Date() ? "Save Changes" : "Publish Now"}
           </button>
           <div className="flex gap-2">
             {publishAt && (

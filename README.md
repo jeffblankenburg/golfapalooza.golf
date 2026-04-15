@@ -1,26 +1,322 @@
 # Golfapalooza
 
-Live scoring, tracking, and planning for Golfapalooza.
-
-## Features
-
-- **Live Scoring** - Enter and track scores in real-time
-- **Leaderboard** - View current standings and rankings
-- **Player Management** - Manage players and teams
-- **Tournament Planning** - Schedule events and manage courses
+The official app for Golfapalooza — a multi-day golf trip with live scoring, contests, social features, and trip management. Built as an installable PWA.
 
 ## Tech Stack
 
-- **Framework**: Next.js 15 (App Router)
+- **Framework**: Next.js 16 (App Router)
+- **Database/Auth**: Supabase (PostgreSQL + SMS OTP login)
 - **Styling**: Tailwind CSS
-- **Database/Auth**: Supabase
+- **Maps**: Mapbox GL (satellite imagery)
 - **Deployment**: Vercel
-- **PWA**: Installable on mobile devices
+- **PWA**: Installable on mobile with push notifications
+
+---
+
+## Features
+
+### Home Page
+- Trip countdown with days remaining
+- Latest article with featured image and preview
+- RSVP status with attendance likelihood (99%/75%/50%/25%)
+- Participant list grouped by likelihood
+- Tee time card with starting hole, time, and teammates
+- Live scoring cards (appear 1 hour before tee time)
+- Schedule "Up Next" card
+- Calcutta roster and winnings
+- Financial balance summary
+- Trip options deadline
+- Action items checklist with completion count
+- Quick links grid (filtered by active contests and visibility rules)
+
+### Live Scoring — My Rounds
+- **Three entry modes**: Quick Entry (final score only), Full Scorecard (hole-by-hole table), Live Scoring (one hole at a time)
+- **Live scoring interface**: +/- buttons for strokes and putts per player per hole
+- Running stroke total per player, color-coded to par
+- Mini scorecard with Out/In/Tot columns and birdie circles / bogey squares
+- Score description labels (Eagle, Birdie, Par, Bogey, etc.)
+- Satellite map view with blue tee dot, green green dot, and draggable amber distance circle
+- Dashed distance lines with yardage labels (tee→circle→green)
+- Overhead and green image views
+- Auto-save with 600ms debounce, flush on exit
+- Multi-player support (up to 4 players per round)
+- Course search with tee selection per player
+- 18-hole, Front 9, and Back 9 round types
+- Full scorecard view with 9-hole and 18-hole totals
+- Putt tracking per hole with totals on round detail
+
+### USGA Handicap System
+- Automatic handicap index calculation using World Handicap System rules
+- Score differential computed on round completion
+- Net Double Bogey adjustment applied when hole-by-hole scores exist
+- WHS lookup table (best N of 20 differentials with adjustments)
+- Soft cap (50% reduction above Low HI + 3.0) and hard cap (max Low HI + 5.0)
+- Truncation to 1 decimal place per WHS spec
+- Handicap history logging with calculation method
+- Handicap index displayed on player profiles
+- Event-level handicap locking (admin snapshots current values for the trip)
+- Manual handicap override per player
+
+### KGB Cup (Ryder Cup-Style Team Event)
+- Two teams with customizable names and colors
+- Player pairs with foursomes derived automatically
+- Three match sections per foursome: individual match play (x2), pair scramble
+- Per-foursome adjusted handicaps (relative to lowest player)
+- Two-man scramble handicap auto-calculation (35% lower CH + 15% higher CH)
+- Per-foursome pair handicap offset (lower pair plays at 0)
+- Live hole-by-hole scoring with stroke allocation dots
+- Section-by-section point tracking
+- Real-time scoreboard and group results
+- Contest tee assignments per hole
+
+### Scramble Contests (Daily Team Events)
+- 4-man scramble teams with drag-and-drop assignment
+- Team handicap auto-calculation (weighted 20/15/10/5 formula, supports 2-5 players)
+- User-facing handicaps offset so lowest team plays at 0
+- Live scoring with team leaderboard
+- Gross and net scoring with per-hole stroke allocation
+- BSPITW (Best Shot Played in the World) bonus point tracking
+- Score verification workflow (close scoring → verify)
+- Scorecards page with day tabs, tee sheet, and detailed team scorecards
+
+### Skins
+- Per-hole skin winners tracked across scramble days
+- Payout tracking
+
+### Daily Games
+- Closest to Pin (Front 9 and Back 9)
+- Long Drive
+- Long Putt
+- Winners organized by event day
+
+### 100 Feet
+- Closest to 100 feet from the pin contest
+- Results tracked by hole and day
+
+### Pick'em
+- Sports prediction/betting game
+- Locked until admin opens picks
+- Game-time deadline with urgent notification (3 hours before)
+- "MAKE PICKS" pulse on home page when urgent
+
+### Calcutta Auction
+- Team ownership via auction
+- Bid tracking and buyer management
+- Share percentages for co-ownership
+- Prize pool calculation from total bids
+- Prize distribution with linked contest winners
+- Buyer payment tracking
+- Winnings displayed on home page with breakdown
+
+### Cornhole
+- Singles and doubles tournament brackets
+- Real-time bracket updates with polling
+- "Show real names" toggle (only when full names exist)
+
+### Chat
+- Direct messages and group conversations
+- Chat rooms with admin-created permanent rooms
+- Message reactions (tapbacks)
+- GIF picker (Giphy integration)
+- Typing indicators
+- Read receipts and unread counts
+- Image sharing
+- Push notification on new messages
+
+### Photo & Video Gallery
+- Upload photos and videos with captions
+- Tag other users in media
+- Filter by photographer and year
+- Sort by upload or taken date
+- EXIF data extraction for photo dates
+- Emoji reactions on media
+- Comments on photos/videos
+- Infinite scroll with lazy loading
+- Deep-link sharing to specific photos
+
+### Music
+- Browse and stream songs
+- Tag songs to specific users
+- Mark favorites
+- Sort by category and title
+- Mini player UI (always available)
+- Play count tracking
+
+### Articles & Announcements
+- Admin publishes articles with markdown content
+- Featured images from the gallery
+- Draft, scheduled, and published states
+- Article readership tracking (who read what, when)
+- View counts displayed in admin
+- Latest article card on home page with hero image
+
+### Financials
+- Per-user balance tracking (charges and payments)
+- Transaction history by trip
+- Balance card on home page (color-coded: red for owed, green for credit)
+- Admin ledger with all user balances
+
+### Trip Options
+- Merchandise and add-on selection
+- Deadline tracking with countdown
+- Quick link hidden until options are open
+
+### Schedule & Itinerary
+- Day-by-day event schedule
+- Event locations and times
+- Timezone-aware display
+- Personal tee time assignments integrated into schedule
+
+### Room Assignments
+- Room assignments by facility
+- Room features (bed type, smoking, showers, etc.)
+- Roommate listing
+
+### Nominations
+- Nominate fellow participants (e.g., Rookie of the Year)
+- Admin approval/rejection workflow
+
+### Notebook
+- Trip notes organized by category
+- Markdown content with internal app links
+- Pinned notes to specific pages (financials, my-rounds, daily-games, options)
+- Expandable/collapsible notes
+
+### Player Profiles
+- Display name, full name, email, phone
+- Avatar upload
+- Birthday, occupation, location
+- Golf details: playing since, swing type, typical shot
+- Shirt size
+- Fun facts and best shot stories
+- Handicap index display
+- Eight-bag average and average scramble score
+- Accolades and achievements
+
+### Course Information
+- Course layout with hole-by-hole data
+- Par, yards, and handicap index per hole
+- Satellite maps with tee, green, and drive markers
+- Draggable distance measurement circle
+- Overhead and green images per hole
+
+### Push Notifications
+- Web Push via VAPID keys
+- Permission prompt on home page
+- Notification types: chat messages, announcements, nominations, gallery tags, tee time reminders
+- Tee time reminders via cron (configurable minutes before)
+- Unread count badges in header
+
+---
+
+## Admin Capabilities
+
+### Event Management
+- Create and archive trips with start/end dates
+- Configure timezone
+- Link courses and facilities to events
+- Event day management with custom names
+
+### Smart Visibility
+- Auto time-gating: features appear at the right time (scoring 1hr before tee time, rooms 1 week before trip, etc.)
+- Admin force-override: toggle any feature visible for demos or testing
+- Per-feature status display (Visible/Hidden with auto rule description)
+
+### Roster & Participants
+- Add/remove event participants
+- RSVP tracking with likelihood percentages
+
+### Contest Management
+- Create contests (scramble, ryder_cup, calcutta, pickem, cornhole_singles, cornhole_doubles)
+- Assign contest days and tees
+- Contest-specific scoring lifecycle (open → close → verify)
+
+### KGB Cup Admin
+- Team creation with colors and names
+- Player-to-pair assignments
+- Auto-derived foursomes from pair matchups
+- Handicap calculation and snapshot
+- Two-man scramble handicap calculation with formula explanation
+- Per-hole tee assignments
+- Score entry and verification
+
+### Scramble Admin
+- Team creation and player assignment
+- Team handicap auto-calculation (2-5 player weighted formula)
+- Score entry with hole-by-hole grid
+- BSPITW bonus point management
+- Scoring lifecycle management
+
+### Handicap Management
+- Event-level handicap locking (snapshot all participants)
+- Individual handicap override
+- Lock/unlock/re-lock controls
+- Live vs. locked handicap comparison
+
+### Tee Times
+- Create tee time groups per day
+- Auto-populate from KGB Cup foursomes
+- Assign starting holes and times
+- Tee time push notification reminders (configurable timing)
+
+### Financial Management
+- Charge and payment recording per user
+- Transaction ledger with trip and lifetime views
+- Balance summary across all participants
+
+### Course Management
+- Course search and creation
+- Tee box management (name, color, rating, slope, par)
+- Hole-by-hole data editing (par, handicap index, yards)
+- Map editor: place tee, green, and ideal drive markers with satellite imagery
+- Overhead and green image upload per hole
+- Auto-geocoding for courses without coordinates
+
+### Content Management
+- Article editor with markdown and preview
+- Gallery image picker for featured images
+- Draft/schedule/publish workflow
+- Readership tracking with per-article view counts
+- Notebook notes with categories and pinning
+- Announcement broadcasting with scheduling
+
+### Daily Games & Contests
+- Daily winner recording (CTP, Long Drive, Long Putt)
+- 100 Feet distance tracking
+- Skins winner management
+- Calcutta auction management (bids, prizes, payouts)
+- Pick'em game management
+- Cornhole bracket management
+
+### Gallery Management
+- Photo/video moderation
+- Bulk management tools
+
+### Music Management
+- Song library management
+- User tagging
+
+### Room Management
+- Facility and room setup
+- Room assignment per trip
+
+### Accolades
+- Award creation and winner assignment per trip
+
+### Simulator
+- Date simulation for testing time-gated features
+- User impersonation for testing user-specific views
+
+### Analytics
+- App usage tracking
+- Article readership analytics
+
+---
 
 ## Getting Started
 
 1. Clone the repository
-2. Copy `.env.local.example` to `.env.local` and add your Supabase credentials
+2. Copy `.env.local.example` to `.env.local` and add credentials
 3. Install dependencies:
    ```bash
    npm install
@@ -33,11 +329,23 @@ Live scoring, tracking, and planning for Golfapalooza.
 
 ## Environment Variables
 
-```
+```bash
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+GOLF_COURSE_API_KEY=your-golfcourseapi-key         # Optional, for external course search
+NEXT_PUBLIC_GIPHY_API_KEY=your-giphy-api-key        # For GIF search in chat
+NEXT_PUBLIC_MAPBOX_TOKEN=your-mapbox-token           # For satellite maps
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=your-vapid-public-key   # For push notifications
+VAPID_PRIVATE_KEY=your-vapid-private-key
+VAPID_SUBJECT=mailto:your-email
+CRON_SECRET=your-cron-secret                         # For scheduled tasks
 ```
 
 ## Deployment
 
-Deploy to Vercel with one click or connect your repository for automatic deployments.
+Deployed to Vercel with automatic deployments from `main`. Cron jobs run on Vercel for scheduled announcements and tee time reminders.
+
+## API Documentation
+
+Interactive API documentation is available at `/api-docs` when the app is running.

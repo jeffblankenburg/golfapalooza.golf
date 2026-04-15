@@ -286,3 +286,13 @@ Draft issue content can be written to `docs/issues/` as markdown files, then use
 ```bash
 gh issue create --title "Feature: Title" --body-file docs/issues/feature-name.md
 ```
+
+## Feature Documentation
+
+**IMPORTANT: Keep README.md up to date with all app capabilities.**
+
+When adding new features, updating existing ones, or removing functionality:
+1. Update the relevant section in `README.md` to reflect the change
+2. Include both user-facing and admin capabilities
+3. Note any time-gated or visibility-controlled features
+4. The README serves as the definitive reference for what the app can do today

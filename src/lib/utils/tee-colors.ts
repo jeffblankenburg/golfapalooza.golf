@@ -1,23 +1,23 @@
-/** Tailwind class names for tee dot colors */
+/** Tailwind class names for tee dot colors (case-insensitive lookup) */
 export const TEE_DOT_COLORS: Record<string, string> = {
-  Black: "bg-gray-900",
-  Blue: "bg-blue-600",
-  White: "bg-white border border-gray-400",
-  Gold: "bg-yellow-500",
-  Green: "bg-green-600",
-  Red: "bg-red-600",
-  Silver: "bg-gray-400",
+  black: "bg-gray-900", Black: "bg-gray-900",
+  blue: "bg-blue-600", Blue: "bg-blue-600",
+  white: "bg-white border border-gray-400", White: "bg-white border border-gray-400",
+  gold: "bg-yellow-500", Gold: "bg-yellow-500",
+  green: "bg-green-600", Green: "bg-green-600",
+  red: "bg-red-600", Red: "bg-red-600",
+  silver: "bg-gray-400", Silver: "bg-gray-400",
 };
 
-/** Hex values for tee colors (used for gradients) */
+/** Hex values for tee colors (case-insensitive lookup) */
 export const TEE_HEX_COLORS: Record<string, string> = {
-  Black: "#111827",
-  Blue: "#2563eb",
-  White: "#f3f4f6",
-  Gold: "#eab308",
-  Green: "#16a34a",
-  Red: "#dc2626",
-  Silver: "#9ca3af",
+  black: "#111827", Black: "#111827",
+  blue: "#2563eb", Blue: "#2563eb",
+  white: "#f3f4f6", White: "#f3f4f6",
+  gold: "#eab308", Gold: "#eab308",
+  green: "#16a34a", Green: "#16a34a",
+  red: "#dc2626", Red: "#dc2626",
+  silver: "#9ca3af", Silver: "#9ca3af",
 };
 
 /**

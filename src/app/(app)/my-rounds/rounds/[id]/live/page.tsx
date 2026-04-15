@@ -9,12 +9,12 @@ interface RoundData {
   id: string;
   round_type: string;
   course: { name: string } | null;
-  tee: { tee_name: string } | null;
+  tee: { tee_name: string; tee_color: string | null } | null;
   round_players: {
     id: string;
     user_id: string;
     user: { display_name: string } | null;
-    tee: { tee_name: string } | null;
+    tee: { tee_name: string; tee_color: string | null } | null;
     scores: { hole_number: number; strokes: number; putts: number | null }[];
   }[];
 }
@@ -33,6 +33,7 @@ export default function LiveScoringResumePage() {
     initialPlayerMap: Record<string, string>;
     courseName: string;
     roundType: string;
+    teeColor: string | null;
   } | null>(null);
 
   useEffect(() => {
@@ -81,6 +82,9 @@ export default function LiveScoringResumePage() {
         }
       }
 
+      // Get tee color from the round's tee
+      const roundTee = Array.isArray(round.tee) ? round.tee[0] : round.tee;
+
       setData({
         round,
         holes,
@@ -90,6 +94,7 @@ export default function LiveScoringResumePage() {
         initialPlayerMap,
         courseName: course?.name || "Unknown Course",
         roundType: round.round_type,
+        teeColor: roundTee?.tee_color || null,
       });
     }
     load();
@@ -110,6 +115,7 @@ export default function LiveScoringResumePage() {
       roundType={data.roundType}
       courseName={data.courseName}
       roundId={roundId}
+      teeColor={data.teeColor}
       initialScores={data.initialScores}
       initialPutts={data.initialPutts}
       initialPlayerMap={data.initialPlayerMap}

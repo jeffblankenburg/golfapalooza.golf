@@ -23,8 +23,10 @@ export default async function MyRoundsPage() {
       tee:course_tees(id, tee_name, tee_color, par),
       round_players!inner(
         user_id,
+        tee_id,
         final_gross_score,
-        score_differential
+        score_differential,
+        player_tee:course_tees(id, tee_name, tee_color, par)
       )
     `)
     .eq("round_players.user_id", effectiveUserId)
@@ -33,7 +35,10 @@ export default async function MyRoundsPage() {
   const roundSummaries = (rounds || []).map((r) => {
     const allPlayers = Array.isArray(r.round_players) ? r.round_players : [r.round_players];
     const player = allPlayers.find((p) => p.user_id === effectiveUserId) || allPlayers[0];
-    const tee = Array.isArray(r.tee) ? r.tee[0] : r.tee;
+    const roundTee = Array.isArray(r.tee) ? r.tee[0] : r.tee;
+    // Prefer the player's personal tee (may be a composition tee override)
+    const playerTee = player?.player_tee ? (Array.isArray(player.player_tee) ? player.player_tee[0] : player.player_tee) : null;
+    const tee = playerTee || roundTee;
     const course = Array.isArray(r.course) ? r.course[0] : r.course;
     const par = tee?.par || 72;
     const score = player?.final_gross_score;

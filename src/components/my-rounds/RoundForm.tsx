@@ -36,6 +36,13 @@ interface HoleData {
   green_longitude?: number | null;
   overhead_image_url?: string | null;
   green_image_url?: string | null;
+  source_tee_color?: string | null;
+  green_front_latitude?: number | null;
+  green_front_longitude?: number | null;
+  green_back_latitude?: number | null;
+  green_back_longitude?: number | null;
+  drive_latitude?: number | null;
+  drive_longitude?: number | null;
 }
 
 interface Loozer {
@@ -143,6 +150,20 @@ export default function RoundForm() {
     const data = await res.json();
     setHoles(data.holes || []);
   }
+
+  // Reload holes when the current user's tee override changes (e.g., composition tee)
+  useEffect(() => {
+    if (!selectedCourse || !currentUserId) return;
+    const overrideTeeId = playerTees[currentUserId];
+    if (!overrideTeeId) return; // no override, default tee holes are already loaded
+    async function loadOverrideHoles() {
+      const res = await fetch(`/api/courses/${selectedCourse!.id}/tees/${overrideTeeId}/holes`);
+      const data = await res.json();
+      setHoles(data.holes || []);
+    }
+    loadOverrideHoles();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId, selectedCourse?.id, playerTees[currentUserId || ""]]);
 
   function togglePlayer(id: string) {
     setSelectedPlayerIds((prev) => {
@@ -290,15 +311,20 @@ export default function RoundForm() {
               </div>
             )}
 
-            {selectedTee && (
-              <div className="text-sm text-gray-600 mt-2">
-                {selectedTee.tee_name} tees
-                <span className="mx-2 text-gray-300">|</span>
-                {selectedTee.course_rating} / {selectedTee.slope_rating}
-                <span className="mx-2 text-gray-300">|</span>
-                Par {selectedTee.par}
-              </div>
-            )}
+            {selectedTee && (() => {
+              // Show the current user's effective tee (may be an override)
+              const effectiveTee = currentUserId ? getPlayerTee(currentUserId) : selectedTee;
+              const displayTee = effectiveTee || selectedTee;
+              return (
+                <div className="text-sm text-gray-600 mt-2">
+                  {displayTee.tee_name} tees
+                  <span className="mx-2 text-gray-300">|</span>
+                  {displayTee.course_rating} / {displayTee.slope_rating}
+                  <span className="mx-2 text-gray-300">|</span>
+                  Par {displayTee.par}
+                </div>
+              );
+            })()}
 
             {currentStepIndex >= 3 && (
               <div className="text-sm text-gray-500 mt-1">
@@ -716,7 +742,11 @@ export default function RoundForm() {
       id,
       name: getPlayerName(id),
       teeName: getPlayerTee(id)?.tee_name,
+      teeId: playerTees[id] || selectedTee?.id,
     }));
+
+    // Use the current user's tee override to determine which holes to show
+    const effectiveTeeId = (currentUserId && playerTees[currentUserId]) || selectedTee?.id;
 
     return (
       <LiveScoringEntry
@@ -726,6 +756,8 @@ export default function RoundForm() {
         courseName={selectedCourse?.name || ""}
         courseId={selectedCourse?.id}
         teeId={selectedTee?.id}
+        effectiveTeeId={effectiveTeeId}
+        teeColor={getPlayerTee(currentUserId || "")?.tee_color || selectedTee?.tee_color}
         roundDate={roundDate}
         onClose={() => {
           router.push("/my-rounds");

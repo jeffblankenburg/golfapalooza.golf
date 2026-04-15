@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect, Fragment, type ReactNode } from "react";
+import { useState, useRef, useCallback, useEffect, Fragment, useMemo, type ReactNode } from "react";
+import { TEE_HEX_COLORS } from "@/lib/utils/tee-colors";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 
@@ -30,6 +31,7 @@ export interface HoleInfo {
   green_front_longitude?: number | null;
   green_back_latitude?: number | null;
   green_back_longitude?: number | null;
+  source_tee_color?: string | null;
 }
 
 interface ScoringShellProps {
@@ -52,6 +54,9 @@ interface ScoringShellProps {
   // Slot: bottom scoring panel
   renderScorePanel: (hole: HoleInfo, holeIndex: number) => ReactNode;
 
+  // Tee color for the round (used for map markers on non-composition tees)
+  teeColor?: string | null;
+
   // Save status (shown as overlay on image area)
   saveStatus?: SaveStatus;
 
@@ -68,9 +73,16 @@ export default function ScoringShell({
   statusBanner,
   courseStrip,
   renderScorePanel,
+  teeColor: roundTeeColor,
   saveStatus = "idle",
   onHoleChange,
 }: ScoringShellProps) {
+  // Check if playing a composition tee (holes have different source_tee_colors)
+  const isCompositionTee = useMemo(() => {
+    const colors = new Set(holes.map((h) => h.source_tee_color).filter(Boolean));
+    return colors.size > 1;
+  }, [holes]);
+
   // Find initial hole index
   const initialIndex = startingHole
     ? Math.max(0, holes.findIndex((h) => h.hole_number === startingHole))
@@ -243,6 +255,16 @@ export default function ScoringShell({
         </button>
 
         <div className="flex items-center gap-3 text-sm text-gray-500">
+          {(() => {
+            const dotColor = isCompositionTee ? hole.source_tee_color : roundTeeColor;
+            const hex = dotColor ? TEE_HEX_COLORS[dotColor] || null : null;
+            return hex ? (
+              <span
+                className="w-3 h-3 rounded-full shrink-0"
+                style={{ backgroundColor: hex, border: hex === "#f3f4f6" ? "1px solid #9ca3af" : undefined }}
+              />
+            ) : null;
+          })()}
           <span className="font-bold text-gray-900">Hole {hole.hole_number}</span>
           <span className="w-px h-4 bg-gray-200" />
           <span>Par <span className="font-bold text-gray-900">{hole.par}</span></span>
@@ -267,17 +289,44 @@ export default function ScoringShell({
                   {h.hole_number === 10 && holes[0]?.hole_number <= 9 && (
                     <th className="px-0 py-1 text-center font-bold text-gray-400 border-l border-r border-gray-200">Out</th>
                   )}
-                  <th
-                    data-active={h.hole_number === hole.hole_number}
-                    onClick={() => goToHole(i)}
-                    className={`px-0 py-1 text-center font-bold cursor-pointer ${
-                      h.hole_number === hole.hole_number
-                        ? "bg-green-600 text-white"
-                        : "text-gray-500 hover:bg-gray-100"
-                    }`}
-                  >
-                    {h.hole_number}
-                  </th>
+                  {(() => {
+                    const isActive = h.hole_number === hole.hole_number;
+                    const teeHex = isCompositionTee && h.source_tee_color
+                      ? TEE_HEX_COLORS[h.source_tee_color] || null
+                      : null;
+
+                    if (teeHex) {
+                      // Composition tee: use source tee color
+                      return (
+                        <th
+                          data-active={isActive}
+                          onClick={() => goToHole(i)}
+                          className="px-0 py-1 text-center font-bold cursor-pointer"
+                          style={isActive
+                            ? { backgroundColor: teeHex, color: "white" }
+                            : { backgroundColor: teeHex + "20", color: teeHex }
+                          }
+                        >
+                          {h.hole_number}
+                        </th>
+                      );
+                    }
+
+                    // Standard tee: green active, gray inactive
+                    return (
+                      <th
+                        data-active={isActive}
+                        onClick={() => goToHole(i)}
+                        className={`px-0 py-1 text-center font-bold cursor-pointer ${
+                          isActive
+                            ? "bg-green-600 text-white"
+                            : "text-gray-500 hover:bg-gray-100"
+                        }`}
+                      >
+                        {h.hole_number}
+                      </th>
+                    );
+                  })()}
                 </Fragment>
               ))}
               {holes.length > 9 && holes[0]?.hole_number <= 9 && (
@@ -396,6 +445,7 @@ export default function ScoringShell({
                   : null}
                 holeNumber={hole.hole_number}
                 par={hole.par}
+                teeColor={hole.source_tee_color || hole.tee_color || roundTeeColor}
               />
             </div>
           ) : currentImageUrl ? (

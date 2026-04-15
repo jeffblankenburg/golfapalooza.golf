@@ -37,9 +37,13 @@ export async function GET(
     return NextResponse.json({ error: "Round not found" }, { status: 404 });
   }
 
-  // Fetch hole data for the tee (handles composition tees transparently)
-  const teeId = round.tee_id;
-  const { data: holes } = await resolveHolesForTee(supabase, teeId, "*");
+  // Fetch hole data — use the current user's tee override if different from round tee
+  const effectiveUserId = await getEffectiveUserId(user.id);
+  const currentPlayer = (round.round_players || []).find(
+    (p: { user_id: string }) => p.user_id === effectiveUserId
+  );
+  const holeTeeId = currentPlayer?.tee_id || round.tee_id;
+  const { data: holes } = await resolveHolesForTee(supabase, holeTeeId, "*");
 
   // Backfill missing differentials for any player with a score but no differential
   const tee = Array.isArray(round.tee) ? round.tee[0] : round.tee;
@@ -61,7 +65,6 @@ export async function GET(
     );
   }
 
-  const effectiveUserId = await getEffectiveUserId(user.id);
   return NextResponse.json({ round, holes: holes || [], current_user_id: effectiveUserId });
 }
 

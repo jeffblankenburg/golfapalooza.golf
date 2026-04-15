@@ -8,6 +8,7 @@ interface Player {
   id: string;
   name: string;
   teeName?: string;
+  teeId?: string;
   roundPlayerId?: string; // set after round is created
 }
 
@@ -20,6 +21,8 @@ interface LiveScoringEntryProps {
   // For new rounds: create round on mount
   courseId?: string;
   teeId?: string;
+  effectiveTeeId?: string; // current user's tee (may differ for composition tees)
+  teeColor?: string | null; // tee color for map markers
   roundDate?: string;
   // For resuming: existing round data
   roundId?: string;
@@ -83,13 +86,37 @@ export default function LiveScoringEntry({
   onClose,
   courseId,
   teeId,
+  effectiveTeeId,
+  teeColor,
   roundDate,
   roundId: existingRoundId,
   initialScores,
   initialPutts,
   initialPlayerMap,
 }: LiveScoringEntryProps) {
-  const visibleHoles = allHoles.filter((h) => {
+  // If the effective tee differs (composition tee), fetch resolved holes on mount
+  const [resolvedHoles, setResolvedHoles] = useState<HoleInfo[] | null>(null);
+
+  useEffect(() => {
+    if (!effectiveTeeId || effectiveTeeId === teeId || !courseId) return;
+    // Check if the passed holes already have source_tee_color (already resolved)
+    const hasSourceColors = allHoles.some((h) => h.source_tee_color);
+    if (hasSourceColors) return;
+
+    async function fetchCompositionHoles() {
+      const res = await fetch(`/api/courses/${courseId}/tees/${effectiveTeeId}/holes`);
+      if (res.ok) {
+        const data = await res.json();
+        setResolvedHoles(data.holes || []);
+      }
+    }
+    fetchCompositionHoles();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveTeeId, teeId, courseId]);
+
+  const effectiveHoles = resolvedHoles || allHoles;
+
+  const visibleHoles = effectiveHoles.filter((h) => {
     if (roundType === "9-front") return h.hole_number <= 9;
     if (roundType === "9-back") return h.hole_number > 9;
     return true;
@@ -123,7 +150,7 @@ export default function LiveScoringEntry({
           tee_id: teeId,
           round_type: roundType,
           round_date: roundDate || new Date().toISOString().split("T")[0],
-          players: initialPlayers.map((p) => ({ user_id: p.id, tee_id: teeId })),
+          players: initialPlayers.map((p) => ({ user_id: p.id, tee_id: p.teeId || teeId })),
         }),
       });
 
@@ -319,6 +346,7 @@ export default function LiveScoringEntry({
     <ScoringShell
       holes={visibleHoles}
       onClose={onClose}
+      teeColor={teeColor}
       saveStatus={saveStatus}
       onHoleChange={(_idx, hole) => { currentHoleRef.current = hole; }}
       headerRight={

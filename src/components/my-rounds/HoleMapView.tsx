@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { TEE_HEX_COLORS } from "@/lib/utils/tee-colors";
 
 interface HoleMapViewProps {
   teeLatLng: [number, number];
@@ -10,6 +11,7 @@ interface HoleMapViewProps {
   greenBackLatLng: [number, number] | null;
   holeNumber: number;
   par: number;
+  teeColor?: string | null;
   showUserLocation?: boolean;
 }
 
@@ -34,6 +36,34 @@ function calcYards(a: [number, number], b: [number, number]): number {
   return Math.round(meters * 1.09361);
 }
 
+/** Given a center point and a bearing (degrees), return two points forming a
+ *  perpendicular line of `widthYards` centered on `center`. */
+function perpendicularLine(
+  center: [number, number],
+  bearingDeg: number,
+  widthYards: number
+): [[number, number], [number, number]] {
+  const meters = (widthYards / 1.09361) / 2;
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const toDeg = (r: number) => (r * 180) / Math.PI;
+  const lat1 = toRad(center[0]);
+  const lng1 = toRad(center[1]);
+  const d = meters / R;
+
+  function project(brng: number): [number, number] {
+    const b = toRad(brng);
+    const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(b));
+    const lng2 = lng1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+    return [toDeg(lat2), toDeg(lng2)];
+  }
+
+  // Perpendicular bearings (90 degrees left and right)
+  const left = (bearingDeg + 270) % 360;
+  const right = (bearingDeg + 90) % 360;
+  return [project(left), project(right)];
+}
+
 export default function HoleMapView({
   teeLatLng,
   greenLatLng,
@@ -42,12 +72,13 @@ export default function HoleMapView({
   greenBackLatLng,
   holeNumber,
   par,
+  teeColor,
   showUserLocation = false,
 }: HoleMapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const [driveYards, setDriveYards] = useState<{ toTee: number; toGreen: number } | null>(null);
+  const [driveYards, setDriveYards] = useState<{ toTee: number; toGreen: number; toFront: number | null; toBack: number | null } | null>(null);
 
   // Stable refs
   const teeRef = useRef(teeLatLng);
@@ -60,6 +91,9 @@ export default function HoleMapView({
   driveRef.current = driveLatLng;
   greenFrontRef.current = greenFrontLatLng;
   greenBackRef.current = greenBackLatLng;
+
+  const teeColorRef = useRef(teeColor);
+  teeColorRef.current = teeColor;
 
   const greenDepth = greenFrontLatLng && greenBackLatLng ? calcYards(greenFrontLatLng, greenBackLatLng) : null;
 
@@ -116,10 +150,11 @@ export default function HoleMapView({
           });
         }
 
-        // Tee dot (blue)
+        // Tee dot (colored by tee box)
+        const teeHex = TEE_HEX_COLORS[teeColorRef.current || ""] || "#2563eb";
         const teeEl = document.createElement("div");
         teeEl.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18">
-          <circle cx="9" cy="9" r="6" fill="#2563eb" stroke="white" stroke-width="2.5"/>
+          <circle cx="9" cy="9" r="6" fill="${teeHex}" stroke="white" stroke-width="2.5"/>
         </svg>`;
         teeEl.style.cursor = "default";
         new mapboxgl.Marker({ element: teeEl, anchor: "center" })
@@ -136,6 +171,39 @@ export default function HoleMapView({
           new mapboxgl.Marker({ element: greenEl, anchor: "center" })
             .setLngLat([green[1], green[0]])
             .addTo(map);
+        }
+
+        // Front/back green lines (perpendicular to line of play)
+        const playBearing = green ? getBearing(tee, green) : 0;
+        const gf = greenFrontRef.current;
+        const gb = greenBackRef.current;
+
+        if (gf) {
+          const [fl, fr] = perpendicularLine(gf, playBearing, 20);
+          map.addSource("green-front-line", {
+            type: "geojson",
+            data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [[fl[1], fl[0]], [fr[1], fr[0]]] } },
+          });
+          map.addLayer({
+            id: "green-front-line",
+            type: "line",
+            source: "green-front-line",
+            paint: { "line-color": "#ffffff", "line-width": 2 },
+          });
+        }
+
+        if (gb) {
+          const [bl, br] = perpendicularLine(gb, playBearing, 20);
+          map.addSource("green-back-line", {
+            type: "geojson",
+            data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [[bl[1], bl[0]], [br[1], br[0]]] } },
+          });
+          map.addLayer({
+            id: "green-back-line",
+            type: "line",
+            source: "green-back-line",
+            paint: { "line-color": "#ffffff", "line-width": 2 },
+          });
         }
 
         // Distance label helper
@@ -194,7 +262,9 @@ export default function HoleMapView({
           const teeLineInfo = addDistanceLabel("tee-drive", tee, initialDrive);
           const greenLineInfo = addDistanceLabel("drive-green", initialDrive, green);
 
-          setDriveYards({ toTee: teeLineInfo.yards, toGreen: greenLineInfo.yards });
+          const frontYards = greenFrontRef.current ? calcYards(initialDrive, greenFrontRef.current) : null;
+          const backYards = greenBackRef.current ? calcYards(initialDrive, greenBackRef.current) : null;
+          setDriveYards({ toTee: teeLineInfo.yards, toGreen: greenLineInfo.yards, toFront: frontYards, toBack: backYards });
 
           // Update on drag
           driveMarker.on("drag", () => {
@@ -237,7 +307,9 @@ export default function HoleMapView({
             const greenLabelEl = containerRef.current?.querySelector(".map-distance-label-drive-green div") as HTMLElement;
             if (greenLabelEl) greenLabelEl.textContent = `${driveGreenYards}y`;
 
-            setDriveYards({ toTee: teeDriveYards, toGreen: driveGreenYards });
+            const frontY = greenFrontRef.current ? calcYards(drivePos, greenFrontRef.current) : null;
+            const backY = greenBackRef.current ? calcYards(drivePos, greenBackRef.current) : null;
+            setDriveYards({ toTee: teeDriveYards, toGreen: driveGreenYards, toFront: frontY, toBack: backY });
           });
         }
 
@@ -279,15 +351,21 @@ export default function HoleMapView({
         <div className="absolute top-2 left-2 z-10 bg-black/60 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-lg space-y-0.5">
           {driveYards && (
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+              <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: TEE_HEX_COLORS[teeColor || ""] || "#2563eb" }} />
               <span>{driveYards.toTee}y</span>
               <span className="w-2 h-2 rounded-full border-2 border-amber-400 inline-block" />
               <span>{driveYards.toGreen}y</span>
               <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
             </div>
           )}
+          {driveYards && (driveYards.toFront != null || driveYards.toBack != null) && (
+            <div className="flex items-center gap-2 text-green-300">
+              {driveYards.toFront != null && <span>Front: {driveYards.toFront}y</span>}
+              {driveYards.toBack != null && <span>Back: {driveYards.toBack}y</span>}
+            </div>
+          )}
           {greenDepth != null && (
-            <div className="text-green-300">Green: {greenDepth}y deep</div>
+            <div className="text-green-300">Depth: {greenDepth}y</div>
           )}
         </div>
       )}

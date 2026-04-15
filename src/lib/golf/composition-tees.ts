@@ -33,18 +33,31 @@ export async function resolveHolesForTee(
     return { data: data || [], error };
   }
 
-  // Composition tee — fetch holes from source tees
+  // Composition tee — fetch holes and source tee colors
   const sourceTeeIds = [...new Set(mappings.map((m) => m.source_tee_id))];
 
-  // Fetch all holes for all source tees in one query
-  // Ensure tee_id and hole_number are always included for lookup
+  // Fetch source tee colors in parallel with holes
   const compositionSelect = select === "*" ? "*" :
     (select.includes("tee_id") ? select : `tee_id, ${select}`);
-  const { data: allSourceHoles, error } = await supabase
-    .from("course_holes")
-    .select(compositionSelect)
-    .in("tee_id", sourceTeeIds)
-    .order("hole_number");
+  const [holesResult, teesResult] = await Promise.all([
+    supabase
+      .from("course_holes")
+      .select(compositionSelect)
+      .in("tee_id", sourceTeeIds)
+      .order("hole_number"),
+    supabase
+      .from("course_tees")
+      .select("id, tee_color")
+      .in("id", sourceTeeIds),
+  ]);
+
+  const { data: allSourceHoles, error } = holesResult;
+
+  // Build tee color lookup
+  const teeColorMap = new Map<string, string | null>();
+  for (const t of teesResult.data || []) {
+    teeColorMap.set(t.id, t.tee_color);
+  }
 
   if (error) return { data: [], error };
 
@@ -59,17 +72,15 @@ export async function resolveHolesForTee(
     lookup.get(tId)!.set(holeData.hole_number as number, holeData);
   }
 
-  // Resolve each hole from its mapped source
+  // Resolve each hole from its mapped source, attaching source tee color
   const resolved = mappings.map((m) => {
     const sourceHoles = lookup.get(m.source_tee_id);
     const holeData = sourceHoles?.get(m.hole_number);
+    const sourceTeeColor = teeColorMap.get(m.source_tee_id) || null;
     if (holeData) {
-      // Return the hole data but strip the tee_id (it's from the source, not the composition)
-      const { ...rest } = holeData;
-      return rest;
+      return { ...holeData, source_tee_color: sourceTeeColor };
     }
-    // Fallback: empty hole
-    return { hole_number: m.hole_number, par: 4, handicap_index: 0, yards: null };
+    return { hole_number: m.hole_number, par: 4, handicap_index: 0, yards: null, source_tee_color: sourceTeeColor };
   });
 
   return { data: resolved, error: null };

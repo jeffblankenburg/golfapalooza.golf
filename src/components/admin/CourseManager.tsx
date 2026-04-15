@@ -628,8 +628,10 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
                     : `${colors.bg} ${colors.text} opacity-60`
               }`}
               style={colors.isCustom ? {
-                backgroundColor: colors.hex!,
-                ...(isSelected ? { outlineColor: colors.hex!, outlineWidth: "2px", outlineStyle: "solid", outlineOffset: "2px" } : {}),
+                ...(colors.isGradient
+                  ? { background: colors.gradientHex! }
+                  : { backgroundColor: colors.hex! }),
+                ...(isSelected ? { outlineColor: colors.hex || "#9ca3af", outlineWidth: "2px", outlineStyle: "solid", outlineOffset: "2px" } : {}),
               } : undefined}
             >
               {tee.tee_name}
@@ -734,10 +736,12 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
                 type="number"
               />
             </div>
-            <TeeColorPicker
-              value={editingTee.tee_color}
-              onChange={(v) => setEditingTee({ ...editingTee, tee_color: v })}
-            />
+            {!(editingTee.tee_color && editingTee.tee_color.includes("/")) && (
+              <TeeColorPicker
+                value={editingTee.tee_color}
+                onChange={(v) => setEditingTee({ ...editingTee, tee_color: v })}
+              />
+            )}
             <div className="flex gap-2">
               <button
                 onClick={updateTee}
@@ -842,6 +846,9 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
           teeName={selectedTee.tee_name}
           otherTees={tees.filter((t) => t.id !== selectedTee.id)}
           onCompositionChange={setSelectedTeeIsComposition}
+          onTeeColorChange={(color) => {
+            setTees((prev) => prev.map((t) => t.id === selectedTee.id ? { ...t, tee_color: color } : t));
+          }}
         />
       )}
 
@@ -875,6 +882,8 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
             <HoleRow
               key={hole.id}
               hole={hole}
+              holeIndex={i}
+              totalHoles={holes.length}
               courseId={course.id}
               courseName={courseName}
               teeName={selectedTee?.tee_name || ""}
@@ -963,6 +972,8 @@ function Field({
 
 function HoleRow({
   hole,
+  holeIndex,
+  totalHoles,
   courseId,
   courseName,
   teeName,
@@ -979,6 +990,8 @@ function HoleRow({
   courseState,
 }: {
   hole: HoleData;
+  holeIndex: number;
+  totalHoles: number;
   courseId: string;
   courseName: string;
   teeName: string;
@@ -1011,6 +1024,7 @@ function HoleRow({
             <label className="text-[10px] text-gray-400 uppercase">Par</label>
             <input
               type="number"
+              tabIndex={holeIndex + 1}
               value={hole.par}
               onChange={(e) => onUpdate("par", e.target.value)}
               className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center"
@@ -1020,6 +1034,7 @@ function HoleRow({
             <label className="text-[10px] text-gray-400 uppercase">Hdcp</label>
             <input
               type="number"
+              tabIndex={totalHoles + holeIndex + 1}
               value={hole.handicap_index}
               onChange={(e) => onUpdate("handicap_index", e.target.value)}
               className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center"
@@ -1031,6 +1046,7 @@ function HoleRow({
             </label>
             <input
               type="number"
+              tabIndex={totalHoles * 2 + holeIndex + 1}
               value={hole.yards}
               onChange={(e) => onUpdate("yards", e.target.value)}
               className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center"
@@ -1389,11 +1405,13 @@ function CompositionTeeEditor({
   teeName,
   otherTees,
   onCompositionChange,
+  onTeeColorChange,
 }: {
   teeId: string;
   teeName: string;
   otherTees: { id: string; tee_name: string }[];
   onCompositionChange?: (isComposition: boolean) => void;
+  onTeeColorChange?: (color: string) => void;
 }) {
   const [isComposition, setIsComposition] = useState(false);
   const [mappings, setMappings] = useState<Record<number, string>>({});
@@ -1469,12 +1487,12 @@ function CompositionTeeEditor({
       .filter(Boolean);
     if (sourceNames.length >= 2) {
       const gradientColor = sourceNames.join("/");
-      // Update tee_color via the tees API
       await fetch("/api/admin/course/tees", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tee_id: teeId, tee_color: gradientColor }),
       });
+      onTeeColorChange?.(gradientColor);
     }
 
     setSaving(false);
@@ -1512,9 +1530,10 @@ function CompositionTeeEditor({
       {isComposition && (
         <div className="px-4 py-3">
           <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-            {[Array.from({ length: 9 }, (_, i) => i + 1), Array.from({ length: 9 }, (_, i) => i + 10)].map((col, colIdx) => (
+            {[{ label: "Front 9", holes: Array.from({ length: 9 }, (_, i) => i + 1) }, { label: "Back 9", holes: Array.from({ length: 9 }, (_, i) => i + 10) }].map((col, colIdx) => (
               <div key={colIdx} className="space-y-2">
-                {col.map((holeNum) => (
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">{col.label}</p>
+                {col.holes.map((holeNum) => (
                   <div key={holeNum} className="flex items-center gap-2">
                     <span className="text-xs font-bold text-gray-500 w-5 text-right">{holeNum}</span>
                     <select

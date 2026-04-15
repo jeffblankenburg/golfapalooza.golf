@@ -20,10 +20,45 @@ export function getContrastText(hex: string): string {
   return luminance > 0.5 ? "text-gray-900" : "text-white";
 }
 
+const TEE_HEX_MAP: Record<string, string> = {
+  black: "#111827",
+  blue: "#2563eb",
+  white: "#f3f4f6",
+  gold: "#eab308",
+  red: "#dc2626",
+  green: "#15803d",
+  silver: "#9ca3af",
+  Black: "#111827",
+  Blue: "#2563eb",
+  White: "#f3f4f6",
+  Gold: "#eab308",
+  Red: "#dc2626",
+  Green: "#15803d",
+  Silver: "#9ca3af",
+};
+
 export function getTeeColorClasses(color: string | null) {
   const match = TEE_COLOR_OPTIONS.find((c) => c.value === color);
-  if (match) return { ...match, isCustom: false, hex: null };
+  if (match) return { ...match, isCustom: false, hex: null, isGradient: false, gradientHex: null as string | null };
+
+  // Composition tee gradient (e.g., "Black/Blue")
+  if (color && color.includes("/")) {
+    const parts = color.split("/").map((c) => c.trim());
+    const hex1 = TEE_HEX_MAP[parts[0]] || "#9ca3af";
+    const hex2 = TEE_HEX_MAP[parts[1]] || "#9ca3af";
+    const gradient = `linear-gradient(135deg, ${hex1} 50%, ${hex2} 50%)`;
+    return {
+      bg: "",
+      text: "text-white",
+      ring: "ring-gray-400",
+      isCustom: true,
+      hex: null,
+      isGradient: true,
+      gradientHex: gradient,
+    };
+  }
+
   if (isHexColor(color))
-    return { bg: "", text: getContrastText(color!), ring: "", isCustom: true, hex: color };
-  return { bg: "bg-gray-100", text: "text-gray-600", ring: "ring-gray-300", isCustom: false, hex: null };
+    return { bg: "", text: getContrastText(color!), ring: "", isCustom: true, hex: color, isGradient: false, gradientHex: null as string | null };
+  return { bg: "bg-gray-100", text: "text-gray-600", ring: "ring-gray-300", isCustom: false, hex: null, isGradient: false, gradientHex: null as string | null };
 }

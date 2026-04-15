@@ -56,6 +56,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
   const [course, setCourse] = useState<CourseInfo | null>(null);
   const [tees, setTees] = useState<TeeData[]>([]);
   const [selectedTeeId, setSelectedTeeId] = useState<string | null>(null);
+  const [selectedTeeIsComposition, setSelectedTeeIsComposition] = useState(false);
   const [holes, setHoles] = useState<HoleData[]>([]);
   const [tripId, setTripId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -840,10 +841,12 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
           teeId={selectedTee.id}
           teeName={selectedTee.tee_name}
           otherTees={tees.filter((t) => t.id !== selectedTee.id)}
+          onCompositionChange={setSelectedTeeIsComposition}
         />
       )}
 
-      {/* Holes Section */}
+      {/* Holes Section — hidden for composition tees */}
+      {!selectedTeeIsComposition && (
       <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-gray-700">
@@ -902,6 +905,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
           ))}
         </div>
       </section>
+      )}
 
       {/* Hidden file input */}
       <input
@@ -1384,10 +1388,12 @@ function CompositionTeeEditor({
   teeId,
   teeName,
   otherTees,
+  onCompositionChange,
 }: {
   teeId: string;
   teeName: string;
   otherTees: { id: string; tee_name: string }[];
+  onCompositionChange?: (isComposition: boolean) => void;
 }) {
   const [isComposition, setIsComposition] = useState(false);
   const [mappings, setMappings] = useState<Record<number, string>>({});
@@ -1402,6 +1408,7 @@ function CompositionTeeEditor({
       const m = data.mappings || [];
       if (m.length > 0) {
         setIsComposition(true);
+        onCompositionChange?.(true);
         const map: Record<number, string> = {};
         for (const entry of m) {
           map[entry.hole_number] = entry.source_tee_id;
@@ -1409,6 +1416,7 @@ function CompositionTeeEditor({
         setMappings(map);
       } else {
         setIsComposition(false);
+        onCompositionChange?.(false);
         setMappings({});
       }
       setLoading(false);
@@ -1425,6 +1433,7 @@ function CompositionTeeEditor({
         body: JSON.stringify({ tee_id: teeId }),
       });
       setIsComposition(false);
+      onCompositionChange?.(false);
       setMappings({});
     } else {
       // Enable composition — default all holes to first other tee
@@ -1436,6 +1445,7 @@ function CompositionTeeEditor({
       }
       setMappings(newMappings);
       setIsComposition(true);
+      onCompositionChange?.(true);
       await saveMappings(newMappings);
     }
   };

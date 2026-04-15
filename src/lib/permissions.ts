@@ -33,6 +33,7 @@ export const EVENT_PERMISSIONS: PermissionDef[] = [
   { key: "manage_notebook", label: "Notebook", description: "Notes & rules for players" },
   { key: "manage_options", label: "Trip Options", description: "Option builder & selections" },
   { key: "manage_loozer_metrics", label: "Loozer Metrics", description: "8 Bag Avg & Avg Scramble Score" },
+  { key: "manage_best_line", label: "Best Line", description: "View all submissions & manage awards" },
 ];
 
 // Combined list for backwards compatibility

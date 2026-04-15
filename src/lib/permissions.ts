@@ -12,6 +12,7 @@ export const GLOBAL_PERMISSIONS: PermissionDef[] = [
   { key: "manage_music", label: "Music", description: "Manage songs & audio files" },
   { key: "manage_finances", label: "Finances", description: "Financial data & budgets" },
   { key: "manage_gallery", label: "Gallery", description: "Manage photos & videos" },
+  { key: "manage_articles", label: "Articles", description: "Create, edit & publish articles" },
 ];
 
 // Event permissions (per-accordion on the event page)

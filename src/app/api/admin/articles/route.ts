@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveUserId } from "@/lib/simulator";
-import { checkIsAdmin } from "@/lib/permissions-server";
+import { checkPermissionAccess } from "@/lib/permissions-server";
 
 // GET - List all articles for a trip (drafts + scheduled + published)
 export async function GET(request: NextRequest) {
-  const isAdmin = await checkIsAdmin();
+  const isAdmin = await checkPermissionAccess("manage_articles");
   if (!isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
 // POST - Create a new article
 export async function POST(request: NextRequest) {
-  const isAdmin = await checkIsAdmin();
+  const isAdmin = await checkPermissionAccess("manage_articles");
   if (!isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
 
 // PUT - Update an article
 export async function PUT(request: NextRequest) {
-  const isAdmin = await checkIsAdmin();
+  const isAdmin = await checkPermissionAccess("manage_articles");
   if (!isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -121,7 +121,7 @@ export async function PUT(request: NextRequest) {
 
 // DELETE - Delete an article
 export async function DELETE(request: NextRequest) {
-  const isAdmin = await checkIsAdmin();
+  const isAdmin = await checkPermissionAccess("manage_articles");
   if (!isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { checkIsAdmin } from "@/lib/permissions-server";
+import { checkPermissionAccess } from "@/lib/permissions-server";
 
 // GET - Get view counts and readers for articles
 export async function GET(request: NextRequest) {
-  const isAdmin = await checkIsAdmin();
+  const isAdmin = await checkPermissionAccess("manage_articles");
   if (!isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

@@ -6,6 +6,7 @@ import Link from "next/link";
 import ScorecardEntry from "./ScorecardEntry";
 import LiveScoringEntry from "./LiveScoringEntry";
 import { calculateDifferential } from "@/lib/golf/calculator";
+import { getTeeDotStyle } from "@/lib/utils/tee-colors";
 
 interface CourseSummary {
   id: string;
@@ -43,15 +44,6 @@ interface Loozer {
   full_name: string | null;
 }
 
-const TEE_DOT_COLORS: Record<string, string> = {
-  Black: "bg-gray-900",
-  Blue: "bg-blue-600",
-  White: "bg-white border border-gray-400",
-  Gold: "bg-yellow-500",
-  Green: "bg-green-600",
-  Red: "bg-red-600",
-  Silver: "bg-gray-400",
-};
 
 const STEPS = [
   { key: "course", label: "Course" },
@@ -284,12 +276,12 @@ export default function RoundForm() {
     const dateObj = new Date(y, m - 1, d);
     const dateLabel = dateObj.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
     const teeColor = selectedTee?.tee_color;
-    const dotClass = TEE_DOT_COLORS[teeColor || ""] || "bg-gray-300";
+    const dot = getTeeDotStyle(teeColor);
 
     return (
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 mb-4">
         <div className="flex items-start gap-3">
-          <div className={`w-8 h-8 rounded-full shrink-0 mt-0.5 ${dotClass}`} />
+          <div className={`w-8 h-8 rounded-full shrink-0 mt-0.5 ${dot.className || ""}`} style={dot.style} />
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-gray-900 leading-snug">{selectedCourse.name}</div>
             {(selectedCourse.city || selectedCourse.state) && (
@@ -501,7 +493,7 @@ export default function RoundForm() {
               const isMe = l.id === currentUserId;
               const pTee = getPlayerTee(l.id);
               const isEditingTee = editingPlayerTee === l.id;
-              const dotColor = TEE_DOT_COLORS[pTee?.tee_color || ""] || "bg-gray-300";
+              const pDot = getTeeDotStyle(pTee?.tee_color);
 
               return (
                 <div key={l.id} className="bg-green-50 border border-green-200 rounded-lg overflow-hidden">
@@ -521,7 +513,7 @@ export default function RoundForm() {
                       onClick={() => setEditingPlayerTee(isEditingTee ? null : l.id)}
                       className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-gray-600 hover:bg-green-100 transition-colors"
                     >
-                      <span className={`w-3 h-3 rounded-full inline-block shrink-0 ${dotColor}`} />
+                      <span className={`w-3 h-3 rounded-full inline-block shrink-0 ${pDot.className || ""}`} style={pDot.style} />
                       <span>{pTee?.tee_name || "—"}</span>
                       <svg className={`w-3 h-3 text-gray-400 transition-transform ${isEditingTee ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -532,7 +524,7 @@ export default function RoundForm() {
                     <div className="px-3 pb-2 flex flex-wrap gap-1.5">
                       {tees.map((t) => {
                         const isActive = (playerTees[l.id] || selectedTee?.id) === t.id;
-                        const tdot = TEE_DOT_COLORS[t.tee_color || ""] || "bg-gray-300";
+                        const tDot = getTeeDotStyle(t.tee_color);
                         return (
                           <button
                             key={t.id}
@@ -546,7 +538,7 @@ export default function RoundForm() {
                                 : "bg-white border border-gray-200 text-gray-700 hover:border-green-300"
                             }`}
                           >
-                            {!isActive && <span className={`w-2.5 h-2.5 rounded-full inline-block ${tdot}`} />}
+                            {!isActive && <span className={`w-2.5 h-2.5 rounded-full inline-block ${tDot.className || ""}`} style={tDot.style} />}
                             {t.tee_name}
                           </button>
                         );

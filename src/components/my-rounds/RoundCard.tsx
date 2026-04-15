@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { getTeeDotStyle } from "@/lib/utils/tee-colors";
 
 interface RoundCardProps {
   id: string;
@@ -18,15 +19,6 @@ interface RoundCardProps {
   score_differential: number | null;
 }
 
-const TEE_DOT_COLORS: Record<string, string> = {
-  Black: "bg-gray-900",
-  Blue: "bg-blue-600",
-  White: "bg-white border border-gray-400",
-  Gold: "bg-yellow-500",
-  Green: "bg-green-600",
-  Red: "bg-red-600",
-  Silver: "bg-gray-400",
-};
 
 function formatDate(dateStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number);
@@ -54,11 +46,10 @@ export default function RoundCard(props: RoundCardProps) {
             <span>{formatDate(round_date)}</span>
             <span>·</span>
             <span className="flex items-center gap-1">
-              <span
-                className={`w-3 h-3 rounded-full inline-block ${
-                  TEE_DOT_COLORS[tee_color || ""] || "bg-gray-300"
-                }`}
-              />
+              {(() => {
+                const dot = getTeeDotStyle(tee_color);
+                return <span className={`w-3 h-3 rounded-full inline-block ${dot.className || ""}`} style={dot.style} />;
+              })()}
               {tee_name}
             </span>
             {round_type !== "18" && (

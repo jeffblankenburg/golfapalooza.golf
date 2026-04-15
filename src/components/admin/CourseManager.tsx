@@ -1451,6 +1451,22 @@ function CompositionTeeEditor({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tee_id: teeId, mappings: arr }),
     });
+
+    // Auto-set the tee color to a gradient name (e.g., "Black/Blue")
+    const uniqueSourceIds = [...new Set(Object.values(m))];
+    const sourceNames = uniqueSourceIds
+      .map((id) => otherTees.find((t) => t.id === id)?.tee_name)
+      .filter(Boolean);
+    if (sourceNames.length >= 2) {
+      const gradientColor = sourceNames.join("/");
+      // Update tee_color via the tees API
+      await fetch("/api/admin/course/tees", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tee_id: teeId, tee_color: gradientColor }),
+      });
+    }
+
     setSaving(false);
   };
 

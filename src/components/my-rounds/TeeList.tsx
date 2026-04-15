@@ -3,16 +3,7 @@
 import { useState, useEffect } from "react";
 import TeeForm from "./TeeForm";
 import HoleEditor from "./HoleEditor";
-
-const TEE_DOT_COLORS: Record<string, string> = {
-  Black: "bg-gray-900",
-  Blue: "bg-blue-600",
-  White: "bg-white border border-gray-400",
-  Gold: "bg-yellow-500",
-  Green: "bg-green-600",
-  Red: "bg-red-600",
-  Silver: "bg-gray-400",
-};
+import { getTeeDotStyle } from "@/lib/utils/tee-colors";
 
 interface Tee {
   id: string;
@@ -97,11 +88,10 @@ export default function TeeList({ courseId, tees, onRefresh, locked = false }: T
             <div className="bg-white border border-gray-200 rounded-lg p-3">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <span
-                    className={`w-4 h-4 rounded-full inline-block ${
-                      TEE_DOT_COLORS[tee.tee_color || ""] || "bg-gray-300"
-                    }`}
-                  />
+                  {(() => {
+                    const dot = getTeeDotStyle(tee.tee_color);
+                    return <span className={`w-4 h-4 rounded-full inline-block ${dot.className || ""}`} style={dot.style} />;
+                  })()}
                   <span className="font-medium text-gray-900">{tee.tee_name}</span>
                 </div>
                 <div className="flex items-center gap-3">

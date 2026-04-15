@@ -162,16 +162,22 @@ export function MessageBubble({
           </p>
         )}
 
-        {/* Reply preview */}
+        {/* Reply preview — iMessage style: compact bubble above the message */}
         {message.reply_to && (
           <div
-            className={`flex ${isSent ? "justify-end" : "justify-start"}`}
+            className={`flex ${isSent ? "justify-end" : "justify-start"} mb-0.5`}
           >
-            <div className="bg-gray-100 rounded-lg px-2.5 py-1 mb-0.5 max-w-full">
-              <p className="text-[11px] text-green-700 font-medium">
+            <div className={`rounded-2xl px-3 py-1.5 max-w-full ${
+              isSent ? "bg-green-600/40" : "bg-gray-300/60"
+            }`}>
+              <p className={`text-[11px] font-semibold ${
+                isSent ? "text-green-100" : "text-gray-600"
+              }`}>
                 {message.reply_to.sender?.display_name || "Unknown"}
               </p>
-              <p className="text-[11px] text-gray-500 truncate">
+              <p className={`text-[12px] truncate ${
+                isSent ? "text-green-200/80" : "text-gray-500"
+              }`}>
                 {message.reply_to.content || "Image"}
               </p>
             </div>
@@ -265,6 +271,10 @@ export function MessageBubble({
             setShowTapback(false);
           }}
           onClose={() => setShowTapback(false)}
+          onReply={() => {
+            setShowTapback(false);
+            onReply();
+          }}
           onDelete={onDelete ? () => {
             setShowTapback(false);
             onDelete();

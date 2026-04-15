@@ -115,40 +115,43 @@ export default function HoleMapView({
 
       mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
-      const center: [number, number] = green
-        ? [(tee[1] + green[1]) / 2, (tee[0] + green[0]) / 2]
-        : [tee[1], tee[0]];
-
       const bearing = green ? getBearing(tee, green) : 0;
 
-      const map = new mapboxgl.Map({
+      // Build initial bounds for the constructor so the map starts at the right zoom
+      const mapOptions: mapboxgl.MapOptions = {
         container: containerRef.current,
         style: "mapbox://styles/mapbox/satellite-streets-v12",
-        center,
-        zoom: 17,
-        bearing,
         pitch: 0,
         attributionControl: false,
-      });
+      };
 
+      if (green) {
+        const bounds = new mapboxgl.LngLatBounds(
+          [tee[1], tee[0]],
+          [green[1], green[0]]
+        );
+        Object.assign(mapOptions, {
+          bounds,
+          fitBoundsOptions: {
+            padding: { top: 40, bottom: 40, left: 30, right: 30 },
+            bearing,
+            maxZoom: 19,
+          },
+        });
+      } else {
+        Object.assign(mapOptions, {
+          center: [tee[1], tee[0]] as [number, number],
+          zoom: 17,
+          bearing,
+        });
+      }
+
+      const map = new mapboxgl.Map(mapOptions);
       mapRef.current = map;
 
       map.on("load", () => {
         if (cancelled) return;
         setLoaded(true);
-
-        // Fit bounds
-        if (green) {
-          const bounds = new mapboxgl.LngLatBounds(
-            [tee[1], tee[0]],
-            [green[1], green[0]]
-          );
-          map.fitBounds(bounds, {
-            padding: { top: 80, bottom: 80, left: 50, right: 50 },
-            bearing,
-            maxZoom: 18,
-          });
-        }
 
         // Tee dot (colored by tee box)
         const teeHex = TEE_HEX_COLORS[teeColorRef.current || ""] || "#2563eb";
@@ -206,7 +209,7 @@ export default function HoleMapView({
           });
         }
 
-        // Distance label helper
+        // Distance label helper — returns marker reference for repositioning
         function addDistanceLabel(id: string, from: [number, number], to: [number, number]) {
           const midLat = (from[0] + to[0]) / 2;
           const midLng = (from[1] + to[1]) / 2;
@@ -239,11 +242,11 @@ export default function HoleMapView({
           labelEl.className = `map-distance-label-${id}`;
           labelEl.innerHTML = `<div style="background:rgba(0,0,0,0.75);color:white;font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap;">${yards}y</div>`;
           labelEl.style.cursor = "default";
-          new mapboxgl.Marker({ element: labelEl, anchor: "center" })
+          const labelMarker = new mapboxgl.Marker({ element: labelEl, anchor: "center" })
             .setLngLat([midLng, midLat])
             .addTo(map);
 
-          return { yards, labelEl, midLat, midLng };
+          return { yards, labelEl, labelMarker };
         }
 
         // Draggable drive circle
@@ -266,7 +269,7 @@ export default function HoleMapView({
           const backYards = greenBackRef.current ? calcYards(initialDrive, greenBackRef.current) : null;
           setDriveYards({ toTee: teeLineInfo.yards, toGreen: greenLineInfo.yards, toFront: frontYards, toBack: backYards });
 
-          // Update on drag
+          // Update on drag — reposition lines AND label markers
           driveMarker.on("drag", () => {
             const lngLat = driveMarker.getLngLat();
             const drivePos: [number, number] = [lngLat.lat, lngLat.lng];
@@ -297,15 +300,23 @@ export default function HoleMapView({
               });
             }
 
-            // Update labels
+            // Update label text AND positions
             const teeDriveYards = calcYards(tee, drivePos);
             const driveGreenYards = calcYards(drivePos, green);
 
             const teeLabelEl = containerRef.current?.querySelector(".map-distance-label-tee-drive div") as HTMLElement;
             if (teeLabelEl) teeLabelEl.textContent = `${teeDriveYards}y`;
+            teeLineInfo.labelMarker.setLngLat([
+              (tee[1] + drivePos[1]) / 2,
+              (tee[0] + drivePos[0]) / 2,
+            ]);
 
             const greenLabelEl = containerRef.current?.querySelector(".map-distance-label-drive-green div") as HTMLElement;
             if (greenLabelEl) greenLabelEl.textContent = `${driveGreenYards}y`;
+            greenLineInfo.labelMarker.setLngLat([
+              (drivePos[1] + green[1]) / 2,
+              (drivePos[0] + green[0]) / 2,
+            ]);
 
             const frontY = greenFrontRef.current ? calcYards(drivePos, greenFrontRef.current) : null;
             const backY = greenBackRef.current ? calcYards(drivePos, greenBackRef.current) : null;

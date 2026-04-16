@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
+
+const PAGE_SIZE = 20;
 
 interface Article {
   id: string;
@@ -9,6 +12,9 @@ interface Article {
   content: string;
   publish_at: string | null;
   created_at: string;
+  featured_image_url?: string | null;
+  featured_image_focal_x?: number | null;
+  featured_image_focal_y?: number | null;
   author: { id: string; display_name: string; avatar_url: string | null } | null;
   featured_image: { id: string; media_url: string; thumbnail_url: string | null } | null;
 }
@@ -40,6 +46,10 @@ function getPreview(content: string, maxLen = 150): string {
 }
 
 export function ArticleList({ articles }: { articles: Article[] }) {
+  const [page, setPage] = useState(0);
+  const totalPages = Math.ceil(articles.length / PAGE_SIZE);
+  const paginated = articles.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">
       <div className="flex items-center gap-2">
@@ -56,17 +66,18 @@ export function ArticleList({ articles }: { articles: Article[] }) {
         </div>
       ) : (
         <div className="space-y-4">
-          {articles.map((article) => (
+          {paginated.map((article) => (
             <Link
               key={article.id}
               href={`/articles/${article.id}`}
               className="block bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden active:bg-gray-50 transition-colors"
             >
-              {article.featured_image && (
+              {(article.featured_image || article.featured_image_url) && (
                 <img
-                  src={article.featured_image.thumbnail_url || article.featured_image.media_url}
+                  src={article.featured_image?.thumbnail_url || article.featured_image?.media_url || article.featured_image_url || ""}
                   alt=""
                   className="w-full h-44 object-cover"
+                  style={{ objectPosition: `${article.featured_image_focal_x ?? 50}% ${article.featured_image_focal_y ?? 50}%` }}
                 />
               )}
               <div className="p-4">
@@ -97,6 +108,28 @@ export function ArticleList({ articles }: { articles: Article[] }) {
               </div>
             </Link>
           ))}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <button
+                onClick={() => { setPage(page - 1); window.scrollTo(0, 0); }}
+                disabled={page === 0}
+                className="px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed active:bg-green-100"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-gray-500">
+                {page + 1} of {totalPages}
+              </span>
+              <button
+                onClick={() => { setPage(page + 1); window.scrollTo(0, 0); }}
+                disabled={page >= totalPages - 1}
+                className="px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed active:bg-green-100"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

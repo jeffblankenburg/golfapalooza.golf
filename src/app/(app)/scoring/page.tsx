@@ -106,13 +106,19 @@ export default async function ScoringPage({ searchParams }: { searchParams: Prom
     tee_longitude: number | null;
     green_latitude: number | null;
     green_longitude: number | null;
+    drive_latitude: number | null;
+    drive_longitude: number | null;
+    green_front_latitude: number | null;
+    green_front_longitude: number | null;
+    green_back_latitude: number | null;
+    green_back_longitude: number | null;
   }[] = [];
 
   if (trip.course_id && teeAssignmentsResult.data?.length) {
     const [courseHolesResult, courseTeesResult] = await Promise.all([
       adminClient
         .from("course_holes")
-        .select("tee_id, hole_number, par, yards, handicap_index, overhead_image_url, green_image_url, tee_latitude, tee_longitude, green_latitude, green_longitude")
+        .select("tee_id, hole_number, par, yards, handicap_index, overhead_image_url, green_image_url, tee_latitude, tee_longitude, green_latitude, green_longitude, drive_latitude, drive_longitude, green_front_latitude, green_front_longitude, green_back_latitude, green_back_longitude")
         .eq("course_id", trip.course_id),
       adminClient
         .from("course_tees")
@@ -137,6 +143,12 @@ export default async function ScoringPage({ searchParams }: { searchParams: Prom
         tee_longitude: number | null;
         green_latitude: number | null;
         green_longitude: number | null;
+        drive_latitude: number | null;
+        drive_longitude: number | null;
+        green_front_latitude: number | null;
+        green_front_longitude: number | null;
+        green_back_latitude: number | null;
+        green_back_longitude: number | null;
       }
     >();
     for (const h of courseHolesResult.data || []) {
@@ -150,23 +162,58 @@ export default async function ScoringPage({ searchParams }: { searchParams: Prom
         tee_longitude: h.tee_longitude ?? null,
         green_latitude: h.green_latitude ?? null,
         green_longitude: h.green_longitude ?? null,
+        drive_latitude: h.drive_latitude ?? null,
+        drive_longitude: h.drive_longitude ?? null,
+        green_front_latitude: h.green_front_latitude ?? null,
+        green_front_longitude: h.green_front_longitude ?? null,
+        green_back_latitude: h.green_back_latitude ?? null,
+        green_back_longitude: h.green_back_longitude ?? null,
       });
+    }
+
+    // Build a fallback map: for each hole number, collect coords from any tee
+    // (green location, drive zone, images are the same physical spots regardless of tee)
+    const coordFallback = new Map<number, typeof holeMap extends Map<string, infer V> ? V : never>();
+    for (const h of courseHolesResult.data || []) {
+      const existing = coordFallback.get(h.hole_number);
+      if (!existing) {
+        coordFallback.set(h.hole_number, holeMap.get(`${h.tee_id}-${h.hole_number}`)!);
+      } else {
+        // Merge: fill in any nulls from this tee's data
+        const src = holeMap.get(`${h.tee_id}-${h.hole_number}`)!;
+        for (const key of [
+          "tee_latitude", "tee_longitude", "green_latitude", "green_longitude",
+          "drive_latitude", "drive_longitude", "green_front_latitude", "green_front_longitude",
+          "green_back_latitude", "green_back_longitude", "overhead_image_url", "green_image_url",
+        ] as const) {
+          if (existing[key] === null && src[key] !== null) {
+            (existing as Record<string, unknown>)[key] = src[key];
+          }
+        }
+      }
     }
 
     holes = teeAssignmentsResult.data.map((ta) => {
       const data = holeMap.get(`${ta.tee_id}-${ta.hole_number}`);
+      const fallback = coordFallback.get(ta.hole_number);
       return {
         hole_number: ta.hole_number,
         par: data?.par || 4,
         handicap_index: data?.handicap_index || 0,
         yards: data?.yards || 0,
         tee_color: teeColorMap.get(ta.tee_id) ?? null,
-        overhead_image_url: data?.overhead_image_url ?? null,
-        green_image_url: data?.green_image_url ?? null,
-        tee_latitude: data?.tee_latitude ?? null,
-        tee_longitude: data?.tee_longitude ?? null,
-        green_latitude: data?.green_latitude ?? null,
-        green_longitude: data?.green_longitude ?? null,
+        overhead_image_url: data?.overhead_image_url ?? fallback?.overhead_image_url ?? null,
+        green_image_url: data?.green_image_url ?? fallback?.green_image_url ?? null,
+        tee_latitude: data?.tee_latitude ?? fallback?.tee_latitude ?? null,
+        tee_longitude: data?.tee_longitude ?? fallback?.tee_longitude ?? null,
+        green_latitude: data?.green_latitude ?? fallback?.green_latitude ?? null,
+        green_longitude: data?.green_longitude ?? fallback?.green_longitude ?? null,
+        drive_latitude: data?.drive_latitude ?? fallback?.drive_latitude ?? null,
+        drive_longitude: data?.drive_longitude ?? fallback?.drive_longitude ?? null,
+        green_front_latitude: data?.green_front_latitude ?? fallback?.green_front_latitude ?? null,
+        green_front_longitude: data?.green_front_longitude ?? fallback?.green_front_longitude ?? null,
+        green_back_latitude: data?.green_back_latitude ?? fallback?.green_back_latitude ?? null,
+        green_back_longitude: data?.green_back_longitude ?? fallback?.green_back_longitude ?? null,
       };
     });
   }

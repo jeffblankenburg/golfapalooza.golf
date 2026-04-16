@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import rehypeRaw from "rehype-raw";
 import Link from "next/link";
-import { GalleryImagePicker } from "./GalleryImagePicker";
+import { ArticleImagePicker, ArticleImageValue } from "./ArticleImagePicker";
 import { ConfirmModal } from "./ConfirmModal";
 
 interface Article {
@@ -15,6 +15,10 @@ interface Article {
   publish_at: string | null;
   created_at: string;
   updated_at: string;
+  featured_image_url: string | null;
+  featured_image_source: string | null;
+  featured_image_focal_x: number | null;
+  featured_image_focal_y: number | null;
   author: { id: string; display_name: string; avatar_url: string | null } | null;
   featured_image: { id: string; media_url: string; thumbnail_url: string | null } | null;
 }
@@ -37,12 +41,12 @@ export function ArticleManager({ tripId }: { tripId: string }) {
   const [editId, setEditId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [featuredImage, setFeaturedImage] = useState<{ id: string; media_url: string; thumbnail_url: string | null } | null>(null);
+  const [featuredImage, setFeaturedImage] = useState<ArticleImageValue | null>(null);
   const [publishAt, setPublishAt] = useState<string>("");
   const [showPreview, setShowPreview] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [showImagePicker, setShowImagePicker] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; title: string } | null>(null);
+  const [page, setPage] = useState(0);
 
   const fetchArticles = useCallback(async () => {
     const [articlesRes, viewsRes] = await Promise.all([
@@ -79,7 +83,29 @@ export function ArticleManager({ tripId }: { tripId: string }) {
     setEditId(article.id);
     setTitle(article.title);
     setContent(article.content);
-    setFeaturedImage(article.featured_image);
+
+    // Hydrate featured image state from article data
+    const source = (article.featured_image_source || "gallery") as "gallery" | "upload" | "song_art";
+    if (source === "gallery" && article.featured_image) {
+      setFeaturedImage({
+        source: "gallery",
+        galleryItemId: article.featured_image.id,
+        imageUrl: article.featured_image.media_url,
+        thumbnailUrl: article.featured_image.thumbnail_url || undefined,
+        focalX: article.featured_image_focal_x ?? 50,
+        focalY: article.featured_image_focal_y ?? 50,
+      });
+    } else if (article.featured_image_url) {
+      setFeaturedImage({
+        source,
+        imageUrl: article.featured_image_url,
+        focalX: article.featured_image_focal_x ?? 50,
+        focalY: article.featured_image_focal_y ?? 50,
+      });
+    } else {
+      setFeaturedImage(null);
+    }
+
     setPublishAt(article.publish_at ? new Date(article.publish_at).toISOString().slice(0, 16) : "");
     setShowPreview(false);
     setMode("edit");
@@ -98,7 +124,11 @@ export function ArticleManager({ tripId }: { tripId: string }) {
       trip_id: tripId,
       title: title.trim(),
       content,
-      featured_image_id: featuredImage?.id || null,
+      featured_image_id: featuredImage?.source === "gallery" ? featuredImage.galleryItemId : null,
+      featured_image_url: featuredImage && featuredImage.source !== "gallery" ? featuredImage.imageUrl : null,
+      featured_image_source: featuredImage?.source || null,
+      featured_image_focal_x: featuredImage?.focalX ?? 50,
+      featured_image_focal_y: featuredImage?.focalY ?? 50,
     };
 
     // Determine publish_at value
@@ -167,41 +197,11 @@ export function ArticleManager({ tripId }: { tripId: string }) {
         />
 
         {/* Featured Image */}
-        <div>
-          <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-            Featured Image
-          </label>
-          {featuredImage ? (
-            <div className="mt-1 relative">
-              <img
-                src={featuredImage.thumbnail_url || featuredImage.media_url}
-                alt=""
-                className="w-full h-40 object-cover rounded-xl"
-              />
-              <div className="absolute top-2 right-2 flex gap-1">
-                <button
-                  onClick={() => setShowImagePicker(true)}
-                  className="px-2 py-1 bg-white/90 rounded-lg text-xs font-medium text-gray-700 shadow"
-                >
-                  Change
-                </button>
-                <button
-                  onClick={() => setFeaturedImage(null)}
-                  className="px-2 py-1 bg-white/90 rounded-lg text-xs font-medium text-red-600 shadow"
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowImagePicker(true)}
-              className="mt-1 w-full py-6 border-2 border-dashed border-gray-300 rounded-xl text-sm text-gray-400 active:bg-gray-50"
-            >
-              Select from gallery
-            </button>
-          )}
-        </div>
+        <ArticleImagePicker
+          tripId={tripId}
+          value={featuredImage}
+          onChange={setFeaturedImage}
+        />
 
         {/* Content — Edit / Preview toggle */}
         <div>
@@ -286,24 +286,15 @@ export function ArticleManager({ tripId }: { tripId: string }) {
           </div>
         </div>
 
-        {/* Gallery Image Picker */}
-        <GalleryImagePicker
-          open={showImagePicker}
-          selectedId={featuredImage?.id || null}
-          onSelect={(item) => {
-            if (item) {
-              setFeaturedImage({ id: item.id, media_url: item.media_url, thumbnail_url: item.thumbnail_url });
-            } else {
-              setFeaturedImage(null);
-            }
-          }}
-          onClose={() => setShowImagePicker(false)}
-        />
       </div>
     );
   }
 
   // ── List View ──
+  const pageSize = 20;
+  const totalPages = Math.ceil(articles.length / pageSize);
+  const paginatedArticles = articles.slice(page * pageSize, (page + 1) * pageSize);
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -324,7 +315,7 @@ export function ArticleManager({ tripId }: { tripId: string }) {
         </p>
       ) : (
         <div className="space-y-2">
-          {articles.map((article) => {
+          {paginatedArticles.map((article) => {
             const status = statusLabel(article);
             return (
               <div
@@ -332,11 +323,12 @@ export function ArticleManager({ tripId }: { tripId: string }) {
                 className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
               >
                 <div className="flex items-center gap-3 p-3">
-                  {article.featured_image && (
+                  {(article.featured_image || article.featured_image_url) && (
                     <img
-                      src={article.featured_image.thumbnail_url || article.featured_image.media_url}
+                      src={article.featured_image?.thumbnail_url || article.featured_image?.media_url || article.featured_image_url || ""}
                       alt=""
                       className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                      style={{ objectPosition: `${article.featured_image_focal_x ?? 50}% ${article.featured_image_focal_y ?? 50}%` }}
                     />
                   )}
                   <div className="flex-1 min-w-0">
@@ -389,6 +381,27 @@ export function ArticleManager({ tripId }: { tripId: string }) {
               </div>
             );
           })}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <button
+                onClick={() => setPage(page - 1)}
+                disabled={page === 0}
+                className="px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed active:bg-green-100"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-gray-500">
+                {page + 1} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage(page + 1)}
+                disabled={page >= totalPages - 1}
+                className="px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed active:bg-green-100"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </div>
       )}
 

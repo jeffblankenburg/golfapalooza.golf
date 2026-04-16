@@ -12,6 +12,9 @@ interface Article {
   content: string;
   publish_at: string | null;
   created_at: string;
+  featured_image_url?: string | null;
+  featured_image_focal_x?: number | null;
+  featured_image_focal_y?: number | null;
   author: { id: string; display_name: string; avatar_url: string | null } | null;
   featured_image: { id: string; media_url: string; thumbnail_url: string | null } | null;
 }
@@ -34,11 +37,12 @@ export function ArticleDetail({ article }: { article: Article }) {
       </div>
 
       {/* Featured image */}
-      {article.featured_image && (
+      {(article.featured_image || article.featured_image_url) && (
         <img
-          src={article.featured_image.media_url}
+          src={article.featured_image?.media_url || article.featured_image_url || ""}
           alt=""
           className="w-full h-52 object-cover"
+          style={{ objectPosition: `${article.featured_image_focal_x ?? 50}% ${article.featured_image_focal_y ?? 50}%` }}
         />
       )}
 

@@ -264,7 +264,7 @@ export function HomeContent({
   myBalance?: { charges: number; payments: number; balance: number } | null;
   optionsDeadline?: string | null;
   hasSubmittedOptions?: boolean;
-  latestArticle?: { id: string; title: string; publishAt: string; imageUrl: string | null; preview: string | null } | null;
+  latestArticle?: { id: string; title: string; publishAt: string; imageUrl: string | null; preview: string | null; focalX?: number; focalY?: number } | null;
   hiddenQuickLinks?: string[];
 }) {
   const router = useRouter();
@@ -419,6 +419,7 @@ export function HomeContent({
                 src={latestArticle.imageUrl}
                 alt=""
                 className="w-full h-full object-cover"
+                style={{ objectPosition: `${latestArticle.focalX ?? 50}% ${latestArticle.focalY ?? 50}%` }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 p-4">

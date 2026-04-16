@@ -98,7 +98,7 @@ export default async function HomePage() {
     // Latest published article (within last 14 days)
     supabase
       .from("articles")
-      .select("id, title, content, publish_at, featured_image:gallery_items!articles_featured_image_id_fkey(media_url, thumbnail_url)")
+      .select("id, title, content, publish_at, featured_image_url, featured_image_focal_x, featured_image_focal_y, featured_image:gallery_items!articles_featured_image_id_fkey(media_url, thumbnail_url)")
       .eq("trip_id", trip.id)
       .not("publish_at", "is", null)
       .lte("publish_at", new Date().toISOString())
@@ -627,8 +627,10 @@ export default async function HomePage() {
           id: d.id,
           title: d.title,
           publishAt: d.publish_at,
-          imageUrl: img?.media_url || img?.thumbnail_url || null,
+          imageUrl: img?.media_url || img?.thumbnail_url || d.featured_image_url || null,
           preview: preview || null,
+          focalX: d.featured_image_focal_x ?? 50,
+          focalY: d.featured_image_focal_y ?? 50,
         };
       })() : null}
       hiddenQuickLinks={hiddenQuickLinks}

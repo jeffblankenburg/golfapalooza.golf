@@ -18,6 +18,7 @@ export default async function ArticleDetailPage({
     .from("articles")
     .select(`
       id, title, content, publish_at, created_at,
+      featured_image_url, featured_image_focal_x, featured_image_focal_y,
       author:users!articles_author_id_fkey(id, display_name, avatar_url),
       featured_image:gallery_items!articles_featured_image_id_fkey(id, media_url, thumbnail_url)
     `)

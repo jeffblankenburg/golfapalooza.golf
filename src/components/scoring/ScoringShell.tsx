@@ -77,9 +77,9 @@ export default function ScoringShell({
   saveStatus = "idle",
   onHoleChange,
 }: ScoringShellProps) {
-  // Check if playing a composition tee (holes have different source_tee_colors)
+  // Check if holes have mixed tee colors (composition tees or scramble contest assignments)
   const isCompositionTee = useMemo(() => {
-    const colors = new Set(holes.map((h) => h.source_tee_color).filter(Boolean));
+    const colors = new Set(holes.map((h) => h.source_tee_color || h.tee_color).filter(Boolean));
     return colors.size > 1;
   }, [holes]);
 
@@ -256,7 +256,7 @@ export default function ScoringShell({
 
         <div className="flex items-center gap-3 text-sm text-gray-500">
           {(() => {
-            const dotColor = isCompositionTee ? hole.source_tee_color : roundTeeColor;
+            const dotColor = isCompositionTee ? (hole.source_tee_color || hole.tee_color) : roundTeeColor;
             const hex = dotColor ? TEE_HEX_COLORS[dotColor] || null : null;
             return hex ? (
               <span
@@ -291,20 +291,26 @@ export default function ScoringShell({
                   )}
                   {(() => {
                     const isActive = h.hole_number === hole.hole_number;
-                    const teeHex = isCompositionTee && h.source_tee_color
-                      ? TEE_HEX_COLORS[h.source_tee_color] || null
+                    const holeTeeColor = h.source_tee_color || h.tee_color;
+                    const teeHex = isCompositionTee && holeTeeColor
+                      ? TEE_HEX_COLORS[holeTeeColor] || null
                       : null;
 
                     if (teeHex) {
-                      // Composition tee: use source tee color
+                      // Per-hole tee color (composition or scramble assignment)
+                      const isWhiteTee = teeHex === "#f3f4f6";
                       return (
                         <th
                           data-active={isActive}
                           onClick={() => goToHole(i)}
                           className="px-0 py-1 text-center font-bold cursor-pointer"
                           style={isActive
-                            ? { backgroundColor: teeHex, color: "white" }
-                            : { backgroundColor: teeHex + "20", color: teeHex }
+                            ? isWhiteTee
+                              ? { backgroundColor: "#e5e7eb", color: "#374151", border: "1px solid #9ca3af" }
+                              : { backgroundColor: teeHex, color: "white" }
+                            : isWhiteTee
+                              ? { backgroundColor: "#f9fafb", color: "#6b7280", border: "1px solid #d1d5db" }
+                              : { backgroundColor: teeHex + "20", color: teeHex }
                           }
                         >
                           {h.hole_number}

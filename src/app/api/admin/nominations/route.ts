@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { checkIsAdmin } from "@/lib/permissions-server";
+import { checkPermissionAccess } from "@/lib/permissions-server";
 
 /**
  * @swagger
@@ -15,7 +15,7 @@ import { checkIsAdmin } from "@/lib/permissions-server";
  *         description: Unauthorized
  */
 export async function GET() {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_nominations");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -68,7 +68,7 @@ export async function GET() {
  *         description: Unauthorized
  */
 export async function PATCH(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_nominations");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

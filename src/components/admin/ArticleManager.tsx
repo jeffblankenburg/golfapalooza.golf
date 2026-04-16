@@ -101,16 +101,17 @@ export function ArticleManager({ tripId }: { tripId: string }) {
       featured_image_id: featuredImage?.id || null,
     };
 
-    // Only change publish_at when explicitly needed
-    if (isAlreadyPublished && publishMode === "now") {
-      // Already published — just save content, keep original publish date
-    } else if (publishMode === "now") {
-      payload.publish_at = new Date().toISOString();
-    } else if (publishMode === "schedule" && publishAt) {
-      payload.publish_at = new Date(publishAt).toISOString();
-    } else if (publishMode === "draft") {
+    // Determine publish_at value
+    if (publishMode === "draft") {
       payload.publish_at = null;
+    } else if (publishAt) {
+      // Explicit schedule date always wins (past dates for imports, future for scheduling)
+      payload.publish_at = new Date(publishAt).toISOString();
+    } else if (publishMode === "now" && !isAlreadyPublished) {
+      // No schedule date, publishing now for the first time
+      payload.publish_at = new Date().toISOString();
     }
+    // If already published with no schedule date change, publish_at is omitted (keeps original)
 
     await fetch("/api/admin/articles", {
       method: editId ? "PUT" : "POST",

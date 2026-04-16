@@ -13,6 +13,7 @@ export const GLOBAL_PERMISSIONS: PermissionDef[] = [
   { key: "manage_finances", label: "Finances", description: "Financial data & budgets" },
   { key: "manage_gallery", label: "Gallery", description: "Manage photos & videos" },
   { key: "manage_articles", label: "Articles", description: "Create, edit & publish articles" },
+  { key: "manage_nominations", label: "Nominations", description: "Review & approve rookie nominations" },
 ];
 
 // Event permissions (per-accordion on the event page)

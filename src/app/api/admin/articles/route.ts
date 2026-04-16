@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
       featured_image:gallery_items!articles_featured_image_id_fkey(id, media_url, thumbnail_url)
     `)
     .eq("trip_id", tripId)
+    .order("publish_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 
   if (error) {

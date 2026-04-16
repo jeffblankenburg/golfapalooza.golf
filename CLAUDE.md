@@ -252,6 +252,12 @@ When writing API routes that create or modify multiple related records:
 
 **Before writing any API route, ask: "How many database calls will this make for a typical request?" If the answer is more than 5, look for batch opportunities.**
 
+## Spectator / Public Home Page
+
+**When adding features to the authenticated home page (`HomeContent.tsx`), always check if they should also appear on the spectator home page (`SpectatorHomeContent.tsx`).** The spectator page is a public, no-auth version of the home page at `/spectator` that shows event info, the latest article, and limited quick links (KGB Cup, Course, Articles). It intentionally excludes anything personalized (RSVP, tee times, scoring, financials, action items, chat, notifications).
+
+Spectator sub-pages live under `src/app/(public)/spectator/` and use `createAdminClient()` to bypass RLS since there is no authenticated user. Only expose truly public data — never phone numbers, financials, chat, or private user data.
+
 ## Verification Checklist
 
 **After completing any implementation task, always provide a verification checklist.** This should be a concise list of manual tests and checks the user can perform to confirm the feature works correctly. Include:

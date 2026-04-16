@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 
 function formatPhone(value: string): string {
   const numbers = value.replace(/\D/g, "");
@@ -62,7 +63,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-white">
+    <div className="min-h-screen flex flex-col items-center justify-between p-4 bg-white">
+      <div />
+
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <Image
@@ -105,6 +108,19 @@ export default function LoginPage() {
             {loading ? "Sending..." : "Send Code"}
           </button>
         </form>
+      </div>
+
+      <div className="pb-safe mb-4">
+        <Link
+          href="/spectator"
+          className="inline-block px-8 py-3 bg-green-800 rounded-full active:bg-green-900 transition-colors"
+        >
+          <img
+            src="/for-our-patrons.png"
+            alt="For our patrons"
+            className="h-4 w-auto"
+          />
+        </Link>
       </div>
     </div>
   );

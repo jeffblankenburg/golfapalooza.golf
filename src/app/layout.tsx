@@ -14,6 +14,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+
 export const metadata: Metadata = {
   title: "Golfapalooza",
   description: "Live scoring, tracking, and planning for Golfapalooza",

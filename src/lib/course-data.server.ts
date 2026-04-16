@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { SupabaseClient } from "@supabase/supabase-js";
 import { CourseData, HoleData } from "./course-data";
 
 interface DbHole {
@@ -11,8 +12,8 @@ interface DbHole {
   green_image_url: string | null;
 }
 
-export async function getCourseData(): Promise<CourseData | null> {
-  const supabase = await createClient();
+export async function getCourseData(client?: SupabaseClient): Promise<CourseData | null> {
+  const supabase = client || await createClient();
 
   // Get active trip with course_id
   const { data: trip } = await supabase

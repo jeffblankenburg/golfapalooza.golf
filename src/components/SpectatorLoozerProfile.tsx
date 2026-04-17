@@ -9,7 +9,6 @@ import rehypeRaw from "rehype-raw";
 interface ProfileData {
   id: string;
   display_name: string;
-  full_name: string | null;
   avatar_url: string | null;
   city: string | null;
   state: string | null;
@@ -107,9 +106,6 @@ export function SpectatorLoozerProfile({
             <h1 className="text-xl font-bold text-gray-900 truncate">
               {profile.display_name}
             </h1>
-            {profile.full_name && profile.full_name !== profile.display_name && (
-              <p className="text-sm text-gray-500 truncate">{profile.full_name}</p>
-            )}
             {handicapIndex != null && (
               <span className="inline-flex items-center gap-1 mt-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2 py-0.5">
                 Handicap: {handicapIndex}

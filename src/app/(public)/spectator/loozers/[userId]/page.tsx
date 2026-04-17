@@ -23,7 +23,7 @@ export default async function SpectatorLoozerProfilePage({
     adminClient
       .from("users")
       .select(
-        "id, display_name, full_name, avatar_url, city, state, playing_since, swings, typical_shot, fun_fact, best_shot, occupation, eight_bag_average, avg_scramble_score"
+        "id, display_name, avatar_url, city, state, playing_since, swings, typical_shot, fun_fact, best_shot, occupation, eight_bag_average, avg_scramble_score"
       )
       .eq("id", userId)
       .single(),

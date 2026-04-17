@@ -1,0 +1,306 @@
+"use client";
+
+import { useState, useRef } from "react";
+import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
+import rehypeRaw from "rehype-raw";
+
+interface ProfileData {
+  id: string;
+  display_name: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  city: string | null;
+  state: string | null;
+  playing_since: number | null;
+  swings: string | null;
+  typical_shot: string | null;
+  fun_fact: string | null;
+  best_shot: string | null;
+  occupation: string | null;
+}
+
+interface AccoladeData {
+  id: string;
+  title: string;
+  trip: { trip_year: number }[] | { trip_year: number } | null;
+}
+
+interface TaggedPhoto {
+  id: string;
+  media_url: string;
+  thumbnail_url: string | null;
+  media_type: string;
+  created_at: string;
+}
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return (name[0] || "?").toUpperCase();
+}
+
+export function SpectatorLoozerProfile({
+  profile,
+  accolades,
+  taggedPhotos,
+  handicapIndex,
+  eightBagAverage,
+  avgScrambleScore,
+  bio,
+  song,
+}: {
+  profile: ProfileData;
+  accolades: AccoladeData[];
+  taggedPhotos: TaggedPhoto[];
+  handicapIndex: number | null;
+  eightBagAverage: number | null;
+  avgScrambleScore: number | null;
+  bio: { content: string } | null;
+}) {
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(["bio"]));
+
+  const toggleSection = (key: string) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full overflow-hidden bg-green-700 text-white flex items-center justify-center flex-shrink-0">
+            {profile.avatar_url ? (
+              <img
+                src={profile.avatar_url}
+                alt={profile.display_name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-2xl font-bold">
+                {getInitials(profile.display_name)}
+              </span>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-bold text-gray-900 truncate">
+              {profile.display_name}
+            </h1>
+            {profile.full_name && profile.full_name !== profile.display_name && (
+              <p className="text-sm text-gray-500 truncate">{profile.full_name}</p>
+            )}
+            {handicapIndex != null && (
+              <span className="inline-flex items-center gap-1 mt-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2 py-0.5">
+                Handicap: {handicapIndex}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Bio */}
+      {bio && bio.content && (
+        <Accordion
+          title="Biography"
+          isOpen={openSections.has("bio")}
+          onToggle={() => toggleSection("bio")}
+        >
+          <div className="prose prose-sm max-w-none text-gray-700">
+            <ReactMarkdown
+              remarkPlugins={[remarkBreaks]}
+              rehypePlugins={[rehypeRaw]}
+              components={{
+                a: ({ href, children }) => {
+                  if (href?.startsWith("/")) {
+                    return (
+                      <Link href={href} className="text-green-700 underline font-medium">
+                        {children}
+                      </Link>
+                    );
+                  }
+                  return (
+                    <a href={href} target="_blank" rel="noopener noreferrer" className="text-green-700 underline font-medium">
+                      {children}
+                    </a>
+                  );
+                },
+              }}
+            >
+              {bio.content}
+            </ReactMarkdown>
+          </div>
+        </Accordion>
+      )}
+
+      {/* Tagged Photos */}
+      <Accordion
+        title="Tagged Photos"
+        count={taggedPhotos.length}
+        isOpen={openSections.has("photos")}
+        onToggle={() => toggleSection("photos")}
+      >
+        {taggedPhotos.length > 0 ? (
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            {taggedPhotos.map((photo) => (
+              <div
+                key={photo.id}
+                className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-gray-100"
+              >
+                <img
+                  src={photo.thumbnail_url || photo.media_url}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400 italic">No tagged photos yet</p>
+        )}
+      </Accordion>
+
+      {/* Current Standings */}
+      <Accordion
+        title="Current Standings"
+        isOpen={openSections.has("standings")}
+        onToggle={() => toggleSection("standings")}
+      >
+        {(eightBagAverage != null || avgScrambleScore != null) ? (
+          <div className="flex flex-wrap gap-2">
+            {eightBagAverage != null && (
+              <div className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5">
+                <span className="text-xs font-medium text-emerald-600 uppercase tracking-wide">8 Bag Avg</span>
+                <span className="text-sm font-bold text-emerald-900">{eightBagAverage}</span>
+              </div>
+            )}
+            {avgScrambleScore != null && (
+              <div className="inline-flex items-center gap-1.5 bg-purple-50 border border-purple-200 rounded-xl px-3 py-1.5">
+                <span className="text-xs font-medium text-purple-600 uppercase tracking-wide">Avg Scramble</span>
+                <span className="text-sm font-bold text-purple-900">{avgScrambleScore}</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400 italic">Coming soon</p>
+        )}
+      </Accordion>
+
+      {/* Accolades */}
+      {accolades.length > 0 && (
+        <Accordion
+          title="Accolades"
+          count={accolades.length}
+          isOpen={openSections.has("accolades")}
+          onToggle={() => toggleSection("accolades")}
+        >
+          <div className="space-y-2">
+            {accolades.map((a) => {
+              const trip = Array.isArray(a.trip) ? a.trip[0] : a.trip;
+              return (
+                <div key={a.id} className="flex items-center gap-2">
+                  <span className="text-amber-500">&#127942;</span>
+                  <span className="text-sm font-medium text-gray-900">{a.title}</span>
+                  {trip?.trip_year && (
+                    <span className="text-xs text-gray-400">({trip.trip_year})</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Accordion>
+      )}
+
+      {/* About */}
+      {(profile.occupation || profile.fun_fact || profile.best_shot || profile.playing_since || profile.swings || profile.typical_shot) && (
+        <Accordion
+          title="About"
+          isOpen={openSections.has("about")}
+          onToggle={() => toggleSection("about")}
+        >
+          <div className="space-y-3">
+            {profile.occupation && <InfoRow label="Occupation" value={profile.occupation} />}
+            {profile.playing_since && <InfoRow label="Playing Since" value={String(profile.playing_since)} />}
+            {profile.swings && <InfoRow label="Swings" value={profile.swings.charAt(0).toUpperCase() + profile.swings.slice(1)} />}
+            {profile.typical_shot && <InfoRow label="Typical Shot" value={profile.typical_shot.charAt(0).toUpperCase() + profile.typical_shot.slice(1)} />}
+            {profile.fun_fact && (
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-0.5">Fun Fact</p>
+                <p className="text-sm text-gray-900">{profile.fun_fact}</p>
+              </div>
+            )}
+            {profile.best_shot && (
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-0.5">Best Shot</p>
+                <p className="text-sm text-gray-900">{profile.best_shot}</p>
+              </div>
+            )}
+          </div>
+        </Accordion>
+      )}
+    </div>
+  );
+}
+
+function Accordion({
+  title,
+  count,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  title: string;
+  count?: number;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-4 py-3 active:bg-gray-50 transition-colors"
+      >
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+          {title}
+          {count != null && count > 0 && (
+            <span className="ml-1.5 text-xs font-normal text-gray-400">({count})</span>
+          )}
+        </h3>
+        <svg
+          className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      <div
+        ref={contentRef}
+        className={`overflow-hidden transition-all duration-200 ${isOpen ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"}`}
+      >
+        <div className="px-4 pb-4">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-xs font-medium text-gray-500">{label}</span>
+      <span className="text-sm text-gray-900">{value}</span>
+    </div>
+  );
+}

@@ -15,17 +15,26 @@ export async function GET(request: NextRequest) {
   }
 
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("composition_tee_mappings")
-    .select("hole_number, source_tee_id")
-    .eq("tee_id", teeId)
-    .order("hole_number");
+  const [{ data, error }, { data: allComposition }] = await Promise.all([
+    admin
+      .from("composition_tee_mappings")
+      .select("hole_number, source_tee_id")
+      .eq("tee_id", teeId)
+      .order("hole_number"),
+    // Return distinct tee IDs that are composition tees (have any mappings)
+    admin
+      .from("composition_tee_mappings")
+      .select("tee_id")
+      .neq("tee_id", teeId),
+  ]);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ mappings: data || [] });
+  const compositionTeeIds = [...new Set((allComposition || []).map((r) => r.tee_id))];
+
+  return NextResponse.json({ mappings: data || [], compositionTeeIds });
 }
 
 // POST - Save composition mappings (upsert all 18 holes)

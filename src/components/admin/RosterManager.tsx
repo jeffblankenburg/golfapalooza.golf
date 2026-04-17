@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 interface UserWithStatus {
   id: string;
@@ -17,11 +17,13 @@ interface Trip {
   trip_year: number;
 }
 
-export function RosterManager({ tripId: propTripId }: { tripId?: string } = {}) {
+export function RosterManager({ tripId: propTripId, onCountChange }: { tripId?: string; onCountChange?: (count: number) => void } = {}) {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [users, setUsers] = useState<UserWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const onCountChangeRef = useRef(onCountChange);
+  onCountChangeRef.current = onCountChange;
 
   const fetchTrip = useCallback(async () => {
     const url = propTripId
@@ -51,6 +53,12 @@ export function RosterManager({ tripId: propTripId }: { tripId?: string } = {}) 
     }
     init();
   }, [fetchTrip, fetchUsers]);
+
+  useEffect(() => {
+    if (users.length > 0 && onCountChangeRef.current) {
+      onCountChangeRef.current(users.filter((u) => u.is_participating).length);
+    }
+  }, [users]);
 
   const toggleParticipation = async (userId: string, participating: boolean) => {
     if (!trip) return;
@@ -185,7 +193,7 @@ export function RosterManager({ tripId: propTripId }: { tripId?: string } = {}) 
             <span className="text-sm font-medium text-gray-900 flex-1">
               {user.display_name || user.full_name || "Unknown"}
             </span>
-            {user.is_participating && user.likelihood !== null && (
+            {user.likelihood !== null && (
               <span
                 className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
                   user.likelihood >= 99

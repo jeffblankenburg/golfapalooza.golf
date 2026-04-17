@@ -77,6 +77,57 @@ export async function GET(request: Request) {
     .eq("tee_id", selectedTeeId)
     .order("hole_number");
 
+  // Backfill: sync images from sibling tees for any holes missing images
+  if (holes && holes.length > 0) {
+    const missingOverhead = holes.filter((h) => !h.overhead_image_url).map((h) => h.hole_number);
+    const missingGreen = holes.filter((h) => !h.green_image_url).map((h) => h.hole_number);
+
+    if (missingOverhead.length > 0 || missingGreen.length > 0) {
+      const allMissing = [...new Set([...missingOverhead, ...missingGreen])];
+      const { data: siblingHoles } = await adminClient
+        .from("course_holes")
+        .select("hole_number, overhead_image_url, green_image_url")
+        .eq("course_id", course.id)
+        .neq("tee_id", selectedTeeId)
+        .in("hole_number", allMissing)
+        .order("hole_number");
+
+      if (siblingHoles && siblingHoles.length > 0) {
+        // Build a map of hole_number → best available image URLs
+        const imageMap: Record<number, { overhead?: string; green?: string }> = {};
+        for (const sh of siblingHoles) {
+          if (!imageMap[sh.hole_number]) imageMap[sh.hole_number] = {};
+          if (sh.overhead_image_url && !imageMap[sh.hole_number].overhead)
+            imageMap[sh.hole_number].overhead = sh.overhead_image_url;
+          if (sh.green_image_url && !imageMap[sh.hole_number].green)
+            imageMap[sh.hole_number].green = sh.green_image_url;
+        }
+
+        // Update current tee's holes and patch the response data in-place
+        const updates: Promise<unknown>[] = [];
+        for (const hole of holes) {
+          const imgs = imageMap[hole.hole_number];
+          if (!imgs) continue;
+          const patch: Record<string, string> = {};
+          if (!hole.overhead_image_url && imgs.overhead) {
+            patch.overhead_image_url = imgs.overhead;
+            hole.overhead_image_url = imgs.overhead;
+          }
+          if (!hole.green_image_url && imgs.green) {
+            patch.green_image_url = imgs.green;
+            hole.green_image_url = imgs.green;
+          }
+          if (Object.keys(patch).length > 0) {
+            updates.push(
+              adminClient.from("course_holes").update(patch).eq("id", hole.id)
+            );
+          }
+        }
+        if (updates.length > 0) await Promise.all(updates);
+      }
+    }
+  }
+
   return NextResponse.json({
     course,
     tees: tees || [],

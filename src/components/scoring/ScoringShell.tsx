@@ -92,9 +92,6 @@ export default function ScoringShell({
   const [imageView, setImageView] = useState<ImageView>("map");
 
   // Swipe + pinch state
-  const touchStartX = useRef(0);
-  const touchStartY = useRef(0);
-  const [dragOffset, setDragOffset] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -117,7 +114,6 @@ export default function ScoringShell({
   const goToHole = useCallback((index: number) => {
     if (index < 0 || index >= holes.length) return;
     setIsAnimating(true);
-    setDragOffset(0);
     setScale(1);
     setOffset({ x: 0, y: 0 });
     setCurrentHoleIndex(index);
@@ -178,8 +174,6 @@ export default function ScoringShell({
           panStartOffset: { ...offset },
         };
       } else {
-        touchStartX.current = e.touches[0].clientX;
-        touchStartY.current = e.touches[0].clientY;
         gestureRef.current.isPinching = false;
         gestureRef.current.isPanning = false;
       }
@@ -206,12 +200,6 @@ export default function ScoringShell({
       const dx = e.touches[0].clientX - g.panStart.x;
       const dy = e.touches[0].clientY - g.panStart.y;
       setOffset({ x: g.panStartOffset.x + dx, y: g.panStartOffset.y + dy });
-    } else if (!g.isPinching && !g.isPanning && e.touches.length === 1 && scale === 1) {
-      const dx = e.touches[0].clientX - touchStartX.current;
-      const dy = e.touches[0].clientY - touchStartY.current;
-      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
-        setDragOffset(dx);
-      }
     }
   }
 
@@ -230,12 +218,6 @@ export default function ScoringShell({
       }
     } else if (g.isPanning) {
       if (e.touches.length === 0) g.isPanning = false;
-    } else if (scale === 1 && Math.abs(dragOffset) > 50) {
-      if (dragOffset < 0 && currentHoleIndex < holes.length - 1) goToHole(currentHoleIndex + 1);
-      else if (dragOffset > 0 && currentHoleIndex > 0) goToHole(currentHoleIndex - 1);
-      else setDragOffset(0);
-    } else {
-      setDragOffset(0);
     }
   }
 
@@ -423,9 +405,9 @@ export default function ScoringShell({
         <div
           className="w-full h-full relative"
           style={{
-            transform: scale === 1
-              ? `translateX(${dragOffset}px)`
-              : `scale(${scale}) translate(${offset.x / scale}px, ${offset.y / scale}px)`,
+            transform: scale > 1
+              ? `scale(${scale}) translate(${offset.x / scale}px, ${offset.y / scale}px)`
+              : undefined,
             transition: isSnapBack
               ? "transform 0.2s ease-out"
               : isAnimating

@@ -214,7 +214,7 @@ export default function EventDetailPage() {
             </svg>
           }
         >
-          <RosterManager tripId={tripId} />
+          <RosterManager tripId={tripId} onCountChange={(count) => setSummary((prev) => prev ? { ...prev, counts: { ...prev.counts, participants: count } } : prev)} />
         </CollapsibleSection>
       )}
 

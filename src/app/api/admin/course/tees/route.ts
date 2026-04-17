@@ -143,15 +143,21 @@ export async function PUT(request: Request) {
 
     const adminClient = createAdminClient();
 
+    // Only update fields that were actually provided
+    const updates: Record<string, unknown> = {};
+    if (tee_name !== undefined) updates.tee_name = tee_name || "White";
+    if (tee_color !== undefined) updates.tee_color = tee_color || null;
+    if (course_rating !== undefined) updates.course_rating = course_rating || 72.0;
+    if (slope_rating !== undefined) updates.slope_rating = slope_rating || 113;
+    if (par !== undefined) updates.par = par || 72;
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+    }
+
     const { error } = await adminClient
       .from("course_tees")
-      .update({
-        tee_name: tee_name || "White",
-        tee_color: tee_color || null,
-        course_rating: course_rating || 72.0,
-        slope_rating: slope_rating || 113,
-        par: par || 72,
-      })
+      .update(updates)
       .eq("id", tee_id);
 
     if (error) {

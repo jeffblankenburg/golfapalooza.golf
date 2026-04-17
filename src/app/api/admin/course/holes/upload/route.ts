@@ -57,14 +57,15 @@ export async function POST(request: Request) {
 
     const imageUrl = urlData.publicUrl;
 
-    // Update hole record with image URL
+    // Update ALL hole records for this course + hole number (shared across tees)
     const column =
       imageType === "overhead" ? "overhead_image_url" : "green_image_url";
 
     const { error: updateError } = await adminClient
       .from("course_holes")
       .update({ [column]: imageUrl })
-      .eq("id", holeId);
+      .eq("course_id", courseId)
+      .eq("hole_number", parseInt(holeNumber));
 
     if (updateError) {
       return NextResponse.json(
@@ -113,28 +114,32 @@ export async function DELETE(request: Request) {
     const column =
       imageType === "overhead" ? "overhead_image_url" : "green_image_url";
 
-    // Get current URL to extract storage path
+    // Get current hole to find course_id, hole_number, and image URL
     const { data: hole } = await adminClient
       .from("course_holes")
-      .select("overhead_image_url, green_image_url")
+      .select("course_id, hole_number, overhead_image_url, green_image_url")
       .eq("id", holeId)
       .single();
 
-    const currentUrl = hole?.[column as keyof typeof hole] as string | null;
+    if (!hole) {
+      return NextResponse.json({ error: "Hole not found" }, { status: 404 });
+    }
+
+    const currentUrl = hole[column as keyof typeof hole] as string | null;
     if (currentUrl) {
       // Try to remove from storage (best-effort)
-      const url = currentUrl;
-      const match = url.match(/course-images\/(.+?)(\?|$)/);
+      const match = currentUrl.match(/course-images\/(.+?)(\?|$)/);
       if (match) {
         await adminClient.storage.from("course-images").remove([match[1]]);
       }
     }
 
-    // Null out the URL in the database
+    // Null out the URL across ALL tees for this course + hole number
     const { error } = await adminClient
       .from("course_holes")
       .update({ [column]: null })
-      .eq("id", holeId);
+      .eq("course_id", hole.course_id)
+      .eq("hole_number", hole.hole_number);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

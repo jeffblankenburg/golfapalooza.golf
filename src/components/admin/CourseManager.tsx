@@ -1409,7 +1409,7 @@ function CompositionTeeEditor({
 }: {
   teeId: string;
   teeName: string;
-  otherTees: { id: string; tee_name: string }[];
+  otherTees: { id: string; tee_name: string; course_rating: number }[];
   onCompositionChange?: (isComposition: boolean) => void;
   onTeeColorChange?: (color: string) => void;
 }) {
@@ -1417,12 +1417,18 @@ function CompositionTeeEditor({
   const [mappings, setMappings] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [eligibleTees, setEligibleTees] = useState(otherTees);
 
   useEffect(() => {
     async function load() {
       setLoading(true);
       const res = await fetch(`/api/admin/course/composition-tees?tee_id=${teeId}`);
       const data = await res.json();
+
+      // Filter out other composition tees from the dropdowns
+      const compositionIds: string[] = data.compositionTeeIds || [];
+      setEligibleTees(otherTees.filter((t) => !compositionIds.includes(t.id)));
+
       const m = data.mappings || [];
       if (m.length > 0) {
         setIsComposition(true);
@@ -1454,8 +1460,8 @@ function CompositionTeeEditor({
       onCompositionChange?.(false);
       setMappings({});
     } else {
-      // Enable composition — default all holes to first other tee
-      const defaultTeeId = otherTees[0]?.id;
+      // Enable composition — default all holes to first eligible (non-composition) tee
+      const defaultTeeId = eligibleTees[0]?.id;
       if (!defaultTeeId) return;
       const newMappings: Record<number, string> = {};
       for (let h = 1; h <= 18; h++) {
@@ -1480,13 +1486,14 @@ function CompositionTeeEditor({
       body: JSON.stringify({ tee_id: teeId, mappings: arr }),
     });
 
-    // Auto-set the tee color to a gradient name (e.g., "Black/Blue")
+    // Auto-set the tee color to a gradient name (e.g., "Black/Blue"), harder tee first
     const uniqueSourceIds = [...new Set(Object.values(m))];
-    const sourceNames = uniqueSourceIds
-      .map((id) => otherTees.find((t) => t.id === id)?.tee_name)
-      .filter(Boolean);
-    if (sourceNames.length >= 2) {
-      const gradientColor = sourceNames.join("/");
+    const sourceTees = uniqueSourceIds
+      .map((id) => eligibleTees.find((t) => t.id === id))
+      .filter(Boolean)
+      .sort((a, b) => b.course_rating - a.course_rating);
+    if (sourceTees.length >= 2) {
+      const gradientColor = sourceTees.map((t) => t.tee_name).join("/");
       await fetch("/api/admin/course/tees", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -1541,7 +1548,7 @@ function CompositionTeeEditor({
                       onChange={(e) => updateHole(holeNum, e.target.value)}
                       className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
                     >
-                      {otherTees.map((t) => (
+                      {eligibleTees.map((t) => (
                         <option key={t.id} value={t.id}>
                           {t.tee_name}
                         </option>

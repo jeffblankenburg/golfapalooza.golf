@@ -1,12 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkBreaks from "remark-breaks";
-import rehypeRaw from "rehype-raw";
-import Link from "next/link";
 import { ArticleImagePicker, ArticleImageValue } from "./ArticleImagePicker";
 import { ConfirmModal } from "./ConfirmModal";
+import { RichTextEditor } from "./RichTextEditor";
 
 interface Article {
   id: string;
@@ -43,10 +40,7 @@ export function ArticleManager({ tripId }: { tripId: string }) {
   const [content, setContent] = useState("");
   const [featuredImage, setFeaturedImage] = useState<ArticleImageValue | null>(null);
   const [publishAt, setPublishAt] = useState<string>("");
-  const [showPreview, setShowPreview] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [showMarkdownHelp, setShowMarkdownHelp] = useState(false);
-  const [copiedSyntax, setCopiedSyntax] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; title: string } | null>(null);
   const [page, setPage] = useState(0);
 
@@ -72,7 +66,7 @@ export function ArticleManager({ tripId }: { tripId: string }) {
     setContent("");
     setFeaturedImage(null);
     setPublishAt("");
-    setShowPreview(false);
+
     setMode("list");
   };
 
@@ -109,7 +103,7 @@ export function ArticleManager({ tripId }: { tripId: string }) {
     }
 
     setPublishAt(article.publish_at ? new Date(article.publish_at).toISOString().slice(0, 16) : "");
-    setShowPreview(false);
+
     setMode("edit");
   };
 
@@ -205,53 +199,12 @@ export function ArticleManager({ tripId }: { tripId: string }) {
           onChange={setFeaturedImage}
         />
 
-        {/* Content — Edit / Preview toggle */}
+        {/* Content */}
         <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              Content
-            </label>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowMarkdownHelp(true)}
-                className="text-xs font-medium text-gray-400"
-              >
-                Formatting
-              </button>
-              <button
-                onClick={() => setShowPreview(!showPreview)}
-                className="text-xs font-medium text-green-700"
-              >
-                {showPreview ? "Edit" : "Preview"}
-              </button>
-            </div>
-          </div>
-          {showPreview ? (
-            <div className="prose prose-sm max-w-none p-3 border border-gray-200 rounded-xl min-h-[200px] text-gray-700">
-              <ReactMarkdown
-                remarkPlugins={[remarkBreaks]}
-                rehypePlugins={[rehypeRaw]}
-                components={{
-                  a: ({ href, children }) => {
-                    if (href?.startsWith("/")) {
-                      return <Link href={href} className="text-green-700 underline font-medium">{children}</Link>;
-                    }
-                    return <a href={href} target="_blank" rel="noopener noreferrer" className="text-green-700 underline font-medium">{children}</a>;
-                  },
-                }}
-              >
-                {content || "*Nothing to preview*"}
-              </ReactMarkdown>
-            </div>
-          ) : (
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Write your article using markdown..."
-              rows={10}
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:outline-none resize-y"
-            />
-          )}
+          <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block">
+            Content
+          </label>
+          <RichTextEditor content={content} onChange={setContent} />
         </div>
 
         {/* Schedule datetime */}
@@ -296,53 +249,6 @@ export function ArticleManager({ tripId }: { tripId: string }) {
           </div>
         </div>
 
-        {/* Markdown Help Drawer */}
-        {showMarkdownHelp && (
-          <div className="fixed inset-0 z-50">
-            <div className="absolute inset-0 bg-black/40" onClick={() => setShowMarkdownHelp(false)} />
-            <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl max-h-[80vh] flex flex-col animate-slide-up">
-              <div className="flex justify-center pt-3 pb-1">
-                <div className="w-10 h-1 rounded-full bg-gray-300" />
-              </div>
-              <div className="flex items-center justify-between px-4 pb-2">
-                <h2 className="text-lg font-semibold">Formatting Guide</h2>
-                <button onClick={() => setShowMarkdownHelp(false)} className="w-8 h-8 flex items-center justify-center">
-                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-4">
-                {[
-                  { label: "Bold", syntax: "**bold text**", result: "bold text" },
-                  { label: "Italics", syntax: "*italic text*", result: "italic text" },
-                  { label: "Underline", syntax: "<u>underlined text</u>", result: "underlined text" },
-                  { label: "Link", syntax: "[link text](https://example.com)", result: "link text" },
-                  { label: "Image", syntax: "![alt text](https://example.com/image.jpg)", result: null },
-                  { label: "Linked Image", syntax: "[![alt](https://example.com/img.jpg)](https://example.com)", result: null },
-                  { label: "Bulleted List", syntax: "- Item one\n- Item two\n- Item three", result: null },
-                ].map((item) => (
-                  <div key={item.label} className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{item.label}</p>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(item.syntax);
-                          setCopiedSyntax(item.label);
-                          setTimeout(() => setCopiedSyntax(null), 1500);
-                        }}
-                        className="text-xs font-medium text-green-700"
-                      >
-                        {copiedSyntax === item.label ? "Copied!" : "Copy"}
-                      </button>
-                    </div>
-                    <pre className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700 font-mono whitespace-pre-wrap">{item.syntax}</pre>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }

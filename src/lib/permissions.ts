@@ -13,6 +13,7 @@ export const GLOBAL_PERMISSIONS: PermissionDef[] = [
   { key: "manage_finances", label: "Finances", description: "Financial data & budgets" },
   { key: "manage_gallery", label: "Gallery", description: "Manage photos & videos" },
   { key: "manage_articles", label: "Articles", description: "Create, edit & publish articles" },
+  { key: "manage_bios", label: "Bios", description: "Write & edit Loozer biographies" },
   { key: "manage_nominations", label: "Nominations", description: "Review & approve rookie nominations" },
 ];
 
@@ -34,7 +35,6 @@ export const EVENT_PERMISSIONS: PermissionDef[] = [
   { key: "manage_pickem", label: "Pick'em", description: "Football pick'em games & results" },
   { key: "manage_notebook", label: "Notebook", description: "Notes & rules for players" },
   { key: "manage_options", label: "Trip Options", description: "Option builder & selections" },
-  { key: "manage_loozer_metrics", label: "Loozer Metrics", description: "8 Bag Avg & Avg Scramble Score" },
   { key: "manage_best_line", label: "Best Line", description: "View all submissions & manage awards" },
 ];
 

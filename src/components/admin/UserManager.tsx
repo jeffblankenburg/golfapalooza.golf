@@ -14,6 +14,8 @@ interface User {
   is_active: boolean;
   permissions: Record<string, boolean> | null;
   handicap_index: number | null;
+  eight_bag_average: number | null;
+  avg_scramble_score: number | null;
   created_at: string;
 }
 
@@ -34,6 +36,8 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
     displayName: "",
     fullName: "",
     handicapIndex: "",
+    eightBagAverage: "",
+    avgScrambleScore: "",
   });
   const [editIsAdmin, setEditIsAdmin] = useState(false);
   const [editPermissions, setEditPermissions] = useState<
@@ -82,12 +86,16 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
             userId: editingUser.id,
             ...formData,
             handicapIndex: formData.handicapIndex === "" ? null : formData.handicapIndex,
+            eightBagAverage: formData.eightBagAverage === "" ? null : formData.eightBagAverage,
+            avgScrambleScore: formData.avgScrambleScore === "" ? null : formData.avgScrambleScore,
             isAdmin: editIsAdmin,
             permissions: editIsAdmin ? {} : editPermissions,
           }
         : {
             ...formData,
             handicapIndex: formData.handicapIndex === "" ? null : formData.handicapIndex,
+            eightBagAverage: formData.eightBagAverage === "" ? null : formData.eightBagAverage,
+            avgScrambleScore: formData.avgScrambleScore === "" ? null : formData.avgScrambleScore,
           };
 
       const res = await fetch(url, {
@@ -114,7 +122,7 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
 
   const openAdd = () => {
     setEditingUser(null);
-    setFormData({ phone: "", displayName: "", fullName: "", handicapIndex: "" });
+    setFormData({ phone: "", displayName: "", fullName: "", handicapIndex: "", eightBagAverage: "", avgScrambleScore: "" });
     setEditIsAdmin(false);
     setEditPermissions({});
     setError("");
@@ -128,6 +136,8 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
       displayName: user.display_name,
       fullName: user.full_name || "",
       handicapIndex: user.handicap_index !== null ? String(user.handicap_index) : "",
+      eightBagAverage: user.eight_bag_average !== null ? String(user.eight_bag_average) : "",
+      avgScrambleScore: user.avg_scramble_score !== null ? String(user.avg_scramble_score) : "",
     });
     setEditIsAdmin(user.is_admin);
     setEditPermissions(user.permissions || {});
@@ -335,6 +345,40 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                     placeholder="e.g. 12.4"
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
                   />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1">
+                      8 Bag Avg
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.1"
+                      value={formData.eightBagAverage}
+                      onChange={(e) =>
+                        setFormData({ ...formData, eightBagAverage: e.target.value })
+                      }
+                      placeholder="e.g. 82.5"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1">
+                      Avg Scramble
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.1"
+                      value={formData.avgScrambleScore}
+                      onChange={(e) =>
+                        setFormData({ ...formData, avgScrambleScore: e.target.value })
+                      }
+                      placeholder="e.g. 72.3"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                    />
+                  </div>
                 </div>
 
                 {editingUser && (

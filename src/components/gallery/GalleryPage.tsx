@@ -61,7 +61,10 @@ export function GalleryPage({
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [deepLinkShowComments, setDeepLinkShowComments] = useState(false);
   const [sortBy, setSortBy] = useState<"taken" | "uploaded">("taken");
-  const [filterUserIds, setFilterUserIds] = useState<Set<string>>(new Set());
+  const [filterUserIds, setFilterUserIds] = useState<Set<string>>(() => {
+    const tagged = searchParams.get("tagged");
+    return tagged ? new Set(tagged.split(",")) : new Set();
+  });
   const [filterYear, setFilterYear] = useState<string>("all");
   const [showFilterUsers, setShowFilterUsers] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);

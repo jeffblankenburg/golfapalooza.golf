@@ -9,45 +9,22 @@ interface UserStat {
   avg_scramble_score: number | null;
 }
 
-export function ScrambleStatsManager({ tripId }: { tripId: string }) {
+export function ScrambleStatsManager() {
   const [stats, setStats] = useState<UserStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
 
   const fetchStats = useCallback(async () => {
     try {
-      const [statsRes, usersRes] = await Promise.all([
-        fetch(`/api/admin/scramble-stats?trip_id=${tripId}`),
-        fetch(`/api/admin/users`),
-      ]);
-      const statsData = await statsRes.json();
-      const usersData = await usersRes.json();
-
-      const users: { id: string; display_name: string }[] = usersData.users || [];
-      const existingStats = statsData.stats || [];
-      const statsMap = new Map(
-        existingStats.map((s: { user_id: string; eight_bag_average: number | null; avg_scramble_score: number | null }) => [s.user_id, s])
-      );
-
-      const merged: UserStat[] = users
-        .sort((a, b) => a.display_name.localeCompare(b.display_name))
-        .map((u) => {
-          const existing = statsMap.get(u.id) as { eight_bag_average: number | null; avg_scramble_score: number | null } | undefined;
-          return {
-            user_id: u.id,
-            display_name: u.display_name,
-            eight_bag_average: existing?.eight_bag_average ?? null,
-            avg_scramble_score: existing?.avg_scramble_score ?? null,
-          };
-        });
-
-      setStats(merged);
+      const res = await fetch("/api/admin/scramble-stats");
+      const data = await res.json();
+      setStats(data.stats || []);
     } catch {
       // silently fail
     } finally {
       setLoading(false);
     }
-  }, [tripId]);
+  }, []);
 
   useEffect(() => {
     fetchStats();
@@ -66,7 +43,6 @@ export function ScrambleStatsManager({ tripId }: { tripId: string }) {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          trip_id: tripId,
           user_id: userId,
           eight_bag_average: field === "eight_bag_average" ? numValue : stat.eight_bag_average,
           avg_scramble_score: field === "avg_scramble_score" ? numValue : stat.avg_scramble_score,

@@ -205,25 +205,24 @@ export async function GET(request: Request) {
         });
       }
 
-      // Fetch handicap and admin-entered scramble stats in parallel
-      const [{ data: handicapRow }, { data: scrambleStats }] = await Promise.all([
+      // Fetch handicap and user metrics
+      const [{ data: handicapRow }, { data: userMetrics }] = await Promise.all([
         adminClient
           .from("player_handicaps")
           .select("handicap_index")
           .eq("user_id", activeParticipant.user_id)
           .maybeSingle(),
         adminClient
-          .from("user_scramble_stats")
+          .from("users")
           .select("eight_bag_average, avg_scramble_score")
-          .eq("user_id", activeParticipant.user_id)
-          .eq("trip_id", contest.trip_id)
-          .maybeSingle(),
+          .eq("id", activeParticipant.user_id)
+          .single(),
       ]);
 
       handicapIndex = handicapRow?.handicap_index ?? null;
-      if (scrambleStats) {
-        eightBagAverage = scrambleStats.eight_bag_average;
-        avgScrambleScore = scrambleStats.avg_scramble_score;
+      if (userMetrics) {
+        eightBagAverage = userMetrics.eight_bag_average;
+        avgScrambleScore = userMetrics.avg_scramble_score;
       }
     }
 
@@ -338,21 +337,21 @@ export async function GET(request: Request) {
       }
     }
 
-    // Bulk fetch handicaps + scramble stats for all participants (for Loozers table)
+    // Bulk fetch handicaps + user metrics for all participants (for Loozers table)
     const allUserIds = (participants || []).map((p) => p.user_id).filter(Boolean);
-    const [{ data: allHandicaps }, { data: allScrambleStats }] = await Promise.all([
+    const [{ data: allHandicaps }, { data: allUserMetrics }] = await Promise.all([
       allUserIds.length > 0
         ? adminClient.from("player_handicaps").select("user_id, handicap_index").in("user_id", allUserIds)
         : { data: [] },
       allUserIds.length > 0
-        ? adminClient.from("user_scramble_stats").select("user_id, eight_bag_average, avg_scramble_score").eq("trip_id", contest.trip_id).in("user_id", allUserIds)
+        ? adminClient.from("users").select("id, eight_bag_average, avg_scramble_score").in("id", allUserIds)
         : { data: [] },
     ]);
 
     const loozerStats: Record<string, { handicap: number | null; eightBag: number | null; avgScramble: number | null }> = {};
     for (const uid of allUserIds) {
       const h = (allHandicaps || []).find((r) => r.user_id === uid);
-      const s = (allScrambleStats || []).find((r) => r.user_id === uid);
+      const s = (allUserMetrics || []).find((r) => r.id === uid);
       loozerStats[uid] = {
         handicap: h?.handicap_index ?? null,
         eightBag: s?.eight_bag_average ?? null,

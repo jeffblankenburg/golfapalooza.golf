@@ -43,7 +43,7 @@ export async function GET(
   const { data: profile, error: profileError } = await queryClient
     .from("users")
     .select(
-      "id, display_name, full_name, avatar_url, phone, city, state, playing_since, swings, typical_shot, fun_fact, best_shot, occupation"
+      "id, display_name, full_name, avatar_url, phone, city, state, playing_since, swings, typical_shot, fun_fact, best_shot, occupation, eight_bag_average, avg_scramble_score"
     )
     .eq("id", userId)
     .single();
@@ -52,13 +52,14 @@ export async function GET(
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  // Get accolades, tagged photos, handicap, and scramble stats in parallel
+  // Get accolades, tagged photos, handicap, bio, and trip in parallel
   const adminClient = createAdminClient();
   const [
     { data: accolades },
     { data: taggedRows },
     { data: handicapRow },
     { data: activeTrip },
+    { data: bioData },
   ] = await Promise.all([
     queryClient
       .from("accolades")
@@ -83,28 +84,26 @@ export async function GET(
       .select("id")
       .eq("status", "active")
       .maybeSingle(),
+    adminClient
+      .from("loozer_bios")
+      .select("content")
+      .eq("user_id", userId)
+      .maybeSingle(),
   ]);
 
-  // Fetch scramble stats and bio note for active trip
-  let scrambleStats: { eight_bag_average: number | null; avg_scramble_score: number | null } | null = null;
-  let bioNote: { title: string; content: string } | null = null;
+  const bioNote = bioData && bioData.content ? { content: bioData.content } : null;
+
+  // Fetch song for active trip
+  let song: { id: string; title: string; mp3_url: string; art_url: string | null } | null = null;
+
   if (activeTrip) {
-    const [scrambleData, bioData] = await Promise.all([
-      adminClient
-        .from("user_scramble_stats")
-        .select("eight_bag_average, avg_scramble_score")
-        .eq("user_id", userId)
-        .eq("trip_id", activeTrip.id)
-        .maybeSingle(),
-      adminClient
-        .from("notebook_notes")
-        .select("title, content")
-        .eq("trip_id", activeTrip.id)
-        .eq("pinned_to", `user:${userId}`)
-        .maybeSingle(),
-    ]);
-    scrambleStats = scrambleData.data;
-    bioNote = bioData.data;
+    const { data: songData } = await adminClient
+      .from("songs")
+      .select("id, title, mp3_url, art_url")
+      .eq("tagged_user_id", userId)
+      .limit(1)
+      .maybeSingle();
+    song = songData;
   }
 
   const taggedPhotos = (taggedRows || [])
@@ -119,9 +118,10 @@ export async function GET(
     accolades: accolades || [],
     taggedPhotos,
     handicapIndex: handicapRow?.handicap_index ?? null,
-    eightBagAverage: scrambleStats?.eight_bag_average ?? null,
-    avgScrambleScore: scrambleStats?.avg_scramble_score ?? null,
+    eightBagAverage: profile.eight_bag_average ?? null,
+    avgScrambleScore: profile.avg_scramble_score ?? null,
     bio: bioNote,
+    song,
     // Stubs for future
     standings: [],
     scorecards: [],

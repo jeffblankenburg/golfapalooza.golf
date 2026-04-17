@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import rehypeRaw from "rehype-raw";
+import { useMusicPlayer, Song } from "@/contexts/MusicPlayerContext";
 
 interface ProfileData {
   id: string;
@@ -37,20 +38,19 @@ interface TaggedPhoto {
   created_at: string;
 }
 
+interface SongData {
+  id: string;
+  title: string;
+  mp3_url: string;
+  art_url: string | null;
+}
+
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
   return (name[0] || "?").toUpperCase();
-}
-
-function formatPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length === 10) {
-    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-  }
-  return phone;
 }
 
 export function LoozerProfile({
@@ -61,6 +61,7 @@ export function LoozerProfile({
   isOwnProfile: boolean;
 }) {
   const router = useRouter();
+  const musicPlayer = useMusicPlayer();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [accolades, setAccolades] = useState<AccoladeData[]>([]);
@@ -68,8 +69,12 @@ export function LoozerProfile({
   const [handicapIndex, setHandicapIndex] = useState<number | null>(null);
   const [eightBagAverage, setEightBagAverage] = useState<number | null>(null);
   const [avgScrambleScore, setAvgScrambleScore] = useState<number | null>(null);
-  const [bio, setBio] = useState<{ title: string; content: string } | null>(null);
+  const [bio, setBio] = useState<{ content: string } | null>(null);
+  const [song, setSong] = useState<SongData | null>(null);
   const [startingChat, setStartingChat] = useState(false);
+
+  // Accordion state — bio open by default, others closed
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(["bio"]));
 
   useEffect(() => {
     fetch(`/api/loozers/${userId}`)
@@ -82,10 +87,20 @@ export function LoozerProfile({
         setEightBagAverage(data.eightBagAverage ?? null);
         setAvgScrambleScore(data.avgScrambleScore ?? null);
         setBio(data.bio ?? null);
+        setSong(data.song ?? null);
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [userId]);
+
+  const toggleSection = (key: string) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   if (loading) {
     return (
@@ -102,8 +117,6 @@ export function LoozerProfile({
       </div>
     );
   }
-
-  const location = [profile.city, profile.state].filter(Boolean).join(", ");
 
   const openChat = async () => {
     setStartingChat(true);
@@ -123,98 +136,132 @@ export function LoozerProfile({
     setStartingChat(false);
   };
 
+  const playSong = () => {
+    if (!song) return;
+    const songObj: Song = {
+      id: song.id,
+      title: song.title,
+      mp3_url: song.mp3_url,
+      art_url: song.art_url,
+      art_thumb_url: null,
+      lyrics: null,
+      duration_seconds: null,
+      sort_order: 0,
+      tagged_user: profile ? { id: profile.id, display_name: profile.display_name, avatar_url: profile.avatar_url } : null,
+      is_favorite: false,
+    };
+    musicPlayer.loadSongs([songObj]);
+    musicPlayer.play(0);
+  };
+
+  const phoneDigits = profile.phone?.replace(/\D/g, "") || "";
+
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col items-center">
-        <div className="w-24 h-24 rounded-full overflow-hidden bg-green-700 text-white flex items-center justify-center">
-          {profile.avatar_url ? (
-            <img
-              src={profile.avatar_url}
-              alt={profile.display_name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <span className="text-3xl font-bold">
-              {getInitials(profile.display_name)}
-            </span>
-          )}
-        </div>
-        <h1 className="mt-3 text-2xl font-bold text-gray-900">
-          {profile.display_name}
-        </h1>
-        {profile.full_name && profile.full_name !== profile.display_name && (
-          <p className="text-sm text-gray-500">{profile.full_name}</p>
-        )}
-        {location && (
-          <p className="text-sm text-gray-500 mt-0.5">{location}</p>
-        )}
-        {profile.phone && (
-          <a
-            href={`tel:+1${profile.phone.replace(/\D/g, "")}`}
-            className="text-sm text-gray-500 mt-0.5 flex items-center gap-1 hover:text-green-600 transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-            </svg>
-            {formatPhone(profile.phone)}
-          </a>
-        )}
-
-        {/* Stats badges */}
-        {(handicapIndex != null || eightBagAverage != null || avgScrambleScore != null) && (
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-3">
-            {handicapIndex != null && (
-              <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-xl px-3 py-1.5">
-                <span className="text-xs font-medium text-blue-600 uppercase tracking-wide">Handicap</span>
-                <span className="text-sm font-bold text-blue-900">{handicapIndex}</span>
-              </div>
-            )}
-            {eightBagAverage != null && (
-              <div className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5">
-                <span className="text-xs font-medium text-emerald-600 uppercase tracking-wide">8 Bag Avg</span>
-                <span className="text-sm font-bold text-emerald-900">{eightBagAverage}</span>
-              </div>
-            )}
-            {avgScrambleScore != null && (
-              <div className="inline-flex items-center gap-1.5 bg-purple-50 border border-purple-200 rounded-xl px-3 py-1.5">
-                <span className="text-xs font-medium text-purple-600 uppercase tracking-wide">Avg Scramble</span>
-                <span className="text-sm font-bold text-purple-900">{avgScrambleScore}</span>
-              </div>
+      {/* ── Compact Header ── */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="flex items-center gap-4">
+          {/* Avatar */}
+          <div className="w-16 h-16 rounded-full overflow-hidden bg-green-700 text-white flex items-center justify-center flex-shrink-0">
+            {profile.avatar_url ? (
+              <img
+                src={profile.avatar_url}
+                alt={profile.display_name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-2xl font-bold">
+                {getInitials(profile.display_name)}
+              </span>
             )}
           </div>
-        )}
 
-        {/* Action buttons */}
-        <div className="flex items-center gap-3 mt-3">
-          {isOwnProfile ? (
-            <Link
-              href="/profile"
-              className="text-sm font-medium text-green-600"
-            >
-              Edit Profile
-            </Link>
-          ) : (
-            <button
-              onClick={openChat}
-              disabled={startingChat}
-              className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-xl active:bg-green-700 transition-colors disabled:opacity-50"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-              {startingChat ? "Opening..." : "Message"}
-            </button>
-          )}
+          {/* Name + stats */}
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-bold text-gray-900 truncate">
+              {profile.display_name}
+            </h1>
+            {profile.full_name && profile.full_name !== profile.display_name && (
+              <p className="text-sm text-gray-500 truncate">{profile.full_name}</p>
+            )}
+            {handicapIndex != null && (
+              <span className="inline-flex items-center gap-1 mt-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2 py-0.5">
+                Handicap: {handicapIndex}
+              </span>
+            )}
+          </div>
+
+          {/* 2x2 comms grid */}
+          <div className="grid grid-cols-2 gap-1.5 flex-shrink-0">
+            {profile.phone && (
+              <a
+                href={`tel:+1${phoneDigits}`}
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-green-50 text-green-700 active:bg-green-100 transition-colors"
+                title="Call"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+              </a>
+            )}
+            {profile.phone && (
+              <a
+                href={`sms:+1${phoneDigits}`}
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-50 text-blue-700 active:bg-blue-100 transition-colors"
+                title="Text"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                </svg>
+              </a>
+            )}
+            {!isOwnProfile && (
+              <button
+                onClick={openChat}
+                disabled={startingChat}
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-50 text-purple-700 active:bg-purple-100 transition-colors disabled:opacity-50"
+                title="Message in app"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </button>
+            )}
+            {song && (
+              <button
+                onClick={playSong}
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-50 text-amber-700 active:bg-amber-100 transition-colors"
+                title={`Play: ${song.title}`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                </svg>
+              </button>
+            )}
+            {isOwnProfile && (
+              <Link
+                href="/profile"
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-50 text-gray-700 active:bg-gray-100 transition-colors"
+                title="Edit Profile"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </Link>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Biography */}
+      {/* ── Accordion Sections ── */}
+
+      {/* Bio — only shown if bio exists */}
       {bio && bio.content && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-            Biography
-          </h3>
+        <Accordion
+          title="Biography"
+          isOpen={openSections.has("bio")}
+          onToggle={() => toggleSection("bio")}
+        >
           <div className="prose prose-sm max-w-none text-gray-700">
             <ReactMarkdown
               remarkPlugins={[remarkBreaks]}
@@ -239,141 +286,178 @@ export function LoozerProfile({
               {bio.content}
             </ReactMarkdown>
           </div>
-        </div>
+        </Accordion>
       )}
 
-      {/* Accolades */}
+      {/* Tagged Photos */}
+      <Accordion
+        title="Tagged Photos"
+        count={taggedPhotos.length}
+        isOpen={openSections.has("photos")}
+        onToggle={() => toggleSection("photos")}
+      >
+        {taggedPhotos.length > 0 ? (
+          <>
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+              {taggedPhotos.map((photo) => (
+                <div
+                  key={photo.id}
+                  className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-gray-100"
+                >
+                  <img
+                    src={photo.thumbnail_url || photo.media_url}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
+              ))}
+            </div>
+            <Link
+              href={`/gallery?tagged=${userId}`}
+              className="block text-center text-xs font-medium text-green-600 mt-2"
+            >
+              See All Photos
+            </Link>
+          </>
+        ) : (
+          <p className="text-sm text-gray-400 italic">No tagged photos yet</p>
+        )}
+      </Accordion>
+
+      {/* Scorecards */}
+      <Accordion
+        title="Scorecards"
+        isOpen={openSections.has("scorecards")}
+        onToggle={() => toggleSection("scorecards")}
+      >
+        <p className="text-sm text-gray-400 italic">Coming soon</p>
+      </Accordion>
+
+      {/* Current Standings */}
+      <Accordion
+        title="Current Standings"
+        isOpen={openSections.has("standings")}
+        onToggle={() => toggleSection("standings")}
+      >
+        {/* Stats badges */}
+        {(eightBagAverage != null || avgScrambleScore != null) ? (
+          <div className="flex flex-wrap gap-2">
+            {eightBagAverage != null && (
+              <div className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5">
+                <span className="text-xs font-medium text-emerald-600 uppercase tracking-wide">8 Bag Avg</span>
+                <span className="text-sm font-bold text-emerald-900">{eightBagAverage}</span>
+              </div>
+            )}
+            {avgScrambleScore != null && (
+              <div className="inline-flex items-center gap-1.5 bg-purple-50 border border-purple-200 rounded-xl px-3 py-1.5">
+                <span className="text-xs font-medium text-purple-600 uppercase tracking-wide">Avg Scramble</span>
+                <span className="text-sm font-bold text-purple-900">{avgScrambleScore}</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400 italic">Coming soon</p>
+        )}
+      </Accordion>
+
+      {/* Accolades (bonus section, not in required spec but already exists) */}
       {accolades.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-            Accolades
-          </h3>
+        <Accordion
+          title="Accolades"
+          count={accolades.length}
+          isOpen={openSections.has("accolades")}
+          onToggle={() => toggleSection("accolades")}
+        >
           <div className="space-y-2">
             {accolades.map((a) => {
               const trip = Array.isArray(a.trip) ? a.trip[0] : a.trip;
               return (
                 <div key={a.id} className="flex items-center gap-2">
                   <span className="text-amber-500">&#127942;</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {a.title}
-                  </span>
+                  <span className="text-sm font-medium text-gray-900">{a.title}</span>
                   {trip?.trip_year && (
-                    <span className="text-xs text-gray-400">
-                      ({trip.trip_year})
-                    </span>
+                    <span className="text-xs text-gray-400">({trip.trip_year})</span>
                   )}
                 </div>
               );
             })}
           </div>
-        </div>
+        </Accordion>
       )}
 
-      {/* About */}
-      {(profile.occupation ||
-        profile.fun_fact ||
-        profile.best_shot ||
-        profile.playing_since ||
-        profile.swings ||
-        profile.typical_shot) && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-            About
-          </h3>
+      {/* About (bonus section) */}
+      {(profile.occupation || profile.fun_fact || profile.best_shot || profile.playing_since || profile.swings || profile.typical_shot) && (
+        <Accordion
+          title="About"
+          isOpen={openSections.has("about")}
+          onToggle={() => toggleSection("about")}
+        >
           <div className="space-y-3">
-            {profile.occupation && (
-              <InfoRow label="Occupation" value={profile.occupation} />
-            )}
-            {profile.playing_since && (
-              <InfoRow
-                label="Playing Since"
-                value={String(profile.playing_since)}
-              />
-            )}
-            {profile.swings && (
-              <InfoRow
-                label="Swings"
-                value={
-                  profile.swings.charAt(0).toUpperCase() +
-                  profile.swings.slice(1)
-                }
-              />
-            )}
-            {profile.typical_shot && (
-              <InfoRow
-                label="Typical Shot"
-                value={
-                  profile.typical_shot.charAt(0).toUpperCase() +
-                  profile.typical_shot.slice(1)
-                }
-              />
-            )}
+            {profile.occupation && <InfoRow label="Occupation" value={profile.occupation} />}
+            {profile.playing_since && <InfoRow label="Playing Since" value={String(profile.playing_since)} />}
+            {profile.swings && <InfoRow label="Swings" value={profile.swings.charAt(0).toUpperCase() + profile.swings.slice(1)} />}
+            {profile.typical_shot && <InfoRow label="Typical Shot" value={profile.typical_shot.charAt(0).toUpperCase() + profile.typical_shot.slice(1)} />}
             {profile.fun_fact && (
               <div>
-                <p className="text-xs font-medium text-gray-500 mb-0.5">
-                  Fun Fact
-                </p>
+                <p className="text-xs font-medium text-gray-500 mb-0.5">Fun Fact</p>
                 <p className="text-sm text-gray-900">{profile.fun_fact}</p>
               </div>
             )}
             {profile.best_shot && (
               <div>
-                <p className="text-xs font-medium text-gray-500 mb-0.5">
-                  Best Shot
-                </p>
+                <p className="text-xs font-medium text-gray-500 mb-0.5">Best Shot</p>
                 <p className="text-sm text-gray-900">{profile.best_shot}</p>
               </div>
             )}
           </div>
-        </div>
+        </Accordion>
       )}
+    </div>
+  );
+}
 
-      {/* Tagged Photos */}
-      {taggedPhotos.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-              Tagged Photos
-            </h3>
-            <Link
-              href={`/gallery?tagged=${userId}`}
-              className="text-xs font-medium text-green-600"
-            >
-              See All
-            </Link>
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-            {taggedPhotos.map((photo) => (
-              <div
-                key={photo.id}
-                className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-gray-100"
-              >
-                <img
-                  src={photo.thumbnail_url || photo.media_url}
-                  alt=""
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+function Accordion({
+  title,
+  count,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  title: string;
+  count?: number;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  const contentRef = useRef<HTMLDivElement>(null);
 
-      {/* Standings - Coming Soon */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
-          Current Standings
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-4 py-3 active:bg-gray-50 transition-colors"
+      >
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+          {title}
+          {count != null && count > 0 && (
+            <span className="ml-1.5 text-xs font-normal text-gray-400">({count})</span>
+          )}
         </h3>
-        <p className="text-sm text-gray-400 italic">Coming soon</p>
-      </div>
-
-      {/* Scorecards - Coming Soon */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
-          Scorecards
-        </h3>
-        <p className="text-sm text-gray-400 italic">Coming soon</p>
+        <svg
+          className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      <div
+        ref={contentRef}
+        className={`overflow-hidden transition-all duration-200 ${isOpen ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"}`}
+      >
+        <div className="px-4 pb-4">{children}</div>
       </div>
     </div>
   );

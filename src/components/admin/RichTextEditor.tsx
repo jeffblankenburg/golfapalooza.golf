@@ -154,6 +154,14 @@ export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
             <rect x="8" y="17" width="13" height="2" rx="1" />
           </svg>
         </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().setHorizontalRule().run()}
+          title="Horizontal Line"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeWidth={2} d="M3 12h18" />
+          </svg>
+        </ToolbarButton>
       </div>
 
       {/* Link input popover */}

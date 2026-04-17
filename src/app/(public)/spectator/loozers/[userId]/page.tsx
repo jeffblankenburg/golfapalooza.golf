@@ -18,6 +18,7 @@ export default async function SpectatorLoozerProfilePage({
     { data: taggedRows, count: taggedPhotosCount },
     { data: handicapRow },
     { data: bioData },
+    { data: teamMemberships },
   ] = await Promise.all([
     adminClient
       .from("users")
@@ -50,9 +51,42 @@ export default async function SpectatorLoozerProfilePage({
       .select("content")
       .eq("user_id", userId)
       .maybeSingle(),
+    adminClient
+      .from("rounds")
+      .select(`
+        id, round_date, round_type, status,
+        course:courses(name),
+        round_players!inner(
+          user_id, final_gross_score, score_differential,
+          player_tee:course_tees(par)
+        )
+      `)
+      .eq("round_players.user_id", userId)
+      .not("round_players.final_gross_score", "is", null)
+      .order("round_date", { ascending: false })
+      .limit(10),
   ]);
 
   if (!profile) notFound();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const scorecards = (teamMemberships || []).map((r: any) => {
+    const players = Array.isArray(r.round_players) ? r.round_players : [r.round_players];
+    const player = players.find((p: { user_id: string }) => p.user_id === userId) || players[0];
+    if (!player?.final_gross_score) return null;
+    const course = Array.isArray(r.course) ? r.course[0] : r.course;
+    const playerTee = player.player_tee ? (Array.isArray(player.player_tee) ? player.player_tee[0] : player.player_tee) : null;
+    const par = playerTee?.par || 72;
+    return {
+      roundDate: r.round_date as string,
+      roundType: r.round_type as string,
+      courseName: (course?.name || "Unknown") as string,
+      score: player.final_gross_score as number,
+      par: par as number,
+      scoreToPar: (player.final_gross_score - par) as number,
+      differential: (player.score_differential ?? null) as number | null,
+    };
+  }).filter((x): x is NonNullable<typeof x> => x != null);
 
   const taggedPhotos = (taggedRows || [])
     .map((row) => {
@@ -75,7 +109,7 @@ export default async function SpectatorLoozerProfilePage({
         eightBagAverage={profile.eight_bag_average ?? null}
         avgScrambleScore={profile.avg_scramble_score ?? null}
         bio={bioData?.content ? { content: bioData.content } : null}
-
+        scorecards={scorecards as { roundDate: string; roundType: string; courseName: string; score: number; par: number; scoreToPar: number; differential: number | null }[]}
       />
     </div>
   );

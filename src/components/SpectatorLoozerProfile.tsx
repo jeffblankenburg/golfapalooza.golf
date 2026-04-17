@@ -35,6 +35,16 @@ interface TaggedPhoto {
   created_at: string;
 }
 
+interface ScorecardSummary {
+  roundDate: string;
+  roundType: string;
+  courseName: string;
+  score: number;
+  par: number;
+  scoreToPar: number;
+  differential: number | null;
+}
+
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) {
@@ -52,6 +62,7 @@ export function SpectatorLoozerProfile({
   eightBagAverage,
   avgScrambleScore,
   bio,
+  scorecards = [],
 }: {
   profile: ProfileData;
   accolades: AccoladeData[];
@@ -61,6 +72,7 @@ export function SpectatorLoozerProfile({
   eightBagAverage: number | null;
   avgScrambleScore: number | null;
   bio: { content: string } | null;
+  scorecards?: ScorecardSummary[];
 }) {
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(["bio"]));
 
@@ -166,6 +178,50 @@ export function SpectatorLoozerProfile({
           </div>
         ) : (
           <p className="text-sm text-gray-400 italic">No tagged photos yet</p>
+        )}
+      </Accordion>
+
+      {/* Scorecards */}
+      <Accordion
+        title="Scorecards"
+        count={scorecards.length}
+        isOpen={openSections.has("scorecards")}
+        onToggle={() => toggleSection("scorecards")}
+      >
+        {scorecards.length > 0 ? (
+          <div className="space-y-2">
+            {scorecards.map((sc, i) => {
+              const toParStr = sc.scoreToPar === 0 ? "E" : sc.scoreToPar > 0 ? `+${sc.scoreToPar}` : `${sc.scoreToPar}`;
+              const dateStr = (() => {
+                const [y, m, d] = sc.roundDate.split("-").map(Number);
+                return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+              })();
+              return (
+                <div
+                  key={i}
+                  className="bg-gray-50 rounded-lg p-3"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-semibold text-gray-900">{sc.courseName}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-gray-900">{sc.score}</span>
+                      <span className={`text-xs font-medium ${sc.scoreToPar < 0 ? "text-green-600" : sc.scoreToPar > 0 ? "text-red-600" : "text-gray-500"}`}>
+                        ({toParStr})
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-gray-500">{dateStr}</p>
+                    {sc.differential != null && (
+                      <span className="text-xs text-gray-400 shrink-0">Diff {sc.differential}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400 italic">No scorecards yet</p>
         )}
       </Accordion>
 

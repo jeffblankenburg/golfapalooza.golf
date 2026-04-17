@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useMusicPlayer } from "@/contexts/MusicPlayerContext";
 
 export function MiniPlayer() {
+  const pathname = usePathname();
   const {
     songs,
     currentIndex,
@@ -16,7 +18,7 @@ export function MiniPlayer() {
     previous,
   } = useMusicPlayer();
 
-  if (!isVisible || songs.length === 0) return null;
+  if (!isVisible || songs.length === 0 || pathname === "/music") return null;
 
   const currentSong = songs[currentIndex];
   if (!currentSong) return null;

@@ -48,6 +48,7 @@ export async function GET(
     { data: handicapRow },
     { data: bioData },
     { data: song },
+    { data: teamMemberships },
   ] = await Promise.all([
     queryClient
       .from("users")
@@ -86,6 +87,20 @@ export async function GET(
       .eq("tagged_user_id", userId)
       .limit(1)
       .maybeSingle(),
+    adminClient
+      .from("rounds")
+      .select(`
+        id, round_date, round_type, status,
+        course:courses(name),
+        round_players!inner(
+          user_id, final_gross_score, score_differential,
+          player_tee:course_tees(par)
+        )
+      `)
+      .eq("round_players.user_id", userId)
+      .not("round_players.final_gross_score", "is", null)
+      .order("round_date", { ascending: false })
+      .limit(10),
   ]);
 
   if (profileError || !profile) {
@@ -101,6 +116,27 @@ export async function GET(
     })
     .filter(Boolean);
 
+  // Build scorecards from individual rounds
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const scorecards = (teamMemberships || []).map((r: any) => {
+    const players = Array.isArray(r.round_players) ? r.round_players : [r.round_players];
+    const player = players.find((p: { user_id: string }) => p.user_id === userId) || players[0];
+    if (!player?.final_gross_score) return null;
+    const course = Array.isArray(r.course) ? r.course[0] : r.course;
+    const playerTee = player.player_tee ? (Array.isArray(player.player_tee) ? player.player_tee[0] : player.player_tee) : null;
+    const par = playerTee?.par || 72;
+    return {
+      roundId: r.id,
+      roundDate: r.round_date,
+      roundType: r.round_type,
+      courseName: course?.name || "Unknown",
+      score: player.final_gross_score,
+      par,
+      scoreToPar: player.final_gross_score - par,
+      differential: player.score_differential ?? null,
+    };
+  }).filter((x): x is NonNullable<typeof x> => x != null);
+
   return NextResponse.json({
     profile,
     accolades: accolades || [],
@@ -111,8 +147,6 @@ export async function GET(
     avgScrambleScore: profile.avg_scramble_score ?? null,
     bio: bioNote,
     song,
-    // Stubs for future
-    standings: [],
-    scorecards: [],
+    scorecards,
   });
 }

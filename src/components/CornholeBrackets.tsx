@@ -54,9 +54,11 @@ function useLiveBracket(contestId: string | null): BracketState & { loading: boo
 export function CornholeBrackets({
   singlesContestId,
   doublesContestId,
+  headerAction,
 }: {
   singlesContestId: string | null;
   doublesContestId: string | null;
+  headerAction?: React.ReactNode;
 }) {
   const [expanded, setExpanded] = useState<"singles" | "doubles" | null>(
     singlesContestId ? "singles" : doublesContestId ? "doubles" : null
@@ -82,6 +84,7 @@ export function CornholeBrackets({
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-bold text-gray-900">Cornhole</h1>
+          {headerAction}
           <PinnedNoteButton pinnedTo="cornhole" />
         </div>
         {Object.values({ ...singles.nameMap, ...doubles.nameMap }).some((n) => n.full_name) && (

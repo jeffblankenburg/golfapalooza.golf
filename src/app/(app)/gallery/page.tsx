@@ -55,10 +55,7 @@ export default async function GalleryServerPage() {
   ].sort((a, b) => b - a);
 
   return (
-    <div className="relative px-4 pt-4 pb-8">
-      <div className="absolute top-4 right-4 z-10">
-        <AdminLink permissionKey="manage_gallery" href="/admin/gallery" />
-      </div>
+    <div className="px-4 pt-4 pb-8">
       <GalleryPage
         activeTripId={trip?.id || null}
         userId={effectiveUserId}
@@ -67,6 +64,7 @@ export default async function GalleryServerPage() {
         allUsers={users || []}
         taggedUsers={taggedUsers}
         availableYears={availableYears}
+        headerAction={<AdminLink permissionKey="manage_gallery" href="/admin/gallery" />}
       />
     </div>
   );

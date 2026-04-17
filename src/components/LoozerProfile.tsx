@@ -66,6 +66,7 @@ export function LoozerProfile({
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [accolades, setAccolades] = useState<AccoladeData[]>([]);
   const [taggedPhotos, setTaggedPhotos] = useState<TaggedPhoto[]>([]);
+  const [taggedPhotosCount, setTaggedPhotosCount] = useState(0);
   const [handicapIndex, setHandicapIndex] = useState<number | null>(null);
   const [eightBagAverage, setEightBagAverage] = useState<number | null>(null);
   const [avgScrambleScore, setAvgScrambleScore] = useState<number | null>(null);
@@ -83,6 +84,7 @@ export function LoozerProfile({
         setProfile(data.profile);
         setAccolades(data.accolades || []);
         setTaggedPhotos(data.taggedPhotos || []);
+        setTaggedPhotosCount(data.taggedPhotosCount ?? 0);
         setHandicapIndex(data.handicapIndex ?? null);
         setEightBagAverage(data.eightBagAverage ?? null);
         setAvgScrambleScore(data.avgScrambleScore ?? null);
@@ -292,17 +294,17 @@ export function LoozerProfile({
       {/* Tagged Photos */}
       <Accordion
         title="Tagged Photos"
-        count={taggedPhotos.length}
+        count={taggedPhotosCount}
         isOpen={openSections.has("photos")}
         onToggle={() => toggleSection("photos")}
       >
         {taggedPhotos.length > 0 ? (
           <>
-            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            <div className="grid grid-cols-4 gap-2">
               {taggedPhotos.map((photo) => (
                 <div
                   key={photo.id}
-                  className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-gray-100"
+                  className="aspect-square rounded-lg overflow-hidden bg-gray-100"
                 >
                   <img
                     src={photo.thumbnail_url || photo.media_url}

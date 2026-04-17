@@ -62,11 +62,6 @@ export default async function PickemPage() {
   }
 
   return (
-    <div className="relative">
-      <div className="absolute top-6 right-4 z-10">
-        <AdminLink permissionKey="manage_pickem" href={`/admin/events/${trip.id}/pickem`} />
-      </div>
-      <PickemContent contestId={contest.id} contestName={contest.name} />
-    </div>
+    <PickemContent contestId={contest.id} contestName={contest.name} headerAction={<AdminLink permissionKey="manage_pickem" href={`/admin/events/${trip.id}/pickem`} />} />
   );
 }

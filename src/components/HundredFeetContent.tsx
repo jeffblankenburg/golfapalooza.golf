@@ -36,10 +36,12 @@ export function HundredFeetContent({
   tripId,
   startDate,
   scrambleDays = [],
+  headerAction,
 }: {
   tripId: string;
   startDate: string;
   scrambleDays?: number[];
+  headerAction?: React.ReactNode;
 }) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,6 +104,7 @@ export function HundredFeetContent({
       <div>
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-bold text-gray-900">100 Feet!</h1>
+          {headerAction}
           <PinnedNoteButton pinnedTo="hundred_feet" />
         </div>
         <p className="text-sm text-gray-500 mt-1">

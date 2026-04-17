@@ -47,9 +47,11 @@ interface LeaderboardEntry {
 export function PickemContent({
   contestId,
   contestName,
+  headerAction,
 }: {
   contestId: string;
   contestName: string;
+  headerAction?: React.ReactNode;
 }) {
   const [games, setGames] = useState<Game[]>([]);
   const [myPicks, setMyPicks] = useState<Pick[]>([]);
@@ -191,6 +193,7 @@ export function PickemContent({
     <div className="px-4 pt-6 pb-24">
       <div className="flex items-center gap-2">
         <h1 className="text-2xl font-bold text-gray-900">{contestName}</h1>
+        {headerAction}
         <PinnedNoteButton pinnedTo="pickem" />
       </div>
 

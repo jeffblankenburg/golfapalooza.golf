@@ -135,7 +135,7 @@ function Accordion({ title, defaultOpen = false, children }: { title: string; de
   );
 }
 
-export function CalcuttaResults({ contestId, userId }: { contestId: string; userId?: string }) {
+export function CalcuttaResults({ contestId, userId, headerAction }: { contestId: string; userId?: string; headerAction?: React.ReactNode }) {
   const [participants, setParticipants] = useState<ResultParticipant[]>([]);
   const [prizes, setPrizes] = useState<Prize[]>([]);
   const [activeOrder, setActiveOrder] = useState<number | null>(null);
@@ -641,6 +641,7 @@ export function CalcuttaResults({ contestId, userId }: { contestId: string; user
         <>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-gray-900">Calcutta</h1>
+            {headerAction}
             <PinnedNoteButton pinnedTo="calcutta" />
           </div>
           {prizes.length > 0 && (

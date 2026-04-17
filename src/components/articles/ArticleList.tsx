@@ -36,7 +36,7 @@ function timeAgo(date: string): string {
 }
 
 
-export function ArticleList({ articles }: { articles: Article[] }) {
+export function ArticleList({ articles, headerAction }: { articles: Article[]; headerAction?: React.ReactNode }) {
   const [page, setPage] = useState(0);
   const totalPages = Math.ceil(articles.length / PAGE_SIZE);
   const paginated = articles.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
@@ -45,6 +45,7 @@ export function ArticleList({ articles }: { articles: Article[] }) {
     <div className="px-4 pt-6 pb-8 space-y-4">
       <div className="flex items-center gap-2">
         <h1 className="text-2xl font-bold text-gray-900">Articles</h1>
+        {headerAction}
         <PinnedNoteButton pinnedTo="articles" />
       </div>
 

@@ -11,23 +11,21 @@ export default async function SpectatorLoozerProfilePage({
   const { userId } = await params;
   const adminClient = createAdminClient();
 
-  // Fetch profile (exclude phone — private data)
-  const { data: profile } = await adminClient
-    .from("users")
-    .select(
-      "id, display_name, full_name, avatar_url, city, state, playing_since, swings, typical_shot, fun_fact, best_shot, occupation, eight_bag_average, avg_scramble_score"
-    )
-    .eq("id", userId)
-    .single();
-
-  if (!profile) notFound();
-
+  // Fetch everything in parallel
   const [
+    { data: profile },
     { data: accolades },
-    { data: taggedRows },
+    { data: taggedRows, count: taggedPhotosCount },
     { data: handicapRow },
     { data: bioData },
   ] = await Promise.all([
+    adminClient
+      .from("users")
+      .select(
+        "id, display_name, full_name, avatar_url, city, state, playing_since, swings, typical_shot, fun_fact, best_shot, occupation, eight_bag_average, avg_scramble_score"
+      )
+      .eq("id", userId)
+      .single(),
     adminClient
       .from("accolades")
       .select("id, title, trip:trip_settings(trip_year)")
@@ -36,7 +34,8 @@ export default async function SpectatorLoozerProfilePage({
     adminClient
       .from("gallery_tags")
       .select(
-        "item:gallery_items(id, media_url, thumbnail_url, media_type, created_at)"
+        "item:gallery_items(id, media_url, thumbnail_url, media_type, created_at)",
+        { count: "exact" }
       )
       .eq("tagged_user_id", userId)
       .order("created_at", { ascending: false })
@@ -52,6 +51,8 @@ export default async function SpectatorLoozerProfilePage({
       .eq("user_id", userId)
       .maybeSingle(),
   ]);
+
+  if (!profile) notFound();
 
   const taggedPhotos = (taggedRows || [])
     .map((row) => {
@@ -69,6 +70,7 @@ export default async function SpectatorLoozerProfilePage({
         profile={profile}
         accolades={(accolades || []) as { id: string; title: string; trip: { trip_year: number }[] | { trip_year: number } | null }[]}
         taggedPhotos={taggedPhotos as { id: string; media_url: string; thumbnail_url: string | null; media_type: string; created_at: string }[]}
+        taggedPhotosCount={taggedPhotosCount ?? 0}
         handicapIndex={handicapRow?.handicap_index ?? null}
         eightBagAverage={profile.eight_bag_average ?? null}
         avgScrambleScore={profile.avg_scramble_score ?? null}

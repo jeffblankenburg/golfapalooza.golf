@@ -35,14 +35,10 @@ export default async function CornholePage() {
     contests?.find((c) => c.contest_type === "cornhole_doubles")?.id || null;
 
   return (
-    <div className="relative">
-      <div className="absolute top-4 right-4 z-10">
-        <AdminLink permissionKey="manage_cornhole" href={`/admin/events/${trip.id}/cornhole`} />
-      </div>
-      <CornholeBrackets
-        singlesContestId={singlesContestId}
-        doublesContestId={doublesContestId}
-      />
-    </div>
+    <CornholeBrackets
+      singlesContestId={singlesContestId}
+      doublesContestId={doublesContestId}
+      headerAction={<AdminLink permissionKey="manage_cornhole" href={`/admin/events/${trip.id}/cornhole`} />}
+    />
   );
 }

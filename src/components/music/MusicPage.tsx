@@ -12,7 +12,7 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export function MusicPage({ initialSongs }: { initialSongs: Song[] }) {
+export function MusicPage({ initialSongs, headerAction }: { initialSongs: Song[]; headerAction?: React.ReactNode }) {
   const {
     songs,
     currentIndex,
@@ -79,6 +79,7 @@ export function MusicPage({ initialSongs }: { initialSongs: Song[] }) {
     <div className="px-4 pt-4 pb-8">
       <div className="flex items-center gap-2 mb-4">
         <h1 className="text-2xl font-bold text-gray-900">Music</h1>
+        {headerAction}
         <PinnedNoteButton pinnedTo="music" />
       </div>
       {/* Now Playing */}

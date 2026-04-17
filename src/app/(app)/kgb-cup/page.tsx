@@ -130,10 +130,6 @@ export default async function KgbCupPage() {
   const hasTeams = (teamsResult.data || []).length > 0;
 
   return (
-    <div className="relative">
-      <div className="absolute top-6 right-4 z-10">
-        <AdminLink permissionKey="manage_kgb_cup" href={`/admin/events/${trip.id}/kgb-cup`} />
-      </div>
     <KgbCupPageClient
       contestId={contest.id}
       startDate={trip.start_date}
@@ -145,7 +141,7 @@ export default async function KgbCupPage() {
       contestComplete={!!contest.verified_at}
       simulatedDate={simDate}
       timezone={trip.timezone}
+      headerAction={<AdminLink permissionKey="manage_kgb_cup" href={`/admin/events/${trip.id}/kgb-cup`} />}
     />
-    </div>
   );
 }

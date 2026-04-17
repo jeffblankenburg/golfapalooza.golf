@@ -53,11 +53,6 @@ export default async function HundredFeetPage() {
   )];
 
   return (
-    <div className="relative">
-      <div className="absolute top-6 right-4 z-10">
-        <AdminLink permissionKey="manage_scrambles" href={`/admin/events/${trip.id}/hundred-feet`} />
-      </div>
-      <HundredFeetContent tripId={trip.id} startDate={trip.start_date} scrambleDays={scrambleDays} />
-    </div>
+    <HundredFeetContent tripId={trip.id} startDate={trip.start_date} scrambleDays={scrambleDays} headerAction={<AdminLink permissionKey="manage_scrambles" href={`/admin/events/${trip.id}/hundred-feet`} />} />
   );
 }

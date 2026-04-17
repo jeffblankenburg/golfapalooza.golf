@@ -33,7 +33,7 @@ interface ResultsData {
   verified?: boolean;
 }
 
-export function KgbCupResults({ contestId }: { contestId: string }) {
+export function KgbCupResults({ contestId, headerAction }: { contestId: string; headerAction?: React.ReactNode }) {
   const [data, setData] = useState<ResultsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +68,10 @@ export function KgbCupResults({ contestId }: { contestId: string }) {
   if (error || !data) {
     return (
       <div className="px-4 pt-6">
-        <h1 className="text-2xl font-bold text-gray-900">KGB Cup</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900">KGB Cup</h1>
+          {headerAction}
+        </div>
         <p className="text-gray-500 text-center py-8">{error || "No data available."}</p>
       </div>
     );
@@ -102,6 +105,7 @@ export function KgbCupResults({ contestId }: { contestId: string }) {
       >
         <div className="flex items-center justify-center gap-2 mb-4">
           <h1 className="text-lg font-bold text-gray-900">KGB Cup</h1>
+          {headerAction}
           <PinnedNoteButton pinnedTo="kgb_cup" />
         </div>
       </KgbCupScoreboard>

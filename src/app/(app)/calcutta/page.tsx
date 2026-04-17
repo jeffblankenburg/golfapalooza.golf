@@ -42,11 +42,6 @@ export default async function CalcuttaPage() {
   }
 
   return (
-    <div className="relative">
-      <div className="absolute top-6 right-4 z-10">
-        <AdminLink permissionKey="manage_calcutta" href={`/admin/events/${trip.id}/calcutta`} />
-      </div>
-      <CalcuttaResults contestId={contest.id} userId={user.id} />
-    </div>
+    <CalcuttaResults contestId={contest.id} userId={user.id} headerAction={<AdminLink permissionKey="manage_calcutta" href={`/admin/events/${trip.id}/calcutta`} />} />
   );
 }

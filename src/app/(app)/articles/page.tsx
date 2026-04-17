@@ -49,11 +49,6 @@ export default async function ArticlesPage() {
   }));
 
   return (
-    <div className="relative">
-      <div className="absolute top-6 right-4 z-10">
-        <AdminLink permissionKey="manage_articles" href="/admin/articles" />
-      </div>
-      <ArticleList articles={normalized} />
-    </div>
+    <ArticleList articles={normalized} headerAction={<AdminLink permissionKey="manage_articles" href="/admin/articles" />} />
   );
 }

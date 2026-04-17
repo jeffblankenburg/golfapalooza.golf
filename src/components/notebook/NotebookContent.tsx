@@ -53,7 +53,7 @@ function MarkdownBody({ content }: { content: string }) {
   );
 }
 
-export function NotebookContent({ categories }: { categories: Category[] }) {
+export function NotebookContent({ categories, headerAction }: { categories: Category[]; headerAction?: React.ReactNode }) {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(
     categories[0]?.id || ""
   );
@@ -62,7 +62,10 @@ export function NotebookContent({ categories }: { categories: Category[] }) {
   if (categories.length === 0) {
     return (
       <div className="px-4 pt-6 pb-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Notebook</h1>
+        <div className="flex items-center gap-2 mb-4">
+          <h1 className="text-2xl font-bold text-gray-900">Notebook</h1>
+          {headerAction}
+        </div>
         <p className="text-gray-500 text-center py-8">No notes yet.</p>
       </div>
     );
@@ -73,7 +76,10 @@ export function NotebookContent({ categories }: { categories: Category[] }) {
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Notebook</h1>
+      <div className="flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-gray-900">Notebook</h1>
+        {headerAction}
+      </div>
 
       {/* Category tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">

@@ -42,6 +42,7 @@ export function GalleryPage({
   allUsers,
   taggedUsers,
   availableYears,
+  headerAction,
 }: {
   activeTripId: string | null;
   userId: string;
@@ -50,6 +51,7 @@ export function GalleryPage({
   allUsers: GalleryUser[];
   taggedUsers: GalleryUser[];
   availableYears: number[];
+  headerAction?: React.ReactNode;
 }) {
   const searchParams = useSearchParams();
   const { isVisible: musicPlayerVisible } = useMusicPlayer();
@@ -249,6 +251,7 @@ export function GalleryPage({
       <div className="flex items-start justify-between gap-2 mb-4">
         <div className="flex items-center gap-2 flex-shrink-0">
           <h1 className="text-2xl font-bold text-gray-900">Photos</h1>
+          {headerAction}
           <PinnedNoteButton pinnedTo="gallery" />
         </div>
         <div className="flex items-center gap-1.5 flex-wrap justify-end">

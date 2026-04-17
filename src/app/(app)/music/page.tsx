@@ -30,11 +30,6 @@ export default async function MusicPageRoute() {
   }));
 
   return (
-    <div className="relative">
-      <div className="absolute top-4 right-4 z-10">
-        <AdminLink permissionKey="manage_music" href="/admin/music" />
-      </div>
-      <MusicPage initialSongs={songsWithFavorites} />
-    </div>
+    <MusicPage initialSongs={songsWithFavorites} headerAction={<AdminLink permissionKey="manage_music" href="/admin/music" />} />
   );
 }

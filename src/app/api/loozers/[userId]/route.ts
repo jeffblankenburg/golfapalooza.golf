@@ -38,29 +38,24 @@ export async function GET(
 
   const simulating = await isSimulating();
   const queryClient = simulating ? createAdminClient() : supabase;
-
-  // Get profile
-  const { data: profile, error: profileError } = await queryClient
-    .from("users")
-    .select(
-      "id, display_name, full_name, avatar_url, phone, city, state, playing_since, swings, typical_shot, fun_fact, best_shot, occupation, eight_bag_average, avg_scramble_score"
-    )
-    .eq("id", userId)
-    .single();
-
-  if (profileError || !profile) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
-  }
-
-  // Get accolades, tagged photos, handicap, bio, and trip in parallel
   const adminClient = createAdminClient();
+
+  // Fetch everything in parallel — profile, accolades, photos, handicap, bio, song
   const [
+    { data: profile, error: profileError },
     { data: accolades },
-    { data: taggedRows },
+    { data: taggedRows, count: taggedPhotosCount },
     { data: handicapRow },
-    { data: activeTrip },
     { data: bioData },
+    { data: song },
   ] = await Promise.all([
+    queryClient
+      .from("users")
+      .select(
+        "id, display_name, full_name, avatar_url, phone, city, state, playing_since, swings, typical_shot, fun_fact, best_shot, occupation, eight_bag_average, avg_scramble_score"
+      )
+      .eq("id", userId)
+      .single(),
     queryClient
       .from("accolades")
       .select("id, title, trip:trip_settings(trip_year)")
@@ -69,7 +64,8 @@ export async function GET(
     queryClient
       .from("gallery_tags")
       .select(
-        "item:gallery_items(id, media_url, thumbnail_url, media_type, created_at)"
+        "item:gallery_items(id, media_url, thumbnail_url, media_type, created_at)",
+        { count: "exact" }
       )
       .eq("tagged_user_id", userId)
       .order("created_at", { ascending: false })
@@ -80,31 +76,23 @@ export async function GET(
       .eq("user_id", userId)
       .maybeSingle(),
     adminClient
-      .from("trip_settings")
-      .select("id")
-      .eq("status", "active")
-      .maybeSingle(),
-    adminClient
       .from("loozer_bios")
       .select("content")
       .eq("user_id", userId)
       .maybeSingle(),
-  ]);
-
-  const bioNote = bioData && bioData.content ? { content: bioData.content } : null;
-
-  // Fetch song for active trip
-  let song: { id: string; title: string; mp3_url: string; art_url: string | null } | null = null;
-
-  if (activeTrip) {
-    const { data: songData } = await adminClient
+    adminClient
       .from("songs")
       .select("id, title, mp3_url, art_url")
       .eq("tagged_user_id", userId)
       .limit(1)
-      .maybeSingle();
-    song = songData;
+      .maybeSingle(),
+  ]);
+
+  if (profileError || !profile) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
+
+  const bioNote = bioData && bioData.content ? { content: bioData.content } : null;
 
   const taggedPhotos = (taggedRows || [])
     .map((row) => {
@@ -117,6 +105,7 @@ export async function GET(
     profile,
     accolades: accolades || [],
     taggedPhotos,
+    taggedPhotosCount: taggedPhotosCount ?? 0,
     handicapIndex: handicapRow?.handicap_index ?? null,
     eightBagAverage: profile.eight_bag_average ?? null,
     avgScrambleScore: profile.avg_scramble_score ?? null,

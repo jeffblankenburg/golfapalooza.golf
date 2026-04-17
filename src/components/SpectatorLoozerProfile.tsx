@@ -47,15 +47,16 @@ export function SpectatorLoozerProfile({
   profile,
   accolades,
   taggedPhotos,
+  taggedPhotosCount,
   handicapIndex,
   eightBagAverage,
   avgScrambleScore,
   bio,
-  song,
 }: {
   profile: ProfileData;
   accolades: AccoladeData[];
   taggedPhotos: TaggedPhoto[];
+  taggedPhotosCount: number;
   handicapIndex: number | null;
   eightBagAverage: number | null;
   avgScrambleScore: number | null;
@@ -143,16 +144,16 @@ export function SpectatorLoozerProfile({
       {/* Tagged Photos */}
       <Accordion
         title="Tagged Photos"
-        count={taggedPhotos.length}
+        count={taggedPhotosCount}
         isOpen={openSections.has("photos")}
         onToggle={() => toggleSection("photos")}
       >
         {taggedPhotos.length > 0 ? (
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+          <div className="grid grid-cols-4 gap-2">
             {taggedPhotos.map((photo) => (
               <div
                 key={photo.id}
-                className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-gray-100"
+                className="aspect-square rounded-lg overflow-hidden bg-gray-100"
               >
                 <img
                   src={photo.thumbnail_url || photo.media_url}

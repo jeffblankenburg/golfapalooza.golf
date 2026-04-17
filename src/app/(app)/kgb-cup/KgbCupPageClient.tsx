@@ -40,6 +40,7 @@ export function KgbCupPageClient({
   contestComplete,
   simulatedDate,
   timezone,
+  headerAction,
 }: {
   contestId: string;
   startDate: string;
@@ -51,6 +52,7 @@ export function KgbCupPageClient({
   contestComplete: boolean;
   simulatedDate: string | null;
   timezone: string | null;
+  headerAction?: React.ReactNode;
 }) {
   const [displayMode, setDisplayMode] = useState<DisplayMode>("forming");
 
@@ -78,8 +80,11 @@ export function KgbCupPageClient({
           Home
         </Link>
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">KGB Cup</h1>
-          <p className="text-gray-500 text-center py-8">Teams are still being formed.</p>
+          <div className="flex items-center justify-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900">KGB Cup</h1>
+            {headerAction}
+          </div>
+          <p className="text-gray-500 py-8">Teams are still being formed.</p>
         </div>
       </div>
     );
@@ -87,7 +92,7 @@ export function KgbCupPageClient({
 
   // State 2 & 4: Leaderboard
   if (displayMode === "leaderboard") {
-    return <KgbCupResults contestId={contestId} />;
+    return <KgbCupResults contestId={contestId} headerAction={headerAction} />;
   }
 
   // State 3: Tee sheet
@@ -104,7 +109,10 @@ export function KgbCupPageClient({
       </Link>
 
       <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900">KGB Cup</h1>
+        <div className="flex items-center justify-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900">KGB Cup</h1>
+          {headerAction}
+        </div>
         <p className="text-sm text-gray-500 mt-1">Tee Sheet</p>
       </div>
 

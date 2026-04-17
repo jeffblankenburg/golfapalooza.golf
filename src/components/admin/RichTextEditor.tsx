@@ -6,27 +6,18 @@ import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import { Markdown } from "tiptap-markdown";
-import { useEffect, useCallback, useState, useRef } from "react";
+import { useEffect, useCallback, useState } from "react";
+import { ArticleImageDrawer } from "./ArticleImageDrawer";
 
 interface RichTextEditorProps {
   content: string; // markdown
   onChange: (markdown: string) => void;
 }
 
-interface StoredImage {
-  name: string;
-  url: string;
-  created_at: string;
-}
-
 export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
   const [linkUrl, setLinkUrl] = useState("");
   const [showLinkInput, setShowLinkInput] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [showImagePicker, setShowImagePicker] = useState(false);
-  const [existingImages, setExistingImages] = useState<StoredImage[]>([]);
-  const [loadingImages, setLoadingImages] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
     extensions: [
@@ -80,56 +71,6 @@ export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
     setLinkUrl("");
     setShowLinkInput(false);
   }, [editor, linkUrl]);
-
-  const openImagePicker = useCallback(async () => {
-    setShowImagePicker(true);
-    setLoadingImages(true);
-    try {
-      const res = await fetch("/api/admin/articles/upload-image");
-      const data = await res.json();
-      setExistingImages(data.images || []);
-    } catch {
-      setExistingImages([]);
-    } finally {
-      setLoadingImages(false);
-    }
-  }, []);
-
-  const insertImage = useCallback((url: string) => {
-    if (!editor) return;
-    editor.chain().focus().setImage({ src: url }).run();
-    setShowImagePicker(false);
-  }, [editor]);
-
-  const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !editor) return;
-
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const res = await fetch("/api/admin/articles/upload-image", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-
-      if (data.error) {
-        console.error("Image upload failed:", data.error);
-        return;
-      }
-
-      editor.chain().focus().setImage({ src: data.url }).run();
-      setShowImagePicker(false);
-    } catch {
-      console.error("Image upload failed");
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  }, [editor]);
 
   if (!editor) return null;
 
@@ -192,7 +133,7 @@ export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
           </svg>
         </ToolbarButton>
         <ToolbarButton
-          onClick={openImagePicker}
+          onClick={() => setShowImagePicker(true)}
           title="Insert Image"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -236,87 +177,15 @@ export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
         </div>
       )}
 
-      {/* Hidden file input for image upload */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleImageUpload}
-      />
-
       {/* Image picker drawer */}
-      {showImagePicker && (
-        <div className="fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowImagePicker(false)} />
-          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl max-h-[80vh] flex flex-col animate-slide-up">
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1 rounded-full bg-gray-300" />
-            </div>
-            <div className="flex items-center justify-between px-4 pb-3">
-              <h2 className="text-lg font-semibold">Insert Image</h2>
-              <button onClick={() => setShowImagePicker(false)} className="w-8 h-8 flex items-center justify-center">
-                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Upload new */}
-            <div className="px-4 pb-4">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-gray-300 rounded-xl text-sm font-semibold text-gray-600 active:bg-gray-50 disabled:opacity-50"
-              >
-                {uploading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                    Upload New Image
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Existing images */}
-            <div className="flex-1 overflow-y-auto px-4 pb-6">
-              {loadingImages ? (
-                <div className="flex justify-center py-8">
-                  <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : existingImages.length === 0 ? (
-                <p className="text-center text-sm text-gray-400 py-4">No previously uploaded images.</p>
-              ) : (
-                <>
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Previously Uploaded</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {existingImages.map((img) => (
-                      <button
-                        key={img.name}
-                        onClick={() => insertImage(img.url)}
-                        className="aspect-square rounded-xl border border-gray-200 overflow-hidden active:ring-2 active:ring-green-500 hover:ring-2 hover:ring-green-300 transition-shadow"
-                      >
-                        <img
-                          src={img.url}
-                          alt={img.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <ArticleImageDrawer
+        open={showImagePicker}
+        onSelect={(url) => {
+          editor.chain().focus().setImage({ src: url }).run();
+          setShowImagePicker(false);
+        }}
+        onClose={() => setShowImagePicker(false)}
+      />
 
       {/* Editor area */}
       <div className="border border-gray-300 rounded-b-xl overflow-hidden">

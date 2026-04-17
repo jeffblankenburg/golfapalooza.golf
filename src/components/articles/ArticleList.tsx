@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
+import { stripMarkdown } from "@/lib/strip-markdown";
 
 const PAGE_SIZE = 20;
 
@@ -34,16 +35,6 @@ function timeAgo(date: string): string {
   });
 }
 
-function getPreview(content: string, maxLen = 150): string {
-  // Strip markdown formatting for preview
-  const stripped = content
-    .replace(/[#*_~`>]/g, "")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/<[^>]+>/g, "")
-    .replace(/\n+/g, " ")
-    .trim();
-  return stripped.length > maxLen ? stripped.slice(0, maxLen) + "..." : stripped;
-}
 
 export function ArticleList({ articles }: { articles: Article[] }) {
   const [page, setPage] = useState(0);
@@ -85,7 +76,7 @@ export function ArticleList({ articles }: { articles: Article[] }) {
                   {article.title}
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">
-                  {getPreview(article.content)}
+                  {stripMarkdown(article.content)}
                 </p>
                 <div className="flex items-center gap-2 mt-3">
                   {article.author?.avatar_url ? (

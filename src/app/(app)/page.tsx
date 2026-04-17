@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { HomeContent } from "@/components/HomeContent";
 import { getEffectiveUserId, getEffectiveDate, getSimDate, isSimulating } from "@/lib/simulator";
 import { isFeatureVisible } from "@/lib/visibility";
+import { stripMarkdown } from "@/lib/strip-markdown";
 
 export default async function HomePage() {
   const user = await getAuthUser();
@@ -618,11 +619,7 @@ export default async function HomePage() {
         const d = latestArticleResult.data;
         const img = Array.isArray(d.featured_image) ? d.featured_image[0] : d.featured_image;
         // Extract first ~150 chars of content as preview, strip markdown
-        const preview = (d.content || "")
-          .replace(/[#*_~`>\[\]()!|\\-]/g, "")
-          .replace(/\n+/g, " ")
-          .trim()
-          .slice(0, 300);
+        const preview = stripMarkdown(d.content || "", 300);
         return {
           id: d.id,
           title: d.title,

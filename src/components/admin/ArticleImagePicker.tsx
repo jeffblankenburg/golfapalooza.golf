@@ -2,8 +2,8 @@
 
 import { useState, useRef } from "react";
 import { GalleryImagePicker } from "./GalleryImagePicker";
-import { SongArtworkPicker } from "./SongArtworkPicker";
 import { FocalPointSelector } from "./FocalPointSelector";
+import { ArticleImageDrawer } from "./ArticleImageDrawer";
 
 export interface ArticleImageValue {
   source: "gallery" | "upload" | "song_art";
@@ -20,9 +20,9 @@ interface ArticleImagePickerProps {
   onChange: (value: ArticleImageValue | null) => void;
 }
 
-export function ArticleImagePicker({ tripId, value, onChange }: ArticleImagePickerProps) {
+export function ArticleImagePicker({ value, onChange }: ArticleImagePickerProps) {
   const [showGallery, setShowGallery] = useState(false);
-  const [showSongArt, setShowSongArt] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -34,7 +34,6 @@ export function ArticleImagePicker({ tripId, value, onChange }: ArticleImagePick
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("tripId", tripId);
 
       const res = await fetch("/api/admin/articles/upload-image", {
         method: "POST",
@@ -54,7 +53,6 @@ export function ArticleImagePicker({ tripId, value, onChange }: ArticleImagePick
       // Upload failed silently
     } finally {
       setUploading(false);
-      // Reset file input so the same file can be re-selected
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
@@ -67,7 +65,6 @@ export function ArticleImagePicker({ tripId, value, onChange }: ArticleImagePick
           Featured Image
         </label>
         <div className="mt-1 space-y-2">
-          {/* Action buttons */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400 flex-1">
               {value.source === "gallery" ? "From gallery" : value.source === "upload" ? "Uploaded" : "Song artwork"}
@@ -80,8 +77,6 @@ export function ArticleImagePicker({ tripId, value, onChange }: ArticleImagePick
               Remove
             </button>
           </div>
-
-          {/* Focal point selector */}
           <FocalPointSelector
             imageUrl={value.imageUrl}
             focalX={value.focalX}
@@ -100,7 +95,7 @@ export function ArticleImagePicker({ tripId, value, onChange }: ArticleImagePick
         Featured Image
       </label>
       <div className="mt-1 grid grid-cols-3 gap-2">
-        {/* Gallery */}
+        {/* Gallery (includes Album Art tab) */}
         <button
           type="button"
           onClick={() => setShowGallery(true)}
@@ -112,7 +107,19 @@ export function ArticleImagePicker({ tripId, value, onChange }: ArticleImagePick
           <span className="text-[11px] font-medium">Gallery</span>
         </button>
 
-        {/* Upload */}
+        {/* Archive (previously uploaded article images) */}
+        <button
+          type="button"
+          onClick={() => setShowArchive(true)}
+          className="flex flex-col items-center gap-1.5 py-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-400 active:bg-gray-50"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+          </svg>
+          <span className="text-[11px] font-medium">Archive</span>
+        </button>
+
+        {/* Upload (direct file picker) */}
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
@@ -128,18 +135,6 @@ export function ArticleImagePicker({ tripId, value, onChange }: ArticleImagePick
           )}
           <span className="text-[11px] font-medium">Upload</span>
         </button>
-
-        {/* Song Artwork */}
-        <button
-          type="button"
-          onClick={() => setShowSongArt(true)}
-          className="flex flex-col items-center gap-1.5 py-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-400 active:bg-gray-50"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-          </svg>
-          <span className="text-[11px] font-medium">Song Art</span>
-        </button>
       </div>
 
       {/* Hidden file input */}
@@ -151,7 +146,7 @@ export function ArticleImagePicker({ tripId, value, onChange }: ArticleImagePick
         className="hidden"
       />
 
-      {/* Gallery picker modal */}
+      {/* Gallery picker (with Album Art tab) */}
       <GalleryImagePicker
         open={showGallery}
         selectedId={null}
@@ -167,22 +162,30 @@ export function ArticleImagePicker({ tripId, value, onChange }: ArticleImagePick
             });
           }
         }}
-        onClose={() => setShowGallery(false)}
-      />
-
-      {/* Song artwork picker modal */}
-      <SongArtworkPicker
-        open={showSongArt}
-        onSelect={(song) => {
+        onSelectUrl={(url) => {
           onChange({
             source: "song_art",
-            imageUrl: song.art_url,
-            thumbnailUrl: song.art_thumb_url || undefined,
+            imageUrl: url,
             focalX: 50,
             focalY: 50,
           });
         }}
-        onClose={() => setShowSongArt(false)}
+        onClose={() => setShowGallery(false)}
+      />
+
+      {/* Archive drawer (previously uploaded article images) */}
+      <ArticleImageDrawer
+        open={showArchive}
+        onSelect={(url) => {
+          onChange({
+            source: "upload",
+            imageUrl: url,
+            focalX: 50,
+            focalY: 50,
+          });
+          setShowArchive(false);
+        }}
+        onClose={() => setShowArchive(false)}
       />
     </div>
   );

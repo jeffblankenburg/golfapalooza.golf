@@ -11,22 +11,50 @@ export async function GET() {
   }
 
   const admin = createAdminClient();
-  const { data, error } = await admin.storage
-    .from("gallery-media")
-    .list("articles", { limit: 100, sortBy: { column: "created_at", order: "desc" } });
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // List files in articles/ and any subfolders (old uploads used articles/{tripId}/)
+  const { data: topLevel } = await admin.storage
+    .from("gallery-media")
+    .list("articles", { limit: 200, sortBy: { column: "created_at", order: "desc" } });
+
+  const allFiles: { path: string; created_at: string }[] = [];
+  const subfolders: string[] = [];
+
+  for (const item of topLevel || []) {
+    if (!item.name) continue;
+    if (/\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)) {
+      allFiles.push({ path: `articles/${item.name}`, created_at: item.created_at || "" });
+    } else if (!item.name.includes(".")) {
+      // Likely a subfolder (no extension)
+      subfolders.push(item.name);
+    }
   }
 
-  const images = (data || [])
-    .filter((f) => f.name && /\.(jpg|jpeg|png|gif|webp)$/i.test(f.name))
-    .map((f) => {
-      const { data: urlData } = admin.storage
-        .from("gallery-media")
-        .getPublicUrl(`articles/${f.name}`);
-      return { name: f.name, url: urlData.publicUrl, created_at: f.created_at };
+  // Check subfolders for old uploads
+  if (subfolders.length > 0) {
+    const subResults = await Promise.all(
+      subfolders.map((folder) =>
+        admin.storage.from("gallery-media").list(`articles/${folder}`, { limit: 100 })
+      )
+    );
+    subResults.forEach((result, i) => {
+      for (const file of result.data || []) {
+        if (file.name && /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name)) {
+          allFiles.push({ path: `articles/${subfolders[i]}/${file.name}`, created_at: file.created_at || "" });
+        }
+      }
     });
+  }
+
+  // Sort newest first
+  allFiles.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+
+  const images = allFiles.map((f) => {
+    const { data: urlData } = admin.storage
+      .from("gallery-media")
+      .getPublicUrl(f.path);
+    return { name: f.path, url: urlData.publicUrl, created_at: f.created_at };
+  });
 
   return NextResponse.json({ images });
 }

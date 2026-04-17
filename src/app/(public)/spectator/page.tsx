@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SpectatorHomeContent } from "@/components/SpectatorHomeContent";
+import { stripMarkdown } from "@/lib/strip-markdown";
 
 export default async function SpectatorPage() {
   const adminClient = createAdminClient();
@@ -46,11 +47,7 @@ export default async function SpectatorPage() {
   if (latestArticleResult.data) {
     const d = latestArticleResult.data;
     const img = Array.isArray(d.featured_image) ? d.featured_image[0] : d.featured_image;
-    const preview = (d.content || "")
-      .replace(/[#*_~`>\[\]()!|\\-]/g, "")
-      .replace(/\n+/g, " ")
-      .trim()
-      .slice(0, 300);
+    const preview = stripMarkdown(d.content || "", 300);
     latestArticle = {
       id: d.id,
       title: d.title,

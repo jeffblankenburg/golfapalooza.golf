@@ -218,6 +218,15 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
     init();
   }, [fetchContest, fetchData]);
 
+  // Refresh when participants are toggled in ContestParticipants
+  useEffect(() => {
+    function handleParticipantsChanged() {
+      if (contestId) fetchData(contestId);
+    }
+    window.addEventListener("contest-participants-changed", handleParticipantsChanged);
+    return () => window.removeEventListener("contest-participants-changed", handleParticipantsChanged);
+  }, [contestId, fetchData]);
+
   // Reorder via drag
   async function handleDragEnd(fromIdx: number, toIdx: number) {
     if (fromIdx === toIdx || !contestId) return;

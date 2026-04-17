@@ -73,6 +73,8 @@ export function ContestParticipants({
         else next.delete(userId);
         return next;
       });
+    } else {
+      window.dispatchEvent(new CustomEvent("contest-participants-changed"));
     }
   };
 
@@ -87,6 +89,7 @@ export function ContestParticipants({
     });
     await fetchParticipants();
     setSaving(null);
+    window.dispatchEvent(new CustomEvent("contest-participants-changed"));
   };
 
   const deselectAll = async () => {
@@ -99,6 +102,7 @@ export function ContestParticipants({
     });
     await fetchParticipants();
     setSaving(null);
+    window.dispatchEvent(new CustomEvent("contest-participants-changed"));
   };
 
   if (!contestId) {

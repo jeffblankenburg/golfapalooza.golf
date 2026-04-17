@@ -1490,7 +1490,7 @@ function CompositionTeeEditor({
     const uniqueSourceIds = [...new Set(Object.values(m))];
     const sourceTees = uniqueSourceIds
       .map((id) => eligibleTees.find((t) => t.id === id))
-      .filter(Boolean)
+      .filter((t): t is { id: string; tee_name: string; course_rating: number } => !!t)
       .sort((a, b) => b.course_rating - a.course_rating);
     if (sourceTees.length >= 2) {
       const gradientColor = sourceTees.map((t) => t.tee_name).join("/");

@@ -1,6 +1,7 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { getSimDate } from "@/lib/simulator";
 import { KgbCupPageClient } from "./KgbCupPageClient";
+import { AdminLink } from "@/components/AdminLink";
 
 export default async function KgbCupPage() {
   const user = await getAuthUser();
@@ -34,7 +35,10 @@ export default async function KgbCupPage() {
   if (!contest) {
     return (
       <div className="px-4 pt-6">
-        <h1 className="text-2xl font-bold text-gray-900">KGB Cup</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900">KGB Cup</h1>
+          <AdminLink permissionKey="manage_kgb_cup" href={`/admin/events/${trip.id}/kgb-cup`} />
+        </div>
         <p className="text-gray-500 text-center py-8">No KGB Cup contest found.</p>
       </div>
     );
@@ -126,6 +130,10 @@ export default async function KgbCupPage() {
   const hasTeams = (teamsResult.data || []).length > 0;
 
   return (
+    <div className="relative">
+      <div className="absolute top-6 right-4 z-10">
+        <AdminLink permissionKey="manage_kgb_cup" href={`/admin/events/${trip.id}/kgb-cup`} />
+      </div>
     <KgbCupPageClient
       contestId={contest.id}
       startDate={trip.start_date}
@@ -138,5 +146,6 @@ export default async function KgbCupPage() {
       simulatedDate={simDate}
       timezone={trip.timezone}
     />
+    </div>
   );
 }

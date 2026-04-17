@@ -2,6 +2,7 @@ import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/simulator";
 import { redirect } from "next/navigation";
 import { MusicPage } from "@/components/music/MusicPage";
+import { AdminLink } from "@/components/AdminLink";
 
 export default async function MusicPageRoute() {
   const user = await getAuthUser();
@@ -28,5 +29,12 @@ export default async function MusicPageRoute() {
     is_favorite: favoriteIds.has(song.id),
   }));
 
-  return <MusicPage initialSongs={songsWithFavorites} />;
+  return (
+    <div className="relative">
+      <div className="absolute top-4 right-4 z-10">
+        <AdminLink permissionKey="manage_music" href="/admin/music" />
+      </div>
+      <MusicPage initialSongs={songsWithFavorites} />
+    </div>
+  );
 }

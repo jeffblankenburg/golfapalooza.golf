@@ -104,7 +104,7 @@ export async function GET(request: Request) {
         }
 
         // Update current tee's holes and patch the response data in-place
-        const updates: Promise<unknown>[] = [];
+        const updates: PromiseLike<unknown>[] = [];
         for (const hole of holes) {
           const imgs = imageMap[hole.hole_number];
           if (!imgs) continue;
@@ -119,7 +119,7 @@ export async function GET(request: Request) {
           }
           if (Object.keys(patch).length > 0) {
             updates.push(
-              adminClient.from("course_holes").update(patch).eq("id", hole.id)
+              adminClient.from("course_holes").update(patch).eq("id", hole.id).then()
             );
           }
         }

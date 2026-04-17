@@ -2,6 +2,7 @@ import { getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { CalcuttaResults } from "@/components/calcutta/CalcuttaResults";
+import { AdminLink } from "@/components/AdminLink";
 
 export default async function CalcuttaPage() {
   const user = await getAuthUser();
@@ -40,5 +41,12 @@ export default async function CalcuttaPage() {
     );
   }
 
-  return <CalcuttaResults contestId={contest.id} userId={user.id} />;
+  return (
+    <div className="relative">
+      <div className="absolute top-6 right-4 z-10">
+        <AdminLink permissionKey="manage_calcutta" href={`/admin/events/${trip.id}/calcutta`} />
+      </div>
+      <CalcuttaResults contestId={contest.id} userId={user.id} />
+    </div>
+  );
 }

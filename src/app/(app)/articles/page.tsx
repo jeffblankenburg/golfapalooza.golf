@@ -2,6 +2,7 @@ import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
 import { ArticleList } from "@/components/articles/ArticleList";
+import { AdminLink } from "@/components/AdminLink";
 
 export default async function ArticlesPage() {
   const user = await getAuthUser();
@@ -47,5 +48,12 @@ export default async function ArticlesPage() {
     featured_image: Array.isArray(a.featured_image) ? a.featured_image[0] || null : a.featured_image,
   }));
 
-  return <ArticleList articles={normalized} />;
+  return (
+    <div className="relative">
+      <div className="absolute top-6 right-4 z-10">
+        <AdminLink permissionKey="manage_articles" href="/admin/articles" />
+      </div>
+      <ArticleList articles={normalized} />
+    </div>
+  );
 }

@@ -1,5 +1,6 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { CornholeBrackets } from "@/components/CornholeBrackets";
+import { AdminLink } from "@/components/AdminLink";
 
 export default async function CornholePage() {
   const user = await getAuthUser();
@@ -34,9 +35,14 @@ export default async function CornholePage() {
     contests?.find((c) => c.contest_type === "cornhole_doubles")?.id || null;
 
   return (
-    <CornholeBrackets
-      singlesContestId={singlesContestId}
-      doublesContestId={doublesContestId}
-    />
+    <div className="relative">
+      <div className="absolute top-4 right-4 z-10">
+        <AdminLink permissionKey="manage_cornhole" href={`/admin/events/${trip.id}/cornhole`} />
+      </div>
+      <CornholeBrackets
+        singlesContestId={singlesContestId}
+        doublesContestId={doublesContestId}
+      />
+    </div>
   );
 }

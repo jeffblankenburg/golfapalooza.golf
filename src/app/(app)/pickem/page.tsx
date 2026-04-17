@@ -1,5 +1,6 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { PickemContent } from "@/components/PickemContent";
+import { AdminLink } from "@/components/AdminLink";
 
 export default async function PickemPage() {
   const user = await getAuthUser();
@@ -60,5 +61,12 @@ export default async function PickemPage() {
     );
   }
 
-  return <PickemContent contestId={contest.id} contestName={contest.name} />;
+  return (
+    <div className="relative">
+      <div className="absolute top-6 right-4 z-10">
+        <AdminLink permissionKey="manage_pickem" href={`/admin/events/${trip.id}/pickem`} />
+      </div>
+      <PickemContent contestId={contest.id} contestName={contest.name} />
+    </div>
+  );
 }

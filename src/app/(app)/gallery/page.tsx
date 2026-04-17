@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
 import { GalleryPage } from "@/components/gallery/GalleryPage";
+import { AdminLink } from "@/components/AdminLink";
 
 export default async function GalleryServerPage() {
   const user = await getAuthUser();
@@ -54,7 +55,10 @@ export default async function GalleryServerPage() {
   ].sort((a, b) => b - a);
 
   return (
-    <div className="px-4 pt-4 pb-8">
+    <div className="relative px-4 pt-4 pb-8">
+      <div className="absolute top-4 right-4 z-10">
+        <AdminLink permissionKey="manage_gallery" href="/admin/gallery" />
+      </div>
       <GalleryPage
         activeTripId={trip?.id || null}
         userId={effectiveUserId}

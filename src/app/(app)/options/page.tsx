@@ -1,6 +1,7 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import OptionSelectionForm from "@/components/OptionSelectionForm";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
+import { AdminLink } from "@/components/AdminLink";
 
 export default async function OptionsPage() {
   const user = await getAuthUser();
@@ -50,6 +51,7 @@ export default async function OptionsPage() {
           {trip.trip_name} {trip.trip_year}
         </h1>
         <PinnedNoteButton pinnedTo="options" />
+        <AdminLink permissionKey="manage_options" href={`/admin/events/${trip.id}/options`} />
       </div>
       <p className="text-sm text-gray-500 mb-4">Select your trip options below</p>
       <OptionSelectionForm tripId={trip.id} />

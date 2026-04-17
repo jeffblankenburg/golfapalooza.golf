@@ -1,5 +1,6 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { NotebookContent } from "@/components/notebook/NotebookContent";
+import { AdminLink } from "@/components/AdminLink";
 
 export default async function NotebookPage() {
   const user = await getAuthUser();
@@ -40,5 +41,12 @@ export default async function NotebookPage() {
     notes: (notesResult.data || []).filter((n) => n.category_id === cat.id),
   }));
 
-  return <NotebookContent categories={categories} />;
+  return (
+    <div className="relative">
+      <div className="absolute top-6 right-4 z-10">
+        <AdminLink permissionKey="manage_notebook" href="/admin/articles" />
+      </div>
+      <NotebookContent categories={categories} />
+    </div>
+  );
 }

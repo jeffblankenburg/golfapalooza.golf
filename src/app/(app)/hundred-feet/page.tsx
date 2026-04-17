@@ -2,6 +2,7 @@ import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { HundredFeetContent } from "@/components/HundredFeetContent";
 import { getEffectiveDate } from "@/lib/simulator";
 import { isFeatureVisible } from "@/lib/visibility";
+import { AdminLink } from "@/components/AdminLink";
 
 export default async function HundredFeetPage() {
   const user = await getAuthUser();
@@ -29,7 +30,10 @@ export default async function HundredFeetPage() {
   if (!isFeatureVisible("hundred_feet", { start_date: trip.start_date, visibility_overrides: (trip.visibility_overrides as Record<string, boolean>) || {} }, now)) {
     return (
       <div className="px-4 pt-6">
-        <h1 className="text-2xl font-bold text-gray-900">100 Feet</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900">100 Feet</h1>
+          <AdminLink permissionKey="manage_scrambles" href={`/admin/events/${trip.id}/hundred-feet`} />
+        </div>
         <p className="text-gray-500 text-center py-8">100 Feet results will be available once the event begins.</p>
       </div>
     );
@@ -49,6 +53,11 @@ export default async function HundredFeetPage() {
   )];
 
   return (
-    <HundredFeetContent tripId={trip.id} startDate={trip.start_date} scrambleDays={scrambleDays} />
+    <div className="relative">
+      <div className="absolute top-6 right-4 z-10">
+        <AdminLink permissionKey="manage_scrambles" href={`/admin/events/${trip.id}/hundred-feet`} />
+      </div>
+      <HundredFeetContent tripId={trip.id} startDate={trip.start_date} scrambleDays={scrambleDays} />
+    </div>
   );
 }

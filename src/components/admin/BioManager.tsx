@@ -152,36 +152,11 @@ export function BioManager() {
   }
 
   // ── List View ──
-  const withBio = users.filter((u) => u.bio);
-  const withoutBio = users.filter((u) => !u.bio);
-
   return (
-    <div className="space-y-4">
-      {withBio.length > 0 && (
-        <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            With Bio ({withBio.length})
-          </h3>
-          <div className="space-y-1">
-            {withBio.map((user) => (
-              <UserRow key={user.id} user={user} onEdit={openEdit} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {withoutBio.length > 0 && (
-        <div>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            No Bio ({withoutBio.length})
-          </h3>
-          <div className="space-y-1">
-            {withoutBio.map((user) => (
-              <UserRow key={user.id} user={user} onEdit={openEdit} />
-            ))}
-          </div>
-        </div>
-      )}
+    <div className="space-y-1">
+      {users.map((user) => (
+        <UserRow key={user.id} user={user} onEdit={openEdit} />
+      ))}
     </div>
   );
 }

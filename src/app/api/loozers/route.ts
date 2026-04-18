@@ -33,11 +33,11 @@ export async function GET() {
       .order("display_name"),
     adminClient
       .from("loozer_bios")
-      .select("user_id"),
+      .select("user_id, content"),
   ]);
 
   const bioUserIds = new Set(
-    (bios || []).map((b) => b.user_id)
+    (bios || []).filter((b) => b.content && b.content.trim().length > 0).map((b) => b.user_id)
   );
 
   const loozers = (users || []).map((u) => ({

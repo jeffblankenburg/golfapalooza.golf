@@ -31,7 +31,11 @@ export async function GET() {
       .select("id, user_id, content, updated_at"),
   ]);
 
-  const bioMap = new Map((bios || []).map((b) => [b.user_id, b]));
+  const bioMap = new Map(
+    (bios || [])
+      .filter((b) => b.content && b.content.trim().length > 0)
+      .map((b) => [b.user_id, b])
+  );
 
   const result = (users || []).map((u) => ({
     ...u,

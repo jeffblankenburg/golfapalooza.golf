@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { SpectatorLoozerProfile } from "@/components/SpectatorLoozerProfile";
+import { LoozerProfile } from "@/components/LoozerProfile";
 
 export default async function SpectatorLoozerProfilePage({
   params,
@@ -18,7 +18,7 @@ export default async function SpectatorLoozerProfilePage({
     { data: taggedRows, count: taggedPhotosCount },
     { data: handicapRow },
     { data: bioData },
-    { data: teamMemberships },
+    { data: roundsData },
   ] = await Promise.all([
     adminClient
       .from("users")
@@ -69,8 +69,15 @@ export default async function SpectatorLoozerProfilePage({
 
   if (!profile) notFound();
 
+  const taggedPhotos = (taggedRows || [])
+    .map((row) => {
+      const item = Array.isArray(row.item) ? row.item[0] : row.item;
+      return item as { id: string; media_url: string; thumbnail_url: string | null; media_type: string; created_at: string } | null;
+    })
+    .filter(Boolean) as { id: string; media_url: string; thumbnail_url: string | null; media_type: string; created_at: string }[];
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const scorecards = (teamMemberships || []).map((r: any) => {
+  const scorecards = (roundsData || []).map((r: any) => {
     const players = Array.isArray(r.round_players) ? r.round_players : [r.round_players];
     const player = players.find((p: { user_id: string }) => p.user_id === userId) || players[0];
     if (!player?.final_gross_score) return null;
@@ -88,28 +95,27 @@ export default async function SpectatorLoozerProfilePage({
     };
   }).filter((x): x is NonNullable<typeof x> => x != null);
 
-  const taggedPhotos = (taggedRows || [])
-    .map((row) => {
-      const item = Array.isArray(row.item) ? row.item[0] : row.item;
-      return item as { id: string; media_url: string; thumbnail_url: string | null; media_type: string; created_at: string } | null;
-    })
-    .filter(Boolean);
+  const bioContent = bioData?.content?.trim() ? { content: bioData.content } : null;
 
   return (
     <div className="px-4 pt-6 pb-8">
       <Link href="/spectator/loozers" className="text-sm text-green-700 font-medium mb-3 inline-block">
         &larr; All Loozers
       </Link>
-      <SpectatorLoozerProfile
-        profile={profile}
-        accolades={(accolades || []) as { id: string; title: string; trip: { trip_year: number }[] | { trip_year: number } | null }[]}
-        taggedPhotos={taggedPhotos as { id: string; media_url: string; thumbnail_url: string | null; media_type: string; created_at: string }[]}
-        taggedPhotosCount={taggedPhotosCount ?? 0}
-        handicapIndex={handicapRow?.handicap_index ?? null}
-        eightBagAverage={profile.eight_bag_average ?? null}
-        avgScrambleScore={profile.avg_scramble_score ?? null}
-        bio={bioData?.content ? { content: bioData.content } : null}
-        scorecards={scorecards as { roundDate: string; roundType: string; courseName: string; score: number; par: number; scoreToPar: number; differential: number | null }[]}
+      <LoozerProfile
+        userId={userId}
+        spectator
+        data={{
+          profile,
+          accolades: (accolades || []) as { id: string; title: string; trip: { trip_year: number }[] | { trip_year: number } | null }[],
+          taggedPhotos,
+          taggedPhotosCount: taggedPhotosCount ?? 0,
+          handicapIndex: handicapRow?.handicap_index ?? null,
+          eightBagAverage: profile.eight_bag_average ?? null,
+          avgScrambleScore: profile.avg_scramble_score ?? null,
+          bio: bioContent,
+          scorecards,
+        }}
       />
     </div>
   );

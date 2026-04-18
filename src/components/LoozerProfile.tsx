@@ -6,14 +6,14 @@ import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import rehypeRaw from "rehype-raw";
-import { useMusicPlayer, Song } from "@/contexts/MusicPlayerContext";
+import { useMusicPlayerOptional, Song } from "@/contexts/MusicPlayerContext";
 
 interface ProfileData {
   id: string;
   display_name: string;
-  full_name: string | null;
+  full_name?: string | null;
   avatar_url: string | null;
-  phone: string | null;
+  phone?: string | null;
   city: string | null;
   state: string | null;
   playing_since: number | null;
@@ -46,7 +46,7 @@ interface SongData {
 }
 
 interface ScorecardSummary {
-  roundId: string;
+  roundId?: string;
   roundDate: string;
   roundType: string;
   courseName: string;
@@ -54,6 +54,19 @@ interface ScorecardSummary {
   par: number;
   scoreToPar: number;
   differential: number | null;
+}
+
+interface LoozerProfileData {
+  profile: ProfileData;
+  accolades: AccoladeData[];
+  taggedPhotos: TaggedPhoto[];
+  taggedPhotosCount: number;
+  handicapIndex: number | null;
+  eightBagAverage: number | null;
+  avgScrambleScore: number | null;
+  bio: { content: string } | null;
+  song?: SongData | null;
+  scorecards: ScorecardSummary[];
 }
 
 function getInitials(name: string): string {
@@ -64,49 +77,53 @@ function getInitials(name: string): string {
   return (name[0] || "?").toUpperCase();
 }
 
+/**
+ * Unified Loozer profile component.
+ * - When `data` is provided, renders immediately (server-fetched, used by spectator pages).
+ * - When `data` is omitted, fetches from `/api/loozers/{userId}` client-side (authenticated pages).
+ * - When `spectator` is true, hides private info (phone, chat, song, full_name, edit profile).
+ */
 export function LoozerProfile({
   userId,
-  isOwnProfile,
+  isOwnProfile = false,
+  spectator = false,
+  data: initialData,
 }: {
   userId: string;
-  isOwnProfile: boolean;
+  isOwnProfile?: boolean;
+  spectator?: boolean;
+  data?: LoozerProfileData;
 }) {
   const router = useRouter();
-  const musicPlayer = useMusicPlayer();
-  const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [accolades, setAccolades] = useState<AccoladeData[]>([]);
-  const [taggedPhotos, setTaggedPhotos] = useState<TaggedPhoto[]>([]);
-  const [taggedPhotosCount, setTaggedPhotosCount] = useState(0);
-  const [handicapIndex, setHandicapIndex] = useState<number | null>(null);
-  const [eightBagAverage, setEightBagAverage] = useState<number | null>(null);
-  const [avgScrambleScore, setAvgScrambleScore] = useState<number | null>(null);
-  const [bio, setBio] = useState<{ content: string } | null>(null);
-  const [song, setSong] = useState<SongData | null>(null);
-  const [scorecards, setScorecards] = useState<ScorecardSummary[]>([]);
+  const musicPlayer = useMusicPlayerOptional();
+  const [loading, setLoading] = useState(!initialData);
+  const [profileData, setProfileData] = useState<LoozerProfileData | null>(initialData || null);
   const [startingChat, setStartingChat] = useState(false);
 
   // Accordion state — bio open by default, others closed
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(["bio"]));
 
   useEffect(() => {
+    if (initialData) return; // already have data
     fetch(`/api/loozers/${userId}`)
       .then((res) => res.json())
-      .then((data) => {
-        setProfile(data.profile);
-        setAccolades(data.accolades || []);
-        setTaggedPhotos(data.taggedPhotos || []);
-        setTaggedPhotosCount(data.taggedPhotosCount ?? 0);
-        setHandicapIndex(data.handicapIndex ?? null);
-        setEightBagAverage(data.eightBagAverage ?? null);
-        setAvgScrambleScore(data.avgScrambleScore ?? null);
-        setBio(data.bio ?? null);
-        setSong(data.song ?? null);
-        setScorecards(data.scorecards || []);
+      .then((d) => {
+        setProfileData({
+          profile: d.profile,
+          accolades: d.accolades || [],
+          taggedPhotos: d.taggedPhotos || [],
+          taggedPhotosCount: d.taggedPhotosCount ?? 0,
+          handicapIndex: d.handicapIndex ?? null,
+          eightBagAverage: d.eightBagAverage ?? null,
+          avgScrambleScore: d.avgScrambleScore ?? null,
+          bio: d.bio ?? null,
+          song: d.song ?? null,
+          scorecards: d.scorecards || [],
+        });
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [userId]);
+  }, [userId, initialData]);
 
   const toggleSection = (key: string) => {
     setOpenSections((prev) => {
@@ -125,7 +142,7 @@ export function LoozerProfile({
     );
   }
 
-  if (!profile) {
+  if (!profileData?.profile) {
     return (
       <div className="text-center py-20 text-gray-500">
         <p className="text-lg font-medium">Loozer not found</p>
@@ -133,7 +150,10 @@ export function LoozerProfile({
     );
   }
 
+  const { profile, accolades, taggedPhotos, taggedPhotosCount, handicapIndex, eightBagAverage, avgScrambleScore, bio, song, scorecards } = profileData;
+
   const openChat = async () => {
+    if (spectator) return;
     setStartingChat(true);
     try {
       const res = await fetch("/api/chat/rooms", {
@@ -152,7 +172,7 @@ export function LoozerProfile({
   };
 
   const playSong = () => {
-    if (!song) return;
+    if (!song || !musicPlayer) return;
     const songObj: Song = {
       id: song.id,
       title: song.title,
@@ -170,6 +190,7 @@ export function LoozerProfile({
   };
 
   const phoneDigits = profile.phone?.replace(/\D/g, "") || "";
+  const showComms = !spectator;
 
   return (
     <div className="space-y-4">
@@ -196,7 +217,7 @@ export function LoozerProfile({
             <h1 className="text-xl font-bold text-gray-900 truncate">
               {profile.display_name}
             </h1>
-            {profile.full_name && profile.full_name !== profile.display_name && (
+            {!spectator && profile.full_name && profile.full_name !== profile.display_name && (
               <p className="text-sm text-gray-500 truncate">{profile.full_name}</p>
             )}
             {handicapIndex != null && (
@@ -206,65 +227,67 @@ export function LoozerProfile({
             )}
           </div>
 
-          {/* 2x2 comms grid */}
-          <div className="grid grid-cols-2 gap-1.5 flex-shrink-0">
-            {profile.phone && (
-              <a
-                href={`tel:+1${phoneDigits}`}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-green-50 text-green-700 active:bg-green-100 transition-colors"
-                title="Call"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                </svg>
-              </a>
-            )}
-            {profile.phone && (
-              <a
-                href={`sms:+1${phoneDigits}`}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-50 text-blue-700 active:bg-blue-100 transition-colors"
-                title="Text"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                </svg>
-              </a>
-            )}
-            {!isOwnProfile && (
-              <button
-                onClick={openChat}
-                disabled={startingChat}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-50 text-purple-700 active:bg-purple-100 transition-colors disabled:opacity-50"
-                title="Message in app"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-              </button>
-            )}
-            {song && (
-              <button
-                onClick={playSong}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-50 text-amber-700 active:bg-amber-100 transition-colors"
-                title={`Play: ${song.title}`}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                </svg>
-              </button>
-            )}
-            {isOwnProfile && (
-              <Link
-                href="/profile"
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-50 text-gray-700 active:bg-gray-100 transition-colors"
-                title="Edit Profile"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              </Link>
-            )}
-          </div>
+          {/* Comms grid — authenticated only */}
+          {showComms && (
+            <div className="grid grid-cols-2 gap-1.5 flex-shrink-0">
+              {profile.phone && (
+                <a
+                  href={`tel:+1${phoneDigits}`}
+                  className="flex items-center justify-center w-10 h-10 rounded-full bg-green-50 text-green-700 active:bg-green-100 transition-colors"
+                  title="Call"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                </a>
+              )}
+              {profile.phone && (
+                <a
+                  href={`sms:+1${phoneDigits}`}
+                  className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-50 text-blue-700 active:bg-blue-100 transition-colors"
+                  title="Text"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                  </svg>
+                </a>
+              )}
+              {!isOwnProfile && (
+                <button
+                  onClick={openChat}
+                  disabled={startingChat}
+                  className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-50 text-purple-700 active:bg-purple-100 transition-colors disabled:opacity-50"
+                  title="Message in app"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                </button>
+              )}
+              {song && musicPlayer && (
+                <button
+                  onClick={playSong}
+                  className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-50 text-amber-700 active:bg-amber-100 transition-colors"
+                  title={`Play: ${song.title}`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                  </svg>
+                </button>
+              )}
+              {isOwnProfile && (
+                <Link
+                  href="/profile"
+                  className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-50 text-gray-700 active:bg-gray-100 transition-colors"
+                  title="Edit Profile"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </Link>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -328,12 +351,14 @@ export function LoozerProfile({
                 </div>
               ))}
             </div>
-            <Link
-              href={`/gallery?tagged=${userId}`}
-              className="block text-center text-xs font-medium text-green-600 mt-2"
-            >
-              See All Photos
-            </Link>
+            {!spectator && (
+              <Link
+                href={`/gallery?tagged=${userId}`}
+                className="block text-center text-xs font-medium text-green-600 mt-2"
+              >
+                See All Photos
+              </Link>
+            )}
           </>
         ) : (
           <p className="text-sm text-gray-400 italic">No tagged photos yet</p>
@@ -349,18 +374,14 @@ export function LoozerProfile({
       >
         {scorecards.length > 0 ? (
           <div className="space-y-2">
-            {scorecards.map((sc) => {
+            {scorecards.map((sc, i) => {
               const toParStr = sc.scoreToPar === 0 ? "E" : sc.scoreToPar > 0 ? `+${sc.scoreToPar}` : `${sc.scoreToPar}`;
               const dateStr = (() => {
                 const [y, m, d] = sc.roundDate.split("-").map(Number);
                 return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
               })();
-              return (
-                <Link
-                  key={sc.roundId}
-                  href={`/my-rounds/rounds/${sc.roundId}`}
-                  className="block bg-gray-50 rounded-lg p-3 active:bg-gray-100 transition-colors"
-                >
+              const content = (
+                <>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm font-semibold text-gray-900">{sc.courseName}</span>
                     <div className="flex items-center gap-2">
@@ -376,7 +397,20 @@ export function LoozerProfile({
                       <span className="text-xs text-gray-400 shrink-0">Diff {sc.differential}</span>
                     )}
                   </div>
+                </>
+              );
+              return !spectator && sc.roundId ? (
+                <Link
+                  key={sc.roundId}
+                  href={`/my-rounds/rounds/${sc.roundId}`}
+                  className="block bg-gray-50 rounded-lg p-3 active:bg-gray-100 transition-colors"
+                >
+                  {content}
                 </Link>
+              ) : (
+                <div key={i} className="bg-gray-50 rounded-lg p-3">
+                  {content}
+                </div>
               );
             })}
           </div>
@@ -391,7 +425,6 @@ export function LoozerProfile({
         isOpen={openSections.has("standings")}
         onToggle={() => toggleSection("standings")}
       >
-        {/* Stats badges */}
         {(eightBagAverage != null || avgScrambleScore != null) ? (
           <div className="flex flex-wrap gap-2">
             {eightBagAverage != null && (
@@ -412,7 +445,7 @@ export function LoozerProfile({
         )}
       </Accordion>
 
-      {/* Accolades (bonus section, not in required spec but already exists) */}
+      {/* Accolades */}
       {accolades.length > 0 && (
         <Accordion
           title="Accolades"
@@ -437,7 +470,7 @@ export function LoozerProfile({
         </Accordion>
       )}
 
-      {/* About (bonus section) */}
+      {/* About */}
       {(profile.occupation || profile.fun_fact || profile.best_shot || profile.playing_since || profile.swings || profile.typical_shot) && (
         <Accordion
           title="About"

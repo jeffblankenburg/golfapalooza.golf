@@ -18,11 +18,24 @@ function getInitials(name: string): string {
   return (name[0] || "?").toUpperCase();
 }
 
-export function LoozersList() {
-  const [loozers, setLoozers] = useState<Loozer[]>([]);
-  const [loading, setLoading] = useState(true);
+/**
+ * Loozers grid component.
+ * - When `loozers` is provided, renders immediately (server-fetched).
+ * - When `loozers` is omitted, fetches from `/api/loozers` client-side.
+ * - `basePath` controls link prefix (default: "/loozers").
+ */
+export function LoozersList({
+  loozers: initialLoozers,
+  basePath = "/loozers",
+}: {
+  loozers?: Loozer[];
+  basePath?: string;
+}) {
+  const [loozers, setLoozers] = useState<Loozer[]>(initialLoozers || []);
+  const [loading, setLoading] = useState(!initialLoozers);
 
   useEffect(() => {
+    if (initialLoozers) return;
     fetch("/api/loozers")
       .then((res) => res.json())
       .then((data) => {
@@ -30,7 +43,7 @@ export function LoozersList() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  }, [initialLoozers]);
 
   if (loading) {
     return (
@@ -54,7 +67,7 @@ export function LoozersList() {
       {loozers.map((loozer) => (
         <Link
           key={loozer.id}
-          href={`/loozers/${loozer.id}`}
+          href={`${basePath}/${loozer.id}`}
           className="flex flex-col items-center p-3 bg-white rounded-xl border border-gray-200 shadow-sm active:scale-95 transition-transform"
         >
           <div className="w-16 h-16 rounded-full overflow-hidden bg-green-700 text-white flex items-center justify-center mb-2">

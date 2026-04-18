@@ -60,6 +60,11 @@ export function useMusicPlayer() {
   return ctx;
 }
 
+/** Safe variant that returns null outside MusicPlayerProvider (e.g., spectator pages) */
+export function useMusicPlayerOptional() {
+  return useContext(MusicPlayerContext);
+}
+
 // localStorage helpers for persisting player state
 const STORAGE_KEY_INDEX = "golfapalooza_player_index";
 const STORAGE_KEY_SHUFFLE = "golfapalooza_player_shuffle";

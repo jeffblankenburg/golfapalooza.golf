@@ -1,13 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { FinancialDashboard } from "@/components/admin/FinancialDashboard";
+import { FinancialContestsDashboard } from "@/components/admin/FinancialContestsDashboard";
 
 export default function FinancialsAdminPage() {
-  const params = useParams();
-  const tripId = params.tripId as string;
   const router = useRouter();
   const [allowed, setAllowed] = useState<boolean | null>(null);
 
@@ -18,11 +16,11 @@ export default function FinancialsAdminPage() {
         const user = data.user;
         if (!user) { router.replace("/admin"); return; }
         const ok = user.is_admin || user.permissions?.manage_finances === true;
-        if (!ok) { router.replace(`/admin/events/${tripId}`); return; }
+        if (!ok) { router.replace("/admin"); return; }
         setAllowed(true);
       })
       .catch(() => router.replace("/admin"));
-  }, [router, tripId]);
+  }, [router]);
 
   if (!allowed) {
     return (
@@ -34,19 +32,19 @@ export default function FinancialsAdminPage() {
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">
-      <Link
-        href={`/admin/events/${tripId}`}
-        className="flex items-center gap-1 text-green-700 text-sm font-medium"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Back to Event
-      </Link>
-
-      <h1 className="text-2xl font-bold text-gray-900">Financials</h1>
-
-      <FinancialDashboard tripId={tripId} />
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">Financials</h1>
+        <Link
+          href="/admin/financials/grid"
+          className="flex items-center gap-1.5 text-green-700 text-sm font-medium active:opacity-70"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18M3 6h18M3 18h18M7 3v18M17 3v18" />
+          </svg>
+          Grid
+        </Link>
+      </div>
+      <FinancialContestsDashboard />
     </div>
   );
 }

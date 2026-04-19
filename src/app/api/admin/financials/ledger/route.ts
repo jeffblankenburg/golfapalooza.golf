@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     const { data: transactions, error } = await adminClient
       .from("financial_transactions")
       .select(
-        "id, trip_id, type, source, description, amount, method, notes, created_by, created_at, trip:trip_settings!financial_transactions_trip_id_fkey(trip_name), creator:users!financial_transactions_created_by_fkey(display_name)"
+        "id, trip_id, financial_contest_id, type, source, description, amount, method, notes, created_by, created_at, trip:trip_settings!financial_transactions_trip_id_fkey(trip_name), contest:financial_contests!financial_transactions_financial_contest_id_fkey(name), creator:users!financial_transactions_created_by_fkey(display_name)"
       )
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
@@ -35,6 +35,8 @@ export async function GET(request: Request) {
       id: t.id,
       trip_id: t.trip_id,
       trip_name: (t.trip as unknown as { trip_name: string } | null)?.trip_name ?? null,
+      financial_contest_id: (t as Record<string, unknown>).financial_contest_id ?? null,
+      contest_name: (t.contest as unknown as { name: string } | null)?.name ?? null,
       type: t.type,
       source: t.source,
       description: t.description,

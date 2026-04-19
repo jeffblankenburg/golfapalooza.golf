@@ -12,12 +12,12 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { user_id, trip_id, type, description, amount, method, notes } = body;
+    const { user_id, trip_id, type, description, amount, method, notes, financial_contest_id } = body;
 
     // Validate required fields
-    if (!user_id || !trip_id || !type || !description || amount == null) {
+    if (!user_id || !type || !description || amount == null) {
       return NextResponse.json(
-        { error: "user_id, trip_id, type, description, and amount are required" },
+        { error: "user_id, type, description, and amount are required" },
         { status: 400 }
       );
     }
@@ -52,10 +52,11 @@ export async function POST(request: Request) {
       .from("financial_transactions")
       .insert({
         user_id,
-        trip_id,
+        trip_id: trip_id || null,
         type,
         source: "manual",
         option_id: null,
+        financial_contest_id: financial_contest_id || null,
         description,
         amount,
         method: method || null,
@@ -85,7 +86,7 @@ export async function PUT(request: Request) {
 
   try {
     const body = await request.json();
-    const { id, type, description, amount, method, notes } = body;
+    const { id, type, description, amount, method, notes, financial_contest_id } = body;
 
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
@@ -127,6 +128,7 @@ export async function PUT(request: Request) {
       if (description !== undefined) updates.description = description;
       if (method !== undefined) updates.method = method || null;
       if (notes !== undefined) updates.notes = notes || null;
+      if (financial_contest_id !== undefined) updates.financial_contest_id = financial_contest_id || null;
     }
 
     if (Object.keys(updates).length === 0) {
@@ -182,6 +184,13 @@ export async function DELETE(request: Request) {
     if (existing.source === "option") {
       return NextResponse.json(
         { error: "Cannot delete option-derived transactions. Manage these through the selection system." },
+        { status: 403 }
+      );
+    }
+
+    if (existing.source === "contest_entry") {
+      return NextResponse.json(
+        { error: "Cannot delete contest entry transactions. Manage these through the contest participant system." },
         { status: 403 }
       );
     }

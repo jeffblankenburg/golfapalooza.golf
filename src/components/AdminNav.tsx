@@ -38,7 +38,6 @@ export function AdminNav({ isAdmin, permissions, activeTripId, activeTripYear }:
             matchPrefix: `/admin/events/${activeTripId}`,
             excludePrefixes: [
               `/admin/events/${activeTripId}/options`,
-              `/admin/events/${activeTripId}/financials`,
             ],
             icon: (
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -66,8 +65,12 @@ export function AdminNav({ isAdmin, permissions, activeTripId, activeTripYear }:
               </svg>
             ),
           },
+        ]
+      : []),
+    ...(isAdmin || permissions?.manage_finances
+      ? [
           {
-            href: `/admin/events/${activeTripId}/financials`,
+            href: "/admin/financials",
             label: "Financials",
             exact: false,
             icon: (
@@ -115,10 +118,14 @@ export function AdminNav({ isAdmin, permissions, activeTripId, activeTripYear }:
     },
   ];
 
-  // Permission-only users see only the Home item
+  // Permission-only users see Home + items they have permission for
   const items = isAdmin
     ? adminNavItems
-    : adminNavItems.filter((item) => item.exact);
+    : adminNavItems.filter(
+        (item) =>
+          item.exact ||
+          (item.href === "/admin/financials" && permissions?.manage_finances)
+      );
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 pb-safe z-40">

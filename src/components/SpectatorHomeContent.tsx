@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { FakeAdCarousel } from "@/components/FakeAdCarousel";
 
 interface TripData {
   trip_name: string;
@@ -200,6 +201,9 @@ export function SpectatorHomeContent({
           )}
         </Link>
       )}
+
+      {/* Fake Ads (humor banners) */}
+      <FakeAdCarousel profileHref="/spectator/loozers" />
 
       {/* Quick Links */}
       <div className="mt-3">

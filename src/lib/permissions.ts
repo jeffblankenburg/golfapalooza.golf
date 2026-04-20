@@ -15,6 +15,7 @@ export const GLOBAL_PERMISSIONS: PermissionDef[] = [
   { key: "manage_articles", label: "Articles", description: "Create, edit & publish articles" },
   { key: "manage_bios", label: "Bios", description: "Write & edit Loozer biographies" },
   { key: "manage_nominations", label: "Nominations", description: "Review & approve rookie nominations" },
+  { key: "manage_fake_ads", label: "Fake Ads", description: "Upload humor banner ads for the home page" },
 ];
 
 // Event permissions (per-accordion on the event page)

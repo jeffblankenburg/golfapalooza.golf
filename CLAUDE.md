@@ -71,6 +71,12 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 | GET | `/api/nominations` | List current user's rookie nominations |
 | POST | `/api/nominations` | Submit a new rookie nomination |
 
+#### Fake Ads (`/api/fake-ads`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/fake-ads?userId={userId}` | List active fake ads (optionally filtered to those tagging a Loozer) |
+
 #### Admin (`/api/admin`)
 
 | Method | Endpoint | Description |
@@ -80,6 +86,10 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 | DELETE | `/api/admin/users?id={userId}` | Delete a user |
 | GET | `/api/admin/nominations` | List all rookie nominations |
 | PATCH | `/api/admin/nominations` | Approve or reject a nomination |
+| GET | `/api/admin/fake-ads` | List all fake ads (includes inactive) |
+| POST | `/api/admin/fake-ads` | Upload a new fake ad (multipart: `file`, `alt_text`, `tagged_user_ids`, `active`) |
+| PATCH | `/api/admin/fake-ads/{id}` | Update alt_text, active, or tags |
+| DELETE | `/api/admin/fake-ads/{id}` | Delete a fake ad and its storage object |
 
 ## Database Schema
 
@@ -95,6 +105,8 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 - `player_handicaps` - Current handicap data
 - `handicap_history` - Handicap changes over time
 - `rookie_nominations` - Peer-nominated rookies pending admin approval
+- `fake_ads` - Admin-uploaded humor banner ads shown on the home page
+- `fake_ad_loozers` - Many-to-many tags linking fake ads to Loozers
 
 ### Migrations
 

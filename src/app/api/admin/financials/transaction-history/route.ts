@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     const { data: history, error } = await adminClient
       .from("financial_transaction_history")
       .select(
-        "id, action, changed_at, previous_type, previous_description, previous_amount, previous_method, previous_notes, changer:users!financial_transaction_history_changed_by_fkey(display_name)"
+        "id, action, changed_at, previous_type, previous_source, previous_description, previous_amount, previous_method, previous_notes, changer:users!financial_transaction_history_changed_by_fkey(display_name)"
       )
       .eq("transaction_id", transactionId)
       .order("changed_at", { ascending: false });
@@ -42,6 +42,7 @@ export async function GET(request: Request) {
         (h.changer as unknown as { display_name: string } | null)
           ?.display_name ?? null,
       previous_type: h.previous_type,
+      previous_source: h.previous_source,
       previous_description: h.previous_description,
       previous_amount: h.previous_amount ? Number(h.previous_amount) : null,
       previous_method: h.previous_method,

@@ -7,6 +7,7 @@ import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import rehypeRaw from "rehype-raw";
 import { useMusicPlayerOptional, Song } from "@/contexts/MusicPlayerContext";
+import { FakeAdCarousel } from "@/components/FakeAdCarousel";
 
 interface ProfileData {
   id: string;
@@ -326,6 +327,9 @@ export function LoozerProfile({
           </div>
         </Accordion>
       )}
+
+      {/* Fake Ads tagged with this Loozer (non-clickable; you're already here) */}
+      <FakeAdCarousel userId={userId} clickable={false} />
 
       {/* Tagged Photos */}
       <Accordion

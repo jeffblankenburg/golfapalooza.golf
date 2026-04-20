@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { ConfirmModal } from "./ConfirmModal";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -72,6 +72,163 @@ const fmt = (n: number) =>
     maximumFractionDigits: 2,
   });
 
+const SOURCE_LABELS: Record<string, { label: string; className: string }> = {
+  deposit:       { label: "deposit",     className: "bg-emerald-100 text-emerald-700" },
+  withdrawal:    { label: "withdrawal",  className: "bg-rose-100 text-rose-700" },
+  winnings:      { label: "winnings",    className: "bg-violet-100 text-violet-700" },
+  credit:        { label: "credit",      className: "bg-sky-100 text-sky-700" },
+  expense:       { label: "expense",     className: "bg-orange-100 text-orange-700" },
+  contest_entry: { label: "entry fee",   className: "bg-indigo-100 text-indigo-700" },
+  option:        { label: "option",      className: "bg-teal-100 text-teal-700" },
+  adjustment:    { label: "adjustment",  className: "bg-amber-100 text-amber-700" },
+  manual:        { label: "manual",      className: "bg-gray-100 text-gray-600" },
+};
+
+function SourceChip({ source }: { source: string }) {
+  const config = SOURCE_LABELS[source] ?? { label: source, className: "bg-gray-100 text-gray-600" };
+  return (
+    <span
+      className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${config.className}`}
+    >
+      {config.label}
+    </span>
+  );
+}
+
+function VersionCard({
+  amount,
+  type,
+  source,
+  description,
+  method,
+  notes,
+  author,
+  timestamp,
+  variant,
+}: {
+  amount: number;
+  type: "charge" | "payment";
+  source: string;
+  description: string | null;
+  method: string | null;
+  notes: string | null;
+  author: string | null;
+  timestamp: string;
+  variant: "current" | "edited" | "deleted" | "original";
+}) {
+  const containerClass =
+    variant === "current"
+      ? "bg-green-50 border border-green-200"
+      : variant === "deleted"
+        ? "bg-red-50 border border-red-100"
+        : "bg-gray-50 border border-gray-100";
+  const actionChip =
+    variant === "current"
+      ? { label: "Current", className: "bg-green-100 text-green-700" }
+      : variant === "deleted"
+        ? { label: "Deleted", className: "bg-red-100 text-red-700" }
+        : variant === "original"
+          ? { label: "Original", className: "bg-blue-100 text-blue-700" }
+          : { label: "Edited", className: "bg-amber-100 text-amber-700" };
+  const signColor = type === "charge" ? "text-red-600" : "text-green-600";
+  return (
+    <div className={`rounded-xl p-3 ${containerClass}`}>
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0 text-xs text-gray-600 space-y-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span
+              className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${actionChip.className}`}
+            >
+              {actionChip.label}
+            </span>
+            <SourceChip source={source} />
+          </div>
+          {description && (
+            <div className="truncate">
+              <span className="text-gray-400">Desc: </span>
+              {description}
+            </div>
+          )}
+          {method && (
+            <div>
+              <span className="text-gray-400">Method: </span>
+              {method}
+            </div>
+          )}
+          {notes && (
+            <div>
+              <span className="text-gray-400">Notes: </span>
+              {notes}
+            </div>
+          )}
+          <div className="text-[11px] text-gray-400 whitespace-nowrap pt-0.5">
+            {new Date(timestamp).toLocaleString()}
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          <div
+            className={`text-2xl font-bold tabular-nums leading-none ${signColor}`}
+          >
+            {type === "charge" ? "-" : "+"}
+            {fmt(amount)}
+          </div>
+          {author && (
+            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">
+              {author}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChargeTypePill({
+  label,
+  sublabel,
+  selected,
+  selectedClass,
+  onClick,
+}: {
+  label: string;
+  sublabel: string;
+  selected: boolean;
+  selectedClass: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onClick}
+      className={`px-3 py-2 rounded-xl border text-center active:opacity-80 transition-colors ${
+        selected
+          ? selectedClass
+          : "bg-white border-gray-300 text-gray-700 hover:border-gray-400"
+      }`}
+    >
+      <div className="text-sm font-semibold leading-tight">{label}</div>
+      <div
+        className={`text-[11px] leading-tight ${
+          selected ? "text-white/80" : "text-gray-500"
+        }`}
+      >
+        {sublabel}
+      </div>
+    </button>
+  );
+}
+
+function ResponsibleChip({ name }: { name?: string | null }) {
+  if (!name) return null;
+  return (
+    <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">
+      {name}
+    </span>
+  );
+}
+
 function ImpactRow({
   label,
   count,
@@ -141,14 +298,14 @@ export function FinancialContestsDashboard() {
     changed_at: string;
     changed_by_name: string | null;
     previous_type: string | null;
+    previous_source: string | null;
     previous_description: string | null;
     previous_amount: number | null;
     previous_method: string | null;
     previous_notes: string | null;
   }
   const [txHistoryModal, setTxHistoryModal] = useState<{
-    transactionId: string;
-    description: string;
+    transaction: Transaction;
   } | null>(null);
   const [txHistory, setTxHistory] = useState<HistoryEntry[]>([]);
   const [txHistoryLoading, setTxHistoryLoading] = useState(false);
@@ -162,7 +319,8 @@ export function FinancialContestsDashboard() {
   const [formMethod, setFormMethod] = useState("Venmo");
   const [formNotes, setFormNotes] = useState("");
   const [formDescription, setFormDescription] = useState("");
-  const [formChargeType, setFormChargeType] = useState<"charge" | "credit">("charge");
+  const [formChargeType, setFormChargeType] = useState<"charge" | "credit" | "winnings">("charge");
+  const chargeAmountRef = useRef<HTMLInputElement | null>(null);
   const [formAttribution, setFormAttribution] = useState(""); // "contest:id" or "trip:id" or ""
   const [formSaving, setFormSaving] = useState(false);
 
@@ -194,8 +352,8 @@ export function FinancialContestsDashboard() {
   const [deleteContestImpact, setDeleteContestImpact] = useState<{
     participant_count: number;
     entry_charges: { count: number; total: number };
-    orphan_charges: { count: number; total: number };
-    orphan_payments: { count: number; total: number };
+    orphan_by_source: Record<string, { count: number; total: number }>;
+    orphan_other: { count: number; total: number };
   } | null>(null);
 
   // Participant management
@@ -250,11 +408,11 @@ export function FinancialContestsDashboard() {
     []
   );
 
-  const openTxHistory = useCallback(async (transactionId: string, description: string) => {
-    setTxHistoryModal({ transactionId, description });
+  const openTxHistory = useCallback(async (tx: Transaction) => {
+    setTxHistoryModal({ transaction: tx });
     setTxHistoryLoading(true);
     const res = await fetch(
-      `/api/admin/financials/transaction-history?transaction_id=${transactionId}`
+      `/api/admin/financials/transaction-history?transaction_id=${tx.id}`
     );
     const data = await res.json();
     setTxHistory(data.history || []);
@@ -322,6 +480,7 @@ export function FinancialContestsDashboard() {
         user_id: userId,
         ...attr,
         type: "payment",
+        source: "deposit",
         description: `Deposit via ${formMethod}`,
         amount,
         method: formMethod,
@@ -336,8 +495,14 @@ export function FinancialContestsDashboard() {
   const handleSaveCharge = async (userId: string) => {
     const amount = parseFloat(formAmount);
     if (!amount || amount <= 0 || !formDescription.trim()) return;
-    setFormSaving(true);
     const attr = parseAttribution(formAttribution);
+    if (formChargeType === "winnings" && !attr.financial_contest_id) return;
+    const sourceMap = {
+      charge: "expense",
+      credit: "credit",
+      winnings: "winnings",
+    } as const;
+    setFormSaving(true);
     await fetch("/api/admin/financials/transactions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -345,6 +510,7 @@ export function FinancialContestsDashboard() {
         user_id: userId,
         ...attr,
         type: formChargeType === "charge" ? "charge" : "payment",
+        source: sourceMap[formChargeType],
         description: formDescription.trim(),
         amount,
       }),
@@ -358,14 +524,13 @@ export function FinancialContestsDashboard() {
     const amount = parseFloat(formAmount);
     if (!amount || amount <= 0) return;
     setFormSaving(true);
-    const attr = parseAttribution(formAttribution);
     await fetch("/api/admin/financials/transactions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         user_id: userId,
-        ...attr,
         type: "charge",
+        source: "withdrawal",
         description: `Withdrawal via ${formMethod}`,
         amount,
         method: formMethod,
@@ -772,10 +937,6 @@ export function FinancialContestsDashboard() {
                       <div className="font-semibold text-gray-900">
                         {u.display_name}
                       </div>
-                      <div className="text-xs text-gray-500">
-                        Charges: {fmt(u.total_charges)} | Paid:{" "}
-                        {fmt(u.total_payments)}
-                      </div>
                     </div>
                   </div>
                   <div className={`text-lg font-bold ${bColor}`}>
@@ -951,32 +1112,14 @@ export function FinancialContestsDashboard() {
                                         tx.created_at
                                       ).toLocaleDateString()}
                                     </span>
-                                    <span
-                                      className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                        tx.type === "charge"
-                                          ? "bg-red-100 text-red-700"
-                                          : "bg-green-100 text-green-700"
-                                      }`}
-                                    >
-                                      {tx.type}
-                                    </span>
-                                    <span
-                                      className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                        tx.source === "manual"
-                                          ? "bg-gray-100 text-gray-600"
-                                          : "bg-blue-100 text-blue-700"
-                                      }`}
-                                    >
-                                      {tx.source === "manual" && tx.attributed_to
-                                        ? tx.attributed_to
-                                        : tx.source}
-                                    </span>
+                                    <SourceChip source={tx.source} />
+                                    <ResponsibleChip name={tx.attributed_to} />
                                     {tx.has_history && (
                                       <button
                                         type="button"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          openTxHistory(tx.id, tx.description);
+                                          openTxHistory(tx);
                                         }}
                                         className="inline-flex p-0 text-amber-500 hover:text-amber-700 ml-0.5"
                                       >
@@ -1226,7 +1369,7 @@ export function FinancialContestsDashboard() {
                       activeForm.kind === "charge" && (
                         <div className="space-y-3 mt-2 p-3 bg-gray-50 rounded-xl">
                           <h5 className="text-sm font-semibold text-gray-700">
-                            Charge / Credit
+                            Charge / Credit / Winnings
                           </h5>
                           <input
                             type="text"
@@ -1239,6 +1382,7 @@ export function FinancialContestsDashboard() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
                           />
                           <input
+                            ref={chargeAmountRef}
                             type="number"
                             placeholder="Amount"
                             value={formAmount}
@@ -1255,8 +1399,12 @@ export function FinancialContestsDashboard() {
                               }
                               className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
                             >
-                              <option value="">No event</option>
-                              {trips.length > 0 && (
+                              <option value="">
+                                {formChargeType === "winnings"
+                                  ? "Select a contest…"
+                                  : "No event"}
+                              </option>
+                              {trips.length > 0 && formChargeType !== "winnings" && (
                                 <optgroup label="Golfapalooza">
                                   {trips.map((t) => (
                                     <option key={t.id} value={`trip:${t.id}`}>
@@ -1276,32 +1424,50 @@ export function FinancialContestsDashboard() {
                               )}
                             </select>
                           )}
-                          <div className="flex gap-3">
-                            <label className="flex items-center gap-1.5 text-sm text-gray-700">
-                              <input
-                                type="radio"
-                                name={`chargeType-${u.user_id}`}
-                                checked={formChargeType === "charge"}
-                                onChange={() => setFormChargeType("charge")}
-                                className="text-green-600 focus:ring-green-500"
-                              />
-                              Charge (they owe more)
-                            </label>
-                            <label className="flex items-center gap-1.5 text-sm text-gray-700">
-                              <input
-                                type="radio"
-                                name={`chargeType-${u.user_id}`}
-                                checked={formChargeType === "credit"}
-                                onChange={() => setFormChargeType("credit")}
-                                className="text-green-600 focus:ring-green-500"
-                              />
-                              Credit (they owe less)
-                            </label>
+                          <div className="grid grid-cols-3 gap-2">
+                            <ChargeTypePill
+                              label="Charge"
+                              sublabel="they owe more"
+                              selected={formChargeType === "charge"}
+                              selectedClass="bg-orange-600 text-white border-orange-600"
+                              onClick={() => setFormChargeType("charge")}
+                            />
+                            <ChargeTypePill
+                              label="Credit"
+                              sublabel="they owe less"
+                              selected={formChargeType === "credit"}
+                              selectedClass="bg-sky-600 text-white border-sky-600"
+                              onClick={() => setFormChargeType("credit")}
+                            />
+                            <ChargeTypePill
+                              label="Winnings"
+                              sublabel="contest payout"
+                              selected={formChargeType === "winnings"}
+                              selectedClass="bg-violet-600 text-white border-violet-600"
+                              onClick={() => {
+                                setFormChargeType("winnings");
+                                setFormDescription("Winnings");
+                                if (!formAttribution.startsWith("contest:")) {
+                                  setFormAttribution("");
+                                }
+                                chargeAmountRef.current?.focus();
+                              }}
+                            />
                           </div>
+                          {formChargeType === "winnings" &&
+                            !formAttribution.startsWith("contest:") && (
+                              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                Pick the contest this payout came from.
+                              </p>
+                            )}
                           <div className="flex gap-2">
                             <button
                               type="button"
-                              disabled={formSaving}
+                              disabled={
+                                formSaving ||
+                                (formChargeType === "winnings" &&
+                                  !formAttribution.startsWith("contest:"))
+                              }
                               onClick={() => handleSaveCharge(u.user_id)}
                               className="flex-1 py-2 bg-green-600 text-white rounded-xl text-sm font-semibold active:opacity-80 disabled:opacity-50"
                             >
@@ -1347,35 +1513,6 @@ export function FinancialContestsDashboard() {
                             <option>Check</option>
                             <option>Other</option>
                           </select>
-                          {(contests.length > 0 || trips.length > 0) && (
-                            <select
-                              value={formAttribution}
-                              onChange={(e) =>
-                                setFormAttribution(e.target.value)
-                              }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:outline-none"
-                            >
-                              <option value="">No event</option>
-                              {trips.length > 0 && (
-                                <optgroup label="Golfapalooza">
-                                  {trips.map((t) => (
-                                    <option key={t.id} value={`trip:${t.id}`}>
-                                      {t.trip_name}
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              )}
-                              {contests.length > 0 && (
-                                <optgroup label="Contests">
-                                  {contests.map((c) => (
-                                    <option key={c.id} value={`contest:${c.id}`}>
-                                      {c.name}
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              )}
-                            </select>
-                          )}
                           <input
                             type="text"
                             placeholder="Notes (optional)"
@@ -2018,32 +2155,14 @@ export function FinancialContestsDashboard() {
                                 <span className="text-xs text-gray-400">
                                   {new Date(tx.created_at).toLocaleDateString()}
                                 </span>
-                                <span
-                                  className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                    tx.type === "charge"
-                                      ? "bg-red-100 text-red-700"
-                                      : "bg-green-100 text-green-700"
-                                  }`}
-                                >
-                                  {tx.type}
-                                </span>
-                                <span
-                                  className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                    tx.source === "manual"
-                                      ? "bg-gray-100 text-gray-600"
-                                      : "bg-blue-100 text-blue-700"
-                                  }`}
-                                >
-                                  {tx.source === "manual" && tx.attributed_to
-                                    ? tx.attributed_to
-                                    : tx.source}
-                                </span>
+                                <SourceChip source={tx.source} />
+                                    <ResponsibleChip name={tx.attributed_to} />
                                 {tx.has_history && (
                                   <button
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      openTxHistory(tx.id, tx.description);
+                                      openTxHistory(tx);
                                     }}
                                     className="inline-flex p-0 text-amber-500 hover:text-amber-700 ml-0.5"
                                   >
@@ -2104,71 +2223,72 @@ export function FinancialContestsDashboard() {
               <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
               <h2 className="text-lg font-bold text-gray-900">Edit History</h2>
               <p className="text-sm text-gray-500 truncate">
-                {txHistoryModal.description}
+                {txHistoryModal.transaction.description}
               </p>
             </div>
             <div className="overflow-y-auto flex-1 px-6 py-4">
+              {(() => {
+                const current = txHistoryModal.transaction;
+                // The current state was created either at original creation
+                // time (no edits) or at the moment of the most recent edit.
+                const currentTimestamp =
+                  txHistory[0]?.changed_at ?? current.created_at;
+                return (
+                  <VersionCard
+                    amount={current.amount}
+                    type={current.type}
+                    source={current.source}
+                    description={current.description}
+                    method={current.method}
+                    notes={current.notes}
+                    author={current.attributed_to}
+                    timestamp={currentTimestamp}
+                    variant="current"
+                  />
+                );
+              })()}
               {txHistoryLoading ? (
-                <div className="flex justify-center py-4">
+                <div className="flex justify-center py-4 mt-3">
                   <div className="w-6 h-6 border-3 border-green-600 border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : txHistory.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-2">
-                  No history found.
+                <p className="text-sm text-gray-400 text-center py-2 mt-3">
+                  No prior versions.
                 </p>
               ) : (
-                <div className="space-y-3">
-                  {txHistory.map((h) => (
-                    <div
-                      key={h.id}
-                      className="bg-gray-50 rounded-xl p-3 text-sm"
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-medium text-gray-900">
-                          {h.changed_by_name || "Unknown"}
-                        </span>
-                        <span className="text-xs text-gray-400">
-                          {new Date(h.changed_at).toLocaleString()}
-                        </span>
-                      </div>
-                      <span
-                        className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium mb-1.5 ${
+                <div className="space-y-3 mt-3">
+                  {txHistory.map((h, i) => {
+                    // The author *and* timestamp of this previous state come
+                    // from the edit that produced it — i.e. the next-older
+                    // history entry — or the original creation for the oldest.
+                    const isOriginal = i === txHistory.length - 1;
+                    const author = isOriginal
+                      ? txHistoryModal.transaction.created_by_name
+                      : txHistory[i + 1].changed_by_name;
+                    const timestamp = isOriginal
+                      ? txHistoryModal.transaction.created_at
+                      : txHistory[i + 1].changed_at;
+                    return (
+                      <VersionCard
+                        key={h.id}
+                        amount={h.previous_amount || 0}
+                        type={h.previous_type === "charge" ? "charge" : "payment"}
+                        source={h.previous_source || "manual"}
+                        description={h.previous_description}
+                        method={h.previous_method}
+                        notes={h.previous_notes}
+                        author={author}
+                        timestamp={timestamp}
+                        variant={
                           h.action === "delete"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-amber-100 text-amber-700"
-                        }`}
-                      >
-                        {h.action === "delete" ? "Deleted" : "Edited"}
-                      </span>
-                      <div className="text-xs text-gray-500 space-y-0.5">
-                        <div>
-                          <span className="text-gray-400">Was: </span>
-                          <span
-                            className={
-                              h.previous_type === "charge"
-                                ? "text-red-600"
-                                : "text-green-600"
-                            }
-                          >
-                            {h.previous_type === "charge" ? "-" : "+"}
-                            {fmt(h.previous_amount || 0)}
-                          </span>
-                        </div>
-                        {h.previous_description && (
-                          <div className="truncate">
-                            <span className="text-gray-400">Desc: </span>
-                            {h.previous_description}
-                          </div>
-                        )}
-                        {h.previous_method && (
-                          <div>
-                            <span className="text-gray-400">Method: </span>
-                            {h.previous_method}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                            ? "deleted"
+                            : isOriginal
+                              ? "original"
+                              : "edited"
+                        }
+                      />
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -2201,38 +2321,63 @@ export function FinancialContestsDashboard() {
             {deleteContestImpact === null ? (
               <p className="text-xs text-gray-400">Checking impact…</p>
             ) : (
-              <div className="rounded-xl bg-gray-50 border border-gray-200 divide-y divide-gray-200 text-[13px]">
-                <ImpactRow
-                  label="Participants removed"
-                  count={deleteContestImpact.participant_count}
-                />
-                <ImpactRow
-                  label="Entry fee charges deleted"
-                  count={deleteContestImpact.entry_charges.count}
-                  total={deleteContestImpact.entry_charges.total}
-                />
-                <ImpactRow
-                  label="Other charges unlinked"
-                  count={deleteContestImpact.orphan_charges.count}
-                  total={deleteContestImpact.orphan_charges.total}
-                  warn
-                />
-                <ImpactRow
-                  label="Payments unlinked"
-                  count={deleteContestImpact.orphan_payments.count}
-                  total={deleteContestImpact.orphan_payments.total}
-                  warn
-                />
-              </div>
+              (() => {
+                const sources = deleteContestImpact.orphan_by_source;
+                const orphanRows = [
+                  { key: "winnings", label: "Winnings unlinked" },
+                  { key: "credit", label: "Credits unlinked" },
+                  { key: "expense", label: "Expenses unlinked" },
+                  { key: "adjustment", label: "Adjustments unlinked" },
+                  { key: "manual", label: "Legacy manual unlinked" },
+                ].filter((r) => (sources[r.key]?.count ?? 0) > 0);
+                const hasOrphans =
+                  orphanRows.length > 0 || deleteContestImpact.orphan_other.count > 0;
+                return (
+                  <>
+                    <div className="rounded-xl bg-gray-50 border border-gray-200 divide-y divide-gray-200 text-[13px]">
+                      <ImpactRow
+                        label="Participants removed"
+                        count={deleteContestImpact.participant_count}
+                      />
+                      <ImpactRow
+                        label="Entry fee charges deleted"
+                        count={deleteContestImpact.entry_charges.count}
+                        total={deleteContestImpact.entry_charges.total}
+                      />
+                      {orphanRows.map((r) => (
+                        <ImpactRow
+                          key={r.key}
+                          label={r.label}
+                          count={sources[r.key].count}
+                          total={sources[r.key].total}
+                          warn
+                        />
+                      ))}
+                      {deleteContestImpact.orphan_other.count > 0 && (
+                        <ImpactRow
+                          label="Other unlinked"
+                          count={deleteContestImpact.orphan_other.count}
+                          total={deleteContestImpact.orphan_other.total}
+                          warn
+                        />
+                      )}
+                      {!hasOrphans && (
+                        <div className="px-3 py-2 text-gray-400">
+                          No other linked transactions
+                        </div>
+                      )}
+                    </div>
+                    {hasOrphans && (
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        Unlinked transactions stay on user balances but lose
+                        their connection to this contest and can&rsquo;t be
+                        restored.
+                      </p>
+                    )}
+                  </>
+                );
+              })()
             )}
-            {deleteContestImpact &&
-              (deleteContestImpact.orphan_charges.count > 0 ||
-                deleteContestImpact.orphan_payments.count > 0) && (
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  Unlinked transactions stay on user balances but lose their
-                  connection to this contest and can&rsquo;t be restored.
-                </p>
-              )}
           </div>
         }
         confirmLabel="Delete"

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { subscribeToPush } from "@/lib/notifications/push-client";
 import { getTimezoneAbbreviation } from "@/lib/utils/timezone";
+import { FakeAdCarousel } from "@/components/FakeAdCarousel";
 
 interface TripData {
   trip_name: string;
@@ -886,6 +887,9 @@ export function HomeContent({
           </svg>
         </Link>
       )}
+
+      {/* Fake Ads (humor banners) */}
+      <FakeAdCarousel />
 
       {/* Quick Links */}
       <div className="mt-3">

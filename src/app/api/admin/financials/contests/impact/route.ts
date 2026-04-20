@@ -54,28 +54,33 @@ export async function GET(request: Request) {
 
     const txs = txRes.data || [];
     const entry = { count: 0, total: 0 };
-    const orphanCharges = { count: 0, total: 0 };
-    const orphanPayments = { count: 0, total: 0 };
+    const bySource: Record<string, { count: number; total: number }> = {};
+    const other = { count: 0, total: 0 };
 
     for (const t of txs) {
       const amt = Number(t.amount || 0);
       if (t.source === "contest_entry") {
         entry.count += 1;
         entry.total += amt;
-      } else if (t.type === "charge") {
-        orphanCharges.count += 1;
-        orphanCharges.total += amt;
-      } else if (t.type === "payment") {
-        orphanPayments.count += 1;
-        orphanPayments.total += amt;
+        continue;
+      }
+      const key = t.source || "manual";
+      // Only track the sources that can legitimately attribute to a contest
+      if (["winnings", "credit", "expense", "manual", "adjustment"].includes(key)) {
+        const bucket = bySource[key] ||= { count: 0, total: 0 };
+        bucket.count += 1;
+        bucket.total += amt;
+      } else {
+        other.count += 1;
+        other.total += amt;
       }
     }
 
     return NextResponse.json({
       participant_count: participantsRes.count || 0,
       entry_charges: entry,
-      orphan_charges: orphanCharges,
-      orphan_payments: orphanPayments,
+      orphan_by_source: bySource,
+      orphan_other: other,
     });
   } catch (error) {
     console.error("Financial contest impact error:", error);

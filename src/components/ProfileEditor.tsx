@@ -10,7 +10,7 @@ interface ProfileData {
   display_name: string;
   full_name: string | null;
   email: string | null;
-  phone: string;
+  phone: string | null;
   avatar_url: string | null;
   birthday: string | null;
   occupation: string | null;

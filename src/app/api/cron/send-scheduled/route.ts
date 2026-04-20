@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
         const { data: users } = await supabase
           .from("users")
           .select("id")
+          .eq("is_financial_only", false)
           .eq("is_active", true);
         userIds = (users || []).map((u) => u.id);
       } else if (announcement.audience_type === "event") {

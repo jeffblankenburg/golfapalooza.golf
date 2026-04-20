@@ -94,9 +94,19 @@ export async function PUT(request: Request) {
 
     const adminClient = createAdminClient();
 
+    // Get the authenticated user for audit trail
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { data: existing, error: fetchError } = await adminClient
       .from("financial_transactions")
-      .select("id, source")
+      .select("id, source, type, description, amount, method, notes, financial_contest_id, trip_id")
       .eq("id", id)
       .single();
 
@@ -135,6 +145,21 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
+    // Log history before applying the update
+    await adminClient.from("financial_transaction_history").insert({
+      transaction_id: id,
+      action: "edit",
+      changed_by: user.id,
+      previous_type: existing.type,
+      previous_source: existing.source,
+      previous_description: existing.description,
+      previous_amount: existing.amount,
+      previous_method: existing.method,
+      previous_notes: existing.notes,
+      previous_financial_contest_id: existing.financial_contest_id,
+      previous_trip_id: existing.trip_id,
+    });
+
     const { data: transaction, error } = await adminClient
       .from("financial_transactions")
       .update(updates)
@@ -168,12 +193,21 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const adminClient = createAdminClient();
 
     // Check that the transaction exists and is not option-derived
     const { data: existing, error: fetchError } = await adminClient
       .from("financial_transactions")
-      .select("id, source")
+      .select("id, source, type, description, amount, method, notes, financial_contest_id, trip_id")
       .eq("id", id)
       .single();
 
@@ -194,6 +228,21 @@ export async function DELETE(request: Request) {
         { status: 403 }
       );
     }
+
+    // Log history before deleting
+    await adminClient.from("financial_transaction_history").insert({
+      transaction_id: id,
+      action: "delete",
+      changed_by: user.id,
+      previous_type: existing.type,
+      previous_source: existing.source,
+      previous_description: existing.description,
+      previous_amount: existing.amount,
+      previous_method: existing.method,
+      previous_notes: existing.notes,
+      previous_financial_contest_id: existing.financial_contest_id,
+      previous_trip_id: existing.trip_id,
+    });
 
     const { error: deleteError } = await adminClient
       .from("financial_transactions")

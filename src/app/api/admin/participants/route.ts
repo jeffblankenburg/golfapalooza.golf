@@ -41,6 +41,7 @@ export async function GET(request: Request) {
     const { data: users, error: usersError } = await adminClient
       .from("users")
       .select("id, display_name, full_name, avatar_url")
+      .eq("is_financial_only", false)
       .order("display_name");
 
     if (usersError) {

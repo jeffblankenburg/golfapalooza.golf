@@ -22,6 +22,7 @@ export async function GET() {
   const { data, error } = await adminClient
     .from("users")
     .select("id, display_name, eight_bag_average, avg_scramble_score")
+    .eq("is_financial_only", false)
     .order("display_name");
 
   if (error) {

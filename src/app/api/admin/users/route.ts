@@ -61,13 +61,54 @@ export async function POST(request: Request) {
   try {
     const { phone, displayName, fullName, handicapIndex, eightBagAverage, avgScrambleScore } = await request.json();
 
-    if (!phone || !displayName) {
+    if (!displayName) {
       return NextResponse.json(
-        { error: "Phone and display name are required" },
+        { error: "Display name is required" },
         { status: 400 }
       );
     }
 
+    const adminClient = createAdminClient();
+    const isFinancialOnly = !phone || phone.trim() === "";
+
+    if (isFinancialOnly) {
+      // Financial-only user: create a disabled auth placeholder (no login possible)
+      const placeholderEmail = `financial-${crypto.randomUUID()}@nologin.local`;
+      const { data: authUser, error: authError } =
+        await adminClient.auth.admin.createUser({
+          email: placeholderEmail,
+          email_confirm: true,
+          user_metadata: { is_financial_only: true },
+        });
+
+      if (authError) {
+        console.error("Financial-only auth creation error:", authError);
+        return NextResponse.json({ error: authError.message }, { status: 500 });
+      }
+
+      const { error: profileError } = await adminClient.from("users").insert({
+        id: authUser.user.id,
+        phone: null,
+        display_name: displayName,
+        full_name: fullName || null,
+        is_financial_only: true,
+        eight_bag_average: eightBagAverage ? parseFloat(eightBagAverage) : null,
+        avg_scramble_score: avgScrambleScore ? parseFloat(avgScrambleScore) : null,
+      });
+
+      if (profileError) {
+        console.error("Financial-only user creation error:", profileError);
+        await adminClient.auth.admin.deleteUser(authUser.user.id);
+        return NextResponse.json(
+          { error: profileError.message || "Failed to create user profile" },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ success: true, userId: authUser.user.id });
+    }
+
+    // Regular user: requires valid phone + auth account
     const phone10 = phone.replace(/\D/g, "").slice(-10);
     if (phone10.length !== 10) {
       return NextResponse.json(
@@ -75,8 +116,6 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-
-    const adminClient = createAdminClient();
 
     // Create auth user
     const { data: authUser, error: authError } =
@@ -104,6 +143,7 @@ export async function POST(request: Request) {
       phone: phone10,
       display_name: displayName,
       full_name: fullName || null,
+      is_financial_only: false,
       eight_bag_average: eightBagAverage ? parseFloat(eightBagAverage) : null,
       avg_scramble_score: avgScrambleScore ? parseFloat(avgScrambleScore) : null,
     });
@@ -183,12 +223,14 @@ export async function PUT(request: Request) {
 
     const { data: currentUser } = await adminClient
       .from("users")
-      .select("phone")
+      .select("phone, is_financial_only")
       .eq("id", userId)
       .single();
 
     const phone10 = phone ? phone.replace(/\D/g, "").slice(-10) : null;
     const phoneChanged = phone10 && currentUser?.phone !== phone10;
+    const wasFinancialOnly = currentUser?.is_financial_only === true;
+    const becomingRegular = wasFinancialOnly && phone10;
 
     if (phoneChanged) {
       const { error: authError } = await adminClient.auth.admin.updateUserById(
@@ -208,6 +250,7 @@ export async function PUT(request: Request) {
     if (displayName !== undefined) updates.display_name = displayName;
     if (fullName !== undefined) updates.full_name = fullName;
     if (phoneChanged && phone10) updates.phone = phone10;
+    if (becomingRegular) updates.is_financial_only = false;
     if (isAdmin !== undefined) updates.is_admin = isAdmin;
     if (permissions !== undefined) updates.permissions = permissions;
     if (eightBagAverage !== undefined) updates.eight_bag_average = eightBagAverage === null || eightBagAverage === "" ? null : parseFloat(eightBagAverage);
@@ -242,6 +285,23 @@ export async function PUT(request: Request) {
         if (hcError) {
           return NextResponse.json({ error: hcError.message }, { status: 500 });
         }
+      }
+    }
+
+    // If transitioning from financial-only to regular, add to All Loozers chat
+    if (becomingRegular) {
+      const { data: loozersRoom } = await adminClient
+        .from("chat_rooms")
+        .select("id")
+        .eq("type", "group")
+        .eq("name", "All Loozers")
+        .single();
+
+      if (loozersRoom) {
+        await adminClient.from("chat_room_members").upsert(
+          { room_id: loozersRoom.id, user_id: userId },
+          { onConflict: "room_id,user_id" }
+        );
       }
     }
 

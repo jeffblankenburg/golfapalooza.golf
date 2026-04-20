@@ -22,6 +22,7 @@ export default async function InfoPage() {
   const { count: playerCount } = await supabase
     .from("users")
     .select("id", { count: "exact", head: true })
+    .eq("is_financial_only", false)
     .eq("is_active", true);
 
   let rsvpLikelihood: number | null = null;

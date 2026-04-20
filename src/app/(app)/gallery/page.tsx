@@ -33,6 +33,7 @@ export default async function GalleryServerPage() {
   const { data: users } = await queryClient
     .from("users")
     .select("id, display_name, avatar_url")
+    .eq("is_financial_only", false)
     .order("display_name");
 
   // Get distinct tagged user IDs (for filter)

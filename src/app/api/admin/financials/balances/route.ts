@@ -83,6 +83,7 @@ export async function GET() {
     const userAgg = new Map<string, { charges: number; payments: number }>();
     const contestBalances: Record<string, Record<string, number>> = {};
     const tripBalances: Record<string, Record<string, number>> = {};
+    const uncategorized: Record<string, number> = {};
 
     for (const t of transactions) {
       // Per-user lifetime totals
@@ -107,6 +108,12 @@ export async function GET() {
         tripBalances[t.user_id][t.trip_id] =
           (tripBalances[t.user_id][t.trip_id] || 0) + delta;
       }
+
+      // Per-user uncategorized balance (no trip, no contest)
+      if (!t.trip_id && !t.financial_contest_id) {
+        if (!uncategorized[t.user_id]) uncategorized[t.user_id] = 0;
+        uncategorized[t.user_id] += delta;
+      }
     }
 
     // Round balances
@@ -119,6 +126,9 @@ export async function GET() {
       for (const key of Object.keys(tripBalances[userId])) {
         tripBalances[userId][key] = Number(tripBalances[userId][key].toFixed(2));
       }
+    }
+    for (const userId of Object.keys(uncategorized)) {
+      uncategorized[userId] = Number(uncategorized[userId].toFixed(2));
     }
 
     // Build user list — all users, with their financial summaries
@@ -143,6 +153,7 @@ export async function GET() {
       trip_balances: tripBalances,
       contest_participants: contestParticipants,
       event_participants: eventParticipants,
+      uncategorized,
     });
   } catch (error) {
     console.error("Balances error:", error);

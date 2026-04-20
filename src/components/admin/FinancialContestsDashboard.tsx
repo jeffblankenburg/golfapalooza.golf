@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { ConfirmModal } from "./ConfirmModal";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -55,6 +55,9 @@ interface Transaction {
   trip_name: string | null;
   contest_name: string | null;
   financial_contest_id: string | null;
+  created_by_name: string | null;
+  attributed_to: string | null;
+  has_history: boolean;
 }
 
 type SortOption = "name" | "balance-desc" | "balance-asc";
@@ -68,6 +71,37 @@ const fmt = (n: number) =>
     minimumFractionDigits: n % 1 === 0 ? 0 : 2,
     maximumFractionDigits: 2,
   });
+
+function ImpactRow({
+  label,
+  count,
+  total,
+  warn = false,
+}: {
+  label: string;
+  count: number;
+  total?: number;
+  warn?: boolean;
+}) {
+  const muted = count === 0;
+  return (
+    <div className="flex items-center justify-between px-3 py-2">
+      <span className={muted ? "text-gray-400" : "text-gray-700"}>{label}</span>
+      <span
+        className={`tabular-nums font-medium ${
+          muted
+            ? "text-gray-400"
+            : warn
+              ? "text-amber-700"
+              : "text-gray-900"
+        }`}
+      >
+        {count}
+        {total !== undefined && count > 0 ? ` · ${fmt(total)}` : ""}
+      </span>
+    </div>
+  );
+}
 
 // ── Component ──────────────────────────────────────────────────────────
 
@@ -88,10 +122,41 @@ export function FinancialContestsDashboard() {
   const [ledger, setLedger] = useState<Transaction[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(false);
 
+  // Full ledger modal
+  const [fullLedgerModal, setFullLedgerModal] = useState<{
+    userId: string;
+    userName: string;
+  } | null>(null);
+  const [fullLedger, setFullLedger] = useState<Transaction[]>([]);
+  const [fullLedgerLoading, setFullLedgerLoading] = useState(false);
+  const [ledgerDateFrom, setLedgerDateFrom] = useState("");
+  const [ledgerDateTo, setLedgerDateTo] = useState("");
+  const [ledgerSearch, setLedgerSearch] = useState("");
+  const [ledgerSortDir, setLedgerSortDir] = useState<"asc" | "desc">("desc");
+
+  // Transaction history modal
+  interface HistoryEntry {
+    id: string;
+    action: string;
+    changed_at: string;
+    changed_by_name: string | null;
+    previous_type: string | null;
+    previous_description: string | null;
+    previous_amount: number | null;
+    previous_method: string | null;
+    previous_notes: string | null;
+  }
+  const [txHistoryModal, setTxHistoryModal] = useState<{
+    transactionId: string;
+    description: string;
+  } | null>(null);
+  const [txHistory, setTxHistory] = useState<HistoryEntry[]>([]);
+  const [txHistoryLoading, setTxHistoryLoading] = useState(false);
+
   // Transaction forms
   const [activeForm, setActiveForm] = useState<{
     userId: string;
-    kind: "payment" | "charge";
+    kind: "payment" | "charge" | "withdrawal";
   } | null>(null);
   const [formAmount, setFormAmount] = useState("");
   const [formMethod, setFormMethod] = useState("Venmo");
@@ -126,6 +191,12 @@ export function FinancialContestsDashboard() {
   const [contestEntryFee, setContestEntryFee] = useState("");
   const [contestSaving, setContestSaving] = useState(false);
   const [deleteContestConfirm, setDeleteContestConfirm] = useState<Contest | null>(null);
+  const [deleteContestImpact, setDeleteContestImpact] = useState<{
+    participant_count: number;
+    entry_charges: { count: number; total: number };
+    orphan_charges: { count: number; total: number };
+    orphan_payments: { count: number; total: number };
+  } | null>(null);
 
   // Participant management
   const [expandedContestId, setExpandedContestId] = useState<string | null>(null);
@@ -145,12 +216,49 @@ export function FinancialContestsDashboard() {
     if (data.users) setUsers(data.users);
   }, []);
 
+  const cutoffDate = (() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 13);
+    return d.toISOString();
+  })();
+
   const fetchLedger = useCallback(async (userId: string) => {
     setLedgerLoading(true);
     const res = await fetch(`/api/admin/financials/ledger?user_id=${userId}`);
     const data = await res.json();
     setLedger(data.transactions || []);
     setLedgerLoading(false);
+  }, []);
+
+  const openFullLedger = useCallback(
+    async (userId: string, userName: string) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - 13);
+      setLedgerDateFrom(d.toISOString().slice(0, 10));
+      setLedgerDateTo(new Date().toISOString().slice(0, 10));
+      setLedgerSearch("");
+      setLedgerSortDir("desc");
+      setFullLedgerModal({ userId, userName });
+      setFullLedgerLoading(true);
+      const res = await fetch(
+        `/api/admin/financials/ledger?user_id=${userId}`
+      );
+      const data = await res.json();
+      setFullLedger(data.transactions || []);
+      setFullLedgerLoading(false);
+    },
+    []
+  );
+
+  const openTxHistory = useCallback(async (transactionId: string, description: string) => {
+    setTxHistoryModal({ transactionId, description });
+    setTxHistoryLoading(true);
+    const res = await fetch(
+      `/api/admin/financials/transaction-history?transaction_id=${transactionId}`
+    );
+    const data = await res.json();
+    setTxHistory(data.history || []);
+    setTxHistoryLoading(false);
   }, []);
 
   const fetchParticipants = useCallback(async (contestId: string) => {
@@ -214,7 +322,7 @@ export function FinancialContestsDashboard() {
         user_id: userId,
         ...attr,
         type: "payment",
-        description: `Payment via ${formMethod}`,
+        description: `Deposit via ${formMethod}`,
         amount,
         method: formMethod,
         notes: formNotes || null,
@@ -239,6 +347,29 @@ export function FinancialContestsDashboard() {
         type: formChargeType === "charge" ? "charge" : "payment",
         description: formDescription.trim(),
         amount,
+      }),
+    });
+    setFormSaving(false);
+    resetForm();
+    await Promise.all([fetchData(), fetchLedger(userId)]);
+  };
+
+  const handleSaveWithdrawal = async (userId: string) => {
+    const amount = parseFloat(formAmount);
+    if (!amount || amount <= 0) return;
+    setFormSaving(true);
+    const attr = parseAttribution(formAttribution);
+    await fetch("/api/admin/financials/transactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: userId,
+        ...attr,
+        type: "charge",
+        description: `Withdrawal via ${formMethod}`,
+        amount,
+        method: formMethod,
+        notes: formNotes || null,
       }),
     });
     setFormSaving(false);
@@ -352,6 +483,7 @@ export function FinancialContestsDashboard() {
       body: JSON.stringify({ id }),
     });
     setDeleteContestConfirm(null);
+    setDeleteContestImpact(null);
     await fetchData();
   };
 
@@ -470,6 +602,26 @@ export function FinancialContestsDashboard() {
       if (sort === "balance-desc") return a.balance - b.balance;
       return b.balance - a.balance;
     });
+
+  // Filtered full ledger (memoized for reactivity)
+  const filteredFullLedger = useMemo(() => {
+    const fromDate = ledgerDateFrom ? ledgerDateFrom + "T00:00:00.000Z" : "";
+    const toDate = ledgerDateTo ? ledgerDateTo + "T23:59:59.999Z" : "";
+    const q = ledgerSearch.toLowerCase();
+
+    return fullLedger
+      .filter((tx) => {
+        if (fromDate && tx.created_at < fromDate) return false;
+        if (toDate && tx.created_at > toDate) return false;
+        if (q && !tx.description.toLowerCase().includes(q)) return false;
+        return true;
+      })
+      .sort((a, b) =>
+        ledgerSortDir === "desc"
+          ? b.created_at.localeCompare(a.created_at)
+          : a.created_at.localeCompare(b.created_at)
+      );
+  }, [fullLedger, ledgerDateFrom, ledgerDateTo, ledgerSearch, ledgerSortDir]);
 
   // ── Render ─────────────────────────────────────────────────────────
 
@@ -637,20 +789,47 @@ export function FinancialContestsDashboard() {
                 <div className="border-t border-gray-100">
                   {/* Ledger */}
                   <div className="px-4 py-3">
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Transactions
-                    </h4>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Recent Transactions
+                      </h4>
+                      {ledger.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openFullLedger(u.user_id, u.display_name)
+                          }
+                          className="text-xs text-green-700 font-medium active:opacity-70"
+                        >
+                          View full history
+                        </button>
+                      )}
+                    </div>
                     {ledgerLoading ? (
                       <div className="flex justify-center py-4">
                         <div className="w-6 h-6 border-3 border-green-600 border-t-transparent rounded-full animate-spin" />
                       </div>
-                    ) : ledger.length === 0 ? (
-                      <p className="text-sm text-gray-400 py-2">
-                        No transactions yet.
-                      </p>
+                    ) : ledger.filter((tx) => tx.created_at >= cutoffDate).length === 0 ? (
+                      <div>
+                        <p className="text-sm text-gray-400 py-2">
+                          No recent transactions.
+                        </p>
+                        {ledger.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openFullLedger(u.user_id, u.display_name)
+                            }
+                            className="text-xs text-green-700 font-medium active:opacity-70"
+                          >
+                            View older transactions
+                          </button>
+                        )}
+                      </div>
                     ) : (
-                      <div className="space-y-0 rounded-xl overflow-hidden border border-gray-100">
-                        {ledger.map((tx, i) => (
+                      <div className="max-h-64 overflow-y-auto rounded-xl border border-gray-100">
+                        <div className="space-y-0">
+                        {ledger.filter((tx) => tx.created_at >= cutoffDate).map((tx, i) => (
                           <div key={tx.id}>
                             {editingTx?.id === tx.id ? (
                               /* Inline Edit Form */
@@ -788,8 +967,24 @@ export function FinancialContestsDashboard() {
                                           : "bg-blue-100 text-blue-700"
                                       }`}
                                     >
-                                      {tx.source}
+                                      {tx.source === "manual" && tx.attributed_to
+                                        ? tx.attributed_to
+                                        : tx.source}
                                     </span>
+                                    {tx.has_history && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openTxHistory(tx.id, tx.description);
+                                        }}
+                                        className="inline-flex p-0 text-amber-500 hover:text-amber-700 ml-0.5"
+                                      >
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                      </button>
+                                    )}
                                     {tx.contest_name && (
                                       <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
                                         {tx.contest_name}
@@ -872,6 +1067,7 @@ export function FinancialContestsDashboard() {
                             )}
                           </div>
                         ))}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -892,9 +1088,12 @@ export function FinancialContestsDashboard() {
                             setFormNotes("");
                             setFormAttribution("");
                           }}
-                          className="flex-1 py-2 bg-green-600 text-white rounded-xl text-sm font-semibold active:opacity-80"
+                          className="flex-1 py-2 bg-green-600 text-white rounded-xl text-xs font-semibold active:opacity-80 flex items-center justify-center gap-1"
                         >
-                          Record Payment
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m0-16l-4 4m4-4l4 4" />
+                          </svg>
+                          Deposit
                         </button>
                         <button
                           type="button"
@@ -908,9 +1107,31 @@ export function FinancialContestsDashboard() {
                             setFormChargeType("charge");
                             setFormAttribution("");
                           }}
-                          className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm font-semibold active:bg-gray-50"
+                          className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-xs font-semibold active:bg-gray-50 flex items-center justify-center gap-1"
                         >
-                          Add Charge/Credit
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Charge
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveForm({
+                              userId: u.user_id,
+                              kind: "withdrawal",
+                            });
+                            setFormAmount("");
+                            setFormMethod("Venmo");
+                            setFormNotes("");
+                            setFormAttribution("");
+                          }}
+                          className="flex-1 py-2 border border-red-300 text-red-700 rounded-xl text-xs font-semibold active:bg-red-50 flex items-center justify-center gap-1"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20V4m0 16l-4-4m4 4l4-4" />
+                          </svg>
+                          Withdraw
                         </button>
                       </div>
                     )}
@@ -920,7 +1141,7 @@ export function FinancialContestsDashboard() {
                       activeForm.kind === "payment" && (
                         <div className="space-y-3 mt-2 p-3 bg-gray-50 rounded-xl">
                           <h5 className="text-sm font-semibold text-gray-700">
-                            Record Payment
+                            Deposit
                           </h5>
                           <input
                             type="number"
@@ -1005,7 +1226,7 @@ export function FinancialContestsDashboard() {
                       activeForm.kind === "charge" && (
                         <div className="space-y-3 mt-2 p-3 bg-gray-50 rounded-xl">
                           <h5 className="text-sm font-semibold text-gray-700">
-                            Add Charge/Credit
+                            Charge / Credit
                           </h5>
                           <input
                             type="text"
@@ -1083,6 +1304,91 @@ export function FinancialContestsDashboard() {
                               disabled={formSaving}
                               onClick={() => handleSaveCharge(u.user_id)}
                               className="flex-1 py-2 bg-green-600 text-white rounded-xl text-sm font-semibold active:opacity-80 disabled:opacity-50"
+                            >
+                              {formSaving ? "Saving..." : "Save"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={resetForm}
+                              className="flex-1 py-2 border border-gray-300 text-gray-600 rounded-xl text-sm font-semibold active:bg-gray-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                    {/* Withdrawal Form */}
+                    {activeForm?.userId === u.user_id &&
+                      activeForm.kind === "withdrawal" && (
+                        <div className="space-y-3 mt-2 p-3 bg-red-50 rounded-xl">
+                          <h5 className="text-sm font-semibold text-red-700">
+                            Record Withdrawal
+                          </h5>
+                          <input
+                            type="number"
+                            placeholder="Amount"
+                            value={formAmount}
+                            onChange={(e) => setFormAmount(e.target.value)}
+                            autoFocus
+                            min="0"
+                            step="0.01"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:outline-none"
+                          />
+                          <select
+                            value={formMethod}
+                            onChange={(e) => setFormMethod(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:outline-none"
+                          >
+                            <option>Cash</option>
+                            <option>G Credit</option>
+                            <option>Venmo</option>
+                            <option>Zelle</option>
+                            <option>Check</option>
+                            <option>Other</option>
+                          </select>
+                          {(contests.length > 0 || trips.length > 0) && (
+                            <select
+                              value={formAttribution}
+                              onChange={(e) =>
+                                setFormAttribution(e.target.value)
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:outline-none"
+                            >
+                              <option value="">No event</option>
+                              {trips.length > 0 && (
+                                <optgroup label="Golfapalooza">
+                                  {trips.map((t) => (
+                                    <option key={t.id} value={`trip:${t.id}`}>
+                                      {t.trip_name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                              {contests.length > 0 && (
+                                <optgroup label="Contests">
+                                  {contests.map((c) => (
+                                    <option key={c.id} value={`contest:${c.id}`}>
+                                      {c.name}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
+                            </select>
+                          )}
+                          <input
+                            type="text"
+                            placeholder="Notes (optional)"
+                            value={formNotes}
+                            onChange={(e) => setFormNotes(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-red-500 focus:outline-none"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              disabled={formSaving}
+                              onClick={() => handleSaveWithdrawal(u.user_id)}
+                              className="flex-1 py-2 bg-red-600 text-white rounded-xl text-sm font-semibold active:opacity-80 disabled:opacity-50"
                             >
                               {formSaving ? "Saving..." : "Save"}
                             </button>
@@ -1315,7 +1621,16 @@ export function FinancialContestsDashboard() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => setDeleteContestConfirm(c)}
+                              onClick={async () => {
+                                setDeleteContestConfirm(c);
+                                setDeleteContestImpact(null);
+                                const res = await fetch(
+                                  `/api/admin/financials/contests/impact?id=${c.id}`
+                                );
+                                if (res.ok) {
+                                  setDeleteContestImpact(await res.json());
+                                }
+                              }}
                               className="text-gray-400 hover:text-red-500 p-1"
                             >
                               <svg
@@ -1581,6 +1896,286 @@ export function FinancialContestsDashboard() {
         </div>
       )}
 
+      {/* Full Ledger Modal */}
+      {fullLedgerModal && (
+        <div className="fixed top-14 bottom-16 left-0 right-0 z-35 flex items-end justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setFullLedgerModal(null)}
+          />
+          <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up max-h-[85vh] flex flex-col">
+            <div className="px-6 pt-5 pb-3 border-b border-gray-100 shrink-0">
+              <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">
+                    {fullLedgerModal.userName}
+                  </h2>
+                  <p className="text-sm text-gray-500">Full Transaction History</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFullLedgerModal(null)}
+                  className="text-gray-400 hover:text-gray-600 p-1"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Filters */}
+              <div className="mt-3 space-y-2">
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="text-[10px] text-gray-500 uppercase">From</label>
+                    <input
+                      type="date"
+                      value={ledgerDateFrom}
+                      onChange={(e) => setLedgerDateFrom(e.target.value)}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-green-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[10px] text-gray-500 uppercase">To</label>
+                    <input
+                      type="date"
+                      value={ledgerDateTo}
+                      onChange={(e) => setLedgerDateTo(e.target.value)}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-green-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search descriptions..."
+                  value={ledgerSearch}
+                  onChange={(e) => setLedgerSearch(e.target.value)}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-green-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Scrollable transaction list */}
+            <div className="overflow-y-auto flex-1 px-6 py-4">
+              {fullLedgerLoading ? (
+                <div className="flex justify-center py-4">
+                  <div className="w-6 h-6 border-3 border-green-600 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : (() => {
+                const totalCharges = filteredFullLedger
+                  .filter((tx) => tx.type === "charge")
+                  .reduce((s, tx) => s + tx.amount, 0);
+                const totalPayments = filteredFullLedger
+                  .filter((tx) => tx.type === "payment")
+                  .reduce((s, tx) => s + tx.amount, 0);
+                const netBalance = totalPayments - totalCharges;
+
+                return (
+                  <>
+                    {/* Summary */}
+                    <div className="flex gap-2 mb-3">
+                      <div className="flex-1 bg-red-50 rounded-xl px-2 py-1.5 text-center">
+                        <div className="text-xs font-bold text-red-700">{fmt(totalCharges)}</div>
+                        <div className="text-[9px] text-gray-500 uppercase">Charges</div>
+                      </div>
+                      <div className="flex-1 bg-green-50 rounded-xl px-2 py-1.5 text-center">
+                        <div className="text-xs font-bold text-green-700">{fmt(totalPayments)}</div>
+                        <div className="text-[9px] text-gray-500 uppercase">Payments</div>
+                      </div>
+                      <div className="flex-1 bg-gray-50 rounded-xl px-2 py-1.5 text-center">
+                        <div className={`text-xs font-bold ${netBalance < 0 ? "text-red-600" : netBalance > 0 ? "text-green-600" : "text-gray-500"}`}>
+                          {fmt(netBalance)}
+                        </div>
+                        <div className="text-[9px] text-gray-500 uppercase">Balance</div>
+                      </div>
+                    </div>
+
+                    {/* Sort toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setLedgerSortDir((d) => d === "desc" ? "asc" : "desc")}
+                      className="text-[10px] text-gray-500 mb-2 flex items-center gap-1"
+                    >
+                      Date {ledgerSortDir === "desc" ? "▼ Newest" : "▲ Oldest"} first
+                    </button>
+
+                    {filteredFullLedger.length === 0 ? (
+                      <p className="text-sm text-gray-400 text-center py-4">
+                        No transactions match your filters.
+                      </p>
+                    ) : (
+                      <div className="space-y-0 rounded-xl overflow-hidden border border-gray-100">
+                        {filteredFullLedger.map((tx, i) => (
+                          <div
+                            key={tx.id}
+                            className={`flex items-center justify-between px-3 py-2 text-sm ${
+                              i % 2 === 0 ? "bg-gray-50" : "bg-white"
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-xs text-gray-400">
+                                  {new Date(tx.created_at).toLocaleDateString()}
+                                </span>
+                                <span
+                                  className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                    tx.type === "charge"
+                                      ? "bg-red-100 text-red-700"
+                                      : "bg-green-100 text-green-700"
+                                  }`}
+                                >
+                                  {tx.type}
+                                </span>
+                                <span
+                                  className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                    tx.source === "manual"
+                                      ? "bg-gray-100 text-gray-600"
+                                      : "bg-blue-100 text-blue-700"
+                                  }`}
+                                >
+                                  {tx.source === "manual" && tx.attributed_to
+                                    ? tx.attributed_to
+                                    : tx.source}
+                                </span>
+                                {tx.has_history && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openTxHistory(tx.id, tx.description);
+                                    }}
+                                    className="inline-flex p-0 text-amber-500 hover:text-amber-700 ml-0.5"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                  </button>
+                                )}
+                                {tx.contest_name && (
+                                  <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
+                                    {tx.contest_name}
+                                  </span>
+                                )}
+                                {tx.trip_name && (
+                                  <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">
+                                    {tx.trip_name}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-gray-700 truncate">
+                                {tx.description}
+                              </div>
+                            </div>
+                            <span
+                              className={`font-semibold whitespace-nowrap ml-2 ${
+                                tx.type === "charge"
+                                  ? "text-red-600"
+                                  : "text-green-600"
+                              }`}
+                            >
+                              {tx.type === "charge" ? "-" : "+"}
+                              {fmt(tx.amount)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-[10px] text-gray-400 text-center mt-2">
+                      {filteredFullLedger.length} transaction{filteredFullLedger.length !== 1 ? "s" : ""}
+                    </p>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transaction History Modal */}
+      {txHistoryModal && (
+        <div className="fixed top-14 bottom-16 left-0 right-0 z-40 flex items-end justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setTxHistoryModal(null)}
+          />
+          <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up max-h-[60vh] flex flex-col">
+            <div className="px-6 pt-5 pb-3 border-b border-gray-100 shrink-0">
+              <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+              <h2 className="text-lg font-bold text-gray-900">Edit History</h2>
+              <p className="text-sm text-gray-500 truncate">
+                {txHistoryModal.description}
+              </p>
+            </div>
+            <div className="overflow-y-auto flex-1 px-6 py-4">
+              {txHistoryLoading ? (
+                <div className="flex justify-center py-4">
+                  <div className="w-6 h-6 border-3 border-green-600 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : txHistory.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-2">
+                  No history found.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {txHistory.map((h) => (
+                    <div
+                      key={h.id}
+                      className="bg-gray-50 rounded-xl p-3 text-sm"
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-medium text-gray-900">
+                          {h.changed_by_name || "Unknown"}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {new Date(h.changed_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <span
+                        className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium mb-1.5 ${
+                          h.action === "delete"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        {h.action === "delete" ? "Deleted" : "Edited"}
+                      </span>
+                      <div className="text-xs text-gray-500 space-y-0.5">
+                        <div>
+                          <span className="text-gray-400">Was: </span>
+                          <span
+                            className={
+                              h.previous_type === "charge"
+                                ? "text-red-600"
+                                : "text-green-600"
+                            }
+                          >
+                            {h.previous_type === "charge" ? "-" : "+"}
+                            {fmt(h.previous_amount || 0)}
+                          </span>
+                        </div>
+                        {h.previous_description && (
+                          <div className="truncate">
+                            <span className="text-gray-400">Desc: </span>
+                            {h.previous_description}
+                          </div>
+                        )}
+                        {h.previous_method && (
+                          <div>
+                            <span className="text-gray-400">Method: </span>
+                            {h.previous_method}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Transaction Confirmation */}
       <ConfirmModal
         open={!!deleteConfirm}
@@ -1598,14 +2193,58 @@ export function FinancialContestsDashboard() {
       <ConfirmModal
         open={!!deleteContestConfirm}
         title="Delete Contest"
-        message={`Are you sure you want to delete "${deleteContestConfirm?.name || ""}"? Transactions linked to this contest will be kept but unlinked.`}
+        message={
+          <div className="space-y-3">
+            <p>
+              Delete <span className="font-semibold text-gray-900">&ldquo;{deleteContestConfirm?.name || ""}&rdquo;</span>?
+            </p>
+            {deleteContestImpact === null ? (
+              <p className="text-xs text-gray-400">Checking impact…</p>
+            ) : (
+              <div className="rounded-xl bg-gray-50 border border-gray-200 divide-y divide-gray-200 text-[13px]">
+                <ImpactRow
+                  label="Participants removed"
+                  count={deleteContestImpact.participant_count}
+                />
+                <ImpactRow
+                  label="Entry fee charges deleted"
+                  count={deleteContestImpact.entry_charges.count}
+                  total={deleteContestImpact.entry_charges.total}
+                />
+                <ImpactRow
+                  label="Other charges unlinked"
+                  count={deleteContestImpact.orphan_charges.count}
+                  total={deleteContestImpact.orphan_charges.total}
+                  warn
+                />
+                <ImpactRow
+                  label="Payments unlinked"
+                  count={deleteContestImpact.orphan_payments.count}
+                  total={deleteContestImpact.orphan_payments.total}
+                  warn
+                />
+              </div>
+            )}
+            {deleteContestImpact &&
+              (deleteContestImpact.orphan_charges.count > 0 ||
+                deleteContestImpact.orphan_payments.count > 0) && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  Unlinked transactions stay on user balances but lose their
+                  connection to this contest and can&rsquo;t be restored.
+                </p>
+              )}
+          </div>
+        }
         confirmLabel="Delete"
         destructive
         onConfirm={() => {
           if (deleteContestConfirm)
             handleDeleteContest(deleteContestConfirm.id);
         }}
-        onCancel={() => setDeleteContestConfirm(null)}
+        onCancel={() => {
+          setDeleteContestConfirm(null);
+          setDeleteContestImpact(null);
+        }}
       />
     </div>
   );

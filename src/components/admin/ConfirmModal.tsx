@@ -1,9 +1,11 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 interface ConfirmModalProps {
   open: boolean;
   title: string;
-  message: string;
+  message: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string | null;
   destructive?: boolean;
@@ -31,8 +33,8 @@ export function ConfirmModal({
           <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-900">{title}</h2>
         </div>
-        <div className="px-6 py-4">
-          <p className="text-sm text-gray-600">{message}</p>
+        <div className="px-6 py-4 text-sm text-gray-600">
+          {typeof message === "string" ? <p>{message}</p> : message}
         </div>
         <div className="px-6 py-4 border-t border-gray-100 flex gap-2">
           <button

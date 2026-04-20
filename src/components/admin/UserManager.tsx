@@ -6,12 +6,13 @@ import { ConfirmModal } from "@/components/admin/ConfirmModal";
 
 interface User {
   id: string;
-  phone: string;
+  phone: string | null;
   display_name: string;
   full_name: string | null;
   avatar_url: string | null;
   is_admin: boolean;
   is_active: boolean;
+  is_financial_only: boolean;
   permissions: Record<string, boolean> | null;
   handicap_index: number | null;
   eight_bag_average: number | null;
@@ -19,7 +20,8 @@ interface User {
   created_at: string;
 }
 
-function formatPhone(phone: string): string {
+function formatPhone(phone: string | null): string {
+  if (!phone) return "";
   const digits = phone.replace(/\D/g, "");
   if (digits.length !== 10) return phone;
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
@@ -27,6 +29,7 @@ function formatPhone(phone: string): string {
 
 export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () => void }>; onCountChange?: (count: number) => void }) {
   const [users, setUsers] = useState<User[]>([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -132,7 +135,7 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
   const openEdit = (user: User) => {
     setEditingUser(user);
     setFormData({
-      phone: formatPhone(user.phone),
+      phone: user.phone ? formatPhone(user.phone) : "",
       displayName: user.display_name,
       fullName: user.full_name || "",
       handicapIndex: user.handicap_index !== null ? String(user.handicap_index) : "",
@@ -199,9 +202,31 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
         </div>
       )}
 
+      {/* Search */}
+      <div className="mb-3">
+        <input
+          type="text"
+          placeholder="Search by name or phone..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
+        />
+      </div>
+
       {/* User list */}
       <div className="space-y-2">
-        {users.map((user) => (
+        {users
+          .filter((u) => {
+            if (!search) return true;
+            const q = search.toLowerCase();
+            const digits = q.replace(/\D/g, "");
+            return (
+              u.display_name.toLowerCase().includes(q) ||
+              (u.full_name || "").toLowerCase().includes(q) ||
+              (digits.length > 0 && (u.phone || "").includes(digits))
+            );
+          })
+          .map((user) => (
           <button
             key={user.id}
             onClick={() => openEdit(user)}
@@ -225,23 +250,30 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                 {user.display_name}
               </p>
               <p className="text-xs text-gray-400 truncate">
-                {formatPhone(user.phone)}
+                {user.phone ? formatPhone(user.phone) : "No phone"}
               </p>
             </div>
+            {user.is_financial_only && (
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 bg-amber-50 text-amber-700">
+                $
+              </span>
+            )}
             {user.handicap_index !== null && (
               <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 bg-blue-50 text-blue-700">
                 {user.handicap_index}
               </span>
             )}
-            <span
-              className={`px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 ${
-                user.is_admin
-                  ? "bg-green-100 text-green-700"
-                  : "bg-gray-100 text-gray-500"
-              }`}
-            >
-              {user.is_admin ? "Admin" : "User"}
-            </span>
+            {!user.is_financial_only && (
+              <span
+                className={`px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 ${
+                  user.is_admin
+                    ? "bg-green-100 text-green-700"
+                    : "bg-gray-100 text-gray-500"
+                }`}
+              >
+                {user.is_admin ? "Admin" : "User"}
+              </span>
+            )}
             <svg className="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
@@ -289,6 +321,7 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
                     Phone Number
+                    <span className="text-gray-400 font-normal ml-1">(leave blank for financial-only)</span>
                   </label>
                   <input
                     type="tel"
@@ -296,7 +329,6 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                     onChange={handlePhoneChange}
                     placeholder="(555) 123-4567"
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
-                    required
                   />
                 </div>
                 <div>

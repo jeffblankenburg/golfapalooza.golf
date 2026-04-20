@@ -15,6 +15,7 @@ export default async function SimulatorPage() {
     supabase
       .from("users")
       .select("id, display_name")
+      .eq("is_financial_only", false)
       .eq("is_active", true)
       .order("display_name"),
     trip

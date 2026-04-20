@@ -25,6 +25,7 @@ export async function GET() {
     adminClient
       .from("users")
       .select("id, display_name, avatar_url")
+      .eq("is_financial_only", false)
       .order("display_name"),
     adminClient
       .from("loozer_bios")

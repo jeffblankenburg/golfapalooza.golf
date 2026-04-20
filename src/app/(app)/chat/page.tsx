@@ -11,6 +11,7 @@ export default async function ChatPage() {
   const { data: allUsers } = await supabase
     .from("users")
     .select("id, display_name, avatar_url")
+    .eq("is_financial_only", false)
     .eq("is_active", true)
     .neq("id", effectiveUserId)
     .order("display_name");

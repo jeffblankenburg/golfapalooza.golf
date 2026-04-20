@@ -13,6 +13,7 @@ export async function GET() {
   const { data: users, error } = await supabase
     .from("users")
     .select("id, display_name, full_name")
+    .eq("is_financial_only", false)
     .order("display_name");
 
   if (error) {

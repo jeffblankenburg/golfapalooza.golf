@@ -102,7 +102,11 @@ export function ChatRoom({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messageId: lastMsg.id }),
-      }).catch(() => {});
+      })
+        .then(() => {
+          window.dispatchEvent(new CustomEvent("chat-read", { detail: { roomId } }));
+        })
+        .catch(() => {});
     }
   }, [roomId, messages]);
 
@@ -122,27 +126,29 @@ export function ChatRoom({
           filter: `room_id=eq.${roomId}`,
         },
         async (payload) => {
-          // Skip if we already have this message (optimistic send)
-          const alreadyExists = (prev: Message[]) =>
-            prev.some((m) => m.id === payload.new.id);
-
-          // Fetch the full message with sender info
-          const res = await fetch(
-            `/api/chat/rooms/${roomId}/messages?limit=1`
-          );
+          // Fetch a small window of recent messages and merge by id.
+          // A limit=1 check is fragile: if two messages land in quick
+          // succession, the fetch can return a different one than the
+          // INSERT we're reacting to, and the new message gets dropped.
+          const res = await fetch(`/api/chat/rooms/${roomId}/messages?limit=10`);
           const data = await res.json();
-          if (data.messages?.[0]?.id === payload.new.id) {
-            const fullMessage = data.messages[0];
-            setMessages((prev) => {
-              if (alreadyExists(prev)) {
-                // Replace optimistic version with full server data
-                return prev.map((m) =>
-                  m.id === fullMessage.id ? fullMessage : m
-                );
-              }
-              return [...prev, fullMessage];
-            });
-            // Auto-scroll if near bottom
+          const fetched = ((data.messages || []) as Message[]).slice().reverse();
+          if (fetched.length === 0) return;
+
+          let didAddNew = false;
+          setMessages((prev) => {
+            const byId = new Map(prev.map((m) => [m.id, m]));
+            for (const m of fetched) {
+              if (!byId.has(m.id)) didAddNew = true;
+              byId.set(m.id, m);
+            }
+            return Array.from(byId.values()).sort(
+              (a, b) =>
+                new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+          });
+
+          if (didAddNew) {
             const container = scrollContainerRef.current;
             if (container) {
               const isNearBottom =
@@ -150,7 +156,8 @@ export function ChatRoom({
                   container.scrollTop -
                   container.clientHeight <
                 150;
-              shouldScrollRef.current = isNearBottom || payload.new.sender_id === currentUserId;
+              shouldScrollRef.current =
+                isNearBottom || payload.new.sender_id === currentUserId;
             }
             setTimeout(scrollToBottom, 50);
           }

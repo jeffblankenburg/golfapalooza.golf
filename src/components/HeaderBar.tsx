@@ -160,8 +160,21 @@ export function HeaderBar({
       )
       .subscribe();
 
+    // Same-tab signal: ChatRoom fires "chat-read" right after it marks a room read.
+    // Bypasses realtime roundtrip + debounce so the badge updates deterministically.
+    const handleChatRead = () => refetchChatCount();
+    window.addEventListener("chat-read", handleChatRead);
+
+    // Catch reads from other tabs/devices when this tab regains focus.
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") refetchChatCount();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
     return () => {
       if (chatRefetchTimer) clearTimeout(chatRefetchTimer);
+      window.removeEventListener("chat-read", handleChatRead);
+      document.removeEventListener("visibilitychange", handleVisibility);
       supabase.removeChannel(channel);
       supabase.removeChannel(chatChannel);
     };

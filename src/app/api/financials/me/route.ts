@@ -31,7 +31,7 @@ export async function GET() {
     const { data: transactions, error } = await adminClient
       .from("financial_transactions")
       .select(
-        "id, trip_id, type, source, description, amount, method, notes, created_at, trip:trip_settings!financial_transactions_trip_id_fkey(trip_name, trip_year)"
+        "id, trip_id, financial_contest_id, type, source, description, amount, method, notes, created_at, trip:trip_settings!financial_transactions_trip_id_fkey(trip_name, trip_year), contest:financial_contests!financial_transactions_financial_contest_id_fkey(name)"
       )
       .eq("user_id", effectiveUserId)
       .order("created_at", { ascending: false });
@@ -45,11 +45,14 @@ export async function GET() {
         trip_name: string;
         trip_year: number;
       } | null;
+      const contest = t.contest as unknown as { name: string } | null;
       return {
         id: t.id,
         trip_id: t.trip_id,
         trip_name: trip?.trip_name ?? null,
         trip_year: trip?.trip_year ?? null,
+        financial_contest_id: t.financial_contest_id,
+        contest_name: contest?.name ?? null,
         type: t.type,
         source: t.source,
         description: t.description,

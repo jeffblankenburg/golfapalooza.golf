@@ -1,15 +1,28 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
+
+type TransactionSource =
+  | "option"
+  | "manual"
+  | "adjustment"
+  | "contest_entry"
+  | "deposit"
+  | "withdrawal"
+  | "winnings"
+  | "credit"
+  | "expense";
 
 interface Transaction {
   id: string;
   trip_id: string | null;
   trip_name: string | null;
   trip_year: number | null;
+  financial_contest_id: string | null;
+  contest_name: string | null;
   type: "charge" | "payment";
-  source: "option" | "manual";
+  source: TransactionSource;
   description: string;
   amount: number;
   method: string | null;
@@ -25,6 +38,33 @@ interface FinancialData {
   };
   transactions: Transaction[];
 }
+
+// Category label + color for each source. `option` intentionally omitted — the
+// description ("Breakfast", "Green fees", etc.) already tells you what it is.
+// `manual` is also omitted: legacy `manual` payments are treated as deposits
+// via effectiveSource() below; manual charges render without a pill.
+const CATEGORY: Partial<Record<TransactionSource, { label: string; className: string }>> = {
+  deposit:        { label: "Deposit",    className: "bg-green-100 text-green-800" },
+  withdrawal:     { label: "Withdrawal", className: "bg-rose-100 text-rose-800" },
+  winnings:       { label: "Winnings",   className: "bg-emerald-100 text-emerald-800" },
+  credit:         { label: "Credit",     className: "bg-sky-100 text-sky-800" },
+  expense:        { label: "Expense",    className: "bg-amber-100 text-amber-800" },
+  contest_entry:  { label: "Entry",      className: "bg-violet-100 text-violet-800" },
+  adjustment:     { label: "Adjustment", className: "bg-gray-100 text-gray-700" },
+};
+
+function effectiveSource(t: Transaction): TransactionSource {
+  if (t.source === "manual" && t.type === "payment") return "deposit";
+  return t.source;
+}
+
+const DATE_RANGES = [
+  { value: "all", label: "All time" },
+  { value: "30d", label: "Last 30 days" },
+  { value: "90d", label: "Last 90 days" },
+  { value: "ytd", label: "This year" },
+] as const;
+type DateRangeValue = (typeof DATE_RANGES)[number]["value"];
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -42,12 +82,34 @@ function formatCurrency(amount: number): string {
   }).format(Math.abs(amount));
 }
 
+function startOfRange(range: DateRangeValue): Date | null {
+  const now = new Date();
+  if (range === "all") return null;
+  if (range === "30d") {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 30);
+    return d;
+  }
+  if (range === "90d") {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 90);
+    return d;
+  }
+  if (range === "ytd") return new Date(now.getFullYear(), 0, 1);
+  return null;
+}
+
 export default function MyFinancials({ userId }: { userId: string }) {
   void userId;
   const [data, setData] = useState<FinancialData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sheikerAvatar, setSheikerAvatar] = useState<string | null>(null);
+
+  // Filter state
+  const [search, setSearch] = useState("");
+  const [dateRange, setDateRange] = useState<DateRangeValue>("all");
+  const [activeSources, setActiveSources] = useState<Set<TransactionSource>>(new Set());
 
   const fetchData = useCallback(async () => {
     try {
@@ -77,6 +139,51 @@ export default function MyFinancials({ userId }: { userId: string }) {
     fetchData();
   }, [fetchData]);
 
+  // Sources actually present in the user's transactions — only show pills for these
+  const availableSources = useMemo<TransactionSource[]>(() => {
+    if (!data) return [];
+    const seen = new Set<TransactionSource>();
+    for (const t of data.transactions) {
+      const src = effectiveSource(t);
+      if (CATEGORY[src]) seen.add(src);
+    }
+    // Preserve the display order defined in CATEGORY
+    return (Object.keys(CATEGORY) as TransactionSource[]).filter((s) => seen.has(s));
+  }, [data]);
+
+  // Filter transactions against all three filter controls
+  const filtered = useMemo(() => {
+    if (!data) return [];
+    const rangeStart = startOfRange(dateRange);
+    const searchLower = search.trim().toLowerCase();
+    return data.transactions.filter((t) => {
+      if (rangeStart && new Date(t.created_at) < rangeStart) return false;
+      if (activeSources.size > 0 && !activeSources.has(effectiveSource(t))) return false;
+      if (searchLower) {
+        const hay = `${t.description} ${t.notes ?? ""}`.toLowerCase();
+        if (!hay.includes(searchLower)) return false;
+      }
+      return true;
+    });
+  }, [data, dateRange, search, activeSources]);
+
+  const toggleSource = (source: TransactionSource) => {
+    setActiveSources((prev) => {
+      const next = new Set(prev);
+      if (next.has(source)) next.delete(source);
+      else next.add(source);
+      return next;
+    });
+  };
+
+  const clearFilters = () => {
+    setSearch("");
+    setDateRange("all");
+    setActiveSources(new Set());
+  };
+
+  const filtersActive = search !== "" || dateRange !== "all" || activeSources.size > 0;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -101,27 +208,8 @@ export default function MyFinancials({ userId }: { userId: string }) {
     );
   }
 
-  const { balance, transactions } = data;
+  const { balance } = data;
   const isNegative = balance.balance < 0;
-
-  // Group transactions by trip
-  const grouped = new Map<string, { name: string; year: number | null; items: Transaction[] }>();
-  for (const t of transactions) {
-    const key = t.trip_id ?? "_none";
-    if (!grouped.has(key)) {
-      grouped.set(key, {
-        name: t.trip_name ?? "Other",
-        year: t.trip_year,
-        items: [],
-      });
-    }
-    grouped.get(key)!.items.push(t);
-  }
-
-  // Sort groups by year descending
-  const sortedGroups = Array.from(grouped.values()).sort(
-    (a, b) => (b.year ?? 0) - (a.year ?? 0)
-  );
 
   return (
     <div className="space-y-6">
@@ -137,10 +225,6 @@ export default function MyFinancials({ userId }: { userId: string }) {
         >
           {isNegative ? "-" : ""}
           {formatCurrency(balance.balance)}
-        </p>
-        <p className="text-xs text-gray-400 mt-2">
-          Total charges: {formatCurrency(balance.total_charges)} | Total paid:{" "}
-          {formatCurrency(balance.total_payments)}
         </p>
       </div>
 
@@ -181,40 +265,112 @@ export default function MyFinancials({ userId }: { userId: string }) {
         );
       })()}
 
-      {/* Transactions by Trip */}
-      {sortedGroups.map((group) => (
-        <div key={`${group.name}-${group.year}`}>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 px-1">
-            {group.name} {group.year ?? ""}
-          </h3>
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-4">
-            {group.items.map((t) => (
+      {/* Filters */}
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <div className="flex-1 relative">
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z" />
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search transactions"
+              className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
+            />
+          </div>
+          <select
+            value={dateRange}
+            onChange={(e) => setDateRange(e.target.value as DateRangeValue)}
+            className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
+          >
+            {DATE_RANGES.map((r) => (
+              <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {availableSources.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            {availableSources.map((src) => {
+              const cat = CATEGORY[src]!;
+              const active = activeSources.has(src);
+              return (
+                <button
+                  key={src}
+                  onClick={() => toggleSource(src)}
+                  className={`flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
+                    active
+                      ? cat.className
+                      : "bg-white text-gray-400 border border-gray-200"
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              );
+            })}
+            {filtersActive && (
+              <button
+                onClick={clearFilters}
+                className="flex-shrink-0 px-2.5 py-1 text-xs font-medium text-gray-500 underline underline-offset-2"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Transactions */}
+      {filtered.length === 0 ? (
+        <div className="text-center py-8 text-sm text-gray-400">
+          No transactions match your filters.
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-4">
+          {filtered.map((t) => {
+            const cat = CATEGORY[effectiveSource(t)];
+            return (
               <div
                 key={t.id}
                 className="flex items-center gap-3 py-3 border-b border-gray-100 last:border-b-0"
               >
-                {/* Description + date */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <p className="text-sm font-medium text-gray-900 truncate">
                       {t.description}
                     </p>
-                    <span
-                      className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                        t.source === "option"
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-gray-100 text-gray-600"
-                      }`}
-                    >
-                      {t.source === "option" ? "Auto" : "Manual"}
-                    </span>
+                    {cat && (
+                      <span
+                        className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${cat.className}`}
+                      >
+                        {cat.label}
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {formatDate(t.created_at)}
-                  </p>
+                  <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                    <p className="text-xs text-gray-400">
+                      {formatDate(t.created_at)}
+                    </p>
+                    {t.contest_name && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 bg-purple-100 text-purple-700">
+                        {t.contest_name}
+                      </span>
+                    )}
+                    {t.trip_name && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 bg-amber-100 text-amber-800">
+                        {t.trip_name}{t.trip_year ? ` ${t.trip_year}` : ""}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                {/* Amount */}
                 <p
                   className={`text-sm font-semibold flex-shrink-0 ${
                     t.type === "charge" ? "text-red-600" : "text-green-600"
@@ -224,10 +380,10 @@ export default function MyFinancials({ userId }: { userId: string }) {
                   {formatCurrency(t.amount)}
                 </p>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
-      ))}
+      )}
     </div>
   );
 }

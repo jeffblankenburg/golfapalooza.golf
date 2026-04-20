@@ -36,6 +36,7 @@ function formatTotalInches(totalInches: number): string {
 
 export function HundredFeetManager({ tripId }: { tripId: string }) {
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [enrolledIds, setEnrolledIds] = useState<Set<string>>(new Set());
   const [contestId, setContestId] = useState<string | null>(null);
   const [scores, setScores] = useState<Record<string, Score>>({});
   const [scrambleDayNumbers, setScrambleDayNumbers] = useState<number[]>([]);
@@ -137,6 +138,7 @@ export function HundredFeetManager({ tripId }: { tripId: string }) {
     const data = await res.json();
 
     setParticipants(data.participants || []);
+    setEnrolledIds(new Set<string>(data.contest_participant_ids || []));
     setContestId(data.contest_id || null);
 
     const scoreMap: Record<string, Score> = {};
@@ -219,9 +221,11 @@ export function HundredFeetManager({ tripId }: { tripId: string }) {
     scheduleSave();
   };
 
+  const activeParticipants = participants.filter((p) => enrolledIds.has(p.id));
+
   const fillDay = (day: number) => {
     const newScores: Record<string, Score> = { ...scores };
-    for (const p of participants) {
+    for (const p of activeParticipants) {
       const key = scoreKey(p.id, day);
       if (newScores[key]) continue;
       const score: Score = { user_id: p.id, day_number: day, feet: 100, inches: 0 };
@@ -241,13 +245,13 @@ export function HundredFeetManager({ tripId }: { tripId: string }) {
       // Remove local scores for this day
       setScores((prev) => {
         const next = { ...prev };
-        for (const p of participants) {
+        for (const p of activeParticipants) {
           delete next[scoreKey(p.id, day)];
         }
         return next;
       });
       // Clear any pending dirty entries for this day
-      for (const p of participants) {
+      for (const p of activeParticipants) {
         dirtyRef.current.delete(scoreKey(p.id, day));
       }
 
@@ -260,11 +264,12 @@ export function HundredFeetManager({ tripId }: { tripId: string }) {
   };
 
   const isDayFilled = (day: number) => {
-    return participants.every((p) => !!scores[scoreKey(p.id, day)]);
+    if (activeParticipants.length === 0) return false;
+    return activeParticipants.every((p) => !!scores[scoreKey(p.id, day)]);
   };
 
   const isDayEmpty = (day: number) => {
-    return participants.every((p) => !scores[scoreKey(p.id, day)]);
+    return activeParticipants.every((p) => !scores[scoreKey(p.id, day)]);
   };
 
   // ── Leaderboard ──
@@ -278,7 +283,7 @@ export function HundredFeetManager({ tripId }: { tripId: string }) {
     }
   };
 
-  const leaderboard = participants.map((p) => {
+  const leaderboard = activeParticipants.map((p) => {
     const dayScores: Record<number, { feet: number; inches: number; totalInches: number }> = {};
     let grandTotal = 0;
     for (const d of scrambleDayNumbers) {
@@ -340,6 +345,7 @@ export function HundredFeetManager({ tripId }: { tripId: string }) {
           tripId={tripId}
           contestName="100 Feet!"
           contestId={contestId}
+          onChanged={fetchData}
         />
       )}
 
@@ -429,9 +435,14 @@ export function HundredFeetManager({ tripId }: { tripId: string }) {
             )}
 
             {/* Participant score list for selected day */}
-            {selectedDay !== null && (
+            {selectedDay !== null && activeParticipants.length === 0 && (
+              <div className="text-xs text-gray-400 text-center py-4">
+                No participants enrolled yet. Use the Participants section above to add Loozers.
+              </div>
+            )}
+            {selectedDay !== null && activeParticipants.length > 0 && (
               <div className="space-y-1">
-                {participants.map((p) => {
+                {activeParticipants.map((p) => {
                   const key = scoreKey(p.id, selectedDay);
                   const s = scores[key];
 

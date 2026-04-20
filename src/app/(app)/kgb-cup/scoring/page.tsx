@@ -180,6 +180,12 @@ export default async function KgbCupScoringPage() {
     tee_longitude: number | null;
     green_latitude: number | null;
     green_longitude: number | null;
+    drive_latitude: number | null;
+    drive_longitude: number | null;
+    green_front_latitude: number | null;
+    green_front_longitude: number | null;
+    green_back_latitude: number | null;
+    green_back_longitude: number | null;
   }[] = [];
 
   if (trip.course_id) {
@@ -191,7 +197,7 @@ export default async function KgbCupScoringPage() {
         .order("hole_number"),
       adminClient
         .from("course_holes")
-        .select("tee_id, hole_number, par, yards, handicap_index, overhead_image_url, green_image_url, tee_latitude, tee_longitude, green_latitude, green_longitude")
+        .select("tee_id, hole_number, par, yards, handicap_index, overhead_image_url, green_image_url, tee_latitude, tee_longitude, green_latitude, green_longitude, drive_latitude, drive_longitude, green_front_latitude, green_front_longitude, green_back_latitude, green_back_longitude")
         .eq("course_id", trip.course_id),
       adminClient
         .from("course_tees")
@@ -212,6 +218,9 @@ export default async function KgbCupScoringPage() {
         overhead_image_url: string | null; green_image_url: string | null;
         tee_latitude: number | null; tee_longitude: number | null;
         green_latitude: number | null; green_longitude: number | null;
+        drive_latitude: number | null; drive_longitude: number | null;
+        green_front_latitude: number | null; green_front_longitude: number | null;
+        green_back_latitude: number | null; green_back_longitude: number | null;
       }>();
       for (const h of courseHoles) {
         holeMap.set(`${h.tee_id}-${h.hole_number}`, {
@@ -224,6 +233,12 @@ export default async function KgbCupScoringPage() {
           tee_longitude: h.tee_longitude ?? null,
           green_latitude: h.green_latitude ?? null,
           green_longitude: h.green_longitude ?? null,
+          drive_latitude: h.drive_latitude ?? null,
+          drive_longitude: h.drive_longitude ?? null,
+          green_front_latitude: h.green_front_latitude ?? null,
+          green_front_longitude: h.green_front_longitude ?? null,
+          green_back_latitude: h.green_back_latitude ?? null,
+          green_back_longitude: h.green_back_longitude ?? null,
         });
       }
 
@@ -241,6 +256,12 @@ export default async function KgbCupScoringPage() {
           tee_longitude: data?.tee_longitude ?? null,
           green_latitude: data?.green_latitude ?? null,
           green_longitude: data?.green_longitude ?? null,
+          drive_latitude: data?.drive_latitude ?? null,
+          drive_longitude: data?.drive_longitude ?? null,
+          green_front_latitude: data?.green_front_latitude ?? null,
+          green_front_longitude: data?.green_front_longitude ?? null,
+          green_back_latitude: data?.green_back_latitude ?? null,
+          green_back_longitude: data?.green_back_longitude ?? null,
         };
       });
     }

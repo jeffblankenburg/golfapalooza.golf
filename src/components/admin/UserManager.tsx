@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useImperativeHandle, type Ref } from "react";
+import { useState, useEffect, useImperativeHandle, useRef, type Ref } from "react";
 import { PermissionsEditor } from "@/components/admin/PermissionsEditor";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import { AvatarCropModal } from "@/components/AvatarCropModal";
 
 interface User {
   id: string;
@@ -52,6 +53,10 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
     message: string;
     onConfirm: () => void;
   } | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [pendingCropFile, setPendingCropFile] = useState<File | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useImperativeHandle(ref, () => ({ openAdd }));
 
@@ -144,6 +149,7 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
     });
     setEditIsAdmin(user.is_admin);
     setEditPermissions(user.permissions || {});
+    setAvatarPreview(user.avatar_url);
     setError("");
     setShowModal(true);
   };
@@ -151,7 +157,51 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
   const closeModal = () => {
     setShowModal(false);
     setEditingUser(null);
+    setAvatarPreview(null);
+    setPendingCropFile(null);
     setError("");
+  };
+
+  const handleAvatarPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (avatarInputRef.current) avatarInputRef.current.value = "";
+    if (!file) return;
+    setError("");
+    setPendingCropFile(file);
+  };
+
+  const handleAvatarCropConfirm = async (blob: Blob) => {
+    if (!editingUser) return;
+    setPendingCropFile(null);
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      const ext = blob.type === "image/png" ? "png" : "jpg";
+      formData.append("file", new File([blob], `avatar.${ext}`, { type: blob.type }));
+
+      const res = await fetch(`/api/admin/users/${editingUser.id}/avatar`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Failed to upload photo");
+        return;
+      }
+
+      const busted = `${data.avatar_url}?t=${Date.now()}`;
+      setAvatarPreview(busted);
+      setEditingUser({ ...editingUser, avatar_url: busted });
+      setUsers((prev) =>
+        prev.map((u) => (u.id === editingUser.id ? { ...u, avatar_url: busted } : u))
+      );
+    } catch {
+      setError("Failed to upload photo");
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   const handleDelete = (user: User) => {
@@ -310,6 +360,55 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
               {error && (
                 <div className="bg-red-50 text-red-700 p-3 rounded-lg mb-4 text-sm">
                   {error}
+                </div>
+              )}
+
+              {editingUser && (
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="relative flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={uploadingAvatar}
+                      className="w-20 h-20 rounded-full overflow-hidden bg-green-700 text-white flex items-center justify-center disabled:opacity-50 active:opacity-80 transition-opacity"
+                    >
+                      {avatarPreview ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={avatarPreview}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-2xl font-bold">
+                          {(editingUser.display_name?.[0] || "?").toUpperCase()}
+                        </span>
+                      )}
+                      {uploadingAvatar && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-full">
+                          <div className="w-6 h-6 border-[3px] border-white border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )}
+                    </button>
+                    {!uploadingAvatar && (
+                      <div
+                        onClick={() => avatarInputRef.current?.click()}
+                        className="absolute bottom-0 right-0 w-7 h-7 bg-green-600 rounded-full flex items-center justify-center border-2 border-white cursor-pointer"
+                      >
+                        <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarPick}
+                    className="hidden"
+                  />
                 </div>
               )}
 
@@ -475,6 +574,14 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
         onConfirm={() => confirmModal?.onConfirm()}
         onCancel={() => setConfirmModal(null)}
       />
+
+      {pendingCropFile && (
+        <AvatarCropModal
+          file={pendingCropFile}
+          onCancel={() => setPendingCropFile(null)}
+          onConfirm={handleAvatarCropConfirm}
+        />
+      )}
     </div>
   );
 }

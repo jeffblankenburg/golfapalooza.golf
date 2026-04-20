@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatPhoneDisplay } from "@/lib/utils/phone";
+import { AvatarCropModal } from "@/components/AvatarCropModal";
 
 interface ProfileData {
   id: string;
@@ -67,6 +68,7 @@ export function ProfileEditor({
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved">("idle");
   const [error, setError] = useState("");
+  const [pendingCropFile, setPendingCropFile] = useState<File | null>(null);
 
   const [form, setForm] = useState({
     display_name: profile.display_name,
@@ -89,46 +91,40 @@ export function ProfileEditor({
     setSaveStatus("idle");
   };
 
-  const handleAvatarUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleAvatarPick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = "";
     if (!file) return;
-
-    setUploading(true);
     setError("");
+    setPendingCropFile(file);
+  };
+
+  const handleCropConfirm = async (blob: Blob) => {
+    setPendingCropFile(null);
+    setUploading(true);
     try {
-      const supabase = createClient();
-      const ext = file.name.split(".").pop() || "jpg";
-      const path = `${profile.id}/avatar.${ext}`;
+      const formData = new FormData();
+      const ext = blob.type === "image/png" ? "png" : "jpg";
+      formData.append("file", new File([blob], `avatar.${ext}`, { type: blob.type }));
 
-      const { data, error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(path, file, { cacheControl: "3600", upsert: true });
+      const res = await fetch("/api/profile/avatar", {
+        method: "POST",
+        body: formData,
+      });
 
-      if (uploadError) {
-        setError("Failed to upload photo. Make sure the avatars bucket exists in Supabase.");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Failed to upload photo");
         return;
       }
 
-      const { data: urlData } = supabase.storage
-        .from("avatars")
-        .getPublicUrl(data.path);
-
-      const newUrl = `${urlData.publicUrl}?t=${Date.now()}`;
-
-      await supabase
-        .from("users")
-        .update({ avatar_url: newUrl })
-        .eq("id", profile.id);
-
-      setAvatarUrl(newUrl);
+      setAvatarUrl(`${data.avatar_url}?t=${Date.now()}`);
       router.refresh();
     } catch {
       setError("Failed to upload photo");
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -243,14 +239,13 @@ export function ProfileEditor({
           ref={fileInputRef}
           type="file"
           accept="image/*"
-          onChange={handleAvatarUpload}
+          onChange={handleAvatarPick}
           className="hidden"
         />
         <div className="flex-1 min-w-0">
           <h2 className="text-xl font-bold text-gray-900 truncate">
             {form.display_name}
           </h2>
-          <p className="text-sm text-gray-500 mb-2">Tap photo to change</p>
           <div className="flex flex-wrap gap-2">
             <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-xl px-3 py-1.5">
               <span className="text-xs font-medium text-blue-600 uppercase tracking-wide">Handicap</span>
@@ -513,6 +508,14 @@ export function ProfileEditor({
       >
         Sign Out
       </button>
+
+      {pendingCropFile && (
+        <AvatarCropModal
+          file={pendingCropFile}
+          onCancel={() => setPendingCropFile(null)}
+          onConfirm={handleCropConfirm}
+        />
+      )}
     </div>
   );
 }

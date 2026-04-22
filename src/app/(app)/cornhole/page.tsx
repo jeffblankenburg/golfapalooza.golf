@@ -2,6 +2,8 @@ import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { CornholeBrackets } from "@/components/CornholeBrackets";
 import { AdminLink } from "@/components/AdminLink";
 
+export { zoomableViewport as viewport } from "@/lib/viewport";
+
 export default async function CornholePage() {
   const user = await getAuthUser();
   if (!user) return null;

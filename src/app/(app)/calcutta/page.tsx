@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { CalcuttaResults } from "@/components/calcutta/CalcuttaResults";
 import { AdminLink } from "@/components/AdminLink";
 
+export { zoomableViewport as viewport } from "@/lib/viewport";
+
 export default async function CalcuttaPage() {
   const user = await getAuthUser();
 

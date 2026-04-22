@@ -6,6 +6,8 @@ import { isFeatureVisible } from "@/lib/visibility";
 import { stripMarkdown } from "@/lib/strip-markdown";
 import { getBirthdaysToday } from "@/lib/birthday/today";
 
+export { zoomableViewport as viewport } from "@/lib/viewport";
+
 export default async function HomePage() {
   const user = await getAuthUser();
   const supabase = await createClient();

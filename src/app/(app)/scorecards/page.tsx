@@ -1,6 +1,8 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { ScorecardsContent } from "@/components/ScorecardsContent";
 
+export { zoomableViewport as viewport } from "@/lib/viewport";
+
 export default async function ScorecardsPage() {
   const user = await getAuthUser();
 

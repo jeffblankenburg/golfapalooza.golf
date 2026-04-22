@@ -3,6 +3,8 @@ import { SkinsContent } from "@/components/SkinsContent";
 import { getEffectiveDate } from "@/lib/simulator";
 import { isFeatureVisible } from "@/lib/visibility";
 
+export { zoomableViewport as viewport } from "@/lib/viewport";
+
 export default async function SkinsPage() {
   const user = await getAuthUser();
 

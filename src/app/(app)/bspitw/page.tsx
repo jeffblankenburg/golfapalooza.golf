@@ -1,6 +1,8 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { BspitwContent } from "@/components/BspitwContent";
 
+export { zoomableViewport as viewport } from "@/lib/viewport";
+
 export default async function BspitwPage() {
   const user = await getAuthUser();
 

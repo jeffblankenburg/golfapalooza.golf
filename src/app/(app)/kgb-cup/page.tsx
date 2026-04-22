@@ -3,6 +3,8 @@ import { getSimDate } from "@/lib/simulator";
 import { KgbCupPageClient } from "./KgbCupPageClient";
 import { AdminLink } from "@/components/AdminLink";
 
+export { zoomableViewport as viewport } from "@/lib/viewport";
+
 export default async function KgbCupPage() {
   const user = await getAuthUser();
   const supabase = await createClient();

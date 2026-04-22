@@ -2,6 +2,8 @@ import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { ArticleDetail } from "@/components/articles/ArticleDetail";
 
+export { zoomableViewport as viewport } from "@/lib/viewport";
+
 export default async function ArticleDetailPage({
   params,
 }: {

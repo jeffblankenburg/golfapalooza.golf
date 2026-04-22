@@ -4,6 +4,8 @@ import { getEffectiveDate } from "@/lib/simulator";
 import { isFeatureVisible } from "@/lib/visibility";
 import { AdminLink } from "@/components/AdminLink";
 
+export { zoomableViewport as viewport } from "@/lib/viewport";
+
 export default async function HundredFeetPage() {
   const user = await getAuthUser();
 

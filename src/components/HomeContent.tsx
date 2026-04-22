@@ -938,7 +938,7 @@ export function HomeContent({
       </div>
 
       {/* Fake Ads (humor banners) */}
-      <FakeAdCarousel />
+      <FakeAdCarousel maxAds={3} />
 
 
       {/* RSVP Modal */}

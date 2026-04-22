@@ -19,6 +19,9 @@ interface FakeAdCarouselProps {
   profileHref?: string;
   /** Auto-advance interval in ms. Default 6000. */
   intervalMs?: number;
+  /** Cap the number of ads in the rotation (chosen randomly after shuffle).
+   *  Undefined = no cap. Home page passes 3. */
+  maxAds?: number;
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -35,6 +38,7 @@ export function FakeAdCarousel({
   clickable = true,
   profileHref = "/loozers",
   intervalMs = 6000,
+  maxAds,
 }: FakeAdCarouselProps) {
   const [ads, setAds] = useState<FakeAd[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -50,9 +54,10 @@ export function FakeAdCarousel({
       .then((data) => {
         if (Array.isArray(data.ads)) {
           const shuffled = shuffle<FakeAd>(data.ads);
-          setAds(shuffled);
+          const capped = maxAds != null ? shuffled.slice(0, maxAds) : shuffled;
+          setAds(capped);
           const picks: Record<string, string> = {};
-          for (const ad of shuffled) {
+          for (const ad of capped) {
             if (ad.tagged_user_ids.length > 0) {
               picks[ad.id] = ad.tagged_user_ids[Math.floor(Math.random() * ad.tagged_user_ids.length)];
             }
@@ -62,7 +67,7 @@ export function FakeAdCarousel({
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
-  }, [userId]);
+  }, [userId, maxAds]);
 
   const advance = useCallback(() => {
     setIndex((i) => (ads.length ? (i + 1) % ads.length : 0));

@@ -77,6 +77,18 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 |--------|----------|-------------|
 | GET | `/api/fake-ads?userId={userId}` | List active fake ads (optionally filtered to those tagging a Loozer) |
 
+#### Birthdays (`/api/birthdays`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/birthdays/today` | List Loozers whose birthday falls on today (in the active trip's timezone). Returns `{id, display_name, avatar_url, age}[]`. |
+
+#### Cron (`/api/cron`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/cron/birthday-posts` | Bearer-authed cron. Posts a randomly chosen birthday message to the "All Loozers" chat room for each Loozer with a birthday today. Idempotent via `birthday_posts(user_id, year, room_id)`. |
+
 #### Admin (`/api/admin`)
 
 | Method | Endpoint | Description |
@@ -107,6 +119,7 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 - `rookie_nominations` - Peer-nominated rookies pending admin approval
 - `fake_ads` - Admin-uploaded humor banner ads shown on the home page
 - `fake_ad_loozers` - Many-to-many tags linking fake ads to Loozers
+- `birthday_posts` - Idempotency log for the daily birthday chat auto-post (user_id, year, room_id)
 
 ### Migrations
 

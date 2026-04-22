@@ -172,6 +172,15 @@ textarea::placeholder {
   }
 }
 
+@keyframes birthday-bob {
+  0%, 100% {
+    transform: translateY(0) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(4deg);
+  }
+}
+
 /* iOS-style safe area padding */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);

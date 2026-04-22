@@ -176,6 +176,13 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Nominate new rookies
 - Admin approval/rejection workflow
 
+### Birthdays
+- `birthday` field on Loozer profiles, editable by the user on `/profile` or by admins on `/admin` → Users
+- Loozer table on the Calcutta page shows each player's current age (decimal to one place)
+- Home page banner (authenticated only): when any Loozer has a birthday today, a gradient card appears at the top with their avatar, age, and floating balloon/party emojis. Tapping the card opens their profile.
+- Daily chat auto-post to "All Loozers" at ~8 AM Eastern (13:00 UTC) — a randomly selected message from 50 templates. One post per Loozer per year, enforced by `birthday_posts` table
+- Today's date is resolved in the active trip's timezone
+
 ### Fake Ads
 - Admin-uploaded humor banner ads shown on the authenticated home page, spectator home, and Loozer profile pages
 - Ads can be tagged with zero or more Loozers (many-to-many)

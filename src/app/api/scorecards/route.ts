@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getStrokesOnHole, sortByDifficulty } from "@/lib/golf/stroke-distribution";
 
 export async function GET(request: Request) {
-  const supabase = await createClient();
+  const authedClient = await createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await authedClient.auth.getUser();
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // Public read access: spectators fall through to the admin client.
+  const supabase = user ? authedClient : createAdminClient();
 
   const { searchParams } = new URL(request.url);
   const contestId = searchParams.get("contest_id");

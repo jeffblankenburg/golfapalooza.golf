@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/tee-time-reminders",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/birthday-posts",
+      "schedule": "0 13 * * *"
     }
   ]
 }

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { subscribeToPush } from "@/lib/notifications/push-client";
 import { getTimezoneAbbreviation } from "@/lib/utils/timezone";
 import { FakeAdCarousel } from "@/components/FakeAdCarousel";
+import { BirthdayBanner } from "@/components/BirthdayBanner";
 
 interface TripData {
   trip_name: string;
@@ -352,6 +353,7 @@ export function HomeContent({
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-3">
+      <BirthdayBanner />
       {/* Push Notification Permission Banner */}
       {pushPermission === "default" && (
         <div className="bg-white rounded-2xl p-4 border border-amber-200 shadow-sm flex items-start gap-3">

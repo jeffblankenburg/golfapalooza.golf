@@ -14,6 +14,11 @@ interface HoleMapViewProps {
   teeColor?: string | null;
 }
 
+// Gate thresholds for the auto-target state machine.
+const GATE_YARDS = 200;         // trigger distance for tee→tracking and tracking→green
+const FMB_YARDS = 250;          // show front/middle/back distances when user within this
+const REFIT_YARDS = 15;         // re-fit map bounds after user moves this far
+
 function getBearing(from: [number, number], to: [number, number]): number {
   const toRad = (d: number) => (d * Math.PI) / 180;
   const toDeg = (r: number) => (r * 180) / Math.PI;
@@ -33,6 +38,31 @@ function calcYards(a: [number, number], b: [number, number]): number {
   const x = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLng / 2) ** 2;
   const meters = R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
   return Math.round(meters * 1.09361);
+}
+
+/** Project `origin` forward along a compass bearing by `distanceYards`. */
+function projectPoint(
+  origin: [number, number],
+  bearingDeg: number,
+  distanceYards: number
+): [number, number] {
+  const R = 6371000;
+  const d = distanceYards / 1.09361 / R;
+  const toRad = (x: number) => (x * Math.PI) / 180;
+  const toDeg = (x: number) => (x * 180) / Math.PI;
+  const brng = toRad(bearingDeg);
+  const lat1 = toRad(origin[0]);
+  const lng1 = toRad(origin[1]);
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(brng)
+  );
+  const lng2 =
+    lng1 +
+    Math.atan2(
+      Math.sin(brng) * Math.sin(d) * Math.cos(lat1),
+      Math.cos(d) - Math.sin(lat1) * Math.sin(lat2)
+    );
+  return [toDeg(lat2), toDeg(lng2)];
 }
 
 /** Given a center point and a bearing (degrees), return two points forming a
@@ -69,13 +99,18 @@ export default function HoleMapView({
   greenFrontLatLng,
   greenBackLatLng,
   holeNumber,
-  par,
   teeColor,
 }: HoleMapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const [driveYards, setDriveYards] = useState<{ toOrigin: number; toGreen: number; toFront: number | null; toBack: number | null } | null>(null);
+  const [distances, setDistances] = useState<{
+    userToTarget: number;
+    targetToGreen: number;
+    userToGreen: number;
+    userToFront: number | null;
+    userToBack: number | null;
+  } | null>(null);
   const [gpsEnabled, setGpsEnabled] = useState(false);
   const [userPos, setUserPos] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
@@ -102,13 +137,19 @@ export default function HoleMapView({
   const currentDriveRef = useRef<[number, number] | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const userMarkerRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const driveMarkerRef = useRef<any>(null);
+
+  // Auto-target state: one-way gates (tee → tracking → green). Reset per hole.
+  // Manual drag flips manualOverrideRef true; each gate transition clears it.
+  const targetStateRef = useRef<"tee" | "tracking" | "green">("tee");
+  const manualOverrideRef = useRef(false);
+  const lastFitUserRef = useRef<[number, number] | null>(null);
 
   const gpsEnabledRef = useRef(gpsEnabled);
   gpsEnabledRef.current = gpsEnabled;
   const userPosRef = useRef(userPos);
   userPosRef.current = userPos;
-
-  const greenDepth = greenFrontLatLng && greenBackLatLng ? calcYards(greenFrontLatLng, greenBackLatLng) : null;
 
   // ───────────────────────── Map init (per hole) ─────────────────────────
   useEffect(() => {
@@ -119,10 +160,17 @@ export default function HoleMapView({
     applyOriginRef.current = null;
     currentDriveRef.current = null;
     userMarkerRef.current = null;
+    driveMarkerRef.current = null;
+    manualOverrideRef.current = false;
+    lastFitUserRef.current = null;
 
     const tee = teeRef.current;
     const green = greenRef.current;
-    const initialDrive = driveRef.current || (par <= 3 && green ? green : null);
+    // Target starts on the ideal drive if we have it, else snaps to green center
+    // (par 3s and any hole missing a drive coordinate). State reflects that choice.
+    const hasDrive = !!driveRef.current;
+    const initialDrive = driveRef.current || green;
+    targetStateRef.current = hasDrive ? "tee" : "green";
 
     async function init() {
       const mapboxgl = (await import("mapbox-gl")).default;
@@ -253,17 +301,25 @@ export default function HoleMapView({
           return { yards, labelEl, labelMarker };
         }
 
-        // Draggable drive circle + first/second dotted segments
+        // Draggable target crosshair + first/second dotted segments
         if (initialDrive && green) {
           const driveEl = document.createElement("div");
-          driveEl.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="8" fill="none" stroke="#f59e0b" stroke-width="3"/>
+          driveEl.innerHTML = `<svg width="44" height="44" viewBox="0 0 44 44">
+            <circle cx="22" cy="22" r="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-dasharray="2 3" opacity="0.85"/>
+            <circle cx="22" cy="22" r="10" fill="none" stroke="#f59e0b" stroke-width="2.5"/>
+            <line x1="22" y1="2" x2="22" y2="9" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="22" y1="35" x2="22" y2="42" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="2" y1="22" x2="9" y2="22" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="35" y1="22" x2="42" y2="22" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="22" cy="22" r="2.5" fill="#f59e0b"/>
           </svg>`;
           driveEl.style.cursor = "grab";
+          driveEl.style.filter = "drop-shadow(0 1px 2px rgba(0,0,0,0.55))";
 
           const driveMarker = new mapboxgl.Marker({ element: driveEl, anchor: "center", draggable: true })
             .setLngLat([initialDrive[1], initialDrive[0]])
             .addTo(map);
+          driveMarkerRef.current = driveMarker;
 
           // Origin defaults to tee; GPS effect swaps this out when enabled.
           const startingOrigin: [number, number] =
@@ -276,18 +332,19 @@ export default function HoleMapView({
 
           currentDriveRef.current = initialDrive;
 
-          const frontYards = greenFrontRef.current ? calcYards(initialDrive, greenFrontRef.current) : null;
-          const backYards = greenBackRef.current ? calcYards(initialDrive, greenBackRef.current) : null;
-          setDriveYards({
-            toOrigin: originLineInfo.yards,
-            toGreen: greenLineInfo.yards,
-            toFront: frontYards,
-            toBack: backYards,
+          const frontYards = greenFrontRef.current ? calcYards(startingOrigin, greenFrontRef.current) : null;
+          const backYards = greenBackRef.current ? calcYards(startingOrigin, greenBackRef.current) : null;
+          setDistances({
+            userToTarget: originLineInfo.yards,
+            targetToGreen: greenLineInfo.yards,
+            userToGreen: calcYards(startingOrigin, green),
+            userToFront: frontYards,
+            userToBack: backYards,
           });
 
           // Rewire first segment (origin → drive). Called from:
           //   • drag handler (drive pos changed)
-          //   • GPS watcher (origin changed)
+          //   • GPS watcher (origin changed, possibly with an auto-moved target)
           function rewire(origin: [number, number], drivePos: [number, number]) {
             const originLineSource = map.getSource("tee-drive-line") as mapboxgl.GeoJSONSource | undefined;
             if (originLineSource) {
@@ -306,26 +363,27 @@ export default function HoleMapView({
               });
             }
 
-            const toOrigin = calcYards(origin, drivePos);
-            const toGreen = calcYards(drivePos, green!);
+            const userToTarget = calcYards(origin, drivePos);
+            const targetToGreen = calcYards(drivePos, green!);
+            const userToGreen = calcYards(origin, green!);
 
             const originLabelEl = containerRef.current?.querySelector(".map-distance-label-tee-drive div") as HTMLElement;
-            if (originLabelEl) originLabelEl.textContent = `${toOrigin}y`;
+            if (originLabelEl) originLabelEl.textContent = `${userToTarget}y`;
             originLineInfo.labelMarker.setLngLat([
               (origin[1] + drivePos[1]) / 2,
               (origin[0] + drivePos[0]) / 2,
             ]);
 
             const greenLabelEl = containerRef.current?.querySelector(".map-distance-label-drive-green div") as HTMLElement;
-            if (greenLabelEl) greenLabelEl.textContent = `${toGreen}y`;
+            if (greenLabelEl) greenLabelEl.textContent = `${targetToGreen}y`;
             greenLineInfo.labelMarker.setLngLat([
               (drivePos[1] + green![1]) / 2,
               (drivePos[0] + green![0]) / 2,
             ]);
 
-            const frontY = greenFrontRef.current ? calcYards(drivePos, greenFrontRef.current) : null;
-            const backY = greenBackRef.current ? calcYards(drivePos, greenBackRef.current) : null;
-            setDriveYards({ toOrigin, toGreen, toFront: frontY, toBack: backY });
+            const userToFront = greenFrontRef.current ? calcYards(origin, greenFrontRef.current) : null;
+            const userToBack = greenBackRef.current ? calcYards(origin, greenBackRef.current) : null;
+            setDistances({ userToTarget, targetToGreen, userToGreen, userToFront, userToBack });
           }
 
           applyOriginRef.current = (origin) => {
@@ -333,6 +391,9 @@ export default function HoleMapView({
             rewire(origin, currentDriveRef.current);
           };
 
+          driveMarker.on("dragstart", () => {
+            manualOverrideRef.current = true;
+          });
           driveMarker.on("drag", () => {
             const lngLat = driveMarker.getLngLat();
             const drivePos: [number, number] = [lngLat.lat, lngLat.lng];
@@ -355,12 +416,13 @@ export default function HoleMapView({
       cancelled = true;
       userMarkerRef.current?.remove?.();
       userMarkerRef.current = null;
+      driveMarkerRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
       applyOriginRef.current = null;
       currentDriveRef.current = null;
+      lastFitUserRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [holeNumber]);
 
   // ───────────────────────── GPS watcher ─────────────────────────
@@ -394,7 +456,7 @@ export default function HoleMapView({
     return () => navigator.geolocation.clearWatch(id);
   }, [gpsEnabled]);
 
-  // ─────────── Apply GPS state to the map (user dot + origin rewire) ───────────
+  // ─────────── Apply GPS state to the map (user dot + state machine + zoom) ───────────
   useEffect(() => {
     if (!loaded) return;
     const map = mapRef.current;
@@ -405,25 +467,85 @@ export default function HoleMapView({
       const mapboxgl = (await import("mapbox-gl")).default;
       if (cancelled) return;
 
-      if (gpsEnabled && userPos) {
-        if (!userMarkerRef.current) {
-          const el = document.createElement("div");
-          el.innerHTML = `<div style="
-            width:16px;height:16px;border-radius:9999px;
-            background:#2563eb;border:3px solid white;
-            box-shadow:0 0 0 4px rgba(37,99,235,0.25);
-          "></div>`;
-          userMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: "center" })
-            .setLngLat([userPos.lng, userPos.lat])
-            .addTo(map);
-        } else {
-          userMarkerRef.current.setLngLat([userPos.lng, userPos.lat]);
-        }
-        applyOriginRef.current?.([userPos.lat, userPos.lng]);
-      } else {
+      if (!gpsEnabled || !userPos) {
         userMarkerRef.current?.remove?.();
         userMarkerRef.current = null;
+        lastFitUserRef.current = null;
         applyOriginRef.current?.(teeRef.current);
+        return;
+      }
+
+      // User marker
+      if (!userMarkerRef.current) {
+        const el = document.createElement("div");
+        el.innerHTML = `<div style="
+          width:16px;height:16px;border-radius:9999px;
+          background:#2563eb;border:3px solid white;
+          box-shadow:0 0 0 4px rgba(37,99,235,0.25);
+        "></div>`;
+        userMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: "center" })
+          .setLngLat([userPos.lng, userPos.lat])
+          .addTo(map);
+      } else {
+        userMarkerRef.current.setLngLat([userPos.lng, userPos.lat]);
+      }
+
+      const user: [number, number] = [userPos.lat, userPos.lng];
+      const green = greenRef.current;
+      const drive = driveRef.current;
+
+      // ─── State machine: gates are one-way locks, each clears manual-override ───
+      if (green) {
+        const distUserGreen = calcYards(user, green);
+        if (distUserGreen <= GATE_YARDS && targetStateRef.current !== "green") {
+          targetStateRef.current = "green";
+          manualOverrideRef.current = false;
+        } else if (
+          targetStateRef.current === "tee" &&
+          drive &&
+          calcYards(user, drive) <= GATE_YARDS
+        ) {
+          targetStateRef.current = "tracking";
+          manualOverrideRef.current = false;
+        }
+
+        // Apply auto target unless the user is currently overriding with a drag.
+        // 'tee' keeps the static ideal-drive point; 'tracking' projects 200y
+        // ahead of the user on the line to green; 'green' snaps to the center.
+        if (!manualOverrideRef.current && driveMarkerRef.current) {
+          let autoTarget: [number, number] | null = null;
+          if (targetStateRef.current === "green") {
+            autoTarget = green;
+          } else if (targetStateRef.current === "tracking") {
+            autoTarget = projectPoint(user, getBearing(user, green), GATE_YARDS);
+          }
+          if (autoTarget) {
+            currentDriveRef.current = autoTarget;
+            driveMarkerRef.current.setLngLat([autoTarget[1], autoTarget[0]]);
+          }
+        }
+      }
+
+      // Rewire origin/green segments with new user origin and current target
+      applyOriginRef.current?.(user);
+
+      // ─── Auto-refit bounds so the map tracks the remaining hole ───
+      // Only refit after meaningful movement to avoid constant re-animation.
+      if (green) {
+        const last = lastFitUserRef.current;
+        const moved = !last || calcYards(last, user) >= REFIT_YARDS;
+        if (moved) {
+          const bounds = new mapboxgl.LngLatBounds([user[1], user[0]], [green[1], green[0]]);
+          if (currentDriveRef.current) {
+            bounds.extend([currentDriveRef.current[1], currentDriveRef.current[0]]);
+          }
+          map.fitBounds(bounds, {
+            padding: { top: 90, bottom: 110, left: 50, right: 50 },
+            duration: 600,
+            maxZoom: 19,
+          });
+          lastFitUserRef.current = user;
+        }
       }
     })();
 
@@ -432,14 +554,11 @@ export default function HoleMapView({
     };
   }, [gpsEnabled, userPos, loaded]);
 
-  const originSwatch = gpsEnabled ? (
-    <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
-  ) : (
-    <span
-      className="w-2 h-2 rounded-full inline-block"
-      style={{ backgroundColor: TEE_HEX_COLORS[teeColor || ""] || "#2563eb" }}
-    />
-  );
+  const showFMB =
+    distances != null &&
+    distances.userToGreen <= FMB_YARDS &&
+    distances.userToFront != null &&
+    distances.userToBack != null;
 
   return (
     <div ref={containerRef} className="w-full h-full relative" style={{ minHeight: "200px" }}>
@@ -449,28 +568,55 @@ export default function HoleMapView({
         </div>
       )}
 
-      {loaded && (driveYards || greenDepth) && (
-        <div className="absolute top-2 left-2 z-10 bg-black/60 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-lg space-y-0.5">
-          {driveYards && (
-            <div className="flex items-center gap-1.5">
-              {originSwatch}
-              <span>{driveYards.toOrigin}y</span>
-              <span className="w-2 h-2 rounded-full border-2 border-amber-400 inline-block" />
-              <span>{driveYards.toGreen}y</span>
-              <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+      {loaded && distances && (
+        <div className="absolute top-2 left-2 z-10 flex gap-1.5 pointer-events-none">
+          <div className="bg-black/75 backdrop-blur-sm text-white rounded-lg px-3 py-1.5 text-center shadow-lg">
+            <div className="text-[9px] font-bold tracking-widest text-amber-300 uppercase leading-none">
+              Target
             </div>
-          )}
-          {driveYards && (driveYards.toFront != null || driveYards.toBack != null) && (
-            <div className="flex items-center gap-2 text-green-300">
-              {driveYards.toFront != null && <span>Front: {driveYards.toFront}y</span>}
-              {driveYards.toBack != null && <span>Back: {driveYards.toBack}y</span>}
+            <div className="text-base font-extrabold leading-tight tabular-nums mt-0.5">
+              {distances.userToTarget}
+              <span className="text-[10px] font-semibold ml-0.5 opacity-75">y</span>
             </div>
-          )}
-          {greenDepth != null && (
-            <div className="text-green-300">Depth: {greenDepth}y</div>
-          )}
-          {gpsEnabled && userPos && (
-            <div className="text-blue-200">±{Math.round(userPos.accuracy)}m</div>
+          </div>
+
+          {showFMB ? (
+            <div className="bg-black/75 backdrop-blur-sm text-white rounded-lg px-3 py-1.5 flex gap-3 shadow-lg">
+              <div className="text-center">
+                <div className="text-[9px] font-bold tracking-widest text-green-300 uppercase leading-none">
+                  F
+                </div>
+                <div className="text-base font-extrabold leading-tight tabular-nums mt-0.5">
+                  {distances.userToFront}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-[9px] font-bold tracking-widest text-green-300 uppercase leading-none">
+                  M
+                </div>
+                <div className="text-base font-extrabold leading-tight tabular-nums mt-0.5">
+                  {distances.userToGreen}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-[9px] font-bold tracking-widest text-green-300 uppercase leading-none">
+                  B
+                </div>
+                <div className="text-base font-extrabold leading-tight tabular-nums mt-0.5">
+                  {distances.userToBack}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-black/75 backdrop-blur-sm text-white rounded-lg px-3 py-1.5 text-center shadow-lg">
+              <div className="text-[9px] font-bold tracking-widest text-green-300 uppercase leading-none">
+                Green
+              </div>
+              <div className="text-base font-extrabold leading-tight tabular-nums mt-0.5">
+                {distances.userToGreen}
+                <span className="text-[10px] font-semibold ml-0.5 opacity-75">y</span>
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -493,6 +639,12 @@ export default function HoleMapView({
           </svg>
           GPS {gpsEnabled ? "On" : "Off"}
         </button>
+      )}
+
+      {loaded && gpsEnabled && userPos && (
+        <div className="absolute bottom-2 left-2 z-10 bg-black/55 text-blue-100 text-[10px] font-semibold px-2 py-0.5 rounded">
+          ±{Math.round(userPos.accuracy)}m
+        </div>
       )}
 
       {gpsError && (

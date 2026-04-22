@@ -18,6 +18,7 @@ interface User {
   handicap_index: number | null;
   eight_bag_average: number | null;
   avg_scramble_score: number | null;
+  birthday: string | null;
   created_at: string;
 }
 
@@ -42,6 +43,7 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
     handicapIndex: "",
     eightBagAverage: "",
     avgScrambleScore: "",
+    birthday: "",
   });
   const [editIsAdmin, setEditIsAdmin] = useState(false);
   const [editPermissions, setEditPermissions] = useState<
@@ -130,7 +132,7 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
 
   const openAdd = () => {
     setEditingUser(null);
-    setFormData({ phone: "", displayName: "", fullName: "", handicapIndex: "", eightBagAverage: "", avgScrambleScore: "" });
+    setFormData({ phone: "", displayName: "", fullName: "", handicapIndex: "", eightBagAverage: "", avgScrambleScore: "", birthday: "" });
     setEditIsAdmin(false);
     setEditPermissions({});
     setError("");
@@ -146,6 +148,7 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
       handicapIndex: user.handicap_index !== null ? String(user.handicap_index) : "",
       eightBagAverage: user.eight_bag_average !== null ? String(user.eight_bag_average) : "",
       avgScrambleScore: user.avg_scramble_score !== null ? String(user.avg_scramble_score) : "",
+      birthday: user.birthday || "",
     });
     setEditIsAdmin(user.is_admin);
     setEditPermissions(user.permissions || {});
@@ -456,6 +459,20 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                       setFormData({ ...formData, fullName: e.target.value })
                     }
                     placeholder="John Smith"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">
+                    Birthday (optional)
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.birthday}
+                    onChange={(e) =>
+                      setFormData({ ...formData, birthday: e.target.value })
+                    }
+                    style={{ backgroundColor: "transparent" }}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
                   />
                 </div>

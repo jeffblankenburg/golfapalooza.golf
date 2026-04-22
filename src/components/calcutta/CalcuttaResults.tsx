@@ -103,6 +103,14 @@ function calculateAge(birthday: string): number | null {
   return age;
 }
 
+function calculateAgeDecimal(birthday: string): number | null {
+  const birth = new Date(birthday + "T00:00:00");
+  if (isNaN(birth.getTime())) return null;
+  const ageMs = Date.now() - birth.getTime();
+  const years = ageMs / (1000 * 60 * 60 * 24 * 365.25);
+  return Math.round(years * 10) / 10;
+}
+
 function fakeBspitwStanding(displayName: string): { place: number; points: number } {
   let hash = 0;
   for (let i = 0; i < displayName.length; i++) {
@@ -165,6 +173,7 @@ export function CalcuttaResults({ contestId, userId, headerAction }: { contestId
       if (data.pool != null) setPool(data.pool);
       if (data.buyer_paid != null) setBuyerPaid(data.buyer_paid);
       if (data.buyer_owes != null) setBuyerOwes(data.buyer_owes);
+      if (data.randy_avatar_url !== undefined) setRandyAvatar(data.randy_avatar_url);
     } catch {
       // retry next poll
     } finally {
@@ -175,10 +184,6 @@ export function CalcuttaResults({ contestId, userId, headerAction }: { contestId
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 5000);
-    fetch("/api/loozers/539feb9d-eb8d-4dfe-88d3-7d0bc89c7154")
-      .then((r) => r.json())
-      .then((d) => setRandyAvatar(d.profile?.avatar_url || null))
-      .catch(() => {});
     return () => clearInterval(interval);
   }, [fetchData]);
 
@@ -225,10 +230,12 @@ export function CalcuttaResults({ contestId, userId, headerAction }: { contestId
   }
 
   // ─── Loozers stats table ───
+  const loozersGridCols = "1fr 2.5rem 2.5rem 2.5rem 2.5rem";
   const loozersTable = (
     <div className="space-y-1">
-      <div className="grid grid-cols-[1fr_3.5rem_3.5rem_3.5rem] gap-1 px-2 pb-1">
+      <div className="grid gap-1 px-2 pb-1" style={{ gridTemplateColumns: loozersGridCols }}>
         <span className="text-[10px] font-bold text-gray-400 uppercase">Name</span>
+        <span className="text-[10px] font-bold text-gray-400 uppercase text-center">Age</span>
         <span className="text-[10px] font-bold text-gray-400 uppercase text-center">HCP</span>
         <span className="text-[10px] font-bold text-gray-400 uppercase text-center">8 Bag</span>
         <span className="text-[10px] font-bold text-gray-400 uppercase text-center">Avg</span>
@@ -237,10 +244,12 @@ export function CalcuttaResults({ contestId, userId, headerAction }: { contestId
         .sort((a, b) => (a.user?.display_name || "").localeCompare(b.user?.display_name || ""))
         .map((p) => {
           const stats = loozerStats[p.user_id];
+          const age = p.user?.birthday ? calculateAgeDecimal(p.user.birthday) : null;
           return (
             <div
               key={p.id}
-              className="grid grid-cols-[1fr_3.5rem_3.5rem_3.5rem] gap-1 items-center px-2 py-1.5 rounded-lg odd:bg-gray-50"
+              className="grid gap-1 items-center px-2 py-1.5 rounded-lg odd:bg-gray-50"
+              style={{ gridTemplateColumns: loozersGridCols }}
             >
               <div className="flex items-center gap-2 min-w-0">
                 {p.user?.avatar_url ? (
@@ -254,9 +263,10 @@ export function CalcuttaResults({ contestId, userId, headerAction }: { contestId
                   {p.user?.display_name || "Unknown"}
                 </span>
               </div>
-              <span className="text-sm text-gray-700 text-center">{stats?.handicap ?? "—"}</span>
-              <span className="text-sm text-gray-700 text-center">{stats?.eightBag ?? "—"}</span>
-              <span className="text-sm text-gray-700 text-center">{stats?.avgScramble ?? "—"}</span>
+              <span className="text-xs text-gray-700 text-center tabular-nums">{age != null ? age.toFixed(1) : "—"}</span>
+              <span className="text-xs text-gray-700 text-center tabular-nums">{stats?.handicap ?? "—"}</span>
+              <span className="text-xs text-gray-700 text-center tabular-nums">{stats?.eightBag ?? "—"}</span>
+              <span className="text-xs text-gray-700 text-center tabular-nums">{stats?.avgScramble ?? "—"}</span>
             </div>
           );
         })}
@@ -758,12 +768,12 @@ export function CalcuttaResults({ contestId, userId, headerAction }: { contestId
                   </div>
                   {spotlight?.cornholeSinglesIn != null && (
                     spotlight.cornholeSinglesIn ? (
-                      <svg className="w-6 h-6 text-green-500" viewBox="0 0 24 24" fill="none">
+                      <svg className="w-8 h-8 text-green-500 flex-shrink-0" viewBox="0 0 24 24" fill="none">
                         <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="currentColor" fillOpacity="0.1" />
                         <path d="M7.5 12.5l3 3 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     ) : (
-                      <svg className="w-6 h-6 text-red-500" viewBox="0 0 24 24" fill="none">
+                      <svg className="w-8 h-8 text-red-500 flex-shrink-0" viewBox="0 0 24 24" fill="none">
                         <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="currentColor" fillOpacity="0.1" />
                         <line x1="4.5" y1="4.5" x2="19.5" y2="19.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
                       </svg>

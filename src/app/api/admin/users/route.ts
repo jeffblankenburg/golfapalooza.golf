@@ -59,7 +59,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { phone, displayName, fullName, handicapIndex, eightBagAverage, avgScrambleScore } = await request.json();
+    const { phone, displayName, fullName, handicapIndex, eightBagAverage, avgScrambleScore, birthday } = await request.json();
 
     if (!displayName) {
       return NextResponse.json(
@@ -94,6 +94,7 @@ export async function POST(request: Request) {
         is_financial_only: true,
         eight_bag_average: eightBagAverage ? parseFloat(eightBagAverage) : null,
         avg_scramble_score: avgScrambleScore ? parseFloat(avgScrambleScore) : null,
+        birthday: birthday || null,
       });
 
       if (profileError) {
@@ -146,6 +147,7 @@ export async function POST(request: Request) {
       is_financial_only: false,
       eight_bag_average: eightBagAverage ? parseFloat(eightBagAverage) : null,
       avg_scramble_score: avgScrambleScore ? parseFloat(avgScrambleScore) : null,
+      birthday: birthday || null,
     });
 
     if (profileError) {
@@ -210,7 +212,7 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const { userId, displayName, fullName, phone, isAdmin, permissions, handicapIndex, eightBagAverage, avgScrambleScore } = await request.json();
+    const { userId, displayName, fullName, phone, isAdmin, permissions, handicapIndex, eightBagAverage, avgScrambleScore, birthday } = await request.json();
 
     if (!userId) {
       return NextResponse.json(
@@ -255,6 +257,7 @@ export async function PUT(request: Request) {
     if (permissions !== undefined) updates.permissions = permissions;
     if (eightBagAverage !== undefined) updates.eight_bag_average = eightBagAverage === null || eightBagAverage === "" ? null : parseFloat(eightBagAverage);
     if (avgScrambleScore !== undefined) updates.avg_scramble_score = avgScrambleScore === null || avgScrambleScore === "" ? null : parseFloat(avgScrambleScore);
+    if (birthday !== undefined) updates.birthday = birthday === null || birthday === "" ? null : birthday;
 
     if (Object.keys(updates).length > 0) {
       const { error } = await adminClient

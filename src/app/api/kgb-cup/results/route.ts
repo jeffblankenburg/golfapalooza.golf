@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   computeFoursomeResult,
   computeOverallResults,
@@ -9,16 +10,16 @@ import {
 } from "@/lib/kgb-cup/match-logic";
 import { deriveFoursomes } from "@/lib/kgb-cup/derive-foursomes";
 
-// GET - User-facing KGB Cup results (authenticated, not admin-only)
+// GET - KGB Cup results. Public read access: authenticated users go through
+// the normal server client; unauthenticated spectators fall back to the admin
+// client since this endpoint only returns public scoreboard data.
 export async function GET(request: Request) {
-  const supabase = await createClient();
+  const authedClient = await createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await authedClient.auth.getUser();
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const supabase = user ? authedClient : createAdminClient();
 
   const { searchParams } = new URL(request.url);
   const contestId = searchParams.get("contest_id");

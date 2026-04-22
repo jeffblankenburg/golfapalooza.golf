@@ -3,18 +3,17 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveUserId } from "@/lib/simulator";
 
-// GET - Public display data for the Calcutta auction
+// GET - Public display data for the Calcutta auction.
+// Spectators (no auth) get the same view minus buyer-specific fields.
+const RANDY_USER_ID = "539feb9d-eb8d-4dfe-88d3-7d0bc89c7154";
+
 export async function GET(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const effectiveUserId = await getEffectiveUserId(user.id);
+  const effectiveUserId = user ? await getEffectiveUserId(user.id) : null;
 
   const { searchParams } = new URL(request.url);
   const contestId = searchParams.get("contest_id");
@@ -314,16 +313,19 @@ export async function GET(request: Request) {
     }));
 
     // Check if the current user is a buyer who hasn't paid
-    const { data: buyerPaidRow } = await adminClient
-      .from("calcutta_buyer_paid")
-      .select("id")
-      .eq("contest_id", contestId)
-      .eq("user_id", effectiveUserId)
-      .maybeSingle();
+    // (spectators have no buyer identity — skip these lookups)
+    const { data: buyerPaidRow } = effectiveUserId
+      ? await adminClient
+          .from("calcutta_buyer_paid")
+          .select("id")
+          .eq("contest_id", contestId)
+          .eq("user_id", effectiveUserId)
+          .maybeSingle()
+      : { data: null };
 
     // Calculate total amount this user owes as a buyer
     let buyerOwes = 0;
-    if (!buyerPaidRow) {
+    if (effectiveUserId && !buyerPaidRow) {
       for (const p of normalizedParticipants) {
         if (p.ownerships && p.ownerships.length > 0) {
           for (const o of p.ownerships) {
@@ -339,13 +341,14 @@ export async function GET(request: Request) {
 
     // Bulk fetch handicaps + user metrics for all participants (for Loozers table)
     const allUserIds = (participants || []).map((p) => p.user_id).filter(Boolean);
-    const [{ data: allHandicaps }, { data: allUserMetrics }] = await Promise.all([
+    const [{ data: allHandicaps }, { data: allUserMetrics }, { data: randyUser }] = await Promise.all([
       allUserIds.length > 0
         ? adminClient.from("player_handicaps").select("user_id, handicap_index").in("user_id", allUserIds)
         : { data: [] },
       allUserIds.length > 0
         ? adminClient.from("users").select("id, eight_bag_average, avg_scramble_score").in("id", allUserIds)
         : { data: [] },
+      adminClient.from("users").select("avatar_url").eq("id", RANDY_USER_ID).maybeSingle(),
     ]);
 
     const loozerStats: Record<string, { handicap: number | null; eightBag: number | null; avgScramble: number | null }> = {};
@@ -367,8 +370,9 @@ export async function GET(request: Request) {
       pool,
       spotlight: activeParticipant ? { teamPartners, accolades, cornholeSinglesIn, eightBagAverage, avgScrambleScore, handicapIndex } : null,
       loozerStats,
-      buyer_paid: !!buyerPaidRow,
+      buyer_paid: effectiveUserId ? !!buyerPaidRow : true,
       buyer_owes: buyerOwes,
+      randy_avatar_url: randyUser?.avatar_url || null,
     });
   } catch (error) {
     console.error("Get calcutta display error:", error);

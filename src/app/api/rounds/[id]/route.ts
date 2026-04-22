@@ -90,8 +90,17 @@ export async function PUT(
 
     // Handle completing a round
     if (status === "completed") {
-      updateData.status = "completed";
-      updateData.completed_at = new Date().toISOString();
+      // Flip status to "completed" BEFORE calculating differentials and
+      // recalculating handicaps. recalculateHandicap filters by
+      // round.status = 'completed', so the just-completed round must already
+      // be flagged in the DB to be counted in its own recalc.
+      const { error: completeError } = await supabase
+        .from("rounds")
+        .update({ status: "completed", completed_at: new Date().toISOString() })
+        .eq("id", id);
+      if (completeError) {
+        return NextResponse.json({ error: completeError.message }, { status: 500 });
+      }
 
       // Get the round and all player info
       const { data: round } = await supabase
@@ -228,13 +237,15 @@ export async function PUT(
       updateData.status = status;
     }
 
-    const { error } = await supabase
-      .from("rounds")
-      .update(updateData)
-      .eq("id", id);
+    if (Object.keys(updateData).length > 0) {
+      const { error } = await supabase
+        .from("rounds")
+        .update(updateData)
+        .eq("id", id);
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ success: true });

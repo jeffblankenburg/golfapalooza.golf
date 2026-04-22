@@ -145,6 +145,9 @@ export default function HoleMapView({
   const targetStateRef = useRef<"tee" | "tracking" | "green">("tee");
   const manualOverrideRef = useRef(false);
   const lastFitUserRef = useRef<[number, number] | null>(null);
+  // Snaps the camera back to "user/tee at bottom, green at top". Called on any
+  // event that repositions map elements, undoing prior manual pan/rotate.
+  const snapOrientationRef = useRef<(() => void) | null>(null);
 
   const gpsEnabledRef = useRef(gpsEnabled);
   gpsEnabledRef.current = gpsEnabled;
@@ -213,6 +216,16 @@ export default function HoleMapView({
 
       map.on("load", () => {
         if (cancelled) return;
+
+        snapOrientationRef.current = () => {
+          const g = greenRef.current;
+          if (!g) return;
+          const origin: [number, number] =
+            gpsEnabledRef.current && userPosRef.current
+              ? [userPosRef.current.lat, userPosRef.current.lng]
+              : teeRef.current;
+          map.easeTo({ bearing: getBearing(origin, g), pitch: 0, duration: 250 });
+        };
 
         // Tee marker (static reference; not connected to the dotted chain when GPS is on)
         const teeHex = TEE_HEX_COLORS[teeColorRef.current || ""] || "#2563eb";
@@ -404,6 +417,9 @@ export default function HoleMapView({
                 : tee;
             rewire(origin, drivePos);
           });
+          driveMarker.on("dragend", () => {
+            snapOrientationRef.current?.();
+          });
         }
 
         setLoaded(true);
@@ -422,6 +438,7 @@ export default function HoleMapView({
       applyOriginRef.current = null;
       currentDriveRef.current = null;
       lastFitUserRef.current = null;
+      snapOrientationRef.current = null;
     };
   }, [holeNumber]);
 
@@ -472,6 +489,7 @@ export default function HoleMapView({
         userMarkerRef.current = null;
         lastFitUserRef.current = null;
         applyOriginRef.current?.(teeRef.current);
+        snapOrientationRef.current?.();
         return;
       }
 
@@ -541,10 +559,16 @@ export default function HoleMapView({
           }
           map.fitBounds(bounds, {
             padding: { top: 90, bottom: 110, left: 50, right: 50 },
+            bearing: getBearing(user, green),
+            pitch: 0,
             duration: 600,
             maxZoom: 19,
           });
           lastFitUserRef.current = user;
+        } else {
+          // Between refits the user marker still moves every tick — snap the
+          // orientation so any prior manual pan/rotate is undone.
+          snapOrientationRef.current?.();
         }
       }
     })();

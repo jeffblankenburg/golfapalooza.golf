@@ -250,6 +250,7 @@ export function HomeContent({
   hasSubmittedOptions = false,
   latestArticle = null,
   hiddenQuickLinks = [],
+  initialBirthdays = [],
 }: {
   displayName: string;
   trip: TripData | null;
@@ -279,6 +280,7 @@ export function HomeContent({
   hasSubmittedOptions?: boolean;
   latestArticle?: { id: string; title: string; publishAt: string; imageUrl: string | null; preview: string | null; focalX?: number; focalY?: number } | null;
   hiddenQuickLinks?: string[];
+  initialBirthdays?: { id: string; display_name: string; avatar_url: string | null; age: number }[];
 }) {
   const router = useRouter();
 
@@ -353,7 +355,7 @@ export function HomeContent({
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-3">
-      <BirthdayBanner />
+      <BirthdayBanner initialBirthdays={initialBirthdays} />
       {/* Push Notification Permission Banner */}
       {pushPermission === "default" && (
         <div className="bg-white rounded-2xl p-4 border border-amber-200 shadow-sm flex items-start gap-3">

@@ -181,6 +181,31 @@ textarea::placeholder {
   }
 }
 
+/* Background balloons drifting up the birthday banner.
+   `bottom` percentages are relative to the container (banner), so the
+   shapes traverse the full height end-to-end instead of their own size. */
+@keyframes birthday-balloon-rise {
+  0% {
+    bottom: -20%;
+    opacity: 0;
+    transform: rotate(-6deg);
+  }
+  15% {
+    opacity: 0.55;
+  }
+  50% {
+    transform: rotate(6deg);
+  }
+  85% {
+    opacity: 0.4;
+  }
+  100% {
+    bottom: 120%;
+    opacity: 0;
+    transform: rotate(-6deg);
+  }
+}
+
 /* iOS-style safe area padding */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);

@@ -4,6 +4,7 @@ import { HomeContent } from "@/components/HomeContent";
 import { getEffectiveUserId, getEffectiveDate, getSimDate, isSimulating } from "@/lib/simulator";
 import { isFeatureVisible } from "@/lib/visibility";
 import { stripMarkdown } from "@/lib/strip-markdown";
+import { getBirthdaysToday } from "@/lib/birthday/today";
 
 export default async function HomePage() {
   const user = await getAuthUser();
@@ -41,9 +42,13 @@ export default async function HomePage() {
         totalActionCount={0}
         rsvpLikelihood={null}
         simulatedDate={simDate}
+        initialBirthdays={[]}
       />
     );
   }
+
+  // Admin client for queries that must bypass RLS (e.g., all users' birthdays)
+  const adminClient = createAdminClient();
 
   // ── Phase 2: ALL trip-dependent queries in parallel ──
   const [
@@ -63,6 +68,7 @@ export default async function HomePage() {
     optionSettingsResult,
     optionSelectionsResult,
     latestArticleResult,
+    birthdaysResult,
   ] = await Promise.all([
     // Course info
     trip.course_id
@@ -107,6 +113,8 @@ export default async function HomePage() {
       .order("publish_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // Today's birthdays (prefetched so the banner doesn't flash in)
+    getBirthdaysToday(adminClient, trip.timezone || "America/New_York"),
   ]);
 
   // ── Process Phase 2 results ──
@@ -600,6 +608,7 @@ export default async function HomePage() {
       teeTimeDay={teeTimesVisible ? teeTimeDay : null}
       teeTimeLinkHref={bestMatch?.source === "player" ? "/kgb-cup" : bestMatch ? `/scorecards?day=${bestMatch.dayNumber}` : "/scorecards"}
       simulatedDate={simDate}
+      initialBirthdays={birthdaysResult}
       participants={participants}
       nextScheduleItem={nextScheduleItem}
       timezone={trip?.timezone}

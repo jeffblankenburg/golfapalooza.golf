@@ -188,7 +188,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Ads can be tagged with zero or more Loozers (many-to-many)
 - Home page: random carousel of active ads, auto-advances every 6s with dot navigation and swipe support; clicking a tagged ad jumps to the tagged Loozer's profile (random if multiple tags)
 - Loozer profile page: only ads tagged with that Loozer appear, rendered as a non-clickable static carousel after the Bio
-- Admin page at `/admin/fake-ads`: upload a 1200&times;300 image (4:1, min width 1200px for retina sharpness — validated client-side), set alt text, multi-select Loozers to tag, toggle active/inactive, delete
+- Admin page at `/admin/fake-ads`: upload a 1200&times;400 image (3:1, min width 1200px for retina sharpness — validated client-side), set alt text, multi-select Loozers to tag, toggle active/inactive, delete
 
 ### Notebook
 - Trip notes organized by category

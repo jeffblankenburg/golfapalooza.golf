@@ -892,9 +892,6 @@ export function HomeContent({
         </Link>
       )}
 
-      {/* Fake Ads (humor banners) */}
-      <FakeAdCarousel />
-
       {/* Quick Links */}
       <div className="mt-3">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
@@ -939,6 +936,9 @@ export function HomeContent({
           })}
         </div>
       </div>
+
+      {/* Fake Ads (humor banners) */}
+      <FakeAdCarousel />
 
 
       {/* RSVP Modal */}

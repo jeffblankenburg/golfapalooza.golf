@@ -105,12 +105,12 @@ export function FakeAdManager() {
     const img = new Image();
     img.onload = () => {
       const ratio = img.width / img.height;
-      const targetRatio = 4;
-      const tolerance = 0.04; // ~2%
+      const targetRatio = 3;
+      const tolerance = 0.04; // ~1.3% — forgiving for creative slightly off spec
       if (Math.abs(ratio - targetRatio) > tolerance) {
         URL.revokeObjectURL(objectUrl);
         setError(
-          `Image must be 4:1 aspect ratio (like 1200×300). Got ${img.width}×${img.height} (${ratio.toFixed(2)}:1).`
+          `Image must be 3:1 aspect ratio (like 1200×400). Got ${img.width}×${img.height} (${ratio.toFixed(2)}:1).`
         );
         return;
       }
@@ -256,7 +256,7 @@ export function FakeAdManager() {
               </label>
             )}
             <p className="text-xs text-gray-500 mt-2">
-              Required: <strong>1200&times;300</strong> (or any 4:1 size — 1600&times;400, 2000&times;500). Sized for retina phone displays. PNG or JPG, under 10MB.
+              Required: <strong>1200&times;400</strong> (or any 3:1 size — 1500&times;500, 1800&times;600). Sized for retina phone displays. PNG or JPG, under 10MB.
             </p>
           </div>
         )}

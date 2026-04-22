@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { pickBannerSubtitle } from "@/lib/birthday/banner-subtitles";
 
@@ -71,10 +71,15 @@ export function BirthdayBanner({ initialBirthdays }: { initialBirthdays?: Birthd
 }
 
 function BirthdayCard({ birthday: b }: { birthday: Birthday }) {
-  // Pick the subtitle + balloon layout once per mount so nothing flickers on
-  // re-render; both reroll on each fresh page load.
-  const subtitle = useMemo(() => pickBannerSubtitle(b.age), [b.age]);
-  const balloons = useMemo(() => generateBalloons(), []);
+  // SSR needs deterministic output or React throws a hydration mismatch.
+  // Render a stable default, then randomize subtitle + balloons after mount.
+  const [subtitle, setSubtitle] = useState<string>(`Turning ${b.age} today!`);
+  const [balloons, setBalloons] = useState<BalloonConfig[]>([]);
+
+  useEffect(() => {
+    setSubtitle(pickBannerSubtitle(b.age));
+    setBalloons(generateBalloons());
+  }, [b.age]);
 
   return (
     <Link

@@ -110,7 +110,7 @@ export function FakeAdCarousel({
   return (
     <div className="w-full" aria-label="Featured sponsors">
       <div
-        className="relative overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-white aspect-[4/1]"
+        className="relative overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-white aspect-[3/1]"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >

@@ -17,7 +17,7 @@ interface FakeAdCarouselProps {
   clickable?: boolean;
   /** Link prefix for a Loozer profile. Defaults to /loozers. Spectator pages pass /spectator/loozers. */
   profileHref?: string;
-  /** Auto-advance interval in ms. Default 6000. */
+  /** Auto-advance interval in ms. Default 10000. */
   intervalMs?: number;
   /** Cap the number of ads in the rotation (chosen randomly after shuffle).
    *  Undefined = no cap. Home page passes 3. */
@@ -37,7 +37,7 @@ export function FakeAdCarousel({
   userId,
   clickable = true,
   profileHref = "/loozers",
-  intervalMs = 6000,
+  intervalMs = 10000,
   maxAds,
 }: FakeAdCarouselProps) {
   const [ads, setAds] = useState<FakeAd[]>([]);

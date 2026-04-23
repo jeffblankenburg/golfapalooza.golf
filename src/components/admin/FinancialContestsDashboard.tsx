@@ -1167,7 +1167,7 @@ export function FinancialContestsDashboard() {
                                       />
                                     </svg>
                                   </button>
-                                  {tx.source === "manual" && (
+                                  {tx.source !== "option" && tx.source !== "contest_entry" && (
                                     <button
                                       type="button"
                                       onClick={(e) => {

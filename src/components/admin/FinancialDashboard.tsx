@@ -543,8 +543,8 @@ export function FinancialDashboard({ tripId }: { tripId: string }) {
                                       />
                                     </svg>
                                   </button>
-                                  {/* Delete button — manual only */}
-                                  {tx.source === "manual" && (
+                                  {/* Delete button — anything except option/contest_entry (those are managed by their owning systems) */}
+                                  {tx.source !== "option" && tx.source !== "contest_entry" && (
                                     <button
                                       type="button"
                                       onClick={(e) => {

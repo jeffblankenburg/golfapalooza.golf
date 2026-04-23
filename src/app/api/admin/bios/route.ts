@@ -29,14 +29,12 @@ export async function GET() {
       .order("display_name"),
     adminClient
       .from("loozer_bios")
-      .select("id, user_id, content, updated_at"),
+      .select("id, user_id, content, is_visible, updated_at"),
   ]);
 
-  const bioMap = new Map(
-    (bios || [])
-      .filter((b) => b.content && b.content.trim().length > 0)
-      .map((b) => [b.user_id, b])
-  );
+  // Admin needs to see every bio row, including hidden ones and rows whose
+  // content has been cleared — clearing content shouldn't lose the toggle state.
+  const bioMap = new Map((bios || []).map((b) => [b.user_id, b]));
 
   const result = (users || []).map((u) => ({
     ...u,
@@ -73,15 +71,32 @@ export async function POST(request: Request) {
   const admin = await checkPermissionAccess("manage_bios");
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { user_id, content } = await request.json();
+  const body = await request.json();
+  const { user_id, content, is_visible } = body;
   if (!user_id) return NextResponse.json({ error: "user_id is required" }, { status: 400 });
 
   const adminClient = createAdminClient();
 
+  // Look up existing row so we can do partial updates — toggling visibility
+  // shouldn't clobber content, and saving content shouldn't flip visibility.
+  const { data: existing } = await adminClient
+    .from("loozer_bios")
+    .select("content, is_visible")
+    .eq("user_id", user_id)
+    .maybeSingle();
+
+  const nextContent = content !== undefined ? content : existing?.content ?? "";
+  const nextVisible = is_visible !== undefined ? is_visible : existing?.is_visible ?? true;
+
   const { data, error } = await adminClient
     .from("loozer_bios")
     .upsert(
-      { user_id, content: content || "", updated_at: new Date().toISOString() },
+      {
+        user_id,
+        content: nextContent,
+        is_visible: nextVisible,
+        updated_at: new Date().toISOString(),
+      },
       { onConflict: "user_id" }
     )
     .select()

@@ -11,6 +11,7 @@ interface UserWithBio {
     id: string;
     user_id: string;
     content: string;
+    is_visible: boolean;
     updated_at: string;
   } | null;
 }
@@ -33,6 +34,7 @@ export function BioManager() {
   // Editor state
   const [editUser, setEditUser] = useState<UserWithBio | null>(null);
   const [content, setContent] = useState("");
+  const [isVisible, setIsVisible] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const fetchUsers = useCallback(async () => {
@@ -49,12 +51,14 @@ export function BioManager() {
   const openEdit = (user: UserWithBio) => {
     setEditUser(user);
     setContent(user.bio?.content || "");
+    setIsVisible(user.bio?.is_visible ?? true);
     setMode("edit");
   };
 
   const resetEditor = () => {
     setEditUser(null);
     setContent("");
+    setIsVisible(true);
     setMode("list");
   };
 
@@ -74,6 +78,28 @@ export function BioManager() {
     setSaving(false);
     resetEditor();
     await fetchUsers();
+  };
+
+  const setBioVisibility = async (userId: string, next: boolean) => {
+    const prevUsers = users;
+    // Optimistic update — list row + editor (if open on this user).
+    setUsers((curr) =>
+      curr.map((u) =>
+        u.id === userId && u.bio ? { ...u, bio: { ...u.bio, is_visible: next } } : u
+      )
+    );
+    if (editUser?.id === userId) setIsVisible(next);
+
+    const res = await fetch("/api/admin/bios", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId, is_visible: next }),
+    });
+
+    if (!res.ok) {
+      setUsers(prevUsers);
+      if (editUser?.id === userId) setIsVisible(!next);
+    }
   };
 
   const handleDelete = async () => {
@@ -120,6 +146,22 @@ export function BioManager() {
           </div>
         </div>
 
+        {/* Visibility Toggle */}
+        <label className="flex items-center justify-between gap-3 px-3 py-2.5 bg-white rounded-xl border border-gray-200 cursor-pointer">
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Visible on profile</p>
+            <p className="text-xs text-gray-500">
+              {isVisible
+                ? "Bio appears on this Loozer's profile when it has content."
+                : "Bio is hidden from everyone — only admins can see it here."}
+            </p>
+          </div>
+          <VisibilityToggle
+            isVisible={isVisible}
+            onToggle={() => setBioVisibility(editUser.id, !isVisible)}
+          />
+        </label>
+
         {/* Content Editor */}
         <div>
           <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block">
@@ -155,38 +197,100 @@ export function BioManager() {
   return (
     <div className="space-y-1">
       {users.map((user) => (
-        <UserRow key={user.id} user={user} onEdit={openEdit} />
+        <UserRow
+          key={user.id}
+          user={user}
+          onEdit={openEdit}
+          onToggleVisibility={(next) => setBioVisibility(user.id, next)}
+        />
       ))}
     </div>
   );
 }
 
-function UserRow({ user, onEdit }: { user: UserWithBio; onEdit: (u: UserWithBio) => void }) {
+function VisibilityToggle({
+  isVisible,
+  onToggle,
+}: {
+  isVisible: boolean;
+  onToggle: () => void;
+}) {
   return (
     <button
-      onClick={() => onEdit(user)}
-      className="w-full flex items-center gap-3 px-3 py-2.5 bg-white rounded-xl border border-gray-200 active:bg-gray-50 transition-colors text-left"
+      type="button"
+      role="switch"
+      aria-checked={isVisible}
+      aria-label={isVisible ? "Hide bio" : "Show bio"}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+        isVisible ? "bg-green-600" : "bg-gray-300"
+      }`}
     >
-      <div className="w-10 h-10 rounded-full overflow-hidden bg-green-700 text-white flex items-center justify-center flex-shrink-0">
-        {user.avatar_url ? (
-          <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
-        ) : (
-          <span className="text-sm font-bold">{getInitials(user.display_name)}</span>
-        )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-900">{user.display_name}</p>
-        {user.bio ? (
-          <p className="text-xs text-gray-500 truncate">
-            Updated {new Date(user.bio.updated_at).toLocaleDateString()}
-          </p>
-        ) : (
-          <p className="text-xs text-gray-400 italic">No bio yet</p>
-        )}
-      </div>
-      <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-      </svg>
+      <span
+        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+          isVisible ? "translate-x-5" : "translate-x-0.5"
+        }`}
+      />
     </button>
+  );
+}
+
+function UserRow({
+  user,
+  onEdit,
+  onToggleVisibility,
+}: {
+  user: UserWithBio;
+  onEdit: (u: UserWithBio) => void;
+  onToggleVisibility: (next: boolean) => void;
+}) {
+  const hasContent =
+    !!user.bio && !!user.bio.content && user.bio.content.trim().length > 0;
+
+  return (
+    <div className="w-full flex items-center gap-3 px-3 py-2.5 bg-white rounded-xl border border-gray-200">
+      <button
+        type="button"
+        onClick={() => onEdit(user)}
+        className="flex items-center gap-3 flex-1 min-w-0 text-left active:opacity-60"
+      >
+        <div className="w-10 h-10 rounded-full overflow-hidden bg-green-700 text-white flex items-center justify-center flex-shrink-0">
+          {user.avatar_url ? (
+            <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-sm font-bold">{getInitials(user.display_name)}</span>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-900">{user.display_name}</p>
+          {hasContent ? (
+            <p className="text-xs text-gray-500 truncate">
+              Updated {new Date(user.bio!.updated_at).toLocaleDateString()}
+            </p>
+          ) : (
+            <p className="text-xs text-gray-400 italic">No bio yet</p>
+          )}
+        </div>
+      </button>
+      {hasContent && (
+        <VisibilityToggle
+          isVisible={user.bio!.is_visible}
+          onToggle={() => onToggleVisibility(!user.bio!.is_visible)}
+        />
+      )}
+      <button
+        type="button"
+        onClick={() => onEdit(user)}
+        aria-label={`Edit ${user.display_name}'s bio`}
+        className="flex-shrink-0 p-1 text-gray-400 active:opacity-60"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+    </div>
   );
 }

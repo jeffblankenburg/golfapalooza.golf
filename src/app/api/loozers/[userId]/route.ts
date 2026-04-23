@@ -80,6 +80,7 @@ export async function GET(
       .from("loozer_bios")
       .select("content")
       .eq("user_id", userId)
+      .eq("is_visible", true)
       .maybeSingle(),
     adminClient
       .from("songs")

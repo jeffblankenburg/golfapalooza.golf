@@ -12,7 +12,8 @@ export default async function SpectatorLoozersPage() {
       .order("display_name"),
     adminClient
       .from("loozer_bios")
-      .select("user_id, content"),
+      .select("user_id, content")
+      .eq("is_visible", true),
   ]);
 
   const bioUserIds = new Set(

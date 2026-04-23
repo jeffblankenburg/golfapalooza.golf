@@ -36,6 +36,14 @@ interface OptionChoice {
   cost?: number;
 }
 
+// Choices are anonymous records (no DB id), so we attach a transient client-side
+// id for @dnd-kit that stays stable across reorders. Stripped before save.
+type ChoiceWithId = OptionChoice & { _dragId: string };
+
+function attachDragId(c: OptionChoice): ChoiceWithId {
+  return { ...c, _dragId: crypto.randomUUID() };
+}
+
 interface Option {
   id: string;
   group_id: string;
@@ -181,7 +189,7 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
   const [optionDescription, setOptionDescription] = useState("");
   const [optionType, setOptionType] = useState<Option["option_type"]>("checkbox");
   const [optionCost, setOptionCost] = useState<number | "">("");
-  const [optionChoices, setOptionChoices] = useState<OptionChoice[]>([]);
+  const [optionChoices, setOptionChoices] = useState<ChoiceWithId[]>([]);
   const [optionIsRequired, setOptionIsRequired] = useState(false);
   const [optionIcon, setOptionIcon] = useState<string | null>(null);
   const [optionDependsOn, setOptionDependsOn] = useState<string | null>(null);
@@ -404,7 +412,7 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
     setOptionDescription(option.description || "");
     setOptionType(option.option_type);
     setOptionCost(option.cost ?? "");
-    setOptionChoices(option.choices || []);
+    setOptionChoices((option.choices || []).map(attachDragId));
     setOptionIsRequired(option.is_required);
     setOptionIcon(option.icon || null);
     setOptionDependsOn(option.depends_on_option_id || null);
@@ -425,7 +433,10 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
       cost: optionType === "checkbox" && optionCost !== "" ? Number(optionCost) : null,
       choices:
         optionType === "select" || optionType === "multi_select"
-          ? optionChoices
+          ? optionChoices.map(({ _dragId: _drop, ...rest }) => {
+              void _drop;
+              return rest;
+            })
           : null,
       is_required: optionIsRequired,
       depends_on_option_id: optionDependsOn,
@@ -469,12 +480,15 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
   // ── Choices helpers ──
 
   const addChoice = () => {
-    setOptionChoices([...optionChoices, { label: "", value: "", cost: 0 }]);
+    setOptionChoices([
+      ...optionChoices,
+      attachDragId({ label: "", value: "", cost: 0 }),
+    ]);
   };
 
   const updateChoice = (index: number, field: keyof OptionChoice, val: string | number) => {
     setOptionChoices((prev) =>
-      prev.map((c, i): OptionChoice => {
+      prev.map((c, i): ChoiceWithId => {
         if (i !== index) return c;
         if (field === "label") {
           return { ...c, label: val as string, value: slugify(val as string) };
@@ -489,6 +503,18 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
 
   const removeChoice = (index: number) => {
     setOptionChoices((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleChoiceDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = optionChoices.findIndex((c) => c._dragId === active.id);
+    const newIdx = optionChoices.findIndex((c) => c._dragId === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+    const reordered = [...optionChoices];
+    const [moved] = reordered.splice(oldIdx, 1);
+    reordered.splice(newIdx, 0, moved);
+    setOptionChoices(reordered);
   };
 
   // ── Helpers ──
@@ -665,35 +691,26 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
         {(optionType === "select" || optionType === "multi_select") && (
           <div className="space-y-2">
             <label className="block text-xs font-medium text-gray-500">Choices</label>
-            {optionChoices.map((choice, idx) => (
-              <div key={idx} className="flex items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="Label"
-                  value={choice.label}
-                  onChange={(e) => updateChoice(idx, "label", e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                />
-                <div className="w-24 relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
-                  <input
-                    type="number"
-                    placeholder="0"
-                    value={choice.cost ?? ""}
-                    onChange={(e) => updateChoice(idx, "cost", e.target.value)}
-                    className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleChoiceDragEnd}
+            >
+              <SortableContext
+                items={optionChoices.map((c) => c._dragId)}
+                strategy={verticalListSortingStrategy}
+              >
+                {optionChoices.map((choice, idx) => (
+                  <SortableChoiceRow
+                    key={choice._dragId}
+                    choice={choice}
+                    index={idx}
+                    updateChoice={updateChoice}
+                    removeChoice={removeChoice}
                   />
-                </div>
-                <button
-                  onClick={() => removeChoice(idx)}
-                  className="p-1 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
-            ))}
+                ))}
+              </SortableContext>
+            </DndContext>
             <button
               onClick={addChoice}
               className="flex items-center gap-1.5 text-sm text-green-600 font-medium hover:text-green-700"
@@ -1326,6 +1343,56 @@ function SortableOptionRow({
       <button
         onClick={(e) => { e.stopPropagation(); deleteOption(option); }}
         className="p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+function SortableChoiceRow({
+  choice,
+  index,
+  updateChoice,
+  removeChoice,
+}: {
+  choice: ChoiceWithId;
+  index: number;
+  updateChoice: (index: number, field: keyof OptionChoice, val: string | number) => void;
+  removeChoice: (index: number) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: choice._dragId });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-2">
+      <DragHandle listeners={listeners} attributes={attributes} />
+      <input
+        type="text"
+        placeholder="Label"
+        value={choice.label}
+        onChange={(e) => updateChoice(index, "label", e.target.value)}
+        className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+      />
+      <div className="w-24 relative flex-shrink-0">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
+        <input
+          type="number"
+          placeholder="0"
+          value={choice.cost ?? ""}
+          onChange={(e) => updateChoice(index, "cost", e.target.value)}
+          className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+        />
+      </div>
+      <button
+        onClick={() => removeChoice(index)}
+        className="p-1 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors flex-shrink-0"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

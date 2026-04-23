@@ -114,6 +114,56 @@ export function CornholeBracketManager({
     });
   };
 
+  // Cascade clear a match and its downstream state (shared by un-advance,
+  // switch-winner, and series reset).
+  const cascadeClear = (
+    byId: Map<string, BracketMatchData>,
+    match: BracketMatchData,
+    depth: number = 0
+  ) => {
+    if (depth > 20) return;
+    if (match.next_winner_match_id) {
+      const next = byId.get(match.next_winner_match_id);
+      if (next?.winner_participant_id) cascadeClear(byId, next, depth + 1);
+    }
+    if (match.next_loser_match_id) {
+      const next = byId.get(match.next_loser_match_id);
+      if (next?.winner_participant_id) cascadeClear(byId, next, depth + 1);
+    }
+    match.winner_participant_id = null;
+    match.slot1_wins = 0;
+    match.slot2_wins = 0;
+    if (match.next_winner_match_id && match.next_winner_slot) {
+      const next = byId.get(match.next_winner_match_id);
+      if (next) {
+        if (match.next_winner_slot === 1) next.slot1_participant_id = null;
+        else next.slot2_participant_id = null;
+        next.slot1_wins = 0;
+        next.slot2_wins = 0;
+      }
+    }
+    if (match.next_loser_match_id && match.next_loser_slot) {
+      const next = byId.get(match.next_loser_match_id);
+      if (next) {
+        if (match.next_loser_slot === 1) next.slot1_participant_id = null;
+        else next.slot2_participant_id = null;
+        next.slot1_wins = 0;
+        next.slot2_wins = 0;
+      }
+    }
+    if (match.next_loser_match_id && !match.next_loser_slot) {
+      const reset = byId.get(match.next_loser_match_id);
+      if (reset) {
+        if (reset.winner_participant_id) cascadeClear(byId, reset, depth + 1);
+        reset.slot1_participant_id = null;
+        reset.slot2_participant_id = null;
+        reset.winner_participant_id = null;
+        reset.slot1_wins = 0;
+        reset.slot2_wins = 0;
+      }
+    }
+  };
+
   // Apply advance/un-advance optimistically to local matches state
   const applyOptimistic = (
     prev: BracketMatchData[],
@@ -124,97 +174,62 @@ export function CornholeBracketManager({
     const match = byId.get(matchId);
     if (!match) return prev;
 
+    // Series-match branch: tally game wins, advance only when threshold hit.
+    if (match.series_best_of) {
+      const winsNeeded = Math.ceil(match.series_best_of / 2);
+      const isWinner = match.winner_participant_id === participantId;
+
+      if (isWinner) {
+        cascadeClear(byId, match);
+        match.slot1_wins = 0;
+        match.slot2_wins = 0;
+        return Array.from(byId.values());
+      }
+
+      if (match.winner_participant_id) {
+        // Click on loser in a decided series — server rejects; no-op client-side.
+        return prev;
+      }
+
+      const isSlot1 = participantId === match.slot1_participant_id;
+      const newSlot1 = (match.slot1_wins ?? 0) + (isSlot1 ? 1 : 0);
+      const newSlot2 = (match.slot2_wins ?? 0) + (isSlot1 ? 0 : 1);
+      match.slot1_wins = newSlot1;
+      match.slot2_wins = newSlot2;
+
+      const seriesWon = newSlot1 >= winsNeeded || newSlot2 >= winsNeeded;
+      if (!seriesWon) return Array.from(byId.values());
+
+      // Series won — cascade the winner forward like a normal advance.
+      const winnerId = participantId;
+      const loserId = isSlot1
+        ? match.slot2_participant_id
+        : match.slot1_participant_id;
+      match.winner_participant_id = winnerId;
+
+      if (match.next_winner_match_id && match.next_winner_slot) {
+        const next = byId.get(match.next_winner_match_id);
+        if (next) {
+          if (match.next_winner_slot === 1) next.slot1_participant_id = winnerId;
+          else next.slot2_participant_id = winnerId;
+        }
+      }
+      if (match.next_loser_match_id && match.next_loser_slot && loserId) {
+        const next = byId.get(match.next_loser_match_id);
+        if (next) {
+          if (match.next_loser_slot === 1) next.slot1_participant_id = loserId;
+          else next.slot2_participant_id = loserId;
+        }
+      }
+      return Array.from(byId.values());
+    }
+
     const isUnadvance = match.winner_participant_id === participantId;
 
     if (isUnadvance) {
-      // Cascade un-advance: clear this match and all downstream
-      const clearDown = (m: BracketMatchData, depth: number) => {
-        if (depth > 20) return;
-
-        // Recurse into downstream winner match if it has a winner
-        if (m.next_winner_match_id) {
-          const next = byId.get(m.next_winner_match_id);
-          if (next?.winner_participant_id) clearDown(next, depth + 1);
-        }
-        // Recurse into downstream loser match if it has a winner
-        if (m.next_loser_match_id) {
-          const next = byId.get(m.next_loser_match_id);
-          if (next?.winner_participant_id) clearDown(next, depth + 1);
-        }
-
-        // Clear winner
-        m.winner_participant_id = null;
-
-        // Remove from next winner slot
-        if (m.next_winner_match_id && m.next_winner_slot) {
-          const next = byId.get(m.next_winner_match_id);
-          if (next) {
-            if (m.next_winner_slot === 1) next.slot1_participant_id = null;
-            else next.slot2_participant_id = null;
-          }
-        }
-        // Remove from next loser slot
-        if (m.next_loser_match_id && m.next_loser_slot) {
-          const next = byId.get(m.next_loser_match_id);
-          if (next) {
-            if (m.next_loser_slot === 1) next.slot1_participant_id = null;
-            else next.slot2_participant_id = null;
-          }
-        }
-        // Championship → reset special case: clear both slots of reset match
-        if (m.next_loser_match_id && !m.next_loser_slot) {
-          const reset = byId.get(m.next_loser_match_id);
-          if (reset) {
-            if (reset.winner_participant_id) clearDown(reset, depth + 1);
-            reset.slot1_participant_id = null;
-            reset.slot2_participant_id = null;
-            reset.winner_participant_id = null;
-          }
-        }
-      };
-      clearDown(match, 0);
+      cascadeClear(byId, match);
     } else {
-      // If switching winners, un-advance old winner first
-      if (match.winner_participant_id) {
-        // Recursively clear using same logic
-        const clearDown = (m: BracketMatchData, depth: number) => {
-          if (depth > 20) return;
-          if (m.next_winner_match_id) {
-            const next = byId.get(m.next_winner_match_id);
-            if (next?.winner_participant_id) clearDown(next, depth + 1);
-          }
-          if (m.next_loser_match_id) {
-            const next = byId.get(m.next_loser_match_id);
-            if (next?.winner_participant_id) clearDown(next, depth + 1);
-          }
-          m.winner_participant_id = null;
-          if (m.next_winner_match_id && m.next_winner_slot) {
-            const next = byId.get(m.next_winner_match_id);
-            if (next) {
-              if (m.next_winner_slot === 1) next.slot1_participant_id = null;
-              else next.slot2_participant_id = null;
-            }
-          }
-          if (m.next_loser_match_id && m.next_loser_slot) {
-            const next = byId.get(m.next_loser_match_id);
-            if (next) {
-              if (m.next_loser_slot === 1) next.slot1_participant_id = null;
-              else next.slot2_participant_id = null;
-            }
-          }
-          // Championship → reset special case: clear both slots of reset match
-          if (m.next_loser_match_id && !m.next_loser_slot) {
-            const reset = byId.get(m.next_loser_match_id);
-            if (reset) {
-              if (reset.winner_participant_id) clearDown(reset, depth + 1);
-              reset.slot1_participant_id = null;
-              reset.slot2_participant_id = null;
-              reset.winner_participant_id = null;
-            }
-          }
-        };
-        clearDown(match, 0);
-      }
+      if (match.winner_participant_id) cascadeClear(byId, match);
 
       // Advance: set winner and place in downstream slots
       const winnerId = participantId;
@@ -273,6 +288,33 @@ export function CornholeBracketManager({
       setLocked(false);
     } catch (err) {
       console.error("Unlock bracket error:", err);
+    }
+  };
+
+  // Reset a series match to 0–0 and cascade-clear any downstream advancement.
+  const handleSeriesReset = async (matchId: string) => {
+    if (!contestId) return;
+    const prevMatches = matches;
+    setMatches((prev) => {
+      const byId = new Map(prev.map((m) => [m.id, { ...m }]));
+      const match = byId.get(matchId);
+      if (!match) return prev;
+      cascadeClear(byId, match);
+      match.slot1_wins = 0;
+      match.slot2_wins = 0;
+      return Array.from(byId.values());
+    });
+
+    try {
+      const res = await fetch("/api/admin/cornhole/bracket/advance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ match_id: matchId, action: "reset" }),
+      });
+      if (!res.ok) setMatches(prevMatches);
+    } catch (e) {
+      console.error("[Series reset error]", e);
+      setMatches(prevMatches);
     }
   };
 
@@ -408,12 +450,50 @@ export function CornholeBracketManager({
         </p>
       )}
 
+      {/* Series-in-progress banner (Cornhole Singles final is best-of-3) */}
+      {!locked &&
+        matches
+          .filter(
+            (m) =>
+              m.series_best_of &&
+              !m.winner_participant_id &&
+              ((m.slot1_wins ?? 0) > 0 || (m.slot2_wins ?? 0) > 0)
+          )
+          .map((m) => {
+            const s1Name = m.slot1_participant_id
+              ? nameMap[m.slot1_participant_id]?.display_name || "—"
+              : "—";
+            const s2Name = m.slot2_participant_id
+              ? nameMap[m.slot2_participant_id]?.display_name || "—"
+              : "—";
+            return (
+              <div
+                key={m.id}
+                className="flex items-center justify-between gap-2 px-3 py-2 mb-3 bg-amber-50 border border-amber-200 rounded-lg"
+              >
+                <span className="text-xs text-amber-800 truncate">
+                  Finals series:{" "}
+                  <span className="font-semibold">
+                    {s1Name} {m.slot1_wins ?? 0}–{m.slot2_wins ?? 0} {s2Name}
+                  </span>
+                </span>
+                <button
+                  onClick={() => handleSeriesReset(m.id)}
+                  className="text-xs font-semibold text-amber-700 bg-amber-100 px-3 py-1.5 rounded-lg active:bg-amber-200 flex-shrink-0"
+                >
+                  Reset
+                </button>
+              </div>
+            );
+          })}
+
       {/* Bracket */}
       <BracketView
         matches={matches}
         nameMap={nameMap}
         showRealNames={showRealNames}
         onSlotClick={locked ? undefined : handleAdvance}
+        onSeriesReset={locked ? undefined : handleSeriesReset}
       />
 
       {/* Confirm modal */}

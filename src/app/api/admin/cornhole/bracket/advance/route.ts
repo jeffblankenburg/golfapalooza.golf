@@ -14,6 +14,12 @@ interface BracketMatchRow {
   next_winner_slot: number | null;
   next_loser_match_id: string | null;
   next_loser_slot: number | null;
+  series_best_of?: number | null;
+  slot1_wins?: number | null;
+  slot2_wins?: number | null;
+  bracket_type?: string;
+  round_number?: number;
+  contest_id?: string;
 }
 
 /**
@@ -53,13 +59,18 @@ async function cascadeUnadvance(
     }
   }
 
-  // Clear winner on this match
+  // Clear winner on this match (and reset series wins — no-op for non-series)
   await adminClient
     .from("cornhole_bracket_matches")
-    .update({ winner_participant_id: null })
+    .update({
+      winner_participant_id: null,
+      slot1_wins: 0,
+      slot2_wins: 0,
+    })
     .eq("id", match.id);
 
-  // Remove winner from the next winner match slot
+  // Remove winner from the next winner match slot. If the downstream match is
+  // a series match, also reset its wins since an original participant is gone.
   if (match.next_winner_match_id && match.next_winner_slot) {
     const slotField =
       match.next_winner_slot === 1
@@ -67,7 +78,7 @@ async function cascadeUnadvance(
         : "slot2_participant_id";
     await adminClient
       .from("cornhole_bracket_matches")
-      .update({ [slotField]: null })
+      .update({ [slotField]: null, slot1_wins: 0, slot2_wins: 0 })
       .eq("id", match.next_winner_match_id);
   }
 
@@ -79,7 +90,7 @@ async function cascadeUnadvance(
         : "slot2_participant_id";
     await adminClient
       .from("cornhole_bracket_matches")
-      .update({ [slotField]: null })
+      .update({ [slotField]: null, slot1_wins: 0, slot2_wins: 0 })
       .eq("id", match.next_loser_match_id);
   }
 
@@ -102,6 +113,8 @@ async function cascadeUnadvance(
           slot1_participant_id: null,
           slot2_participant_id: null,
           winner_participant_id: null,
+          slot1_wins: 0,
+          slot2_wins: 0,
         })
         .eq("id", match.next_loser_match_id);
     }
@@ -118,11 +131,23 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const { match_id, participant_id } = await request.json();
+    const body = await request.json();
+    const { match_id, participant_id, action } = body as {
+      match_id?: string;
+      participant_id?: string;
+      action?: "reset";
+    };
 
-    if (!match_id || !participant_id) {
+    if (!match_id) {
       return NextResponse.json(
-        { error: "match_id and participant_id are required" },
+        { error: "match_id is required" },
+        { status: 400 }
+      );
+    }
+
+    if (action !== "reset" && !participant_id) {
+      return NextResponse.json(
+        { error: "participant_id is required" },
         { status: 400 }
       );
     }
@@ -154,6 +179,32 @@ export async function PUT(request: Request) {
       );
     }
 
+    // Reset action: clear series progress and cascade un-advance
+    if (action === "reset") {
+      if (!match.series_best_of) {
+        return NextResponse.json(
+          { error: "Reset is only valid for a series match" },
+          { status: 400 }
+        );
+      }
+      await cascadeUnadvance(adminClient, match);
+      await adminClient
+        .from("cornhole_bracket_matches")
+        .update({ slot1_wins: 0, slot2_wins: 0 })
+        .eq("id", match_id);
+
+      const { data: allMatches } = await adminClient
+        .from("cornhole_bracket_matches")
+        .select("bracket_type, round_number, match_number, slot1_participant_id, slot2_participant_id, winner_participant_id")
+        .eq("contest_id", match.contest_id);
+
+      if (allMatches && !computeChampionId(allMatches)) {
+        await clearWinnersForContest(adminClient, match.contest_id).catch(console.error);
+      }
+
+      return NextResponse.json({ success: true, action: "reset" });
+    }
+
     // Validation
     if (match.is_bye) {
       return NextResponse.json(
@@ -177,6 +228,107 @@ export async function PUT(request: Request) {
         { error: "Participant is not in this match" },
         { status: 400 }
       );
+    }
+
+    // Series-match branch: each click records a game win; advance fires only
+    // when one slot reaches the win threshold.
+    if (match.series_best_of) {
+      const winsNeeded = Math.ceil(match.series_best_of / 2);
+
+      // Click on winner of completed series → un-advance + reset wins.
+      if (match.winner_participant_id === participant_id) {
+        await cascadeUnadvance(adminClient, match);
+        await adminClient
+          .from("cornhole_bracket_matches")
+          .update({ slot1_wins: 0, slot2_wins: 0 })
+          .eq("id", match_id);
+
+        const { data: allMatches } = await adminClient
+          .from("cornhole_bracket_matches")
+          .select("bracket_type, round_number, match_number, slot1_participant_id, slot2_participant_id, winner_participant_id")
+          .eq("contest_id", match.contest_id);
+
+        if (allMatches && !computeChampionId(allMatches)) {
+          await clearWinnersForContest(adminClient, match.contest_id).catch(console.error);
+        }
+
+        return NextResponse.json({ success: true, action: "unadvanced" });
+      }
+
+      // Clicks on the non-winning slot in a completed series are rejected —
+      // the admin must first reset by clicking the winner.
+      if (match.winner_participant_id) {
+        return NextResponse.json(
+          { error: "Series is already decided. Tap the current winner to reset." },
+          { status: 400 }
+        );
+      }
+
+      const isSlot1 = participant_id === match.slot1_participant_id;
+      const newSlot1Wins = (match.slot1_wins ?? 0) + (isSlot1 ? 1 : 0);
+      const newSlot2Wins = (match.slot2_wins ?? 0) + (isSlot1 ? 0 : 1);
+      const seriesWon =
+        newSlot1Wins >= winsNeeded || newSlot2Wins >= winsNeeded;
+
+      const updateFields: Record<string, unknown> = {
+        slot1_wins: newSlot1Wins,
+        slot2_wins: newSlot2Wins,
+      };
+      if (seriesWon) updateFields.winner_participant_id = participant_id;
+
+      await adminClient
+        .from("cornhole_bracket_matches")
+        .update(updateFields)
+        .eq("id", match_id);
+
+      if (seriesWon) {
+        const winnerId = participant_id!;
+        const loserId = isSlot1
+          ? match.slot2_participant_id
+          : match.slot1_participant_id;
+
+        if (match.next_winner_match_id && match.next_winner_slot) {
+          const slotField =
+            match.next_winner_slot === 1
+              ? "slot1_participant_id"
+              : "slot2_participant_id";
+          await adminClient
+            .from("cornhole_bracket_matches")
+            .update({ [slotField]: winnerId })
+            .eq("id", match.next_winner_match_id);
+        }
+
+        if (match.next_loser_match_id && match.next_loser_slot) {
+          const slotField =
+            match.next_loser_slot === 1
+              ? "slot1_participant_id"
+              : "slot2_participant_id";
+          await adminClient
+            .from("cornhole_bracket_matches")
+            .update({ [slotField]: loserId })
+            .eq("id", match.next_loser_match_id);
+        }
+
+        const { data: allMatches } = await adminClient
+          .from("cornhole_bracket_matches")
+          .select("bracket_type, round_number, match_number, slot1_participant_id, slot2_participant_id, winner_participant_id")
+          .eq("contest_id", match.contest_id);
+
+        if (allMatches && computeChampionId(allMatches)) {
+          await resolveAllForContest(adminClient, match.contest_id, admin.id).catch(
+            (err) => console.error("Auto-resolve cornhole winners error:", err)
+          );
+        }
+
+        return NextResponse.json({ success: true, action: "advanced" });
+      }
+
+      return NextResponse.json({
+        success: true,
+        action: "game_recorded",
+        slot1_wins: newSlot1Wins,
+        slot2_wins: newSlot2Wins,
+      });
     }
 
     // Toggle: if already the winner, un-advance

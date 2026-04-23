@@ -110,6 +110,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 
 ### Cornhole
 - Singles and doubles tournament brackets
+- Singles final is a best-of-3 series (admin records each game; the bracket advances only when one player reaches 2 wins)
 - Real-time bracket updates with polling
 - "Show real names" toggle (only when full names exist)
 

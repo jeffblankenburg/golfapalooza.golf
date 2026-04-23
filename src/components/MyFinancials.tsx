@@ -369,6 +369,11 @@ export default function MyFinancials({ userId }: { userId: string }) {
                       </span>
                     )}
                   </div>
+                  {t.notes && (
+                    <p className="text-xs text-gray-500 mt-1 italic whitespace-pre-wrap break-words">
+                      {t.notes}
+                    </p>
+                  )}
                 </div>
 
                 <p

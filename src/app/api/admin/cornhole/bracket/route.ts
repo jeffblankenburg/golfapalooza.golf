@@ -232,6 +232,22 @@ export async function POST(request: Request) {
 
     await Promise.all(updates);
 
+    // Singles final is a best-of-3 series
+    if (isSingles) {
+      const mainMatches = bracketMatches.filter((m) => m.bracket_type === "main");
+      const finalRound = Math.max(...mainMatches.map((m) => m.round_number));
+      const finalMatch = mainMatches.find((m) => m.round_number === finalRound);
+      const finalId = finalMatch
+        ? keyToId[`main|${finalMatch.round_number}|${finalMatch.match_number}`]
+        : null;
+      if (finalId) {
+        await adminClient
+          .from("cornhole_bracket_matches")
+          .update({ series_best_of: 3 })
+          .eq("id", finalId);
+      }
+    }
+
     return NextResponse.json({ success: true, matchCount: inserted.length });
   } catch (error) {
     console.error("Generate bracket error:", error);

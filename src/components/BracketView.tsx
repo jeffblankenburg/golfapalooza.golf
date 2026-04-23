@@ -28,6 +28,9 @@ export interface BracketMatchData {
   next_winner_slot: number | null;
   next_loser_match_id: string | null;
   next_loser_slot: number | null;
+  series_best_of?: number | null;
+  slot1_wins?: number | null;
+  slot2_wins?: number | null;
 }
 
 interface BracketViewProps {
@@ -36,6 +39,7 @@ interface BracketViewProps {
   showRealNames?: boolean;
   bracketLabel?: string;
   onSlotClick?: (matchId: string, participantId: string) => void;
+  onSeriesReset?: (matchId: string) => void;
 }
 
 export function BracketView({
@@ -44,6 +48,7 @@ export function BracketView({
   showRealNames = false,
   bracketLabel,
   onSlotClick,
+  onSeriesReset,
 }: BracketViewProps) {
   const championId = useMemo(() => computeChampionId(matches), [matches]);
 
@@ -101,6 +106,7 @@ export function BracketView({
           getName={getName}
           showLabel={bracketTypes.length > 1}
           onSlotClick={onSlotClick}
+          onSeriesReset={onSeriesReset}
           championId={championId}
         />
       ))}
@@ -116,6 +122,7 @@ function BracketSection({
   getName,
   showLabel,
   onSlotClick,
+  onSeriesReset,
   championId,
 }: {
   bracketType: string;
@@ -123,6 +130,7 @@ function BracketSection({
   getName: (id: string | null) => string | null;
   showLabel: boolean;
   onSlotClick?: (matchId: string, participantId: string) => void;
+  onSeriesReset?: (matchId: string) => void;
   championId: string | null;
 }) {
   const rounds = Object.keys(roundsMap)
@@ -221,18 +229,26 @@ function BracketSection({
         >
           {/* Round labels */}
           <div className="flex" style={{ width: totalWidth }}>
-            {rounds.map((round, ri) => (
-              <div
-                key={round}
-                className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider text-center"
-                style={{
-                  width: COL_W,
-                  marginLeft: ri > 0 ? CONN_W : 0,
-                }}
-              >
-                {getRoundLabel(bracketType, round, rounds.length)}
-              </div>
-            ))}
+            {rounds.map((round, ri) => {
+              const matchesInRound = roundsMap[round] || [];
+              const seriesMatch = matchesInRound.find((m) => m.series_best_of);
+              const label = getRoundLabel(bracketType, round, rounds.length);
+              const finalLabel = seriesMatch
+                ? `${label} · Best of ${seriesMatch.series_best_of}`
+                : label;
+              return (
+                <div
+                  key={round}
+                  className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider text-center"
+                  style={{
+                    width: COL_W,
+                    marginLeft: ri > 0 ? CONN_W : 0,
+                  }}
+                >
+                  {finalLabel}
+                </div>
+              );
+            })}
           </div>
 
           {/* Matches and connectors */}
@@ -270,6 +286,7 @@ function BracketSection({
                           match={match}
                           getName={getName}
                           onSlotClick={onSlotClick}
+                          onSeriesReset={onSeriesReset}
                           championId={championId}
                         />
                       </div>
@@ -436,11 +453,13 @@ function MatchCard({
   match,
   getName,
   onSlotClick,
+  onSeriesReset,
   championId,
 }: {
   match: BracketMatchData;
   getName: (id: string | null) => string | null;
   onSlotClick?: (matchId: string, participantId: string) => void;
+  onSeriesReset?: (matchId: string) => void;
   championId: string | null;
 }) {
   const slot1Name = getName(match.slot1_participant_id);
@@ -451,6 +470,12 @@ function MatchCard({
     !match.is_bye &&
     !!match.slot1_participant_id &&
     !!match.slot2_participant_id;
+
+  const isSeries = !!match.series_best_of;
+  const slot1Wins = match.slot1_wins ?? 0;
+  const slot2Wins = match.slot2_wins ?? 0;
+
+  void onSeriesReset; // reset affordance is rendered outside the bracket graphic
 
   return (
     <div
@@ -463,6 +488,7 @@ function MatchCard({
       <SlotRow
         name={slot1Name}
         seed={match.seed1}
+        score={isSeries ? slot1Wins : null}
         isWinner={
           match.winner_participant_id === match.slot1_participant_id &&
           !!match.winner_participant_id
@@ -484,6 +510,7 @@ function MatchCard({
       <SlotRow
         name={slot2Name}
         seed={match.seed2}
+        score={isSeries ? slot2Wins : null}
         isWinner={
           match.winner_participant_id === match.slot2_participant_id &&
           !!match.winner_participant_id
@@ -510,6 +537,7 @@ function MatchCard({
 function SlotRow({
   name,
   seed,
+  score,
   isWinner,
   isChampion,
   isEmpty,
@@ -518,6 +546,7 @@ function SlotRow({
 }: {
   name: string | null;
   seed: number | null;
+  score?: number | null;
   isWinner: boolean;
   isChampion?: boolean;
   isEmpty: boolean;
@@ -541,10 +570,15 @@ function SlotRow({
         </span>
       )}
       <span
-        className={`truncate ${isEmpty ? "text-gray-300 italic" : "text-gray-800"}`}
+        className={`truncate flex-1 ${isEmpty ? "text-gray-300 italic" : "text-gray-800"}`}
       >
         {name || "TBD"}
       </span>
+      {score !== null && score !== undefined && (
+        <span className="text-[11px] font-semibold tabular-nums w-4 text-right flex-shrink-0">
+          {score}
+        </span>
+      )}
     </div>
   );
 }

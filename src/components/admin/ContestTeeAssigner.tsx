@@ -38,6 +38,7 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
   const [tees, setTees] = useState<Tee[]>([]);
   const [holes, setHoles] = useState<HoleData[]>([]);
   const [assignments, setAssignments] = useState<Map<number, string>>(new Map());
+  const [overrides, setOverrides] = useState<Map<number, number>>(new Map());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -46,10 +47,12 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contestRef = useRef<ContestInfo | null>(null);
   const assignmentsRef = useRef<Map<number, string>>(new Map());
+  const overridesRef = useRef<Map<number, number>>(new Map());
 
   // Keep refs in sync
   useEffect(() => { contestRef.current = contest; }, [contest]);
   useEffect(() => { assignmentsRef.current = assignments; }, [assignments]);
+  useEffect(() => { overridesRef.current = overrides; }, [overrides]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -63,12 +66,17 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
       setErrorMessage(data.error_message || null);
 
       const map = new Map<number, string>();
+      const overrideMap = new Map<number, number>();
       if (data.assignments) {
         for (const a of data.assignments) {
           map.set(a.hole_number, a.tee_id);
+          if (typeof a.handicap_index_override === "number") {
+            overrideMap.set(a.hole_number, a.handicap_index_override);
+          }
         }
       }
       setAssignments(map);
+      setOverrides(overrideMap);
     } catch {
       setErrorMessage("Failed to load tee data");
     } finally {
@@ -88,6 +96,7 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
       // Fire-and-forget save of latest state
       const c = contestRef.current;
       const a = assignmentsRef.current;
+      const o = overridesRef.current;
       if (c && a.size > 0) {
         const isRC = c.contest_type === "ryder_cup";
         const body: Record<string, unknown> = { contest_id: c.id };
@@ -96,7 +105,11 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
           body.tee_id = allSame ? a.get(1) : a.get(1);
         } else {
           body.assignments = Array.from(a.entries()).map(
-            ([hole_number, tee_id]) => ({ hole_number, tee_id })
+            ([hole_number, tee_id]) => ({
+              hole_number,
+              tee_id,
+              handicap_index_override: o.get(hole_number) ?? null,
+            })
           );
         }
         fetch("/api/admin/contest-tees", {
@@ -126,6 +139,7 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
     saveTimerRef.current = setTimeout(async () => {
       const c = contestRef.current;
       const a = assignmentsRef.current;
+      const o = overridesRef.current;
       if (!c || a.size === 0) {
         setSaveState("idle");
         return;
@@ -139,7 +153,11 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
         body.tee_id = allSame ? a.get(1) : a.get(1);
       } else {
         body.assignments = Array.from(a.entries()).map(
-          ([hole_number, tee_id]) => ({ hole_number, tee_id })
+          ([hole_number, tee_id]) => ({
+            hole_number,
+            tee_id,
+            handicap_index_override: o.get(hole_number) ?? null,
+          })
         );
       }
 
@@ -173,6 +191,26 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
     setAssignments((prev) => {
       const next = new Map(prev);
       next.set(hole, teeId);
+      return next;
+    });
+    scheduleSave();
+  }
+
+  // Accepts raw text from the input; clamps to 1–18 or clears on empty/invalid.
+  function setHoleOverride(hole: number, raw: string) {
+    setOverrides((prev) => {
+      const next = new Map(prev);
+      if (raw.trim() === "") {
+        next.delete(hole);
+      } else {
+        const n = Number(raw);
+        if (Number.isFinite(n) && n >= 1 && n <= 18) {
+          next.set(hole, Math.round(n));
+        } else {
+          // Invalid value — drop it silently
+          next.delete(hole);
+        }
+      }
       return next;
     });
     scheduleSave();
@@ -356,9 +394,35 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
                       {selectedHole.yards ? ` · ${selectedHole.yards}y` : ""}
                     </span>
                   )}
+                  <input
+                    type="number"
+                    min={1}
+                    max={18}
+                    inputMode="numeric"
+                    placeholder={selectedHole ? String(selectedHole.handicap_index) : "HC"}
+                    value={overrides.get(holeNum) ?? ""}
+                    onChange={(e) => setHoleOverride(holeNum, e.target.value)}
+                    title="Override handicap (1–18). Only applied when all 18 holes are overridden."
+                    className="w-10 h-7 text-xs text-center tabular-nums rounded border border-gray-200 bg-white text-gray-700 focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
+                  />
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Override-state banner for scrambles */}
+        {!isRyderCup && overrides.size > 0 && (
+          <div
+            className={`text-xs rounded-lg px-3 py-2 ${
+              overrides.size === 18
+                ? "bg-green-50 text-green-700 border border-green-200"
+                : "bg-amber-50 text-amber-800 border border-amber-200"
+            }`}
+          >
+            {overrides.size === 18
+              ? "All 18 handicap overrides set — scoring will use overrides instead of stock hole difficulty."
+              : `${overrides.size} of 18 overrides set. Scoring ignores partial overrides — fill all 18 to activate, or clear them all to fall back to stock.`}
           </div>
         )}
 

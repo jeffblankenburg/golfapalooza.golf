@@ -92,7 +92,7 @@ export async function GET(req: NextRequest) {
   // Get current assignments
   const { data: assignments } = await supabase
     .from("contest_hole_tees")
-    .select("id, hole_number, tee_id")
+    .select("id, hole_number, tee_id, handicap_index_override")
     .eq("contest_id", contestId)
     .order("hole_number");
 
@@ -170,22 +170,36 @@ export async function PUT(req: NextRequest) {
   const supabase = createAdminClient();
 
   // Build rows
-  let rows: { contest_id: string; hole_number: number; tee_id: string }[];
+  let rows: {
+    contest_id: string;
+    hole_number: number;
+    tee_id: string;
+    handicap_index_override: number | null;
+  }[];
 
   if (tee_id) {
-    // Single tee for all 18 holes
+    // Single tee for all 18 holes — no override (single-tee rounds use stock handicap)
     rows = Array.from({ length: 18 }, (_, i) => ({
       contest_id,
       hole_number: i + 1,
       tee_id,
+      handicap_index_override: null,
     }));
   } else {
     // Per-hole assignments
     rows = assignments.map(
-      (a: { hole_number: number; tee_id: string }) => ({
+      (a: {
+        hole_number: number;
+        tee_id: string;
+        handicap_index_override?: number | null;
+      }) => ({
         contest_id,
         hole_number: a.hole_number,
         tee_id: a.tee_id,
+        handicap_index_override:
+          typeof a.handicap_index_override === "number"
+            ? a.handicap_index_override
+            : null,
       })
     );
   }

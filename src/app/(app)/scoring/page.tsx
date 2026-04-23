@@ -88,10 +88,18 @@ export default async function ScoringPage({ searchParams }: { searchParams: Prom
         .maybeSingle(),
       adminClient
         .from("contest_hole_tees")
-        .select("hole_number, tee_id")
+        .select("hole_number, tee_id, handicap_index_override")
         .eq("contest_id", contest.id)
         .order("hole_number"),
     ]);
+
+  const overridesActive =
+    (teeAssignmentsResult.data?.length || 0) === 18 &&
+    (teeAssignmentsResult.data || []).every(
+      (ta) =>
+        typeof (ta as { handicap_index_override?: number | null })
+          .handicap_index_override === "number"
+    );
 
   // Build hole data
   let holes: {
@@ -196,10 +204,16 @@ export default async function ScoringPage({ searchParams }: { searchParams: Prom
     holes = teeAssignmentsResult.data.map((ta) => {
       const data = holeMap.get(`${ta.tee_id}-${ta.hole_number}`);
       const fallback = coordFallback.get(ta.hole_number);
+      const overrideValue = (
+        ta as { handicap_index_override?: number | null }
+      ).handicap_index_override;
       return {
         hole_number: ta.hole_number,
         par: data?.par || 4,
-        handicap_index: data?.handicap_index || 0,
+        handicap_index:
+          overridesActive && typeof overrideValue === "number"
+            ? overrideValue
+            : (data?.handicap_index || 0),
         yards: data?.yards || 0,
         tee_color: teeColorMap.get(ta.tee_id) ?? null,
         overhead_image_url: data?.overhead_image_url ?? fallback?.overhead_image_url ?? null,

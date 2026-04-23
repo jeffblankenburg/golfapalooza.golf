@@ -113,10 +113,19 @@ async function breakScrambleTie(
   // Get the trip's course holes via contest_hole_tees
   const { data: teeAssignments } = await supabase
     .from("contest_hole_tees")
-    .select("hole_number, tee_id")
+    .select("hole_number, tee_id, handicap_index_override")
     .eq("contest_id", contestId);
 
   if (!teeAssignments || teeAssignments.length === 0) return null;
+
+  // All-or-nothing: overrides only apply when all 18 holes have a value.
+  const overridesActive =
+    teeAssignments.length === 18 &&
+    teeAssignments.every(
+      (ta) =>
+        typeof (ta as { handicap_index_override?: number | null })
+          .handicap_index_override === "number"
+    );
 
   // Get the course_id from the trip
   const { data: contest } = await supabase
@@ -148,9 +157,14 @@ async function breakScrambleTie(
   const holes: HoleWithHandicap[] = teeAssignments.map((ta) => {
     const info = holeMap.get(`${ta.tee_id}-${ta.hole_number}`);
     holesWithPar[ta.hole_number] = info?.par || 4;
+    const overrideValue = (
+      ta as { handicap_index_override?: number | null }
+    ).handicap_index_override;
     return {
       hole_number: ta.hole_number,
-      handicap_index: info?.handicap_index || 0,
+      handicap_index: overridesActive && typeof overrideValue === "number"
+        ? overrideValue
+        : (info?.handicap_index || 0),
     };
   });
 

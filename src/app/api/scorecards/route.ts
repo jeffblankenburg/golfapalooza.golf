@@ -56,6 +56,7 @@ export async function GET(request: Request) {
     .from("contest_hole_tees")
     .select(`
       hole_number,
+      handicap_index_override,
       tee:course_tees(
         tee_name,
         tee_color,
@@ -69,6 +70,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: teeError.message }, { status: 500 });
   }
 
+  // All-or-nothing: overrides only apply when every one of the 18 holes has one.
+  const overridesActive =
+    (teeAssignments?.length || 0) === 18 &&
+    (teeAssignments || []).every(
+      (ta) =>
+        typeof (ta as { handicap_index_override?: number | null })
+          .handicap_index_override === "number"
+    );
+
   // Build hole info from tee assignments
   const holes: { hole_number: number; par: number; handicap_index: number }[] = [];
   for (const ta of teeAssignments || []) {
@@ -79,10 +89,16 @@ export async function GET(request: Request) {
       (h: { hole_number: number }) => h.hole_number === ta.hole_number
     );
     if (holeData) {
+      const overrideValue = (
+        ta as { handicap_index_override?: number | null }
+      ).handicap_index_override;
       holes.push({
         hole_number: ta.hole_number,
         par: holeData.par,
-        handicap_index: holeData.handicap_index,
+        handicap_index:
+          overridesActive && typeof overrideValue === "number"
+            ? overrideValue
+            : holeData.handicap_index,
       });
     }
   }

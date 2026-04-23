@@ -1,6 +1,7 @@
 import { getAuthUser } from "@/lib/supabase/server";
 import NominationForm from "@/components/NominationForm";
 import { AdminLink } from "@/components/AdminLink";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 export default async function NominationsPage() {
   const user = await getAuthUser();
@@ -11,6 +12,7 @@ export default async function NominationsPage() {
       <div className="flex items-center gap-2 mb-4">
         <h1 className="text-2xl font-bold">Nominate a Rookie</h1>
         <AdminLink permissionKey="manage_nominations" href="/admin/nominations" />
+        <PinnedNoteButton pinnedTo="nominations" />
       </div>
       <NominationForm />
     </div>

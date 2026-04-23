@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 
 interface Submission {
   id: string;
@@ -136,7 +137,10 @@ export default function BestLineContent() {
   return (
     <div className="px-4 py-4 max-w-lg mx-auto">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">Best Line</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold">Best Line</h1>
+          <PinnedNoteButton pinnedTo="best_line" />
+        </div>
         <Link href="/" className="text-sm text-gray-500 hover:text-gray-700">Done</Link>
       </div>
 

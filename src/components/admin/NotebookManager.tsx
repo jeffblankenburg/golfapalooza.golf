@@ -29,8 +29,15 @@ interface Note {
   category?: { id: string; name: string; sort_order: number } | null;
 }
 
+// Grouped by section for easier scanning in the dropdown. The `value` strings
+// must match exactly what each target page passes as `pinnedTo` on its
+// PinnedNoteButton — adding a value here without a matching placement is a
+// no-op; placing a button with a value not listed here works at render time
+// but admins won't have a way to pin a note to it.
 const PINNED_OPTIONS = [
   { value: "", label: "None" },
+
+  // Contests & competitions
   { value: "kgb_cup", label: "KGB Cup" },
   { value: "scramble", label: "Scrambles" },
   { value: "bspitw", label: "BSPITW" },
@@ -40,6 +47,27 @@ const PINNED_OPTIONS = [
   { value: "cornhole", label: "Cornhole" },
   { value: "pickem", label: "Pick'em" },
   { value: "daily_games", label: "Daily Games" },
+  { value: "best_line", label: "Best Line" },
+
+  // Scoring & rounds
+  { value: "scoring", label: "Live Scoring" },
+  { value: "my_rounds", label: "My Rounds" },
+  { value: "course", label: "Course" },
+
+  // Logistics
+  { value: "schedule", label: "Schedule / Tee Times" },
+  { value: "rooms", label: "Rooms" },
+  { value: "financials", label: "Financials" },
+  { value: "options", label: "Options" },
+  { value: "nominations", label: "Nominations" },
+  { value: "action_items", label: "Action Items" },
+  { value: "info", label: "Trip Info" },
+
+  // Content & social
+  { value: "articles", label: "Articles" },
+  { value: "gallery", label: "Photo Gallery" },
+  { value: "chat", label: "Chat" },
+  { value: "music", label: "Music" },
 ];
 
 export function NotebookManager({ tripId }: { tripId: string }) {

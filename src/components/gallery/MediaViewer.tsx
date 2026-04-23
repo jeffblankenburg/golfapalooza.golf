@@ -183,7 +183,7 @@ function MediaPanel({
           transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
           transition: isSnapBack ? "transform 0.2s ease-out" : "none",
           ...(hasAspectRatio
-            ? { aspectRatio: `${item.width}/${item.height}`, width: "100vw", maxWidth: "100vw", maxHeight: "100vh" }
+            ? { aspectRatio: `${item.width}/${item.height}`, width: "100vw", maxWidth: "100vw", maxHeight: "100dvh" }
             : {}),
         }}
         className={hasAspectRatio ? "relative" : "relative flex items-center justify-center"}
@@ -568,7 +568,7 @@ export function MediaViewer({
             <div
               key={panelItem.id}
               className="absolute inset-0 flex items-center justify-center"
-              style={{ transform: `translateY(${position * 100}vh)` }}
+              style={{ transform: `translateY(${position * 100}dvh)` }}
             >
               <MediaPanel
                 item={panelItem}

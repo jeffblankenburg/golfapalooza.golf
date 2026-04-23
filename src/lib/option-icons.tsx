@@ -1273,5 +1273,13 @@ export function OptionIcon({
 }) {
   const icon = getOptionIcon(iconKey);
   if (!icon) return null;
-  return <span className={className}>{icon.svg}</span>;
+  // The underlying <svg> has no intrinsic width/height (only a viewBox), so
+  // sizing has to live on the SVG itself — wrapping it in a <span> with w-N/h-N
+  // doesn't work because inline spans ignore width/height.
+  if (!React.isValidElement(icon.svg)) return null;
+  const svgEl = icon.svg as React.ReactElement<{ className?: string }>;
+  const existingClass = svgEl.props.className ?? "";
+  return React.cloneElement(svgEl, {
+    className: `${existingClass} ${className}`.trim(),
+  });
 }

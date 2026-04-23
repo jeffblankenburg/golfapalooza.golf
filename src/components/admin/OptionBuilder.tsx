@@ -1039,7 +1039,7 @@ function SortableGroupCard({
     <div
       ref={setNodeRef}
       style={style}
-      className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
+      className="bg-white rounded-2xl border border-gray-200 shadow-sm"
     >
       {/* Group header */}
       <div

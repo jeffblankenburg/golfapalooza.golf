@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { checkIsAdmin, checkAnyPermissionAccess } from "@/lib/permissions-server";
+import { checkIsAdmin, checkAnyPermissionAccess, checkPermissionAccess } from "@/lib/permissions-server";
 
 /**
  * @swagger
@@ -53,7 +53,7 @@ export async function GET() {
  *         description: Unauthorized
  */
 export async function POST(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_loozers");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -206,10 +206,11 @@ export async function POST(request: Request) {
  *         description: Unauthorized
  */
 export async function PUT(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_loozers");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const isFullAdmin = !!(await checkIsAdmin());
 
   try {
     const { userId, displayName, fullName, phone, isAdmin, permissions, handicapIndex, eightBagAverage, avgScrambleScore, birthday, sponsorId, isFounder } = await request.json();
@@ -299,8 +300,10 @@ export async function PUT(request: Request) {
     if (fullName !== undefined) updates.full_name = fullName;
     if (phoneChanged && phone10) updates.phone = phone10;
     if (becomingRegular) updates.is_financial_only = false;
-    if (isAdmin !== undefined) updates.is_admin = isAdmin;
-    if (permissions !== undefined) updates.permissions = permissions;
+    // Only full admins can grant admin or change permissions — prevents
+    // a manage_loozers permission holder from escalating their own access.
+    if (isFullAdmin && isAdmin !== undefined) updates.is_admin = isAdmin;
+    if (isFullAdmin && permissions !== undefined) updates.permissions = permissions;
     if (eightBagAverage !== undefined) updates.eight_bag_average = eightBagAverage === null || eightBagAverage === "" ? null : parseFloat(eightBagAverage);
     if (avgScrambleScore !== undefined) updates.avg_scramble_score = avgScrambleScore === null || avgScrambleScore === "" ? null : parseFloat(avgScrambleScore);
     if (birthday !== undefined) updates.birthday = birthday === null || birthday === "" ? null : birthday;

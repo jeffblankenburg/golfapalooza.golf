@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { checkIsAdmin } from "@/lib/permissions-server";
+import { checkPermissionAccess } from "@/lib/permissions-server";
 
 /**
  * @swagger
@@ -39,7 +39,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_loozers");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

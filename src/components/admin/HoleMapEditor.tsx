@@ -24,6 +24,9 @@ interface HoleMapEditorProps {
   courseName: string | null;
   courseCity: string | null;
   courseState: string | null;
+  /** Previous hole's green coordinates, used as a smarter starting center
+   *  when the current hole has no markers placed yet. */
+  previousHoleGreen?: [number, number] | null;
   coordinates: Coordinates;
   onSave: (coords: Coordinates) => void;
   onClose: () => void;
@@ -59,6 +62,7 @@ export default function HoleMapEditor({
   courseName,
   courseCity,
   courseState,
+  previousHoleGreen,
   coordinates,
   onSave,
   onClose,
@@ -142,11 +146,13 @@ export default function HoleMapEditor({
   const driveToGreen = drive && green ? calcYards(drive, green) : null;
   const greenDepth = greenFront && greenBack ? calcYards(greenFront, greenBack) : null;
 
-  const center: [number, number] = tee || green || (
-    courseLatitude != null && courseLongitude != null
+  const center: [number, number] =
+    tee ||
+    green ||
+    previousHoleGreen ||
+    (courseLatitude != null && courseLongitude != null
       ? [courseLatitude, courseLongitude]
-      : geocodedCenter || [40.0, -83.0]
-  );
+      : geocodedCenter || [40.0, -83.0]);
 
   // Init Mapbox
   useEffect(() => {
@@ -167,7 +173,7 @@ export default function HoleMapEditor({
         container: containerRef.current,
         style: "mapbox://styles/mapbox/satellite-streets-v12",
         center: [center[1], center[0]],
-        zoom: tee || green ? 17 : 15,
+        zoom: tee || green || previousHoleGreen ? 17 : 15,
         bearing,
         attributionControl: false,
       });

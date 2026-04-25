@@ -878,7 +878,13 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
           </button>
         </div>
         <div className="divide-y divide-gray-100">
-          {holes.map((hole, i) => (
+          {holes.map((hole, i) => {
+            const prev = holes.find((h) => h.hole_number === hole.hole_number - 1);
+            const previousHoleGreen: [number, number] | null =
+              prev && prev.green_latitude != null && prev.green_longitude != null
+                ? [prev.green_latitude, prev.green_longitude]
+                : null;
+            return (
             <HoleRow
               key={hole.id}
               hole={hole}
@@ -910,8 +916,10 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
               courseAddress={course.address}
               courseCity={course.city}
               courseState={course.state}
+              previousHoleGreen={previousHoleGreen}
             />
-          ))}
+            );
+          })}
         </div>
       </section>
       )}
@@ -988,6 +996,7 @@ function HoleRow({
   courseAddress,
   courseCity,
   courseState,
+  previousHoleGreen,
 }: {
   hole: HoleData;
   holeIndex: number;
@@ -1006,6 +1015,7 @@ function HoleRow({
   courseAddress: string | null;
   courseCity: string | null;
   courseState: string | null;
+  previousHoleGreen: [number, number] | null;
 }) {
   const [showMap, setShowMap] = useState(false);
   const isUploadingOverhead = uploadingKey === `${hole.id}-overhead`;
@@ -1104,6 +1114,7 @@ function HoleRow({
           courseName={courseName}
           courseCity={courseCity}
           courseState={courseState}
+          previousHoleGreen={previousHoleGreen}
           coordinates={{
             tee_latitude: hole.tee_latitude,
             tee_longitude: hole.tee_longitude,

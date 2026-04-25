@@ -170,7 +170,7 @@ export function LoozersList({
           <button
             type="button"
             onClick={() => setShowRealNamesPersisted(!showRealNames)}
-            className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors border ${
+            className={`ml-auto px-3 py-1 rounded-md text-xs font-semibold transition-colors border ${
               showRealNames
                 ? "bg-green-600 text-white border-green-600"
                 : "bg-white text-gray-700 border-gray-300"

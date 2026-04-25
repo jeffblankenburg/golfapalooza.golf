@@ -17,7 +17,9 @@ interface HoleMapViewProps {
 // Gate thresholds for the auto-target state machine.
 const GATE_YARDS = 200;         // trigger distance for tee→tracking and tracking→green
 const FMB_YARDS = 250;          // show front/middle/back distances when user within this
-const REFIT_YARDS = 15;         // re-fit map bounds after user moves this far
+// GPS jitter is typically 1–2 yards; anything past this counts as real movement
+// and (a) re-frames the camera and (b) clears any manual pan/zoom override.
+const RESET_YARDS = 3;
 
 function getBearing(from: [number, number], to: [number, number]): number {
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -145,9 +147,12 @@ export default function HoleMapView({
   const targetStateRef = useRef<"tee" | "tracking" | "green">("tee");
   const manualOverrideRef = useRef(false);
   const lastFitUserRef = useRef<[number, number] | null>(null);
-  // Snaps the camera back to "user/tee at bottom, green at top". Called on any
-  // event that repositions map elements, undoing prior manual pan/rotate.
-  const snapOrientationRef = useRef<(() => void) | null>(null);
+  // Frames the camera so the green sits near the top center and the user
+  // (or tee, when GPS is off) sits near the bottom center.
+  const applyAutoCameraRef = useRef<((origin: [number, number]) => void) | null>(null);
+  // Set when the user pans/zooms/rotates the map themselves. Cleared on the
+  // next GPS tick that shows meaningful movement (≥ RESET_YARDS).
+  const userMapOverrideRef = useRef(false);
 
   const gpsEnabledRef = useRef(gpsEnabled);
   gpsEnabledRef.current = gpsEnabled;
@@ -166,6 +171,8 @@ export default function HoleMapView({
     driveMarkerRef.current = null;
     manualOverrideRef.current = false;
     lastFitUserRef.current = null;
+    userMapOverrideRef.current = false;
+    applyAutoCameraRef.current = null;
 
     const tee = teeRef.current;
     const green = greenRef.current;
@@ -217,15 +224,35 @@ export default function HoleMapView({
       map.on("load", () => {
         if (cancelled) return;
 
-        snapOrientationRef.current = () => {
+        // Re-frame the camera so origin (user or tee) sits near the bottom
+        // center and green sits near the top center. Bearing aligns the
+        // origin→green vector with screen "up", and asymmetric vertical
+        // padding centers each end of the line.
+        applyAutoCameraRef.current = (origin) => {
           const g = greenRef.current;
           if (!g) return;
-          const origin: [number, number] =
-            gpsEnabledRef.current && userPosRef.current
-              ? [userPosRef.current.lat, userPosRef.current.lng]
-              : teeRef.current;
-          map.easeTo({ bearing: getBearing(origin, g), pitch: 0, duration: 250 });
+          const bounds = new mapboxgl.LngLatBounds(
+            [origin[1], origin[0]],
+            [g[1], g[0]]
+          );
+          const cam = map.cameraForBounds(bounds, {
+            padding: { top: 90, bottom: 110, left: 40, right: 40 },
+            bearing: getBearing(origin, g),
+            maxZoom: 19,
+          });
+          if (cam) {
+            map.easeTo({ ...cam, pitch: 0, duration: 350 });
+          }
         };
+
+        // Distinguish user gestures from programmatic camera moves: only
+        // user-initiated events have an originalEvent on them.
+        const onUserGesture = (e: { originalEvent?: Event }) => {
+          if (e.originalEvent) userMapOverrideRef.current = true;
+        };
+        map.on("dragstart", onUserGesture);
+        map.on("zoomstart", onUserGesture);
+        map.on("rotatestart", onUserGesture);
 
         // Tee marker (static reference; not connected to the dotted chain when GPS is on)
         const teeHex = TEE_HEX_COLORS[teeColorRef.current || ""] || "#2563eb";
@@ -418,7 +445,8 @@ export default function HoleMapView({
             rewire(origin, drivePos);
           });
           driveMarker.on("dragend", () => {
-            snapOrientationRef.current?.();
+            // Don't fight the user's framing on a target tweak — the next
+            // GPS tick will re-apply auto framing if appropriate.
           });
         }
 
@@ -438,7 +466,8 @@ export default function HoleMapView({
       applyOriginRef.current = null;
       currentDriveRef.current = null;
       lastFitUserRef.current = null;
-      snapOrientationRef.current = null;
+      applyAutoCameraRef.current = null;
+      userMapOverrideRef.current = false;
     };
   }, [holeNumber]);
 
@@ -488,8 +517,9 @@ export default function HoleMapView({
         userMarkerRef.current?.remove?.();
         userMarkerRef.current = null;
         lastFitUserRef.current = null;
+        userMapOverrideRef.current = false;
         applyOriginRef.current?.(teeRef.current);
-        snapOrientationRef.current?.();
+        applyAutoCameraRef.current?.(teeRef.current);
         return;
       }
 
@@ -547,28 +577,22 @@ export default function HoleMapView({
       // Rewire origin/green segments with new user origin and current target
       applyOriginRef.current?.(user);
 
-      // ─── Auto-refit bounds so the map tracks the remaining hole ───
-      // Only refit after meaningful movement to avoid constant re-animation.
+      // ─── Keep green at top center, user at bottom center ───
+      // Re-frame on every tick that shows real movement. Any meaningful
+      // movement also clears a manual pan/zoom override so the camera
+      // resets the moment the player walks.
       if (green) {
         const last = lastFitUserRef.current;
-        const moved = !last || calcYards(last, user) >= REFIT_YARDS;
-        if (moved) {
-          const bounds = new mapboxgl.LngLatBounds([user[1], user[0]], [green[1], green[0]]);
-          if (currentDriveRef.current) {
-            bounds.extend([currentDriveRef.current[1], currentDriveRef.current[0]]);
-          }
-          map.fitBounds(bounds, {
-            padding: { top: 90, bottom: 110, left: 50, right: 50 },
-            bearing: getBearing(user, green),
-            pitch: 0,
-            duration: 600,
-            maxZoom: 19,
-          });
+        const movedYards = last ? calcYards(last, user) : Infinity;
+        const meaningfulMove = movedYards >= RESET_YARDS;
+
+        if (meaningfulMove) {
+          userMapOverrideRef.current = false;
           lastFitUserRef.current = user;
-        } else {
-          // Between refits the user marker still moves every tick — snap the
-          // orientation so any prior manual pan/rotate is undone.
-          snapOrientationRef.current?.();
+        }
+
+        if (!userMapOverrideRef.current) {
+          applyAutoCameraRef.current?.(user);
         }
       }
     })();

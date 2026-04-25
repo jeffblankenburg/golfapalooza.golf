@@ -212,7 +212,7 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const { userId, displayName, fullName, phone, isAdmin, permissions, handicapIndex, eightBagAverage, avgScrambleScore, birthday } = await request.json();
+    const { userId, displayName, fullName, phone, isAdmin, permissions, handicapIndex, eightBagAverage, avgScrambleScore, birthday, sponsorId, isFounder } = await request.json();
 
     if (!userId) {
       return NextResponse.json(
@@ -228,6 +228,58 @@ export async function PUT(request: Request) {
       .select("phone, is_financial_only")
       .eq("id", userId)
       .single();
+
+    // Sponsorship validation
+    if (sponsorId !== undefined && sponsorId !== null) {
+      if (sponsorId === userId) {
+        return NextResponse.json(
+          { error: "A Loozer cannot sponsor themselves" },
+          { status: 400 }
+        );
+      }
+      const { data: sponsor } = await adminClient
+        .from("users")
+        .select("id, is_financial_only")
+        .eq("id", sponsorId)
+        .single();
+      if (!sponsor) {
+        return NextResponse.json({ error: "Sponsor not found" }, { status: 400 });
+      }
+      if (sponsor.is_financial_only) {
+        return NextResponse.json(
+          { error: "Financial-only users cannot be sponsors" },
+          { status: 400 }
+        );
+      }
+      // Walk descendants of userId — sponsorId must not appear in there
+      const { data: allUsers } = await adminClient
+        .from("users")
+        .select("id, sponsor_id")
+        .not("sponsor_id", "is", null);
+      const childrenByParent = new Map<string, string[]>();
+      for (const u of allUsers || []) {
+        if (!u.sponsor_id) continue;
+        if (!childrenByParent.has(u.sponsor_id)) childrenByParent.set(u.sponsor_id, []);
+        childrenByParent.get(u.sponsor_id)!.push(u.id);
+      }
+      const descendants = new Set<string>();
+      const queue = [userId];
+      while (queue.length) {
+        const cur = queue.shift()!;
+        for (const child of childrenByParent.get(cur) || []) {
+          if (!descendants.has(child)) {
+            descendants.add(child);
+            queue.push(child);
+          }
+        }
+      }
+      if (descendants.has(sponsorId)) {
+        return NextResponse.json(
+          { error: "Cannot select a descendant as a sponsor (would create a cycle)" },
+          { status: 400 }
+        );
+      }
+    }
 
     const phone10 = phone ? phone.replace(/\D/g, "").slice(-10) : null;
     const phoneChanged = phone10 && currentUser?.phone !== phone10;
@@ -258,6 +310,18 @@ export async function PUT(request: Request) {
     if (eightBagAverage !== undefined) updates.eight_bag_average = eightBagAverage === null || eightBagAverage === "" ? null : parseFloat(eightBagAverage);
     if (avgScrambleScore !== undefined) updates.avg_scramble_score = avgScrambleScore === null || avgScrambleScore === "" ? null : parseFloat(avgScrambleScore);
     if (birthday !== undefined) updates.birthday = birthday === null || birthday === "" ? null : birthday;
+
+    // Sponsorship: founder and sponsor are mutually exclusive — setting one clears the other
+    if (isFounder === true) {
+      updates.is_founder = true;
+      updates.sponsor_id = null;
+    } else if (isFounder === false) {
+      updates.is_founder = false;
+      if (sponsorId !== undefined) updates.sponsor_id = sponsorId;
+    } else if (sponsorId !== undefined) {
+      updates.sponsor_id = sponsorId;
+      if (sponsorId !== null) updates.is_founder = false;
+    }
 
     if (Object.keys(updates).length > 0) {
       const { error } = await adminClient
@@ -402,6 +466,21 @@ export async function DELETE(request: Request) {
     }
 
     const adminClient = createAdminClient();
+
+    // Block deletion if this Loozer has sponsees — admin must reassign first
+    const { data: sponsees, count: sponseeCount } = await adminClient
+      .from("users")
+      .select("id, display_name", { count: "exact" })
+      .eq("sponsor_id", userId);
+    if ((sponseeCount || 0) > 0) {
+      const names = (sponsees || []).slice(0, 3).map((s) => s.display_name).join(", ");
+      const more = (sponseeCount || 0) > 3 ? ` and ${(sponseeCount || 0) - 3} more` : "";
+      return NextResponse.json(
+        { error: `Cannot delete: this Loozer sponsored ${names}${more}. Reassign them to another sponsor first.` },
+        { status: 400 }
+      );
+    }
+
     const { error } = await adminClient.auth.admin.deleteUser(userId);
 
     if (error) {

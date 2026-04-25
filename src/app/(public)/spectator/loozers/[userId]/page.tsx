@@ -23,7 +23,7 @@ export default async function SpectatorLoozerProfilePage({
     adminClient
       .from("users")
       .select(
-        "id, display_name, avatar_url, city, state, playing_since, swings, typical_shot, fun_fact, best_shot, occupation, eight_bag_average, avg_scramble_score"
+        "id, display_name, avatar_url, city, state, playing_since, swings, typical_shot, fun_fact, best_shot, occupation, eight_bag_average, avg_scramble_score, is_founder, sponsor_id"
       )
       .eq("id", userId)
       .single(),
@@ -98,6 +98,16 @@ export default async function SpectatorLoozerProfilePage({
 
   const bioContent = bioData?.content?.trim() ? { content: bioData.content } : null;
 
+  let sponsor: { id: string; display_name: string; avatar_url: string | null } | null = null;
+  if (profile.sponsor_id) {
+    const { data: sponsorRow } = await adminClient
+      .from("users")
+      .select("id, display_name, avatar_url")
+      .eq("id", profile.sponsor_id)
+      .maybeSingle();
+    if (sponsorRow) sponsor = sponsorRow;
+  }
+
   return (
     <div className="px-4 pt-6 pb-8">
       <Link href="/spectator/loozers" className="text-sm text-green-700 font-medium mb-3 inline-block">
@@ -116,6 +126,8 @@ export default async function SpectatorLoozerProfilePage({
           avgScrambleScore: profile.avg_scramble_score ?? null,
           bio: bioContent,
           scorecards,
+          isFounder: profile.is_founder === true,
+          sponsor,
         }}
       />
     </div>

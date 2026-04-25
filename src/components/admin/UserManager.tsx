@@ -14,12 +14,35 @@ interface User {
   is_admin: boolean;
   is_active: boolean;
   is_financial_only: boolean;
+  is_founder: boolean;
+  sponsor_id: string | null;
   permissions: Record<string, boolean> | null;
   handicap_index: number | null;
   eight_bag_average: number | null;
   avg_scramble_score: number | null;
   birthday: string | null;
   created_at: string;
+}
+
+function computeDescendants(rootId: string, users: User[]): Set<string> {
+  const childrenByParent = new Map<string, string[]>();
+  for (const u of users) {
+    if (!u.sponsor_id) continue;
+    if (!childrenByParent.has(u.sponsor_id)) childrenByParent.set(u.sponsor_id, []);
+    childrenByParent.get(u.sponsor_id)!.push(u.id);
+  }
+  const descendants = new Set<string>();
+  const queue = [rootId];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    for (const child of childrenByParent.get(cur) || []) {
+      if (!descendants.has(child)) {
+        descendants.add(child);
+        queue.push(child);
+      }
+    }
+  }
+  return descendants;
 }
 
 function formatPhone(phone: string | null): string {
@@ -49,6 +72,10 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
   const [editPermissions, setEditPermissions] = useState<
     Record<string, boolean>
   >({});
+  const [editIsFounder, setEditIsFounder] = useState(false);
+  const [editSponsorId, setEditSponsorId] = useState<string | null>(null);
+  const [sponsorSearch, setSponsorSearch] = useState("");
+  const [showSponsorPicker, setShowSponsorPicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
@@ -85,8 +112,15 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
     setError("");
+
+    // Sponsorship validation: editing a non-financial Loozer must be either a founder or have a sponsor
+    if (editingUser && !editingUser.is_financial_only && !editIsFounder && !editSponsorId) {
+      setError("Pick a sponsor or mark this Loozer as a Founding Father.");
+      return;
+    }
+
+    setSaving(true);
 
     try {
       const url = "/api/admin/users";
@@ -100,6 +134,8 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
             avgScrambleScore: formData.avgScrambleScore === "" ? null : formData.avgScrambleScore,
             isAdmin: editIsAdmin,
             permissions: editIsAdmin ? {} : editPermissions,
+            isFounder: editIsFounder,
+            sponsorId: editIsFounder ? null : editSponsorId,
           }
         : {
             ...formData,
@@ -135,6 +171,10 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
     setFormData({ phone: "", displayName: "", fullName: "", handicapIndex: "", eightBagAverage: "", avgScrambleScore: "", birthday: "" });
     setEditIsAdmin(false);
     setEditPermissions({});
+    setEditIsFounder(false);
+    setEditSponsorId(null);
+    setSponsorSearch("");
+    setShowSponsorPicker(false);
     setError("");
     setShowModal(true);
   };
@@ -152,6 +192,10 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
     });
     setEditIsAdmin(user.is_admin);
     setEditPermissions(user.permissions || {});
+    setEditIsFounder(user.is_founder);
+    setEditSponsorId(user.sponsor_id);
+    setSponsorSearch("");
+    setShowSponsorPicker(false);
     setAvatarPreview(user.avatar_url);
     setError("");
     setShowModal(true);
@@ -528,6 +572,134 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                     />
                   </div>
                 </div>
+
+                {editingUser && !editingUser.is_financial_only && (() => {
+                  const descendants = computeDescendants(editingUser.id, users);
+                  const eligibleSponsors = users.filter(
+                    (u) =>
+                      u.id !== editingUser.id &&
+                      !u.is_financial_only &&
+                      !descendants.has(u.id)
+                  );
+                  const q = sponsorSearch.toLowerCase().trim();
+                  const filteredSponsors = q
+                    ? eligibleSponsors.filter(
+                        (u) =>
+                          u.display_name.toLowerCase().includes(q) ||
+                          (u.full_name || "").toLowerCase().includes(q)
+                      )
+                    : eligibleSponsors;
+                  const currentSponsor = editSponsorId
+                    ? users.find((u) => u.id === editSponsorId)
+                    : null;
+
+                  return (
+                    <div className="pt-3 border-t border-gray-100 space-y-3">
+                      <h3 className="text-sm font-semibold text-gray-700">Origin Story</h3>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = !editIsFounder;
+                          setEditIsFounder(next);
+                          if (next) {
+                            setEditSponsorId(null);
+                            setShowSponsorPicker(false);
+                          }
+                        }}
+                        className="flex items-center justify-between w-full py-1"
+                      >
+                        <span className="text-sm text-gray-700">Founding Father</span>
+                        <div
+                          className={`w-11 h-6 rounded-full transition-colors relative ${
+                            editIsFounder ? "bg-green-600" : "bg-gray-300"
+                          }`}
+                        >
+                          <div
+                            className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                              editIsFounder ? "translate-x-[22px]" : "translate-x-0.5"
+                            }`}
+                          />
+                        </div>
+                      </button>
+
+                      {!editIsFounder && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">
+                            Sponsor
+                          </label>
+                          {currentSponsor && !showSponsorPicker ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowSponsorPicker(true);
+                                setSponsorSearch("");
+                              }}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-left active:bg-gray-50"
+                            >
+                              {currentSponsor.avatar_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={currentSponsor.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                  <span className="text-xs font-semibold text-gray-500">
+                                    {currentSponsor.display_name?.[0]?.toUpperCase() || "?"}
+                                  </span>
+                                </div>
+                              )}
+                              <span className="flex-1 text-sm text-gray-900">{currentSponsor.display_name}</span>
+                              <span className="text-xs text-green-700 font-medium">Change</span>
+                            </button>
+                          ) : (
+                            <>
+                              <input
+                                type="text"
+                                value={sponsorSearch}
+                                onChange={(e) => {
+                                  setSponsorSearch(e.target.value);
+                                  setShowSponsorPicker(true);
+                                }}
+                                onFocus={() => setShowSponsorPicker(true)}
+                                placeholder="Search Loozers…"
+                                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                              />
+                              {showSponsorPicker && (
+                                <div className="mt-2 max-h-56 overflow-y-auto border border-gray-200 rounded-xl bg-white">
+                                  {filteredSponsors.length === 0 && (
+                                    <div className="px-3 py-3 text-xs text-gray-400 text-center">No matches</div>
+                                  )}
+                                  {filteredSponsors.map((u) => (
+                                    <button
+                                      key={u.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setEditSponsorId(u.id);
+                                        setShowSponsorPicker(false);
+                                        setSponsorSearch("");
+                                      }}
+                                      className="w-full flex items-center gap-3 px-3 py-2 text-left active:bg-gray-50"
+                                    >
+                                      {u.avatar_url ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={u.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                                      ) : (
+                                        <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                          <span className="text-[10px] font-semibold text-gray-500">
+                                            {u.display_name?.[0]?.toUpperCase() || "?"}
+                                          </span>
+                                        </div>
+                                      )}
+                                      <span className="text-sm text-gray-900">{u.display_name}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {editingUser && (
                   <div className="pt-3 border-t border-gray-100 space-y-3">

@@ -107,7 +107,7 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 
 ### Tables
 
-- `users` - User profiles (display_name, phone, full_name)
+- `users` - User profiles (display_name, phone, full_name, `is_founder`, `sponsor_id` self-FK for the Loozer family tree)
 - `courses` - Cached golf courses from GolfCourseAPI
 - `course_tees` - Tee boxes with ratings (course_rating, slope_rating)
 - `course_holes` - Hole details (par, handicap_index, yards)
@@ -148,6 +148,23 @@ Handicap Index = Average of best 8 of last 20 differentials
 - `18` - Full 18 holes
 - `9-front` - Front nine (holes 1-9)
 - `9-back` - Back nine (holes 10-18)
+
+### Loozer Sponsorship Tree
+
+Every Loozer (except founding fathers) was brought in by another Loozer. The relationship is captured by:
+- `users.is_founder` (boolean) — flagged for founders, who sit at the roots of the family tree
+- `users.sponsor_id` (uuid, self-FK with `ON DELETE RESTRICT`) — the Loozer who brought them in
+
+Rules enforced by `/api/admin/users`:
+- A non-`is_financial_only` Loozer must be either a founder or have a sponsor (UI-gated; no DB CHECK)
+- A Loozer cannot sponsor themselves or any of their descendants (cycle prevention, server-validated)
+- Financial-only users are excluded from sponsor pickers and the tree view
+- Trying to delete a Loozer with sponsees fails with a helpful error — admin must reassign first
+
+Surface area:
+- Admin: founder toggle + searchable sponsor picker in the user edit modal
+- Profile pages: "Sponsor: [avatar] X" line, or "★ Founding Father" badge
+- `/loozers` and `/spectator/loozers`: Grid | Tree toggle (persisted in localStorage). Tree is a vertical org chart with pinch-zoom + pan. Authenticated tree centers on the current user's node and highlights it.
 
 ## Development Commands
 

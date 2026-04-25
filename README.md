@@ -207,6 +207,15 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Handicap index display
 - Eight-bag average and average scramble score
 - Accolades and achievements
+- Sponsorship: each Loozer was either a Founding Father (badge) or was sponsored by another Loozer (shown as "Sponsor: [avatar] X")
+
+### Loozer Family Tree
+- Every Loozer (except the founders) was brought in by another Loozer — that relationship is captured by `is_founder` and `sponsor_id` on `users`
+- Admin sets a Founding Father toggle or picks a sponsor from a searchable list (avatar + name); self and descendants are filtered out to prevent cycles
+- A Loozer with sponsees can't be deleted until those sponsees are reassigned
+- `/loozers` and `/spectator/loozers` have a Grid | Tree toggle (persisted per-device); the Tree view is a vertical org chart with pinch-zoom and pan
+- On the authenticated tree, the view opens centered on the current user's node and highlights it
+- Financial-only users are excluded from the tree
 
 ### Course Information
 - Course layout with hole-by-hole data

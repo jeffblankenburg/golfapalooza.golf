@@ -57,6 +57,12 @@ interface ScorecardSummary {
   differential: number | null;
 }
 
+interface SponsorRef {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
 interface LoozerProfileData {
   profile: ProfileData;
   accolades: AccoladeData[];
@@ -68,6 +74,8 @@ interface LoozerProfileData {
   bio: { content: string } | null;
   song?: SongData | null;
   scorecards: ScorecardSummary[];
+  isFounder?: boolean;
+  sponsor?: SponsorRef | null;
 }
 
 function getInitials(name: string): string {
@@ -120,6 +128,8 @@ export function LoozerProfile({
           bio: d.bio ?? null,
           song: d.song ?? null,
           scorecards: d.scorecards || [],
+          isFounder: d.isFounder === true,
+          sponsor: d.sponsor ?? null,
         });
         setLoading(false);
       })
@@ -151,7 +161,7 @@ export function LoozerProfile({
     );
   }
 
-  const { profile, accolades, taggedPhotos, taggedPhotosCount, handicapIndex, eightBagAverage, avgScrambleScore, bio, song, scorecards } = profileData;
+  const { profile, accolades, taggedPhotos, taggedPhotosCount, handicapIndex, eightBagAverage, avgScrambleScore, bio, song, scorecards, isFounder, sponsor } = profileData;
 
   const openChat = async () => {
     if (spectator) return;
@@ -226,6 +236,31 @@ export function LoozerProfile({
                 Handicap: {handicapIndex}
               </span>
             )}
+            {isFounder ? (
+              <div className="mt-1">
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-0.5">
+                  ★ Founding Father
+                </span>
+              </div>
+            ) : sponsor ? (
+              <div className="mt-1 text-xs text-gray-500 flex items-center gap-1.5">
+                <span>Sponsor:</span>
+                <Link
+                  href={`${spectator ? "/spectator/loozers" : "/loozers"}/${sponsor.id}`}
+                  className="inline-flex items-center gap-1 text-green-700 font-medium"
+                >
+                  {sponsor.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={sponsor.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                  ) : (
+                    <span className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center text-[8px] font-bold text-gray-500">
+                      {sponsor.display_name?.[0]?.toUpperCase() || "?"}
+                    </span>
+                  )}
+                  {sponsor.display_name}
+                </Link>
+              </div>
+            ) : null}
           </div>
 
           {/* Comms grid — authenticated only */}

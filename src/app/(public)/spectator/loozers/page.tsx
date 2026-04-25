@@ -7,7 +7,7 @@ export default async function SpectatorLoozersPage() {
   const [{ data: users }, { data: bios }] = await Promise.all([
     adminClient
       .from("users")
-      .select("id, display_name, avatar_url")
+      .select("id, display_name, avatar_url, sponsor_id, is_founder")
       .eq("is_financial_only", false)
       .order("display_name"),
     adminClient
@@ -25,6 +25,8 @@ export default async function SpectatorLoozersPage() {
     display_name: u.display_name,
     avatar_url: u.avatar_url,
     has_bio: bioUserIds.has(u.id),
+    sponsor_id: u.sponsor_id,
+    is_founder: u.is_founder,
   }));
 
   return (

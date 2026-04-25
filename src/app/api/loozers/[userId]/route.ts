@@ -53,7 +53,7 @@ export async function GET(
     queryClient
       .from("users")
       .select(
-        "id, display_name, full_name, avatar_url, phone, city, state, playing_since, swings, typical_shot, fun_fact, best_shot, occupation, eight_bag_average, avg_scramble_score"
+        "id, display_name, full_name, avatar_url, phone, city, state, playing_since, swings, typical_shot, fun_fact, best_shot, occupation, eight_bag_average, avg_scramble_score, is_founder, sponsor_id"
       )
       .eq("id", userId)
       .single(),
@@ -108,6 +108,16 @@ export async function GET(
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
+  let sponsor: { id: string; display_name: string; avatar_url: string | null } | null = null;
+  if (profile.sponsor_id) {
+    const { data: sponsorRow } = await adminClient
+      .from("users")
+      .select("id, display_name, avatar_url")
+      .eq("id", profile.sponsor_id)
+      .maybeSingle();
+    if (sponsorRow) sponsor = sponsorRow;
+  }
+
   const bioNote = bioData && bioData.content ? { content: bioData.content } : null;
 
   const taggedPhotos = (taggedRows || [])
@@ -149,5 +159,7 @@ export async function GET(
     bio: bioNote,
     song,
     scorecards,
+    isFounder: profile.is_founder === true,
+    sponsor,
   });
 }

@@ -45,38 +45,38 @@ export function LoozersList({
   basePath?: string;
   currentUserId?: string | null;
 }) {
-  // Read the focus query param directly from window.location to avoid useSearchParams,
-  // which requires a Suspense boundary during static prerendering in Next.js 15.
+  // SSR-safe defaults (Grid + Attending). On mount we restore the user's last
+  // choice from localStorage, or honor the ?focus= param which forces tree view.
   const [focusUserId, setFocusUserId] = useState<string | null>(null);
-
   const [loozers, setLoozers] = useState<Loozer[]>(initialLoozers || []);
   const [loading, setLoading] = useState(!initialLoozers);
-  const [view, setView] = useState<ViewMode>(() => {
-    if (typeof window === "undefined") return "grid";
-    if (new URLSearchParams(window.location.search).get("focus")) return "tree";
-    try {
-      const stored = window.localStorage.getItem(VIEW_STORAGE_KEY);
-      return stored === "tree" || stored === "grid" ? stored : "grid";
-    } catch {
-      return "grid";
-    }
-  });
+  const [view, setView] = useState<ViewMode>("grid");
 
   useEffect(() => {
     const focus = new URLSearchParams(window.location.search).get("focus");
     setFocusUserId(focus);
-    if (focus) setView("tree");
+    if (focus) {
+      setView("tree");
+      return;
+    }
+    try {
+      const stored = window.localStorage.getItem(VIEW_STORAGE_KEY);
+      if (stored === "tree" || stored === "grid") setView(stored);
+    } catch {
+      // ignore
+    }
   }, []);
 
-  const [scope, setScope] = useState<Scope>(() => {
-    if (typeof window === "undefined") return "attending";
+  const [scope, setScope] = useState<Scope>("attending");
+
+  useEffect(() => {
     try {
       const stored = window.localStorage.getItem(SCOPE_STORAGE_KEY);
-      return stored === "all" || stored === "attending" ? stored : "attending";
+      if (stored === "all" || stored === "attending") setScope(stored);
     } catch {
-      return "attending";
+      // ignore
     }
-  });
+  }, []);
 
   const setViewPersisted = (next: ViewMode) => {
     setView(next);

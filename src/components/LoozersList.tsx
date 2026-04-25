@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { LoozerTree } from "@/components/LoozerTree";
 
 interface Loozer {
@@ -46,17 +45,15 @@ export function LoozersList({
   basePath?: string;
   currentUserId?: string | null;
 }) {
-  const searchParams = useSearchParams();
-  const focusUserId = searchParams.get("focus");
+  // Read the focus query param directly from window.location to avoid useSearchParams,
+  // which requires a Suspense boundary during static prerendering in Next.js 15.
+  const [focusUserId, setFocusUserId] = useState<string | null>(null);
 
   const [loozers, setLoozers] = useState<Loozer[]>(initialLoozers || []);
   const [loading, setLoading] = useState(!initialLoozers);
   const [view, setView] = useState<ViewMode>(() => {
-    // Focus param forces tree view so the link from a profile lands the right place.
-    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("focus")) {
-      return "tree";
-    }
     if (typeof window === "undefined") return "grid";
+    if (new URLSearchParams(window.location.search).get("focus")) return "tree";
     try {
       const stored = window.localStorage.getItem(VIEW_STORAGE_KEY);
       return stored === "tree" || stored === "grid" ? stored : "grid";
@@ -65,10 +62,11 @@ export function LoozersList({
     }
   });
 
-  // If focus arrives after mount (e.g. client-side navigation), force tree view.
   useEffect(() => {
-    if (focusUserId) setView("tree");
-  }, [focusUserId]);
+    const focus = new URLSearchParams(window.location.search).get("focus");
+    setFocusUserId(focus);
+    if (focus) setView("tree");
+  }, []);
 
   const [scope, setScope] = useState<Scope>(() => {
     if (typeof window === "undefined") return "attending";

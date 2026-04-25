@@ -246,7 +246,7 @@ export function LoozerProfile({
               <div className="mt-1 text-xs text-gray-500 flex items-center gap-1.5">
                 <span>Sponsor:</span>
                 <Link
-                  href={`${spectator ? "/spectator/loozers" : "/loozers"}/${sponsor.id}`}
+                  href={`${spectator ? "/spectator/loozers" : "/loozers"}?focus=${sponsor.id}`}
                   className="inline-flex items-center gap-1 text-green-700 font-medium"
                 >
                   {sponsor.avatar_url ? (

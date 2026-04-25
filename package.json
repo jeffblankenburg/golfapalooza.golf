@@ -32,8 +32,6 @@
     "react-easy-crop": "^5.5.7",
     "react-leaflet": "^5.0.0",
     "react-markdown": "^10.1.0",
-    "react-organizational-chart": "^2.2.1",
-    "react-zoom-pan-pinch": "^4.0.3",
     "rehype-raw": "^7.0.0",
     "remark-breaks": "^4.0.0",
     "swagger-ui-react": "^5.31.0",

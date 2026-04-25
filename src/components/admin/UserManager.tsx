@@ -113,13 +113,6 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-
-    // Sponsorship validation: editing a non-financial Loozer must be either a founder or have a sponsor
-    if (editingUser && !editingUser.is_financial_only && !editIsFounder && !editSponsorId) {
-      setError("Pick a sponsor or mark this Loozer as a Founding Father.");
-      return;
-    }
-
     setSaving(true);
 
     try {
@@ -573,12 +566,11 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                   </div>
                 </div>
 
-                {editingUser && !editingUser.is_financial_only && (() => {
+                {editingUser && (() => {
                   const descendants = computeDescendants(editingUser.id, users);
                   const eligibleSponsors = users.filter(
                     (u) =>
                       u.id !== editingUser.id &&
-                      !u.is_financial_only &&
                       !descendants.has(u.id)
                   );
                   const q = sponsorSearch.toLowerCase().trim();

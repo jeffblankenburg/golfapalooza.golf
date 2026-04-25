@@ -239,17 +239,11 @@ export async function PUT(request: Request) {
       }
       const { data: sponsor } = await adminClient
         .from("users")
-        .select("id, is_financial_only")
+        .select("id")
         .eq("id", sponsorId)
         .single();
       if (!sponsor) {
         return NextResponse.json({ error: "Sponsor not found" }, { status: 400 });
-      }
-      if (sponsor.is_financial_only) {
-        return NextResponse.json(
-          { error: "Financial-only users cannot be sponsors" },
-          { status: 400 }
-        );
       }
       // Walk descendants of userId — sponsorId must not appear in there
       const { data: allUsers } = await adminClient

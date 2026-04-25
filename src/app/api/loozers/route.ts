@@ -35,7 +35,7 @@ export async function GET() {
   const [{ data: users }, { data: bios }, { data: roster }] = await Promise.all([
     adminClient
       .from("users")
-      .select("id, display_name, avatar_url, sponsor_id, is_founder, is_financial_only")
+      .select("id, display_name, full_name, avatar_url, sponsor_id, is_founder, is_financial_only")
       .order("display_name"),
     adminClient
       .from("loozer_bios")
@@ -58,6 +58,7 @@ export async function GET() {
   const loozers = (users || []).map((u) => ({
     id: u.id,
     display_name: u.display_name,
+    full_name: u.full_name,
     avatar_url: u.avatar_url,
     has_bio: bioUserIds.has(u.id),
     sponsor_id: u.sponsor_id,

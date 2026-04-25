@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 2;
+const ZOOM_STEP = 0.15;
+const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 
 interface Loozer {
   id: string;
   display_name: string;
+  full_name?: string | null;
   avatar_url: string | null;
   sponsor_id: string | null;
   is_founder: boolean;
@@ -16,6 +22,7 @@ interface LoozerTreeProps {
   currentUserId?: string | null;
   focusUserId?: string | null;
   basePath?: string;
+  showRealNames?: boolean;
 }
 
 function getInitial(name: string): string {
@@ -27,36 +34,43 @@ function NodeCard({
   basePath,
   isCurrentUser,
   isFocused,
+  showRealNames,
 }: {
   loozer: Loozer;
   basePath: string;
   isCurrentUser: boolean;
   isFocused?: boolean;
+  showRealNames?: boolean;
 }) {
   const ringClass = isFocused
     ? "border-amber-500 ring-2 ring-amber-300"
     : isCurrentUser
       ? "border-green-500 ring-2 ring-green-300"
       : "border-gray-200";
+  const label =
+    showRealNames && loozer.full_name && loozer.full_name.trim().length > 0
+      ? loozer.full_name
+      : loozer.display_name;
   return (
     <Link
       href={`${basePath}/${loozer.id}`}
       data-loozer-id={loozer.id}
-      className={`inline-flex flex-col items-center gap-1 px-2 py-2 bg-white border rounded-xl shadow-sm w-24 flex-shrink-0 active:bg-gray-50 transition-colors ${ringClass}`}
+      className={`inline-flex items-center gap-2 px-2 py-1.5 bg-white border rounded-xl shadow-sm flex-shrink-0 active:bg-gray-50 transition-colors ${ringClass}`}
+      style={{ minWidth: 140 }}
     >
-      <div className="w-12 h-12 rounded-full overflow-hidden bg-green-700 text-white flex items-center justify-center">
+      <div className="w-9 h-9 rounded-full overflow-hidden bg-green-700 text-white flex items-center justify-center flex-shrink-0">
         {loozer.avatar_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={loozer.avatar_url} alt="" className="w-full h-full object-cover" />
         ) : (
-          <span className="text-base font-bold">{getInitial(loozer.display_name)}</span>
+          <span className="text-sm font-bold">{getInitial(loozer.display_name)}</span>
         )}
       </div>
-      <span className="text-[11px] font-semibold text-gray-900 text-center leading-tight line-clamp-2">
-        {loozer.display_name}
+      <span className="text-[12px] font-semibold text-gray-900 leading-tight whitespace-nowrap pr-1">
+        {label}
       </span>
       {loozer.is_founder && (
-        <span className="text-[9px] text-amber-700 font-semibold">★ Founder</span>
+        <span className="text-amber-500 text-sm leading-none flex-shrink-0" aria-label="Founder">★</span>
       )}
     </Link>
   );
@@ -68,12 +82,14 @@ function HorizontalSubtree({
   basePath,
   currentUserId,
   focusUserId,
+  showRealNames,
 }: {
   node: Loozer;
   childrenByParent: Map<string, Loozer[]>;
   basePath: string;
   currentUserId: string | null | undefined;
   focusUserId: string | null | undefined;
+  showRealNames: boolean;
 }): React.ReactElement {
   const kids = childrenByParent.get(node.id) || [];
 
@@ -84,6 +100,7 @@ function HorizontalSubtree({
         basePath={basePath}
         isCurrentUser={node.id === currentUserId}
         isFocused={focusUserId != null && node.id === focusUserId}
+        showRealNames={showRealNames}
       />
       {kids.length > 0 && (
         <>
@@ -95,6 +112,7 @@ function HorizontalSubtree({
               basePath={basePath}
               currentUserId={currentUserId}
               focusUserId={focusUserId}
+              showRealNames={showRealNames}
             />
           ) : (
             <div className="flex flex-col">
@@ -110,7 +128,7 @@ function HorizontalSubtree({
                   bottom: isLast ? "50%" : 0,
                 };
                 return (
-                  <div key={kid.id} className="relative pl-6 py-2 flex items-center">
+                  <div key={kid.id} className="relative pl-6 py-1 flex items-center">
                     <div style={spineStyle} />
                     <div className="absolute left-0 top-1/2 w-6 h-0.5 -translate-y-1/2 bg-gray-400" />
                     <HorizontalSubtree
@@ -119,6 +137,7 @@ function HorizontalSubtree({
                       basePath={basePath}
                       currentUserId={currentUserId}
                       focusUserId={focusUserId}
+                      showRealNames={showRealNames}
                     />
                   </div>
                 );
@@ -131,8 +150,30 @@ function HorizontalSubtree({
   );
 }
 
-export function LoozerTree({ loozers, currentUserId, focusUserId, basePath = "/loozers" }: LoozerTreeProps) {
+export function LoozerTree({ loozers, currentUserId, focusUserId, basePath = "/loozers", showRealNames = false }: LoozerTreeProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  const [zoom, setZoom] = useState(1);
+
+  const fitToView = () => {
+    const container = scrollRef.current;
+    const content = contentRef.current;
+    if (!container || !content) return;
+    const rect = content.getBoundingClientRect();
+    // Natural size = current visible size / current zoom (zoom scales the box).
+    const naturalWidth = rect.width / zoom;
+    const naturalHeight = rect.height / zoom;
+    // p-6 = 24px padding on each side.
+    const availableWidth = container.clientWidth - 48;
+    const availableHeight = container.clientHeight - 48;
+    if (naturalWidth <= 0 || naturalHeight <= 0) return;
+    const next = Math.min(
+      availableWidth / naturalWidth,
+      availableHeight / naturalHeight,
+      1
+    );
+    setZoom(clampZoom(next));
+  };
 
   const { roots, childrenByParent } = useMemo(() => {
     // A loozer is "shown" if they're a founder OR have a sponsor.
@@ -181,6 +222,20 @@ export function LoozerTree({ loozers, currentUserId, focusUserId, basePath = "/l
     node.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
   }, [focusUserId, currentUserId, loozers]);
 
+  // Trackpad pinch shows up as a Ctrl+wheel event. Only intercept when Ctrl is held
+  // so plain scrolling stays native and untouched.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      setZoom((z) => clampZoom(z - e.deltaY * 0.005));
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, []);
+
   if (loozers.length === 0) {
     return (
       <div className="text-center py-12 text-sm text-gray-400">No Loozers to display.</div>
@@ -188,21 +243,56 @@ export function LoozerTree({ loozers, currentUserId, focusUserId, basePath = "/l
   }
 
   return (
-    <div
-      ref={scrollRef}
-      className="w-full max-h-[80vh] overflow-auto bg-gray-50 border border-gray-200 rounded-xl p-6"
-    >
-      <div className="flex flex-col gap-8 items-start w-max">
-        {roots.map((root) => (
-          <HorizontalSubtree
-            key={root.id}
-            node={root}
-            childrenByParent={childrenByParent}
-            basePath={basePath}
-            currentUserId={currentUserId}
-            focusUserId={focusUserId}
-          />
-        ))}
+    <div className="relative">
+      <div
+        ref={scrollRef}
+        className="w-full max-h-[80vh] overflow-auto bg-gray-50 border border-gray-200 rounded-xl p-6"
+      >
+        <div
+          ref={contentRef}
+          className="flex flex-col gap-4 items-start w-max transition-[zoom] duration-150"
+          style={{ zoom }}
+        >
+          {roots.map((root) => (
+            <HorizontalSubtree
+              key={root.id}
+              node={root}
+              childrenByParent={childrenByParent}
+              basePath={basePath}
+              currentUserId={currentUserId}
+              focusUserId={focusUserId}
+              showRealNames={showRealNames}
+            />
+          ))}
+        </div>
+      </div>
+      <div className="absolute bottom-2 right-2 flex flex-col gap-1 bg-white/90 backdrop-blur border border-gray-200 rounded-lg shadow-sm">
+        <button
+          type="button"
+          onClick={() => setZoom((z) => clampZoom(z + ZOOM_STEP))}
+          disabled={zoom >= MAX_ZOOM}
+          aria-label="Zoom in"
+          className="w-8 h-8 flex items-center justify-center text-gray-700 active:bg-gray-100 disabled:opacity-30 rounded-t-lg"
+        >
+          <span className="text-base leading-none">+</span>
+        </button>
+        <button
+          type="button"
+          onClick={fitToView}
+          aria-label="Fit tree to view"
+          className="w-8 h-8 flex items-center justify-center text-[9px] font-semibold text-gray-600 active:bg-gray-100 border-y border-gray-200"
+        >
+          Fit
+        </button>
+        <button
+          type="button"
+          onClick={() => setZoom((z) => clampZoom(z - ZOOM_STEP))}
+          disabled={zoom <= MIN_ZOOM}
+          aria-label="Zoom out"
+          className="w-8 h-8 flex items-center justify-center text-gray-700 active:bg-gray-100 disabled:opacity-30 rounded-b-lg"
+        >
+          <span className="text-base leading-none">−</span>
+        </button>
       </div>
     </div>
   );

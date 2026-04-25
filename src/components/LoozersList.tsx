@@ -7,6 +7,7 @@ import { LoozerTree } from "@/components/LoozerTree";
 interface Loozer {
   id: string;
   display_name: string;
+  full_name?: string | null;
   avatar_url: string | null;
   has_bio: boolean;
   sponsor_id?: string | null;
@@ -20,6 +21,7 @@ type Scope = "all" | "attending";
 
 const VIEW_STORAGE_KEY = "loozers-view-mode";
 const SCOPE_STORAGE_KEY = "loozers-scope";
+const REAL_NAMES_STORAGE_KEY = "loozers-show-real-names";
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -68,11 +70,18 @@ export function LoozersList({
   }, []);
 
   const [scope, setScope] = useState<Scope>("attending");
+  const [showRealNames, setShowRealNames] = useState(false);
 
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(SCOPE_STORAGE_KEY);
       if (stored === "all" || stored === "attending") setScope(stored);
+    } catch {
+      // ignore
+    }
+    try {
+      const storedNames = window.localStorage.getItem(REAL_NAMES_STORAGE_KEY);
+      if (storedNames === "true") setShowRealNames(true);
     } catch {
       // ignore
     }
@@ -91,6 +100,15 @@ export function LoozersList({
     setScope(next);
     try {
       localStorage.setItem(SCOPE_STORAGE_KEY, next);
+    } catch {
+      // ignore
+    }
+  };
+
+  const setShowRealNamesPersisted = (next: boolean) => {
+    setShowRealNames(next);
+    try {
+      localStorage.setItem(REAL_NAMES_STORAGE_KEY, next ? "true" : "false");
     } catch {
       // ignore
     }
@@ -146,6 +164,19 @@ export function LoozersList({
             </button>
           ))}
         </div>
+        {view === "tree" && (
+          <button
+            type="button"
+            onClick={() => setShowRealNamesPersisted(!showRealNames)}
+            className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors border ${
+              showRealNames
+                ? "bg-green-600 text-white border-green-600"
+                : "bg-white text-gray-700 border-gray-300"
+            }`}
+          >
+            Real Names
+          </button>
+        )}
         {view === "grid" && (
           <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
             {(["attending", "all"] as const).map((s) => (
@@ -204,6 +235,7 @@ export function LoozersList({
           loozers={loozers.map((l) => ({
             id: l.id,
             display_name: l.display_name,
+            full_name: l.full_name ?? null,
             avatar_url: l.avatar_url,
             sponsor_id: l.sponsor_id ?? null,
             is_founder: l.is_founder === true,
@@ -211,6 +243,7 @@ export function LoozersList({
           currentUserId={currentUserId}
           focusUserId={focusUserId}
           basePath={basePath}
+          showRealNames={showRealNames}
         />
       )}
     </div>

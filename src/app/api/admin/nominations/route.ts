@@ -161,12 +161,14 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: authError.message }, { status: 500 });
     }
 
-    // 2. Create public.users record
+    // 2. Create public.users record. The nominator becomes the sponsor —
+    //    that's the whole point of the rookie nomination flow.
     const { error: profileError } = await adminClient.from("users").insert({
       id: authUser.user.id,
       phone: phone10,
       display_name: nomination.first_name,
       full_name: `${nomination.first_name} ${nomination.last_name}`,
+      sponsor_id: nomination.nominator_id,
     });
 
     if (profileError) {

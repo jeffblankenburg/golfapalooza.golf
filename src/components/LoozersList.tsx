@@ -42,10 +42,12 @@ export function LoozersList({
   loozers: initialLoozers,
   basePath = "/loozers",
   currentUserId,
+  spectator = false,
 }: {
   loozers?: Loozer[];
   basePath?: string;
   currentUserId?: string | null;
+  spectator?: boolean;
 }) {
   // SSR-safe defaults (Grid + Attending). On mount we restore the user's last
   // choice from localStorage, or honor the ?focus= param which forces tree view.
@@ -164,7 +166,7 @@ export function LoozersList({
             </button>
           ))}
         </div>
-        {view === "tree" && (
+        {view === "tree" && !spectator && (
           <button
             type="button"
             onClick={() => setShowRealNamesPersisted(!showRealNames)}
@@ -243,7 +245,7 @@ export function LoozersList({
           currentUserId={currentUserId}
           focusUserId={focusUserId}
           basePath={basePath}
-          showRealNames={showRealNames}
+          showRealNames={!spectator && showRealNames}
         />
       )}
     </div>

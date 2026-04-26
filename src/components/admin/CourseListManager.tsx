@@ -232,7 +232,13 @@ export function CourseListManager() {
 
       {lookupOpen && (
         <CourseLookupModal
-          onClose={() => setLookupOpen(false)}
+          onClose={() => {
+            setLookupOpen(false);
+            // Refetch on close in case the modal performed a bulk import
+            // and the user closed without picking one — the list might
+            // otherwise show stale counts until the next navigation.
+            fetchCourses();
+          }}
           onCourseReady={(c) => {
             setLookupOpen(false);
             fetchCourses();

@@ -81,14 +81,17 @@ interface CommittedCourse {
   club_name?: string | null;
   city: string | null;
   state: string | null;
+  hole_count?: number;
 }
 
 interface LookupResponse {
-  step: "cache" | "gcapi" | "gcapi_multi" | "ai" | "manual" | "ai_rate_limited";
+  step: "cache" | "gcapi" | "gcapi_multi" | "ai" | "manual" | "ai_rate_limited" | "all_imported";
   committed: boolean;
   course?: CommittedCourse;
+  courses?: CommittedCourse[];
   draft?: Draft;
   drafts?: Draft[];
+  alreadyImported?: CommittedCourse[];
   generationId?: string | null;
   cityMismatch?: boolean;
   warnings?: string[];
@@ -108,11 +111,15 @@ export default function CourseLookupModal({ initialName = "", onClose, onCourseR
   const [name, setName] = useState(initialName);
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
-  const [phase, setPhase] = useState<"input" | "loading" | "select" | "confirm" | "error">("input");
+  const [phase, setPhase] = useState<"input" | "loading" | "select" | "confirm" | "pick" | "error">("input");
   const [candidates, setCandidates] = useState<Draft[]>([]);
   const [statusMsg, setStatusMsg] = useState("");
   const [response, setResponse] = useState<LookupResponse | null>(null);
   const [committing, setCommitting] = useState(false);
+  // Courses shown on the pick phase — either bulk-imported just now, or
+  // returned by the server when the search hit only already-imported rows.
+  const [pickList, setPickList] = useState<CommittedCourse[]>([]);
+  const [pickHeading, setPickHeading] = useState<string>("Which one are you playing?");
 
   // Cycle through silly phrases every 1.6s while loading — picked random
   // sequence on entry so each lookup feels different.
@@ -160,6 +167,17 @@ export default function CourseLookupModal({ initialName = "", onClose, onCourseR
       onCourseReady(data.course);
       return;
     }
+    if (res.ok && data.step === "all_imported" && data.courses && data.courses.length > 0) {
+      setPickList(data.courses);
+      setPickHeading(
+        data.courses.length === 1
+          ? "This course is already in your list."
+          : "These courses are already in your list — pick the one you're playing."
+      );
+      setResponse(data);
+      setPhase("pick");
+      return;
+    }
     if (res.ok && data.drafts && data.drafts.length > 0) {
       setCandidates(data.drafts);
       setResponse(data);
@@ -199,6 +217,40 @@ export default function CourseLookupModal({ initialName = "", onClose, onCourseR
       setStatusMsg(data.error || "Failed to save course.");
       setPhase("error");
     }
+  }
+
+  async function importAll() {
+    if (candidates.length === 0) return;
+    setCommitting(true);
+    setPhase("loading");
+    const res = await fetch("/api/courses/lookup/commit-bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        generationId: response?.generationId ?? null,
+        drafts: candidates,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setCommitting(false);
+    if (!res.ok || !Array.isArray(data.courses) || data.courses.length === 0) {
+      setStatusMsg(data.error || "Failed to import courses.");
+      setPhase("error");
+      return;
+    }
+    // Merge any rows the server flagged as already-imported on the original
+    // search so the user can also pick those without leaving the modal.
+    const merged = [
+      ...(data.courses as CommittedCourse[]),
+      ...((response?.alreadyImported as CommittedCourse[] | undefined) || []),
+    ];
+    setPickList(merged);
+    setPickHeading(
+      merged.length === 1
+        ? "Imported. Continue with this course?"
+        : "Imported. Which one are you playing?"
+    );
+    setPhase("pick");
   }
 
   function reject() {
@@ -269,8 +321,13 @@ export default function CourseLookupModal({ initialName = "", onClose, onCourseR
         {phase === "select" && candidates.length > 0 && (
           <div className="px-6 py-4 space-y-2 overflow-y-auto">
             <p className="text-sm text-gray-600 mb-1">
-              Found {candidates.length} courses at this club. Pick the one you played:
+              Found {candidates.length} new course{candidates.length === 1 ? "" : "s"} at this club. Pick one or import all:
             </p>
+            {response?.alreadyImported && response.alreadyImported.length > 0 && (
+              <p className="text-[11px] text-gray-500 italic">
+                {response.alreadyImported.length} other course{response.alreadyImported.length === 1 ? "" : "s"} at this club already in your list.
+              </p>
+            )}
             {candidates.map((c, i) => {
               const back = [...c.tees].sort((a, b) => (b.course_rating ?? 0) - (a.course_rating ?? 0))[0];
               return (
@@ -289,6 +346,33 @@ export default function CourseLookupModal({ initialName = "", onClose, onCourseR
                 </button>
               );
             })}
+            {candidates.length > 1 && (
+              <button
+                onClick={importAll}
+                disabled={committing}
+                className="w-full mt-1 py-3 bg-green-600 text-white rounded-xl font-semibold text-[15px] disabled:opacity-50 active:opacity-80"
+              >
+                Import all {candidates.length}
+              </button>
+            )}
+          </div>
+        )}
+
+        {phase === "pick" && pickList.length > 0 && (
+          <div className="px-6 py-4 space-y-2 overflow-y-auto">
+            <p className="text-sm text-gray-600 mb-1">{pickHeading}</p>
+            {pickList.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => onCourseReady(c)}
+                className="w-full text-left bg-white border border-gray-200 rounded-xl px-3 py-3 active:bg-gray-50"
+              >
+                <div className="text-sm font-semibold text-gray-900">{formatCourseName(c)}</div>
+                {(c.city || c.state) && (
+                  <div className="text-xs text-gray-500 mt-0.5">{[c.city, c.state].filter(Boolean).join(", ")}</div>
+                )}
+              </button>
+            ))}
           </div>
         )}
 

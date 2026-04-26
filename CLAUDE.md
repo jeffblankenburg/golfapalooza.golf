@@ -40,8 +40,9 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 | GET | `/api/courses?q={query}` | Search courses by name or location |
 | GET | `/api/courses?lat={lat}&lng={lng}&radius={miles}` | Search cached courses by GPS coordinates (haversine, capped at 20). |
 | GET | `/api/courses/{courseId}` | Get course details with tees and holes |
-| POST | `/api/courses/lookup` | Run the DB → GCAPI → AI cascade. Returns a draft scorecard for the user to confirm; 422 with prefill when cascade exhausted. |
+| POST | `/api/courses/lookup` | Run the DB → GCAPI → AI cascade. Returns a draft scorecard for the user to confirm; 422 with prefill when cascade exhausted. Filters out drafts whose `lookup_key`/`external_id` already exist in our DB; if every candidate is already imported, returns `step: "all_imported"` with the existing rows so the user can still pick one. |
 | POST | `/api/courses/lookup/commit` | Persist a confirmed lookup draft as a real course + tees + holes. |
+| POST | `/api/courses/lookup/commit-bulk` | Persist multiple confirmed drafts in one call (multi-course clubs via "Import all"). Returns `{ courses, errors }`. |
 
 #### Rounds (`/api/rounds`)
 

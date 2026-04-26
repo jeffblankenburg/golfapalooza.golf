@@ -1,20 +1,27 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { CourseManager } from "./CourseManager";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import CourseLookupModal from "@/components/my-rounds/CourseLookupModal";
+import { formatCourseName } from "@/lib/utils/course-display";
 
 interface CourseOption {
   id: string;
   name: string;
+  club_name: string | null;
   city: string | null;
   state: string | null;
   hole_count: number;
   locked: boolean;
+  source: "manual" | "gcapi" | "ai";
+  verified: boolean;
 }
 
 export function CourseListManager() {
   const [courses, setCourses] = useState<CourseOption[]>([]);
+  const [unverifiedCount, setUnverifiedCount] = useState(0);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -23,11 +30,13 @@ export function CourseListManager() {
   const [newState, setNewState] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  const [lookupOpen, setLookupOpen] = useState(false);
 
   const fetchCourses = useCallback(async () => {
     const res = await fetch("/api/admin/course?list=true");
     const data = await res.json();
     if (data.courses) setCourses(data.courses);
+    if (typeof data.unverified_count === "number") setUnverifiedCount(data.unverified_count);
     setLoading(false);
   }, []);
 
@@ -96,9 +105,18 @@ export function CourseListManager() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Courses</h1>
-      <p className="text-sm text-gray-500 mb-6">
+      <p className="text-sm text-gray-500 mb-3">
         Golf courses available for events
       </p>
+
+      {unverifiedCount > 0 && (
+        <Link
+          href="/admin/courses/unverified"
+          className="block mb-4 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-900 hover:bg-amber-100"
+        >
+          <span className="font-semibold">{unverifiedCount}</span> course{unverifiedCount === 1 ? "" : "s"} awaiting verification →
+        </Link>
+      )}
 
       {error && (
         <div className="bg-red-50 text-red-700 p-3 rounded-lg mb-4 text-sm">
@@ -112,7 +130,7 @@ export function CourseListManager() {
             All Courses ({courses.length})
           </h2>
           <button
-            onClick={() => setShowCreate(!showCreate)}
+            onClick={() => setLookupOpen(true)}
             className="text-xs text-green-700 font-medium px-2 py-1 rounded-lg hover:bg-green-50"
           >
             + Add
@@ -169,19 +187,27 @@ export function CourseListManager() {
         )}
 
         <div className="divide-y divide-gray-50">
-          {courses.map((course) => (
+          {[...courses].sort((a, b) => formatCourseName(a).localeCompare(formatCourseName(b))).map((course) => (
             <button
               key={course.id}
               onClick={() => setSelectedCourseId(course.id)}
               className="w-full flex items-center px-4 py-3 text-left active:bg-gray-50"
             >
               <div className="flex-1">
-                <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900">
-                  {course.name}
+                <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900 flex-wrap">
+                  {formatCourseName(course)}
                   {course.locked && (
                     <svg className="w-3.5 h-3.5 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                     </svg>
+                  )}
+                  {course.source !== "manual" && (
+                    <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${
+                      course.source === "ai" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+                    }`}>{course.source}</span>
+                  )}
+                  {!course.verified && (
+                    <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">unverified</span>
                   )}
                 </div>
                 <div className="text-xs text-gray-500">
@@ -203,6 +229,24 @@ export function CourseListManager() {
           )}
         </div>
       </div>
+
+      {lookupOpen && (
+        <CourseLookupModal
+          onClose={() => setLookupOpen(false)}
+          onCourseReady={(c) => {
+            setLookupOpen(false);
+            fetchCourses();
+            setSelectedCourseId(c.id);
+          }}
+          onManualFallback={(prefill) => {
+            setLookupOpen(false);
+            setNewName(prefill.name || "");
+            setNewCity(prefill.city || "");
+            setNewState(prefill.state || "");
+            setShowCreate(true);
+          }}
+        />
+      )}
     </div>
   );
 }

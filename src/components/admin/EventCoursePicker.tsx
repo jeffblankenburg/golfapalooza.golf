@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { BottomDrawer } from "@/components/admin/BottomDrawer";
+import { formatCourseName } from "@/lib/utils/course-display";
 
 interface CourseOption {
   id: string;
   name: string;
+  club_name?: string | null;
   city: string | null;
   state: string | null;
   hole_count: number;
@@ -115,7 +117,7 @@ export function EventCoursePicker({ tripId }: { tripId: string }) {
       {/* Drawer */}
       <BottomDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Select Course">
         <div className="divide-y divide-gray-100">
-          {courses.map((course) => {
+          {[...courses].sort((a, b) => formatCourseName(a).localeCompare(formatCourseName(b))).map((course) => {
             const isSelected = course.id === selectedCourseId;
             return (
               <button
@@ -125,7 +127,7 @@ export function EventCoursePicker({ tripId }: { tripId: string }) {
                 className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-gray-900">{course.name}</div>
+                  <div className="text-sm font-medium text-gray-900">{formatCourseName(course)}</div>
                   {(course.city || course.state) && (
                     <div className="text-xs text-gray-500">
                       {formatLocation(course.city, course.state)}

@@ -2,6 +2,21 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { geocodeAddress } from "@/lib/geocode";
 
+// Great-circle distance in miles. We do this in JS rather than PostGIS
+// because the courses table is small (<2k rows) and likely to stay that
+// way for years; a single SELECT + sort in app code beats adding a DB
+// extension and an index for v1 of the "near me" feature.
+function haversineMi(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 3958.8;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
 // GET - Search/list courses
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -12,23 +27,48 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("q");
+  const latParam = searchParams.get("lat");
+  const lngParam = searchParams.get("lng");
+  const radiusParam = searchParams.get("radius");
+  const lat = latParam !== null ? parseFloat(latParam) : NaN;
+  const lng = lngParam !== null ? parseFloat(lngParam) : NaN;
+  const radius = radiusParam !== null ? parseFloat(radiusParam) : 25;
+  const isNearby = Number.isFinite(lat) && Number.isFinite(lng);
 
   let dbQuery = supabase
     .from("courses")
-    .select("id, name, club_name, city, state, hole_count")
-    .order("name");
+    .select("id, name, club_name, city, state, hole_count, latitude, longitude");
 
-  if (query) {
-    dbQuery = dbQuery.or(`name.ilike.%${query}%,city.ilike.%${query}%,state.ilike.%${query}%`);
+  if (isNearby) {
+    dbQuery = dbQuery.not("latitude", "is", null).not("longitude", "is", null);
+  } else {
+    dbQuery = dbQuery.order("name");
   }
 
-  const { data: courses, error } = await dbQuery;
+  if (query) {
+    dbQuery = dbQuery.or(`name.ilike.%${query}%,club_name.ilike.%${query}%,city.ilike.%${query}%,state.ilike.%${query}%`);
+  }
+
+  const { data, error } = await dbQuery;
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ courses: courses || [] });
+  let courses = data || [];
+
+  if (isNearby) {
+    courses = courses
+      .map((c) => ({
+        ...c,
+        distance_mi: haversineMi(lat, lng, c.latitude as number, c.longitude as number),
+      }))
+      .filter((c) => c.distance_mi <= radius)
+      .sort((a, b) => a.distance_mi - b.distance_mi)
+      .slice(0, 20);
+  }
+
+  return NextResponse.json({ courses });
 }
 
 // POST - Create a new course with initial tee and default holes

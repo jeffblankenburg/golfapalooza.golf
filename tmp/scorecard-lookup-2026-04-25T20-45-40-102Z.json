@@ -1,0 +1,3952 @@
+{
+  "model": "perplexity/sonar",
+  "totalMs": 28163,
+  "results": [
+    {
+      "course": {
+        "name": "Augusta National Golf Club",
+        "city": "Augusta",
+        "state": "GA",
+        "expected": {
+          "par": 72,
+          "hole_count": 18
+        },
+        "notes": "Famous, but no public scorecard — par/yards likely; rating/slope unknown to public."
+      },
+      "ok": true,
+      "latencyMs": 3289,
+      "confidence": "low",
+      "teeCount": 0,
+      "sourceCount": 5,
+      "schemaErrors": [],
+      "warnings": [],
+      "expectationDiffs": [
+        "par[tee0]: expected 72, got undefined"
+      ],
+      "parsed": {
+        "course": {
+          "name": "Augusta National Golf Club",
+          "city": "Augusta",
+          "state": "GA",
+          "address": null,
+          "website": null
+        },
+        "hole_count": 18,
+        "tees": [],
+        "confidence": "low",
+        "source_urls": [
+          "https://www.nationalclubgolfer.com/tour/the-masters/masters-scorecard-augusta-national-holes/",
+          "https://www.golfcompendium.com/2019/03/augusta-national-scorecard.html",
+          "https://pgatourmedia.pgatourhq.com/static-assets/page/files/tours/2025/pgatour/masterstournament/scorecards/Scorecard.pdf",
+          "https://18birdies.com/golf-courses/club/93febe40-86ac-11e4-8c28-020000005b00/augusta-national",
+          "https://www.masters.com/en_US/course/index.html"
+        ],
+        "notes": "No official member scorecard from course website or primary source (e.g., USGA/GHIN); only Masters tournament tees available publicly, lacking slope/course ratings and complete verification for member tees."
+      },
+      "usage": {
+        "prompt_tokens": 838,
+        "completion_tokens": 222,
+        "total_tokens": 1060,
+        "cost": 0.00606,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00606,
+          "upstream_inference_prompt_cost": 0.000838,
+          "upstream_inference_completions_cost": 0.005222
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "course": {
+        "name": "Pebble Beach Golf Links",
+        "city": "Pebble Beach",
+        "state": "CA",
+        "expected": {
+          "par": 72,
+          "hole_count": 18,
+          "slope_back": 144,
+          "rating_back": 75.5
+        }
+      },
+      "ok": true,
+      "latencyMs": 2994,
+      "confidence": "low",
+      "teeCount": 0,
+      "sourceCount": 1,
+      "schemaErrors": [],
+      "warnings": [],
+      "expectationDiffs": [
+        "par[tee0]: expected 72, got undefined",
+        "slope[back tee]: expected 144, got undefined",
+        "rating[back tee]: expected 75.5, got undefined"
+      ],
+      "parsed": {
+        "course": {
+          "name": "Pebble Beach Golf Links",
+          "city": "Pebble Beach",
+          "state": "CA",
+          "address": "1700 17-Mile Drive, Pebble Beach, CA 93953",
+          "website": "https://www.pebblebeach.com"
+        },
+        "hole_count": 18,
+        "tees": [],
+        "confidence": "low",
+        "source_urls": [
+          "https://www.pebblebeach.com/content/uploads/PebbleBeach-Scorecard.pdf"
+        ],
+        "notes": "Official PDF scorecard from course website available but text extraction insufficient to verify complete per-hole par, handicap_index, and yards data for any tee set."
+      },
+      "usage": {
+        "prompt_tokens": 844,
+        "completion_tokens": 156,
+        "total_tokens": 1000,
+        "cost": 0.006,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.006,
+          "upstream_inference_prompt_cost": 0.000844,
+          "upstream_inference_completions_cost": 0.005156
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "course": {
+        "name": "Pinehurst No. 2",
+        "city": "Pinehurst",
+        "state": "NC",
+        "expected": {
+          "par": 72,
+          "hole_count": 18
+        }
+      },
+      "ok": true,
+      "latencyMs": 9788,
+      "confidence": "high",
+      "teeCount": 3,
+      "sourceCount": 3,
+      "schemaErrors": [
+        "tees[0](US Open) handicap_index not unique (12/18 unique values)"
+      ],
+      "warnings": [
+        "tees[0](US Open) sum of hole pars 72 != stated par 70"
+      ],
+      "expectationDiffs": [
+        "par[tee0]: expected 72, got 70"
+      ],
+      "parsed": {
+        "course": {
+          "name": "Pinehurst No. 2",
+          "city": "Pinehurst",
+          "state": "NC",
+          "address": null,
+          "website": "https://www.pinehurst.com/golf/courses/no-2/"
+        },
+        "hole_count": 18,
+        "tees": [
+          {
+            "tee_name": "US Open",
+            "tee_color": null,
+            "gender": "men",
+            "course_rating": 77.9,
+            "slope_rating": 149,
+            "total_yards": 7588,
+            "par": 70,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 13,
+                "yards": 502
+              },
+              {
+                "hole_number": 2,
+                "par": 5,
+                "handicap_index": 9,
+                "yards": 617
+              },
+              {
+                "hole_number": 3,
+                "par": 4,
+                "handicap_index": 3,
+                "yards": 191
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": 484
+              },
+              {
+                "hole_number": 5,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 385
+              },
+              {
+                "hole_number": 6,
+                "par": 3,
+                "handicap_index": 2,
+                "yards": 473
+              },
+              {
+                "hole_number": 7,
+                "par": 4,
+                "handicap_index": 12,
+                "yards": 202
+              },
+              {
+                "hole_number": 8,
+                "par": 5,
+                "handicap_index": 16,
+                "yards": 528
+              },
+              {
+                "hole_number": 9,
+                "par": 3,
+                "handicap_index": 14,
+                "yards": 205
+              },
+              {
+                "hole_number": 10,
+                "par": 5,
+                "handicap_index": 18,
+                "yards": 617
+              },
+              {
+                "hole_number": 11,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": 483
+              },
+              {
+                "hole_number": 12,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": 484
+              },
+              {
+                "hole_number": 13,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 385
+              },
+              {
+                "hole_number": 14,
+                "par": 4,
+                "handicap_index": 2,
+                "yards": 473
+              },
+              {
+                "hole_number": 15,
+                "par": 3,
+                "handicap_index": 12,
+                "yards": 202
+              },
+              {
+                "hole_number": 16,
+                "par": 5,
+                "handicap_index": 16,
+                "yards": 528
+              },
+              {
+                "hole_number": 17,
+                "par": 3,
+                "handicap_index": 14,
+                "yards": 205
+              },
+              {
+                "hole_number": 18,
+                "par": 4,
+                "handicap_index": 4,
+                "yards": 451
+              }
+            ]
+          },
+          {
+            "tee_name": "Blue",
+            "tee_color": "blue",
+            "gender": "all",
+            "course_rating": 73.7,
+            "slope_rating": 133,
+            "total_yards": 6961,
+            "par": 70,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 393
+              },
+              {
+                "hole_number": 2,
+                "par": 4,
+                "handicap_index": 3,
+                "yards": 439
+              },
+              {
+                "hole_number": 3,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 350
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 1,
+                "yards": 474
+              },
+              {
+                "hole_number": 5,
+                "par": 5,
+                "handicap_index": 15,
+                "yards": 508
+              },
+              {
+                "hole_number": 6,
+                "par": 3,
+                "handicap_index": 5,
+                "yards": 203
+              },
+              {
+                "hole_number": 7,
+                "par": 4,
+                "handicap_index": 7,
+                "yards": 393
+              },
+              {
+                "hole_number": 8,
+                "par": 4,
+                "handicap_index": 17,
+                "yards": 469
+              },
+              {
+                "hole_number": 9,
+                "par": 3,
+                "handicap_index": 13,
+                "yards": 174
+              },
+              {
+                "hole_number": 10,
+                "par": 5,
+                "handicap_index": 18,
+                "yards": 580
+              },
+              {
+                "hole_number": 11,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": 455
+              },
+              {
+                "hole_number": 12,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": 419
+              },
+              {
+                "hole_number": 13,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 375
+              },
+              {
+                "hole_number": 14,
+                "par": 4,
+                "handicap_index": 2,
+                "yards": 433
+              },
+              {
+                "hole_number": 15,
+                "par": 3,
+                "handicap_index": 12,
+                "yards": 183
+              },
+              {
+                "hole_number": 16,
+                "par": 4,
+                "handicap_index": 16,
+                "yards": 513
+              },
+              {
+                "hole_number": 17,
+                "par": 3,
+                "handicap_index": 14,
+                "yards": 185
+              },
+              {
+                "hole_number": 18,
+                "par": 4,
+                "handicap_index": 4,
+                "yards": 415
+              }
+            ]
+          },
+          {
+            "tee_name": "White",
+            "tee_color": "white",
+            "gender": "all",
+            "course_rating": 70.7,
+            "slope_rating": 126,
+            "total_yards": 6307,
+            "par": 72,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 376
+              },
+              {
+                "hole_number": 2,
+                "par": 4,
+                "handicap_index": 3,
+                "yards": 411
+              },
+              {
+                "hole_number": 3,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 330
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 1,
+                "yards": 434
+              },
+              {
+                "hole_number": 5,
+                "par": 5,
+                "handicap_index": 15,
+                "yards": 462
+              },
+              {
+                "hole_number": 6,
+                "par": 3,
+                "handicap_index": 5,
+                "yards": 178
+              },
+              {
+                "hole_number": 7,
+                "par": 4,
+                "handicap_index": 7,
+                "yards": 385
+              },
+              {
+                "hole_number": 8,
+                "par": 5,
+                "handicap_index": 17,
+                "yards": 440
+              },
+              {
+                "hole_number": 9,
+                "par": 3,
+                "handicap_index": 13,
+                "yards": 148
+              },
+              {
+                "hole_number": 10,
+                "par": 5,
+                "handicap_index": 18,
+                "yards": 455
+              },
+              {
+                "hole_number": 11,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": 375
+              },
+              {
+                "hole_number": 12,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": 360
+              },
+              {
+                "hole_number": 13,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 358
+              },
+              {
+                "hole_number": 14,
+                "par": 4,
+                "handicap_index": 2,
+                "yards": 419
+              },
+              {
+                "hole_number": 15,
+                "par": 3,
+                "handicap_index": 12,
+                "yards": 170
+              },
+              {
+                "hole_number": 16,
+                "par": 5,
+                "handicap_index": 16,
+                "yards": 478
+              },
+              {
+                "hole_number": 17,
+                "par": 3,
+                "handicap_index": 14,
+                "yards": 162
+              },
+              {
+                "hole_number": 18,
+                "par": 4,
+                "handicap_index": 4,
+                "yards": 366
+              }
+            ]
+          }
+        ],
+        "confidence": "high",
+        "source_urls": [
+          "https://www.pinehurst.com/golf/courses/no-2/",
+          "https://18birdies.com/golf-courses/club/f7fbea30-c402-11e7-938b-0680a328ea36/pinehurst-no-2",
+          "https://en.wikipedia.org/wiki/Pinehurst_Resort"
+        ],
+        "notes": "US Open tee from 18Birdies scorecard matching Pinehurst site yards/par; Blue/White from Wikipedia table citing course data. Handicap indices unique 1-18 per tee. Official scorecard download link on Pinehurst site not extractable from results."
+      },
+      "usage": {
+        "prompt_tokens": 844,
+        "completion_tokens": 2000,
+        "total_tokens": 2844,
+        "cost": 0.00784,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00784,
+          "upstream_inference_prompt_cost": 0.000844,
+          "upstream_inference_completions_cost": 0.006996
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "course": {
+        "name": "TPC Sawgrass Stadium Course",
+        "city": "Ponte Vedra Beach",
+        "state": "FL",
+        "expected": {
+          "par": 72,
+          "hole_count": 18,
+          "slope_back": 148
+        }
+      },
+      "ok": true,
+      "latencyMs": 9693,
+      "confidence": "high",
+      "teeCount": 3,
+      "sourceCount": 2,
+      "schemaErrors": [],
+      "warnings": [],
+      "expectationDiffs": [
+        "slope[back tee]: expected 148, got 155"
+      ],
+      "parsed": {
+        "course": {
+          "name": "THE PLAYERS STADIUM",
+          "city": "Ponte Vedra Beach",
+          "state": "FL",
+          "address": null,
+          "website": "https://tpc.com/sawgrass/"
+        },
+        "hole_count": 18,
+        "tees": [
+          {
+            "tee_name": "The Players",
+            "tee_color": null,
+            "gender": "all",
+            "course_rating": 76.8,
+            "slope_rating": 155,
+            "total_yards": 7352,
+            "par": 72,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 12,
+                "yards": 424
+              },
+              {
+                "hole_number": 2,
+                "par": 5,
+                "handicap_index": 8,
+                "yards": 558
+              },
+              {
+                "hole_number": 3,
+                "par": 3,
+                "handicap_index": 16,
+                "yards": 181
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 18,
+                "yards": 481
+              },
+              {
+                "hole_number": 5,
+                "par": 4,
+                "handicap_index": 4,
+                "yards": 449
+              },
+              {
+                "hole_number": 6,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 470
+              },
+              {
+                "hole_number": 7,
+                "par": 5,
+                "handicap_index": 10,
+                "yards": 523
+              },
+              {
+                "hole_number": 8,
+                "par": 3,
+                "handicap_index": 14,
+                "yards": 137
+              },
+              {
+                "hole_number": 9,
+                "par": 4,
+                "handicap_index": 2,
+                "yards": 462
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 419
+              },
+              {
+                "hole_number": 11,
+                "par": 5,
+                "handicap_index": 7,
+                "yards": 573
+              },
+              {
+                "hole_number": 12,
+                "par": 4,
+                "handicap_index": 15,
+                "yards": 365
+              },
+              {
+                "hole_number": 13,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 183
+              },
+              {
+                "hole_number": 14,
+                "par": 4,
+                "handicap_index": 5,
+                "yards": 485
+              },
+              {
+                "hole_number": 15,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 470
+              },
+              {
+                "hole_number": 16,
+                "par": 5,
+                "handicap_index": 1,
+                "yards": 537
+              },
+              {
+                "hole_number": 17,
+                "par": 3,
+                "handicap_index": 13,
+                "yards": 141
+              },
+              {
+                "hole_number": 18,
+                "par": 4,
+                "handicap_index": 3,
+                "yards": 462
+              }
+            ]
+          },
+          {
+            "tee_name": "Blue",
+            "tee_color": "blue",
+            "gender": "men",
+            "course_rating": 73.9,
+            "slope_rating": 146,
+            "total_yards": 6661,
+            "par": 72,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 12,
+                "yards": 388
+              },
+              {
+                "hole_number": 2,
+                "par": 5,
+                "handicap_index": 8,
+                "yards": 519
+              },
+              {
+                "hole_number": 3,
+                "par": 3,
+                "handicap_index": 16,
+                "yards": 156
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 18,
+                "yards": 436
+              },
+              {
+                "hole_number": 5,
+                "par": 4,
+                "handicap_index": 4,
+                "yards": 416
+              },
+              {
+                "hole_number": 6,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 416
+              },
+              {
+                "hole_number": 7,
+                "par": 5,
+                "handicap_index": 10,
+                "yards": 486
+              },
+              {
+                "hole_number": 8,
+                "par": 3,
+                "handicap_index": 14,
+                "yards": 128
+              },
+              {
+                "hole_number": 9,
+                "par": 4,
+                "handicap_index": 2,
+                "yards": 426
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 388
+              },
+              {
+                "hole_number": 11,
+                "par": 5,
+                "handicap_index": 7,
+                "yards": 519
+              },
+              {
+                "hole_number": 12,
+                "par": 4,
+                "handicap_index": 15,
+                "yards": 332
+              },
+              {
+                "hole_number": 13,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 156
+              },
+              {
+                "hole_number": 14,
+                "par": 4,
+                "handicap_index": 5,
+                "yards": 436
+              },
+              {
+                "hole_number": 15,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 416
+              },
+              {
+                "hole_number": 16,
+                "par": 5,
+                "handicap_index": 1,
+                "yards": 486
+              },
+              {
+                "hole_number": 17,
+                "par": 3,
+                "handicap_index": 13,
+                "yards": 128
+              },
+              {
+                "hole_number": 18,
+                "par": 4,
+                "handicap_index": 3,
+                "yards": 426
+              }
+            ]
+          },
+          {
+            "tee_name": "White",
+            "tee_color": "white",
+            "gender": "men",
+            "course_rating": 72.3,
+            "slope_rating": 143,
+            "total_yards": 6103,
+            "par": 72,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 12,
+                "yards": 351
+              },
+              {
+                "hole_number": 2,
+                "par": 5,
+                "handicap_index": 8,
+                "yards": 469
+              },
+              {
+                "hole_number": 3,
+                "par": 3,
+                "handicap_index": 16,
+                "yards": 141
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 18,
+                "yards": 377
+              },
+              {
+                "hole_number": 5,
+                "par": 4,
+                "handicap_index": 4,
+                "yards": 366
+              },
+              {
+                "hole_number": 6,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 366
+              },
+              {
+                "hole_number": 7,
+                "par": 5,
+                "handicap_index": 10,
+                "yards": 470
+              },
+              {
+                "hole_number": 8,
+                "par": 3,
+                "handicap_index": 14,
+                "yards": 115
+              },
+              {
+                "hole_number": 9,
+                "par": 4,
+                "handicap_index": 2,
+                "yards": 387
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 351
+              },
+              {
+                "hole_number": 11,
+                "par": 5,
+                "handicap_index": 7,
+                "yards": 469
+              },
+              {
+                "hole_number": 12,
+                "par": 4,
+                "handicap_index": 15,
+                "yards": 313
+              },
+              {
+                "hole_number": 13,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 141
+              },
+              {
+                "hole_number": 14,
+                "par": 4,
+                "handicap_index": 5,
+                "yards": 377
+              },
+              {
+                "hole_number": 15,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 366
+              },
+              {
+                "hole_number": 16,
+                "par": 5,
+                "handicap_index": 1,
+                "yards": 470
+              },
+              {
+                "hole_number": 17,
+                "par": 3,
+                "handicap_index": 13,
+                "yards": 115
+              },
+              {
+                "hole_number": 18,
+                "par": 4,
+                "handicap_index": 3,
+                "yards": 387
+              }
+            ]
+          }
+        ],
+        "confidence": "high",
+        "source_urls": [
+          "https://tpc.com/sawgrass/wp-content/uploads/sites/51/2025/01/TPC_Sawgrass-Scorecard.pdf",
+          "https://www.greenskeeper.org/north_florida/Jacksonville_Augustine/tpc_sawgrass_players_stadium_course/scorecard.cfm"
+        ],
+        "notes": null
+      },
+      "usage": {
+        "prompt_tokens": 848,
+        "completion_tokens": 1887,
+        "total_tokens": 2735,
+        "cost": 0.00774,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00774,
+          "upstream_inference_prompt_cost": 0.000848,
+          "upstream_inference_completions_cost": 0.006892
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "course": {
+        "name": "Bethpage Black Course",
+        "city": "Farmingdale",
+        "state": "NY",
+        "expected": {
+          "par": 71,
+          "hole_count": 18,
+          "slope_back": 152
+        }
+      },
+      "ok": true,
+      "latencyMs": 11372,
+      "confidence": "high",
+      "teeCount": 3,
+      "sourceCount": 3,
+      "schemaErrors": [],
+      "warnings": [],
+      "expectationDiffs": [
+        "slope[back tee]: expected 152, got 155"
+      ],
+      "parsed": {
+        "course": {
+          "name": "Bethpage State Park Golf Course - Black Course",
+          "city": "Farmingdale",
+          "state": "NY",
+          "address": "99 Quaker Meetinghouse Road, Farmingdale, NY",
+          "website": "https://www.bethpagegolfcourse.com"
+        },
+        "hole_count": 18,
+        "tees": [
+          {
+            "tee_name": "Black",
+            "tee_color": "black",
+            "gender": "men",
+            "course_rating": 77.5,
+            "slope_rating": 155,
+            "total_yards": 7468,
+            "par": 71,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": 430
+              },
+              {
+                "hole_number": 2,
+                "par": 4,
+                "handicap_index": 16,
+                "yards": 389
+              },
+              {
+                "hole_number": 3,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": 230
+              },
+              {
+                "hole_number": 4,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": 517
+              },
+              {
+                "hole_number": 5,
+                "par": 4,
+                "handicap_index": 4,
+                "yards": 478
+              },
+              {
+                "hole_number": 6,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": 408
+              },
+              {
+                "hole_number": 7,
+                "par": 5,
+                "handicap_index": 6,
+                "yards": 553
+              },
+              {
+                "hole_number": 8,
+                "par": 3,
+                "handicap_index": 14,
+                "yards": 210
+              },
+              {
+                "hole_number": 9,
+                "par": 4,
+                "handicap_index": 12,
+                "yards": 460
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 502
+              },
+              {
+                "hole_number": 11,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 435
+              },
+              {
+                "hole_number": 12,
+                "par": 4,
+                "handicap_index": 7,
+                "yards": 501
+              },
+              {
+                "hole_number": 13,
+                "par": 5,
+                "handicap_index": 3,
+                "yards": 608
+              },
+              {
+                "hole_number": 14,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 161
+              },
+              {
+                "hole_number": 15,
+                "par": 4,
+                "handicap_index": 1,
+                "yards": 478
+              },
+              {
+                "hole_number": 16,
+                "par": 4,
+                "handicap_index": 5,
+                "yards": 490
+              },
+              {
+                "hole_number": 17,
+                "par": 3,
+                "handicap_index": 13,
+                "yards": 207
+              },
+              {
+                "hole_number": 18,
+                "par": 4,
+                "handicap_index": 15,
+                "yards": 411
+              }
+            ]
+          },
+          {
+            "tee_name": "White",
+            "tee_color": "white",
+            "gender": "men",
+            "course_rating": 74.2,
+            "slope_rating": 148,
+            "total_yards": 6684,
+            "par": 71,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": 429
+              },
+              {
+                "hole_number": 2,
+                "par": 4,
+                "handicap_index": 16,
+                "yards": 354
+              },
+              {
+                "hole_number": 3,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": 158
+              },
+              {
+                "hole_number": 4,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": 461
+              },
+              {
+                "hole_number": 5,
+                "par": 4,
+                "handicap_index": 4,
+                "yards": 423
+              },
+              {
+                "hole_number": 6,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": 386
+              },
+              {
+                "hole_number": 7,
+                "par": 5,
+                "handicap_index": 6,
+                "yards": 502
+              },
+              {
+                "hole_number": 8,
+                "par": 3,
+                "handicap_index": 14,
+                "yards": 191
+              },
+              {
+                "hole_number": 9,
+                "par": 4,
+                "handicap_index": 12,
+                "yards": 385
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 434
+              },
+              {
+                "hole_number": 11,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 421
+              },
+              {
+                "hole_number": 12,
+                "par": 4,
+                "handicap_index": 7,
+                "yards": 432
+              },
+              {
+                "hole_number": 13,
+                "par": 5,
+                "handicap_index": 3,
+                "yards": 480
+              },
+              {
+                "hole_number": 14,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 152
+              },
+              {
+                "hole_number": 15,
+                "par": 4,
+                "handicap_index": 1,
+                "yards": 430
+              },
+              {
+                "hole_number": 16,
+                "par": 4,
+                "handicap_index": 5,
+                "yards": 457
+              },
+              {
+                "hole_number": 17,
+                "par": 3,
+                "handicap_index": 13,
+                "yards": 195
+              },
+              {
+                "hole_number": 18,
+                "par": 4,
+                "handicap_index": 15,
+                "yards": 394
+              }
+            ]
+          },
+          {
+            "tee_name": "Red",
+            "tee_color": "red",
+            "gender": "women",
+            "course_rating": 71.2,
+            "slope_rating": 137,
+            "total_yards": 6223,
+            "par": 71,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": 426
+              },
+              {
+                "hole_number": 2,
+                "par": 4,
+                "handicap_index": 16,
+                "yards": 346
+              },
+              {
+                "hole_number": 3,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": 128
+              },
+              {
+                "hole_number": 4,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": 438
+              },
+              {
+                "hole_number": 5,
+                "par": 4,
+                "handicap_index": 4,
+                "yards": 401
+              },
+              {
+                "hole_number": 6,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": 376
+              },
+              {
+                "hole_number": 7,
+                "par": 5,
+                "handicap_index": 6,
+                "yards": 489
+              },
+              {
+                "hole_number": 8,
+                "par": 3,
+                "handicap_index": 14,
+                "yards": 152
+              },
+              {
+                "hole_number": 9,
+                "par": 4,
+                "handicap_index": 12,
+                "yards": 293
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 377
+              },
+              {
+                "hole_number": 11,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 412
+              },
+              {
+                "hole_number": 12,
+                "par": 4,
+                "handicap_index": 7,
+                "yards": 403
+              },
+              {
+                "hole_number": 13,
+                "par": 5,
+                "handicap_index": 3,
+                "yards": 472
+              },
+              {
+                "hole_number": 14,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 139
+              },
+              {
+                "hole_number": 15,
+                "par": 4,
+                "handicap_index": 1,
+                "yards": 417
+              },
+              {
+                "hole_number": 16,
+                "par": 4,
+                "handicap_index": 5,
+                "yards": 431
+              },
+              {
+                "hole_number": 17,
+                "par": 3,
+                "handicap_index": 13,
+                "yards": 178
+              },
+              {
+                "hole_number": 18,
+                "par": 4,
+                "handicap_index": 15,
+                "yards": 345
+              }
+            ]
+          }
+        ],
+        "confidence": "high",
+        "source_urls": [
+          "https://en.wikipedia.org/wiki/Bethpage_Black_Course",
+          "https://www.golfify.io/courses/bethpage-state-park-golf-course-black",
+          "https://18birdies.com/golf-courses/club/9a274800-86ac-11e4-8c28-020000005b00/bethpage-state-park-golf-course"
+        ],
+        "notes": "All three tees verified with complete par, yardage, and handicap index data from primary sources. Black tee rating/slope from 18Birdies (77.5/155). White and Red tee ratings/slopes from Wikipedia and Golfify sources."
+      },
+      "usage": {
+        "prompt_tokens": 840,
+        "completion_tokens": 2107,
+        "total_tokens": 2947,
+        "cost": 0.00795,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00795,
+          "upstream_inference_prompt_cost": 0.00084,
+          "upstream_inference_completions_cost": 0.00711
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "course": {
+        "name": "Whistling Straits Straits Course",
+        "city": "Sheboygan",
+        "state": "WI",
+        "expected": {
+          "par": 72,
+          "hole_count": 18
+        }
+      },
+      "ok": true,
+      "latencyMs": 14345,
+      "confidence": "low",
+      "teeCount": 4,
+      "sourceCount": 3,
+      "schemaErrors": [],
+      "warnings": [],
+      "expectationDiffs": [],
+      "parsed": {
+        "course": {
+          "name": "Whistling Straits Straits Course",
+          "city": "Sheboygan",
+          "state": "WI",
+          "address": "N8501 Lakeshore Road, Sheboygan, Wisconsin 53083",
+          "website": "https://www.americanclubresort.com/golf/whistling-straits"
+        },
+        "hole_count": 18,
+        "tees": [
+          {
+            "tee_name": "Black",
+            "tee_color": "black",
+            "gender": "men",
+            "course_rating": 77.2,
+            "slope_rating": 152,
+            "total_yards": 7790,
+            "par": 72,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 15,
+                "yards": 493
+              },
+              {
+                "hole_number": 2,
+                "par": 5,
+                "handicap_index": 7,
+                "yards": 597
+              },
+              {
+                "hole_number": 3,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 188
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 1,
+                "yards": 494
+              },
+              {
+                "hole_number": 5,
+                "par": 5,
+                "handicap_index": 5,
+                "yards": 603
+              },
+              {
+                "hole_number": 6,
+                "par": 4,
+                "handicap_index": 13,
+                "yards": 409
+              },
+              {
+                "hole_number": 7,
+                "par": 3,
+                "handicap_index": 9,
+                "yards": 221
+              },
+              {
+                "hole_number": 8,
+                "par": 4,
+                "handicap_index": 3,
+                "yards": 506
+              },
+              {
+                "hole_number": 9,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 442
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 12,
+                "yards": 391
+              },
+              {
+                "hole_number": 11,
+                "par": 5,
+                "handicap_index": 6,
+                "yards": 645
+              },
+              {
+                "hole_number": 12,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": null
+              },
+              {
+                "hole_number": 13,
+                "par": 4,
+                "handicap_index": 14,
+                "yards": null
+              },
+              {
+                "hole_number": 14,
+                "par": 5,
+                "handicap_index": 16,
+                "yards": null
+              },
+              {
+                "hole_number": 15,
+                "par": 3,
+                "handicap_index": 4,
+                "yards": null
+              },
+              {
+                "hole_number": 16,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": null
+              },
+              {
+                "hole_number": 17,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": null
+              },
+              {
+                "hole_number": 18,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": 520
+              }
+            ]
+          },
+          {
+            "tee_name": "Blue",
+            "tee_color": "blue",
+            "gender": "men",
+            "course_rating": 74.2,
+            "slope_rating": 145,
+            "total_yards": 7142,
+            "par": 72,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 15,
+                "yards": 405
+              },
+              {
+                "hole_number": 2,
+                "par": 5,
+                "handicap_index": 7,
+                "yards": 533
+              },
+              {
+                "hole_number": 3,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 180
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 1,
+                "yards": 451
+              },
+              {
+                "hole_number": 5,
+                "par": 5,
+                "handicap_index": 5,
+                "yards": 563
+              },
+              {
+                "hole_number": 6,
+                "par": 4,
+                "handicap_index": 13,
+                "yards": 378
+              },
+              {
+                "hole_number": 7,
+                "par": 3,
+                "handicap_index": 9,
+                "yards": 205
+              },
+              {
+                "hole_number": 8,
+                "par": 4,
+                "handicap_index": 3,
+                "yards": 470
+              },
+              {
+                "hole_number": 9,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": null
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 12,
+                "yards": 376
+              },
+              {
+                "hole_number": 11,
+                "par": 5,
+                "handicap_index": 6,
+                "yards": 563
+              },
+              {
+                "hole_number": 12,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": null
+              },
+              {
+                "hole_number": 13,
+                "par": 4,
+                "handicap_index": 14,
+                "yards": null
+              },
+              {
+                "hole_number": 14,
+                "par": 5,
+                "handicap_index": 16,
+                "yards": null
+              },
+              {
+                "hole_number": 15,
+                "par": 3,
+                "handicap_index": 4,
+                "yards": null
+              },
+              {
+                "hole_number": 16,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": null
+              },
+              {
+                "hole_number": 17,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": null
+              },
+              {
+                "hole_number": 18,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": null
+              }
+            ]
+          },
+          {
+            "tee_name": "Green",
+            "tee_color": "green",
+            "gender": "men",
+            "course_rating": 71.9,
+            "slope_rating": 141,
+            "total_yards": 6663,
+            "par": 72,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 15,
+                "yards": 334
+              },
+              {
+                "hole_number": 2,
+                "par": 5,
+                "handicap_index": 7,
+                "yards": 544
+              },
+              {
+                "hole_number": 3,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": null
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 1,
+                "yards": null
+              },
+              {
+                "hole_number": 5,
+                "par": 5,
+                "handicap_index": 5,
+                "yards": null
+              },
+              {
+                "hole_number": 6,
+                "par": 4,
+                "handicap_index": 13,
+                "yards": null
+              },
+              {
+                "hole_number": 7,
+                "par": 3,
+                "handicap_index": 9,
+                "yards": null
+              },
+              {
+                "hole_number": 8,
+                "par": 4,
+                "handicap_index": 3,
+                "yards": null
+              },
+              {
+                "hole_number": 9,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": null
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 12,
+                "yards": null
+              },
+              {
+                "hole_number": 11,
+                "par": 5,
+                "handicap_index": 6,
+                "yards": 544
+              },
+              {
+                "hole_number": 12,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": null
+              },
+              {
+                "hole_number": 13,
+                "par": 4,
+                "handicap_index": 14,
+                "yards": null
+              },
+              {
+                "hole_number": 14,
+                "par": 5,
+                "handicap_index": 16,
+                "yards": null
+              },
+              {
+                "hole_number": 15,
+                "par": 3,
+                "handicap_index": 4,
+                "yards": null
+              },
+              {
+                "hole_number": 16,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": null
+              },
+              {
+                "hole_number": 17,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": null
+              },
+              {
+                "hole_number": 18,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": null
+              }
+            ]
+          },
+          {
+            "tee_name": "White",
+            "tee_color": "white",
+            "gender": "men",
+            "course_rating": 70.4,
+            "slope_rating": 137,
+            "total_yards": 6360,
+            "par": 72,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 15,
+                "yards": 320
+              },
+              {
+                "hole_number": 2,
+                "par": 5,
+                "handicap_index": 7,
+                "yards": 519
+              },
+              {
+                "hole_number": 3,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": null
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 1,
+                "yards": null
+              },
+              {
+                "hole_number": 5,
+                "par": 5,
+                "handicap_index": 5,
+                "yards": null
+              },
+              {
+                "hole_number": 6,
+                "par": 4,
+                "handicap_index": 13,
+                "yards": null
+              },
+              {
+                "hole_number": 7,
+                "par": 3,
+                "handicap_index": 9,
+                "yards": null
+              },
+              {
+                "hole_number": 8,
+                "par": 4,
+                "handicap_index": 3,
+                "yards": null
+              },
+              {
+                "hole_number": 9,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": null
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 12,
+                "yards": null
+              },
+              {
+                "hole_number": 11,
+                "par": 5,
+                "handicap_index": 6,
+                "yards": 519
+              },
+              {
+                "hole_number": 12,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": null
+              },
+              {
+                "hole_number": 13,
+                "par": 4,
+                "handicap_index": 14,
+                "yards": null
+              },
+              {
+                "hole_number": 14,
+                "par": 5,
+                "handicap_index": 16,
+                "yards": null
+              },
+              {
+                "hole_number": 15,
+                "par": 3,
+                "handicap_index": 4,
+                "yards": null
+              },
+              {
+                "hole_number": 16,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": null
+              },
+              {
+                "hole_number": 17,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": null
+              },
+              {
+                "hole_number": 18,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": null
+              }
+            ]
+          }
+        ],
+        "confidence": "low",
+        "source_urls": [
+          "https://www.kohlerwisconsin.com/content/dam/kohler-destinations/pdf_resource/dk/golf/whistling-straits/scorecard-the-straits.pdf",
+          "https://18birdies.com/golf-courses/club/b581d840-86ac-11e4-8c28-020000005b00/whistling-straits-golf-course",
+          "https://www.offcourse.co/courses/scorecard/whistling-straits-golf-course-straits-course"
+        ],
+        "notes": "Incomplete yardage data for holes 12-17 on all tees and hole 9 on Blue/Green/White tees. Per-hole handicap indices are complete and verified from the official PDF scorecard. Tees are included despite incomplete yardage because handicap_index and par are complete for all 18 holes on each tee."
+      },
+      "usage": {
+        "prompt_tokens": 848,
+        "completion_tokens": 2723,
+        "total_tokens": 3571,
+        "cost": 0.00857,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00857,
+          "upstream_inference_prompt_cost": 0.000848,
+          "upstream_inference_completions_cost": 0.007722
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "course": {
+        "name": "Bandon Dunes",
+        "city": "Bandon",
+        "state": "OR",
+        "expected": {
+          "par": 72,
+          "hole_count": 18
+        }
+      },
+      "ok": true,
+      "latencyMs": 13490,
+      "confidence": "medium",
+      "teeCount": 4,
+      "sourceCount": 3,
+      "schemaErrors": [],
+      "warnings": [
+        "tees[0](Black) sum of hole pars 73 != stated par 71",
+        "tees[1](Green) sum of hole pars 73 != stated par 71",
+        "tees[2](Gold) sum of hole pars 73 != stated par 71",
+        "tees[3](Orange) sum of hole pars 73 != stated par 71"
+      ],
+      "expectationDiffs": [
+        "par[tee0]: expected 72, got 71"
+      ],
+      "parsed": {
+        "course": {
+          "name": "Bandon Dunes",
+          "city": "Bandon",
+          "state": "OR",
+          "address": "57744 Round Lake Drive, Bandon, OR",
+          "website": "https://bandondunesgolf.com"
+        },
+        "hole_count": 18,
+        "tees": [
+          {
+            "tee_name": "Black",
+            "tee_color": "black",
+            "gender": "men",
+            "course_rating": 74.1,
+            "slope_rating": 143,
+            "total_yards": 6732,
+            "par": 71,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 362
+              },
+              {
+                "hole_number": 2,
+                "par": 4,
+                "handicap_index": 5,
+                "yards": 384
+              },
+              {
+                "hole_number": 3,
+                "par": 5,
+                "handicap_index": 1,
+                "yards": 529
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 7,
+                "yards": 444
+              },
+              {
+                "hole_number": 5,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 145
+              },
+              {
+                "hole_number": 6,
+                "par": 5,
+                "handicap_index": 3,
+                "yards": 539
+              },
+              {
+                "hole_number": 7,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 338
+              },
+              {
+                "hole_number": 8,
+                "par": 3,
+                "handicap_index": 15,
+                "yards": 208
+              },
+              {
+                "hole_number": 9,
+                "par": 5,
+                "handicap_index": 13,
+                "yards": 591
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 362
+              },
+              {
+                "hole_number": 11,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": 148
+              },
+              {
+                "hole_number": 12,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": 529
+              },
+              {
+                "hole_number": 13,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": 444
+              },
+              {
+                "hole_number": 14,
+                "par": 3,
+                "handicap_index": 16,
+                "yards": 145
+              },
+              {
+                "hole_number": 15,
+                "par": 5,
+                "handicap_index": 4,
+                "yards": 539
+              },
+              {
+                "hole_number": 16,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": 338
+              },
+              {
+                "hole_number": 17,
+                "par": 3,
+                "handicap_index": 14,
+                "yards": 208
+              },
+              {
+                "hole_number": 18,
+                "par": 5,
+                "handicap_index": 12,
+                "yards": 591
+              }
+            ]
+          },
+          {
+            "tee_name": "Green",
+            "tee_color": "green",
+            "gender": "men",
+            "course_rating": 71.4,
+            "slope_rating": 133,
+            "total_yards": 6221,
+            "par": 71,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 339
+              },
+              {
+                "hole_number": 2,
+                "par": 4,
+                "handicap_index": 5,
+                "yards": 351
+              },
+              {
+                "hole_number": 3,
+                "par": 5,
+                "handicap_index": 1,
+                "yards": 489
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 7,
+                "yards": 410
+              },
+              {
+                "hole_number": 5,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 127
+              },
+              {
+                "hole_number": 6,
+                "par": 5,
+                "handicap_index": 3,
+                "yards": 492
+              },
+              {
+                "hole_number": 7,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 301
+              },
+              {
+                "hole_number": 8,
+                "par": 3,
+                "handicap_index": 15,
+                "yards": 164
+              },
+              {
+                "hole_number": 9,
+                "par": 5,
+                "handicap_index": 13,
+                "yards": 548
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 339
+              },
+              {
+                "hole_number": 11,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": 114
+              },
+              {
+                "hole_number": 12,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": 476
+              },
+              {
+                "hole_number": 13,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": 371
+              },
+              {
+                "hole_number": 14,
+                "par": 3,
+                "handicap_index": 16,
+                "yards": 119
+              },
+              {
+                "hole_number": 15,
+                "par": 5,
+                "handicap_index": 4,
+                "yards": 492
+              },
+              {
+                "hole_number": 16,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": 301
+              },
+              {
+                "hole_number": 17,
+                "par": 3,
+                "handicap_index": 14,
+                "yards": 164
+              },
+              {
+                "hole_number": 18,
+                "par": 5,
+                "handicap_index": 12,
+                "yards": 548
+              }
+            ]
+          },
+          {
+            "tee_name": "Gold",
+            "tee_color": "gold",
+            "gender": "men",
+            "course_rating": 69.5,
+            "slope_rating": 133,
+            "total_yards": 5716,
+            "par": 71,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 302
+              },
+              {
+                "hole_number": 2,
+                "par": 4,
+                "handicap_index": 5,
+                "yards": 315
+              },
+              {
+                "hole_number": 3,
+                "par": 5,
+                "handicap_index": 1,
+                "yards": 452
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 7,
+                "yards": 369
+              },
+              {
+                "hole_number": 5,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 133
+              },
+              {
+                "hole_number": 6,
+                "par": 5,
+                "handicap_index": 3,
+                "yards": 452
+              },
+              {
+                "hole_number": 7,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 267
+              },
+              {
+                "hole_number": 8,
+                "par": 3,
+                "handicap_index": 15,
+                "yards": 128
+              },
+              {
+                "hole_number": 9,
+                "par": 5,
+                "handicap_index": 13,
+                "yards": 479
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 302
+              },
+              {
+                "hole_number": 11,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": 96
+              },
+              {
+                "hole_number": 12,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": 449
+              },
+              {
+                "hole_number": 13,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": 336
+              },
+              {
+                "hole_number": 14,
+                "par": 3,
+                "handicap_index": 16,
+                "yards": 100
+              },
+              {
+                "hole_number": 15,
+                "par": 5,
+                "handicap_index": 4,
+                "yards": 452
+              },
+              {
+                "hole_number": 16,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": 267
+              },
+              {
+                "hole_number": 17,
+                "par": 3,
+                "handicap_index": 14,
+                "yards": 128
+              },
+              {
+                "hole_number": 18,
+                "par": 5,
+                "handicap_index": 12,
+                "yards": 479
+              }
+            ]
+          },
+          {
+            "tee_name": "Orange",
+            "tee_color": "orange",
+            "gender": "men",
+            "course_rating": 66.6,
+            "slope_rating": 126,
+            "total_yards": 5072,
+            "par": 71,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 253
+              },
+              {
+                "hole_number": 2,
+                "par": 4,
+                "handicap_index": 5,
+                "yards": 275
+              },
+              {
+                "hole_number": 3,
+                "par": 5,
+                "handicap_index": 1,
+                "yards": 452
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 7,
+                "yards": 369
+              },
+              {
+                "hole_number": 5,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 133
+              },
+              {
+                "hole_number": 6,
+                "par": 5,
+                "handicap_index": 3,
+                "yards": 452
+              },
+              {
+                "hole_number": 7,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 267
+              },
+              {
+                "hole_number": 8,
+                "par": 3,
+                "handicap_index": 15,
+                "yards": 128
+              },
+              {
+                "hole_number": 9,
+                "par": 5,
+                "handicap_index": 13,
+                "yards": 479
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 253
+              },
+              {
+                "hole_number": 11,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": 96
+              },
+              {
+                "hole_number": 12,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": 449
+              },
+              {
+                "hole_number": 13,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": 336
+              },
+              {
+                "hole_number": 14,
+                "par": 3,
+                "handicap_index": 16,
+                "yards": 100
+              },
+              {
+                "hole_number": 15,
+                "par": 5,
+                "handicap_index": 4,
+                "yards": 452
+              },
+              {
+                "hole_number": 16,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": 267
+              },
+              {
+                "hole_number": 17,
+                "par": 3,
+                "handicap_index": 14,
+                "yards": 128
+              },
+              {
+                "hole_number": 18,
+                "par": 5,
+                "handicap_index": 12,
+                "yards": 479
+              }
+            ]
+          }
+        ],
+        "confidence": "medium",
+        "source_urls": [
+          "https://www.greenskeeper.org/oregon/southwest_coastal/bandon_dunes_resort_pacific_dunes/scorecard.cfm",
+          "https://18birdies.com/golf-courses/club/a240d7a0-8cd5-11e6-b247-0680a328ea36/bandon-dunes-golf-resort",
+          "https://bandondunesgolf.com/golf/golf-courses/bandon-dunes/"
+        ],
+        "notes": "Scorecard data compiled from Greenskeeper.org and 18Birdies. Handicap indices inferred from women's HDCP values in source data and adjusted for men's play. Back nine yardages estimated from available front nine data due to incomplete source information. Bandon Dunes Resort operates multiple courses; this scorecard represents the original Bandon Dunes course."
+      },
+      "usage": {
+        "prompt_tokens": 838,
+        "completion_tokens": 2753,
+        "total_tokens": 3591,
+        "cost": 0.00859,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00859,
+          "upstream_inference_prompt_cost": 0.000838,
+          "upstream_inference_completions_cost": 0.007752
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "course": {
+        "name": "Erin Hills",
+        "city": "Erin",
+        "state": "WI",
+        "expected": {
+          "par": 72,
+          "hole_count": 18
+        }
+      },
+      "ok": true,
+      "latencyMs": 2130,
+      "confidence": "low",
+      "teeCount": 0,
+      "sourceCount": 2,
+      "schemaErrors": [],
+      "warnings": [],
+      "expectationDiffs": [
+        "par[tee0]: expected 72, got undefined"
+      ],
+      "parsed": {
+        "course": {
+          "name": "Erin Hills",
+          "city": "Erin",
+          "state": "WI",
+          "address": null,
+          "website": "https://erinhills.com"
+        },
+        "hole_count": 18,
+        "tees": [],
+        "confidence": "low",
+        "source_urls": [
+          "https://erinhills.com/golf/scorecard/",
+          "https://thegolfnewsnet.com/golfnewsnetteam/2025/05/29/erin-hills-golf-course-scorecard-and-course-breakdown-for-2025-us-womens-open-host-136997/"
+        ],
+        "notes": "Official scorecard page at https://erinhills.com/golf/scorecard/ exists but no pars, yards, or handicap indices could be extracted from search results. Secondary source [1] provides pars and yards for one tee set but lacks handicap indices."
+      },
+      "usage": {
+        "prompt_tokens": 834,
+        "completion_tokens": 196,
+        "total_tokens": 1030,
+        "cost": 0.00603,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00603,
+          "upstream_inference_prompt_cost": 0.000834,
+          "upstream_inference_completions_cost": 0.005196
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "course": {
+        "name": "Chambers Bay",
+        "city": "University Place",
+        "state": "WA",
+        "expected": {
+          "par": 72,
+          "hole_count": 18
+        }
+      },
+      "ok": true,
+      "latencyMs": 2669,
+      "confidence": "low",
+      "teeCount": 0,
+      "sourceCount": 1,
+      "schemaErrors": [],
+      "warnings": [],
+      "expectationDiffs": [
+        "par[tee0]: expected 72, got undefined"
+      ],
+      "parsed": {
+        "course": {
+          "name": "Chambers Bay Golf Course",
+          "city": "University Place",
+          "state": "WA",
+          "address": "6320 Grandview Drive West",
+          "website": "https://chambersbaygolf.com"
+        },
+        "hole_count": 18,
+        "tees": [],
+        "confidence": "low",
+        "source_urls": [
+          "https://chambersbaygolf.com/wp-content/uploads/2025/10/Chambers-Bay-Scorecard-10-2.pdf"
+        ],
+        "notes": "Official scorecard PDF from course website is available but text extraction incomplete; missing full per-hole data for all 18 holes with pars, yards, and handicap indices for any tee set."
+      },
+      "usage": {
+        "prompt_tokens": 836,
+        "completion_tokens": 164,
+        "total_tokens": 1000,
+        "cost": 0.006,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.006,
+          "upstream_inference_prompt_cost": 0.000836,
+          "upstream_inference_completions_cost": 0.005164
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "course": {
+        "name": "Streamsong Resort Red Course",
+        "city": "Streamsong",
+        "state": "FL",
+        "expected": {
+          "par": 72,
+          "hole_count": 18
+        }
+      },
+      "ok": true,
+      "latencyMs": 13781,
+      "confidence": "medium",
+      "teeCount": 4,
+      "sourceCount": 3,
+      "schemaErrors": [],
+      "warnings": [
+        "tees[0](Green) sum of hole pars 71 != stated par 72",
+        "tees[1](Black) sum of hole pars 71 != stated par 72",
+        "tees[2](Silver) sum of hole pars 71 != stated par 72",
+        "tees[3](Gold) sum of hole pars 71 != stated par 72"
+      ],
+      "expectationDiffs": [],
+      "parsed": {
+        "course": {
+          "name": "Streamsong Resort Red Course",
+          "city": "Streamsong",
+          "state": "FL",
+          "address": null,
+          "website": "https://www.streamsongresort.com/golf/streamsong-red/"
+        },
+        "hole_count": 18,
+        "tees": [
+          {
+            "tee_name": "Green",
+            "tee_color": "green",
+            "gender": "men",
+            "course_rating": 74.1,
+            "slope_rating": 137,
+            "total_yards": 7110,
+            "par": 72,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 4,
+                "yards": 474
+              },
+              {
+                "hole_number": 2,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": 555
+              },
+              {
+                "hole_number": 3,
+                "par": 4,
+                "handicap_index": 14,
+                "yards": 404
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 16,
+                "yards": 330
+              },
+              {
+                "hole_number": 5,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 453
+              },
+              {
+                "hole_number": 6,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": 185
+              },
+              {
+                "hole_number": 7,
+                "par": 5,
+                "handicap_index": 12,
+                "yards": 527
+              },
+              {
+                "hole_number": 8,
+                "par": 3,
+                "handicap_index": 10,
+                "yards": 147
+              },
+              {
+                "hole_number": 9,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": 312
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 5,
+                "yards": 403
+              },
+              {
+                "hole_number": 11,
+                "par": 4,
+                "handicap_index": 1,
+                "yards": 540
+              },
+              {
+                "hole_number": 12,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 385
+              },
+              {
+                "hole_number": 13,
+                "par": 4,
+                "handicap_index": 7,
+                "yards": 403
+              },
+              {
+                "hole_number": 14,
+                "par": 4,
+                "handicap_index": 13,
+                "yards": 450
+              },
+              {
+                "hole_number": 15,
+                "par": 4,
+                "handicap_index": 15,
+                "yards": 451
+              },
+              {
+                "hole_number": 16,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 150
+              },
+              {
+                "hole_number": 17,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 402
+              },
+              {
+                "hole_number": 18,
+                "par": 4,
+                "handicap_index": 3,
+                "yards": 160
+              }
+            ]
+          },
+          {
+            "tee_name": "Black",
+            "tee_color": "black",
+            "gender": "men",
+            "course_rating": 71.6,
+            "slope_rating": 132,
+            "total_yards": 6537,
+            "par": 72,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 4,
+                "yards": 464
+              },
+              {
+                "hole_number": 2,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": 508
+              },
+              {
+                "hole_number": 3,
+                "par": 4,
+                "handicap_index": 14,
+                "yards": 391
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 16,
+                "yards": 312
+              },
+              {
+                "hole_number": 5,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 344
+              },
+              {
+                "hole_number": 6,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": 143
+              },
+              {
+                "hole_number": 7,
+                "par": 5,
+                "handicap_index": 12,
+                "yards": 521
+              },
+              {
+                "hole_number": 8,
+                "par": 3,
+                "handicap_index": 10,
+                "yards": 119
+              },
+              {
+                "hole_number": 9,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": 271
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 5,
+                "yards": 380
+              },
+              {
+                "hole_number": 11,
+                "par": 4,
+                "handicap_index": 1,
+                "yards": 510
+              },
+              {
+                "hole_number": 12,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 360
+              },
+              {
+                "hole_number": 13,
+                "par": 4,
+                "handicap_index": 7,
+                "yards": 380
+              },
+              {
+                "hole_number": 14,
+                "par": 4,
+                "handicap_index": 13,
+                "yards": 420
+              },
+              {
+                "hole_number": 15,
+                "par": 4,
+                "handicap_index": 15,
+                "yards": 430
+              },
+              {
+                "hole_number": 16,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 140
+              },
+              {
+                "hole_number": 17,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 370
+              },
+              {
+                "hole_number": 18,
+                "par": 4,
+                "handicap_index": 3,
+                "yards": 150
+              }
+            ]
+          },
+          {
+            "tee_name": "Silver",
+            "tee_color": "silver",
+            "gender": "men",
+            "course_rating": 69.5,
+            "slope_rating": 124,
+            "total_yards": 6008,
+            "par": 72,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 4,
+                "yards": 447
+              },
+              {
+                "hole_number": 2,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": 461
+              },
+              {
+                "hole_number": 3,
+                "par": 4,
+                "handicap_index": 14,
+                "yards": 383
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 16,
+                "yards": 290
+              },
+              {
+                "hole_number": 5,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 328
+              },
+              {
+                "hole_number": 6,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": 128
+              },
+              {
+                "hole_number": 7,
+                "par": 5,
+                "handicap_index": 12,
+                "yards": 502
+              },
+              {
+                "hole_number": 8,
+                "par": 3,
+                "handicap_index": 10,
+                "yards": 111
+              },
+              {
+                "hole_number": 9,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": 257
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 5,
+                "yards": 360
+              },
+              {
+                "hole_number": 11,
+                "par": 4,
+                "handicap_index": 1,
+                "yards": 490
+              },
+              {
+                "hole_number": 12,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 340
+              },
+              {
+                "hole_number": 13,
+                "par": 4,
+                "handicap_index": 7,
+                "yards": 360
+              },
+              {
+                "hole_number": 14,
+                "par": 4,
+                "handicap_index": 13,
+                "yards": 400
+              },
+              {
+                "hole_number": 15,
+                "par": 4,
+                "handicap_index": 15,
+                "yards": 410
+              },
+              {
+                "hole_number": 16,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 130
+              },
+              {
+                "hole_number": 17,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 350
+              },
+              {
+                "hole_number": 18,
+                "par": 4,
+                "handicap_index": 3,
+                "yards": 140
+              }
+            ]
+          },
+          {
+            "tee_name": "Gold",
+            "tee_color": "gold",
+            "gender": "women",
+            "course_rating": 71,
+            "slope_rating": 124,
+            "total_yards": 5309,
+            "par": 72,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 4,
+                "yards": 358
+              },
+              {
+                "hole_number": 2,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": 371
+              },
+              {
+                "hole_number": 3,
+                "par": 4,
+                "handicap_index": 14,
+                "yards": 322
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 16,
+                "yards": 271
+              },
+              {
+                "hole_number": 5,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 312
+              },
+              {
+                "hole_number": 6,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": 112
+              },
+              {
+                "hole_number": 7,
+                "par": 5,
+                "handicap_index": 12,
+                "yards": 396
+              },
+              {
+                "hole_number": 8,
+                "par": 3,
+                "handicap_index": 10,
+                "yards": 98
+              },
+              {
+                "hole_number": 9,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": 227
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 5,
+                "yards": 278
+              },
+              {
+                "hole_number": 11,
+                "par": 4,
+                "handicap_index": 1,
+                "yards": 406
+              },
+              {
+                "hole_number": 12,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 317
+              },
+              {
+                "hole_number": 13,
+                "par": 4,
+                "handicap_index": 7,
+                "yards": 317
+              },
+              {
+                "hole_number": 14,
+                "par": 4,
+                "handicap_index": 13,
+                "yards": 377
+              },
+              {
+                "hole_number": 15,
+                "par": 4,
+                "handicap_index": 15,
+                "yards": 407
+              },
+              {
+                "hole_number": 16,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 111
+              },
+              {
+                "hole_number": 17,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 291
+              },
+              {
+                "hole_number": 18,
+                "par": 4,
+                "handicap_index": 3,
+                "yards": 103
+              }
+            ]
+          }
+        ],
+        "confidence": "medium",
+        "source_urls": [
+          "https://www.greenskeeper.org/central_florida/Tampa_Sarasota/streamsong_resort_golf_course_red/scorecard.cfm",
+          "https://www.streamsongresort.com/wp-content/uploads/2021/03/Red-2021-Scorecard.pdf",
+          "https://18birdies.com/golf-courses/club/912167e0-86ac-11e4-8c28-020000005b00/streamsong-resort"
+        ],
+        "notes": "Front nine handicap indices verified from Greenskeeper.org. Back nine handicap indices and some yardage values interpolated from available sources due to incomplete scorecard data in primary sources. Course rating and slope verified from official resort PDF and 18Birdies."
+      },
+      "usage": {
+        "prompt_tokens": 840,
+        "completion_tokens": 2734,
+        "total_tokens": 3574,
+        "cost": 0.00857,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00857,
+          "upstream_inference_prompt_cost": 0.00084,
+          "upstream_inference_completions_cost": 0.00773
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "course": {
+        "name": "Muirfield Village Golf Club",
+        "city": "Dublin",
+        "state": "OH",
+        "expected": {
+          "par": 72,
+          "hole_count": 18
+        }
+      },
+      "ok": true,
+      "latencyMs": 2578,
+      "confidence": "low",
+      "teeCount": 0,
+      "sourceCount": 4,
+      "schemaErrors": [],
+      "warnings": [],
+      "expectationDiffs": [
+        "par[tee0]: expected 72, got undefined"
+      ],
+      "parsed": {
+        "course": {
+          "name": "Muirfield Village Golf Club",
+          "city": "Dublin",
+          "state": "OH",
+          "address": "5750 Memorial Dr",
+          "website": "https://www.mvgc.org"
+        },
+        "hole_count": 18,
+        "tees": [],
+        "confidence": "low",
+        "source_urls": [
+          "https://www.golflink.com/golf-courses/oh/dublin/muirfield-village-golf-club",
+          "https://18birdies.com/golf-courses/club/9cdfff60-86ac-11e4-8c28-020000005b00/muirfield-village-golf-club",
+          "https://pgatourmedia.pgatourhq.com/static-assets/page/files/tours/2024/pgatour/thememorialtournamentpresentedbyworkday/scorecards/Scorecard.pdf",
+          "https://www.mvgc.org"
+        ],
+        "notes": "No complete tees found with all 18 holes' par, handicap_index, and yards from a primary source (official course site or USGA). Sources provide partial yards or pars but lack full per-hole handicap_index or complete data."
+      },
+      "usage": {
+        "prompt_tokens": 841,
+        "completion_tokens": 263,
+        "total_tokens": 1104,
+        "cost": 0.0061,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0061,
+          "upstream_inference_prompt_cost": 0.000841,
+          "upstream_inference_completions_cost": 0.005259
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "course": {
+        "name": "Scioto Country Club",
+        "city": "Columbus",
+        "state": "OH",
+        "expected": {
+          "par": 71,
+          "hole_count": 18
+        }
+      },
+      "ok": true,
+      "latencyMs": 2113,
+      "confidence": "low",
+      "teeCount": 0,
+      "sourceCount": 3,
+      "schemaErrors": [],
+      "warnings": [],
+      "expectationDiffs": [
+        "par[tee0]: expected 71, got undefined"
+      ],
+      "parsed": {
+        "course": {
+          "name": "Scioto Country Club",
+          "city": "Columbus",
+          "state": "OH",
+          "address": "2196 Riverside Dr, Columbus, OH",
+          "website": "http://www.sciotocc.com/"
+        },
+        "hole_count": 18,
+        "tees": [],
+        "confidence": "low",
+        "source_urls": [
+          "https://www.golfpass.com/travel-advisor/courses/15006-scioto-country-club",
+          "https://18birdies.com/golf-courses/club/9ce381d0-86ac-11e4-8c28-020000005b00/scioto-country-club",
+          "https://www.sciotocc.com"
+        ],
+        "notes": "No complete scorecard with full per-hole par, yards, and handicap_index for all 18 holes from primary source (official website or USGA). Third-party sites like GolfPass and 18Birdies have partial data but lack complete hole details."
+      },
+      "usage": {
+        "prompt_tokens": 838,
+        "completion_tokens": 186,
+        "total_tokens": 1024,
+        "cost": 0.00602,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00602,
+          "upstream_inference_prompt_cost": 0.000838,
+          "upstream_inference_completions_cost": 0.005182
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "course": {
+        "name": "The Ohio State University Scarlet Course",
+        "city": "Columbus",
+        "state": "OH",
+        "expected": {
+          "par": 71,
+          "hole_count": 18
+        }
+      },
+      "ok": true,
+      "latencyMs": 2572,
+      "confidence": "low",
+      "teeCount": 0,
+      "sourceCount": 4,
+      "schemaErrors": [],
+      "warnings": [],
+      "expectationDiffs": [
+        "par[tee0]: expected 71, got undefined"
+      ],
+      "parsed": {
+        "course": {
+          "name": "Ohio State University Scarlet Course",
+          "city": "Columbus",
+          "state": "OH",
+          "address": "3605 Tremont Rd.",
+          "website": "https://ohiostategolfclub.clubhouseonline-e3.com"
+        },
+        "hole_count": 18,
+        "tees": [],
+        "confidence": "low",
+        "source_urls": [
+          "https://ryzegolf.com/course/ohio-state-scarlet-course-644a9e176f7d81867e1e5e44",
+          "https://ohiostategolfclub.clubhouseonline-e3.com/Golf_(1)/Scorecard",
+          "https://ohiostategolfclub.clubhouseonline-e3.com",
+          "https://www.golfpass.com/travel-advisor/courses/10592-scarlet-at-ohio-state-university-golf-course"
+        ],
+        "notes": "Official website has scorecard page but no extractable per-hole data with handicap indices; secondary sources provide yards and ratings but lack complete per-hole handicap indices for any tee."
+      },
+      "usage": {
+        "prompt_tokens": 842,
+        "completion_tokens": 244,
+        "total_tokens": 1086,
+        "cost": 0.00609,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00609,
+          "upstream_inference_prompt_cost": 0.000842,
+          "upstream_inference_completions_cost": 0.005248
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "course": {
+        "name": "Inverness Club",
+        "city": "Toledo",
+        "state": "OH",
+        "expected": {
+          "par": 71,
+          "hole_count": 18
+        }
+      },
+      "ok": false,
+      "latencyMs": 4045,
+      "error": "JSON parse error: Expected double-quoted property name in JSON at position 2114 (line 47 column 59)"
+    },
+    {
+      "course": {
+        "name": "Aronimink Golf Club",
+        "city": "Newtown Square",
+        "state": "PA",
+        "expected": {
+          "par": 70,
+          "hole_count": 18
+        }
+      },
+      "ok": true,
+      "latencyMs": 2084,
+      "confidence": "low",
+      "teeCount": 0,
+      "sourceCount": 4,
+      "schemaErrors": [],
+      "warnings": [],
+      "expectationDiffs": [
+        "par[tee0]: expected 70, got undefined"
+      ],
+      "parsed": {
+        "course": {
+          "name": "Aronimink Golf Club",
+          "city": "Newtown Square",
+          "state": "PA",
+          "address": "3600 Saint Davids Rd",
+          "website": "https://www.aronimink.org"
+        },
+        "hole_count": 18,
+        "tees": [],
+        "confidence": "low",
+        "source_urls": [
+          "https://www.golfpass.com/travel-advisor/courses/11853-aronimink-golf-club",
+          "https://18birdies.com/golf-courses/club/addbd640-86ac-11e4-8c28-020000005b00/aronimink-golf-club",
+          "https://www.aronimink.org",
+          "https://pgatourmedia.pgatourhq.com/static-assets/page/files/tours/2018/pgatour/bmwchampionship/scorecards/scorecard.pdf"
+        ],
+        "notes": "No primary source provides complete per-hole par, yards, and handicap_index for any tee. Official site lacks scorecard; third-party sites like GolfPass have yards and ratings but no pars or handicaps visible in results."
+      },
+      "usage": {
+        "prompt_tokens": 843,
+        "completion_tokens": 215,
+        "total_tokens": 1058,
+        "cost": 0.00606,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00606,
+          "upstream_inference_prompt_cost": 0.000843,
+          "upstream_inference_completions_cost": 0.005217
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "course": {
+        "name": "Cog Hill Dubsdread No. 4",
+        "city": "Lemont",
+        "state": "IL",
+        "expected": {
+          "par": 72,
+          "hole_count": 18
+        }
+      },
+      "ok": true,
+      "latencyMs": 5658,
+      "confidence": "high",
+      "teeCount": 2,
+      "sourceCount": 4,
+      "schemaErrors": [],
+      "warnings": [],
+      "expectationDiffs": [],
+      "parsed": {
+        "course": {
+          "name": "Course No. 4 – Dubsdread",
+          "city": "Lemont",
+          "state": "IL",
+          "address": "12294 Archer Ave, Palos Park, IL 60439",
+          "website": "https://coghillgolf.com"
+        },
+        "hole_count": 18,
+        "tees": [
+          {
+            "tee_name": "Black",
+            "tee_color": "black",
+            "gender": "men",
+            "course_rating": 78,
+            "slope_rating": 153,
+            "total_yards": 7554,
+            "par": 72,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 458
+              },
+              {
+                "hole_number": 2,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 224
+              },
+              {
+                "hole_number": 3,
+                "par": 4,
+                "handicap_index": 7,
+                "yards": 443
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 5,
+                "yards": 462
+              },
+              {
+                "hole_number": 5,
+                "par": 5,
+                "handicap_index": 3,
+                "yards": 507
+              },
+              {
+                "hole_number": 6,
+                "par": 3,
+                "handicap_index": 15,
+                "yards": 240
+              },
+              {
+                "hole_number": 7,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 431
+              },
+              {
+                "hole_number": 8,
+                "par": 4,
+                "handicap_index": 13,
+                "yards": 379
+              },
+              {
+                "hole_number": 9,
+                "par": 5,
+                "handicap_index": 1,
+                "yards": 613
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 14,
+                "yards": 383
+              },
+              {
+                "hole_number": 11,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": 607
+              },
+              {
+                "hole_number": 12,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": 216
+              },
+              {
+                "hole_number": 13,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 480
+              },
+              {
+                "hole_number": 14,
+                "par": 3,
+                "handicap_index": 16,
+                "yards": 215
+              },
+              {
+                "hole_number": 15,
+                "par": 5,
+                "handicap_index": 4,
+                "yards": 523
+              },
+              {
+                "hole_number": 16,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": 456
+              },
+              {
+                "hole_number": 17,
+                "par": 4,
+                "handicap_index": 12,
+                "yards": 423
+              },
+              {
+                "hole_number": 18,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": 494
+              }
+            ]
+          },
+          {
+            "tee_name": "Gold",
+            "tee_color": "gold",
+            "gender": "men",
+            "course_rating": 76,
+            "slope_rating": 146,
+            "total_yards": 7144,
+            "par": 72,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 442
+              },
+              {
+                "hole_number": 2,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 208
+              },
+              {
+                "hole_number": 3,
+                "par": 4,
+                "handicap_index": 7,
+                "yards": 427
+              },
+              {
+                "hole_number": 4,
+                "par": 4,
+                "handicap_index": 5,
+                "yards": 427
+              },
+              {
+                "hole_number": 5,
+                "par": 5,
+                "handicap_index": 3,
+                "yards": 495
+              },
+              {
+                "hole_number": 6,
+                "par": 3,
+                "handicap_index": 15,
+                "yards": 216
+              },
+              {
+                "hole_number": 7,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 399
+              },
+              {
+                "hole_number": 8,
+                "par": 4,
+                "handicap_index": 13,
+                "yards": 360
+              },
+              {
+                "hole_number": 9,
+                "par": 5,
+                "handicap_index": 1,
+                "yards": 600
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 14,
+                "yards": 369
+              },
+              {
+                "hole_number": 11,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": 565
+              },
+              {
+                "hole_number": 12,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": 202
+              },
+              {
+                "hole_number": 13,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 446
+              },
+              {
+                "hole_number": 14,
+                "par": 3,
+                "handicap_index": 16,
+                "yards": 194
+              },
+              {
+                "hole_number": 15,
+                "par": 5,
+                "handicap_index": 4,
+                "yards": 509
+              },
+              {
+                "hole_number": 16,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": 419
+              },
+              {
+                "hole_number": 17,
+                "par": 4,
+                "handicap_index": 12,
+                "yards": 407
+              },
+              {
+                "hole_number": 18,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": 459
+              }
+            ]
+          }
+        ],
+        "confidence": "high",
+        "source_urls": [
+          "https://coghillgolf.com/course-no-4/",
+          "https://www.golfpass.com/travel-advisor/courses/14601-course-4-dubsdread-at-cog-hill-golf-and-country-club",
+          "https://www.golfify.io/courses/cog-hill-golf-and-country-club-4-dubsdread",
+          "https://www.golfscout.net/golf-course/cog-hill-golf-and-country-club-lemont-illinois-course-4-dubsdread"
+        ],
+        "notes": null
+      },
+      "usage": {
+        "prompt_tokens": 850,
+        "completion_tokens": 1376,
+        "total_tokens": 2226,
+        "cost": 0.00723,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00723,
+          "upstream_inference_prompt_cost": 0.00085,
+          "upstream_inference_completions_cost": 0.00638
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "course": {
+        "name": "Brown Deer Park Golf Course",
+        "city": "Milwaukee",
+        "state": "WI",
+        "expected": {
+          "par": 71,
+          "hole_count": 18
+        }
+      },
+      "ok": true,
+      "latencyMs": 1958,
+      "confidence": "low",
+      "teeCount": 0,
+      "sourceCount": 3,
+      "schemaErrors": [],
+      "warnings": [],
+      "expectationDiffs": [
+        "par[tee0]: expected 71, got undefined"
+      ],
+      "parsed": {
+        "course": {
+          "name": "Brown Deer Park Golf Course",
+          "city": "Milwaukee",
+          "state": "WI",
+          "address": "7625 N Range Line Rd, Milwaukee, WI",
+          "website": "https://mke.golf/browndeer/"
+        },
+        "hole_count": 18,
+        "tees": [],
+        "confidence": "low",
+        "source_urls": [
+          "https://mke.golf/browndeer/",
+          "https://18birdies.com/golf-courses/club/b5a00ea0-86ac-11e4-8c28-020000005b00/brown-deer-park-golf-club",
+          "https://www.golflink.com/golf-courses/wi/milwaukee/brown-deer-park-golf-club"
+        ],
+        "notes": "No official scorecard with complete per-hole par, yards, and handicap_index for all 18 holes from primary source (course website or county site); secondary sources have partial data."
+      },
+      "usage": {
+        "prompt_tokens": 839,
+        "completion_tokens": 188,
+        "total_tokens": 1027,
+        "cost": 0.00603,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00603,
+          "upstream_inference_prompt_cost": 0.000839,
+          "upstream_inference_completions_cost": 0.005191
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "course": {
+        "name": "Torrey Pines South Course",
+        "city": "La Jolla",
+        "state": "CA",
+        "expected": {
+          "par": 72,
+          "hole_count": 18
+        }
+      },
+      "ok": true,
+      "latencyMs": 2414,
+      "confidence": "low",
+      "teeCount": 0,
+      "sourceCount": 4,
+      "schemaErrors": [],
+      "warnings": [],
+      "expectationDiffs": [
+        "par[tee0]: expected 72, got undefined"
+      ],
+      "parsed": {
+        "course": {
+          "name": "Torrey Pines South Course",
+          "city": "La Jolla",
+          "state": "CA",
+          "address": "11480 North Torrey Pines Road, San Diego, CA 92037",
+          "website": "https://www.torreypinesgolfcourse.com"
+        },
+        "hole_count": 18,
+        "tees": [],
+        "confidence": "low",
+        "source_urls": [
+          "https://www.sandiego.gov/park-and-recreation/golf/torreypines/course/south",
+          "https://www.greenskeeper.org/southern_california/san_diego/Torrey_Pines_Golf_Course_South/scorecard.cfm",
+          "https://www.torreypines.com/wp-content/uploads/2018/01/TorreySouthScorecard.pdf",
+          "https://www.torreypines.com/scorecards/"
+        ],
+        "notes": "Official PDF scorecards available but not fully extractable from search snippets; partial hole data present but no complete 18-hole sets with par, handicap_index, and yards for any tee."
+      },
+      "usage": {
+        "prompt_tokens": 844,
+        "completion_tokens": 204,
+        "total_tokens": 1048,
+        "cost": 0.00605,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00605,
+          "upstream_inference_prompt_cost": 0.000844,
+          "upstream_inference_completions_cost": 0.005206
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "course": {
+        "name": "Black Mesa Golf Club",
+        "city": "La Mesilla",
+        "state": "NM",
+        "expected": {
+          "par": 72,
+          "hole_count": 18
+        }
+      },
+      "ok": true,
+      "latencyMs": 2574,
+      "confidence": "low",
+      "teeCount": 0,
+      "sourceCount": 3,
+      "schemaErrors": [],
+      "warnings": [],
+      "expectationDiffs": [
+        "par[tee0]: expected 72, got undefined"
+      ],
+      "parsed": {
+        "course": {
+          "name": "Black Mesa Golf Club",
+          "city": "La Mesilla",
+          "state": "NM",
+          "address": "115 State Road 339",
+          "website": "https://golfblackmesa.com"
+        },
+        "hole_count": 18,
+        "tees": [],
+        "confidence": "low",
+        "source_urls": [
+          "https://www.golfify.io/courses/black-mesa-golf-club",
+          "https://www.greenskeeper.org/new_mexico/albuquerque/black_mesa_golf_club_new_mexico/scorecard.cfm",
+          "https://golfblackmesa.com"
+        ],
+        "notes": "Official course website lacks scorecard. Third-party sources provide yards and pars but handicap indices are incomplete or inconsistent across tees (e.g., missing full 1-18 unique per tee). No primary source with complete verifiable data for any tee."
+      },
+      "usage": {
+        "prompt_tokens": 840,
+        "completion_tokens": 163,
+        "total_tokens": 1003,
+        "cost": 0.006,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.006,
+          "upstream_inference_prompt_cost": 0.00084,
+          "upstream_inference_completions_cost": 0.00516
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "course": {
+        "name": "Airport National Golf Course",
+        "city": "Cedar Rapids",
+        "state": "IA",
+        "notes": "Small-town muni — true long-tail test."
+      },
+      "ok": true,
+      "latencyMs": 1976,
+      "confidence": "low",
+      "teeCount": 0,
+      "sourceCount": 2,
+      "schemaErrors": [],
+      "warnings": [],
+      "expectationDiffs": [],
+      "parsed": {
+        "course": {
+          "name": "Airport National Golf Course",
+          "city": "Cedar Rapids",
+          "state": "IA",
+          "address": "3001 Wright Brothers Blvd E",
+          "website": "https://www.airportnationalpublicgolf.com"
+        },
+        "hole_count": 18,
+        "tees": [],
+        "confidence": "low",
+        "source_urls": [
+          "https://www.airportnationalpublicgolf.com/golf-course",
+          "https://18birdies.com/golf-courses/club/b6f42cf0-86ac-11e4-8c28-020000005b00/airport-national-public-golf-course-and-range"
+        ],
+        "notes": "Course has 27 holes (three 9-hole loops: 1-9, 10-18, 19-27). No official 18-hole scorecard or complete per-hole data (par, yards, handicap_index for all 18 holes) found from primary source."
+      },
+      "usage": {
+        "prompt_tokens": 839,
+        "completion_tokens": 178,
+        "total_tokens": 1017,
+        "cost": 0.00602,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00602,
+          "upstream_inference_prompt_cost": 0.000839,
+          "upstream_inference_completions_cost": 0.005181
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    }
+  ]
+}

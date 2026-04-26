@@ -19,7 +19,10 @@ A PWA for live golf scoring, round tracking, and USGA handicap calculation. Buil
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-GOLF_COURSE_API_KEY=your-golfcourseapi-key  # Optional, for external course search
+GOLF_COURSE_API_KEY=your-golfcourseapi-key    # Step 1 of the /api/courses/lookup cascade
+OPENROUTER_API_KEY=your-openrouter-key        # Step 2 of the cascade (AI scorecard lookup)
+OPENROUTER_SITE_URL=https://golfapalooza.golf # Optional OpenRouter attribution
+OPENROUTER_APP_NAME=Golfapalooza              # Optional OpenRouter attribution
 NEXT_PUBLIC_GIPHY_API_KEY=your-giphy-api-key  # For GIF search in chat
 NEXT_PUBLIC_MAPBOX_TOKEN=your-mapbox-token    # For satellite maps in scoring
 ```
@@ -35,8 +38,10 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/courses?q={query}` | Search courses by name or location |
-| GET | `/api/courses?lat={lat}&lng={lng}&radius={miles}` | Search courses by GPS coordinates |
+| GET | `/api/courses?lat={lat}&lng={lng}&radius={miles}` | Search cached courses by GPS coordinates (haversine, capped at 20). |
 | GET | `/api/courses/{courseId}` | Get course details with tees and holes |
+| POST | `/api/courses/lookup` | Run the DB → GCAPI → AI cascade. Returns a draft scorecard for the user to confirm; 422 with prefill when cascade exhausted. |
+| POST | `/api/courses/lookup/commit` | Persist a confirmed lookup draft as a real course + tees + holes. |
 
 #### Rounds (`/api/rounds`)
 
@@ -102,14 +107,18 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 | POST | `/api/admin/fake-ads` | Upload a new fake ad (multipart: `file`, `alt_text`, `tagged_user_ids`, `active`) |
 | PATCH | `/api/admin/fake-ads/{id}` | Update alt_text, active, or tags |
 | DELETE | `/api/admin/fake-ads/{id}` | Delete a fake ad and its storage object |
+| GET | `/api/admin/courses/unverified` | List courses awaiting verification (created via the lookup cascade) |
+| POST | `/api/admin/courses/{id}/verify` | Mark an AI/GCAPI-imported course as verified |
+| DELETE | `/api/admin/courses/{id}/verify` | Revert a course to community-submitted |
+| DELETE | `/api/admin/courses/{id}` | Delete a course (cascades to tees/holes; 409 if any rounds reference it) |
 
 ## Database Schema
 
 ### Tables
 
 - `users` - User profiles (display_name, phone, full_name, `is_founder`, `sponsor_id` self-FK for the Loozer family tree)
-- `courses` - Cached golf courses from GolfCourseAPI
-- `course_tees` - Tee boxes with ratings (course_rating, slope_rating)
+- `courses` - Cached golf courses; `source` ∈ ('manual','gcapi','ai'), `verified` flag, `lookup_key` for cross-user dedup
+- `course_tees` - Tee boxes with ratings (course_rating, slope_rating); `confidence` jsonb for AI-extracted ratings
 - `course_holes` - Hole details (par, handicap_index, yards)
 - `rounds` - Scoring sessions
 - `round_players` - Players in a round (up to 4)
@@ -120,6 +129,7 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 - `fake_ads` - Admin-uploaded humor banner ads shown on the home page
 - `fake_ad_loozers` - Many-to-many tags linking fake ads to Loozers
 - `birthday_posts` - Idempotency log for the daily birthday chat auto-post (user_id, year, room_id)
+- `ai_generations` - Audit log for every OpenRouter call (task, model, input_hash, output, confidence, cost_usd, latency_ms, committed). RLS-locked; server-only access via service role.
 
 ### Migrations
 
@@ -128,10 +138,31 @@ Located in `supabase/migrations/`:
 - `00002_golf_scoring_schema.sql` - Golf scoring tables and RLS policies
 - `00003_fix_rls_recursion.sql` - Fix RLS recursion for SELECT policies
 - `00004_fix_rls_all_operations.sql` - Fix RLS recursion for INSERT/UPDATE/DELETE
+- `00112_ai_course_import.sql` - `lookup_key`/`source`/`verified` on courses, `confidence` on tees, `ai_generations` audit table
 
 **IMPORTANT: Always create NEW migration files.** Never modify existing migrations that may have already been run. Use sequential numbering (00004, 00005, etc.) for new migrations. Each migration should be atomic and handle its own rollback safety (use `DROP ... IF EXISTS` before `CREATE`).
 
 ## Key Features
+
+### AI-Assisted Course Import (Lookup Cascade)
+
+When a user (or admin) needs to add a course they've never played before, `/api/courses/lookup` runs a 3-step fallback chain so the common case is instant and the long tail still gets resolved automatically:
+
+1. **DB cache** — match by `lookup_key` (normalized name|state|city). Two users searching for the same course converge on the same row, so this is the path 90% of summer rounds will take after the first user adds a course.
+2. **GolfCourseAPI** — sub-second, free under the 300/day quota. Catches well-known clubs and most regional courses with full slope/rating/per-hole data.
+3. **AI scorecard lookup** — Claude Haiku 4.5 with web search via OpenRouter (model picked after the Phase 0 comparison in `scripts/test-models.mjs`: 7/7 hit rate vs sonar-pro's 6/7). Prompted to prefer structured scorecard databases (BlueGolf, 18Birdies, Golfify, GolfPass) before falling to general web search. Per-user rate limit: 5 successful AI lookups per day.
+4. **Manual entry fallback** — when the cascade exhausts, the lookup endpoint returns 422 with a `prefill` payload so the user is dropped into the manual `CourseForm` with their original input pre-populated.
+
+Every AI call is logged to `ai_generations` with input/output/confidence/cost/latency, regardless of outcome. AI- and GCAPI-imported courses are flagged `verified=false` until an admin spot-checks them at `/admin/courses/unverified`. Manual courses are grandfathered in as verified.
+
+The user-facing flow lives in `src/components/my-rounds/CourseLookupModal.tsx` and is triggered from the round-creation wizard's "Add a new course" CTA. The user sees a single confirmation screen showing the matched scorecard (name, location, source URL, all tees with par/rating/slope/yards) before anything is persisted.
+
+To re-run the model comparison or coverage tests:
+```bash
+node scripts/test-cascade.mjs        # DB → GCAPI → AI cascade against Loozer courses
+node scripts/test-models.mjs         # 4-model accuracy/cost matrix
+node scripts/test-gcapi-coverage.mjs # GCAPI hit rate alone
+```
 
 ### Handicap Calculation (USGA World Handicap System)
 

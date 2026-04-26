@@ -1,0 +1,401 @@
+[
+  {
+    "model": "perplexity/sonar",
+    "results": [
+      {
+        "course": "The Links at Groveport",
+        "state": "OH",
+        "ok": true,
+        "ms": 3594,
+        "confidence": "parse-fail",
+        "validTees": 0,
+        "sources": 0,
+        "sourcesList": []
+      },
+      {
+        "course": "Norwood Hills Country Club",
+        "state": "MO",
+        "ok": true,
+        "ms": 6325,
+        "confidence": "low",
+        "validTees": 0,
+        "sources": 3,
+        "hasRating": false,
+        "sourcesList": [
+          "https://18birdies.com/golf-courses/club/b9b6f670-86ac-11e4-8c28-020000005b00/norwood-hills-country-club"
+        ]
+      },
+      {
+        "course": "Springvale Golf Club",
+        "state": "OH",
+        "ok": true,
+        "ms": 4270,
+        "confidence": "medium",
+        "validTees": 2,
+        "sources": 3,
+        "hasRating": false,
+        "sourcesList": [
+          "https://www.springvalegolfcourseandballroom.com/wp-content/uploads/sites/3483/2014/11/Springvale-Scorecard-2017.pdf"
+        ]
+      },
+      {
+        "course": "Turnberry Golf Club",
+        "state": "OH",
+        "ok": true,
+        "ms": 15004,
+        "confidence": "medium",
+        "validTees": 5,
+        "sources": 3,
+        "hasRating": true,
+        "sourcesList": [
+          "https://crpdgolf.com/wp-content/uploads/2022/02/Turnberry_Golf_Course_Scorecard_NoAds-2022-UPDATED-compressed_1.pdf"
+        ]
+      },
+      {
+        "course": "The Medallion Club",
+        "state": "OH",
+        "ok": true,
+        "ms": 3777,
+        "confidence": "low",
+        "validTees": 0,
+        "sources": 5,
+        "hasRating": false,
+        "sourcesList": [
+          "https://nicklausdesign.com/course/medallion/"
+        ]
+      },
+      {
+        "course": "Royal American Links",
+        "state": "OH",
+        "ok": true,
+        "ms": 4696,
+        "confidence": "parse-fail",
+        "validTees": 0,
+        "sources": 0,
+        "sourcesList": []
+      },
+      {
+        "course": "Delaware Golf Club",
+        "state": "OH",
+        "ok": true,
+        "ms": 3820,
+        "confidence": "low",
+        "validTees": 0,
+        "sources": 3,
+        "hasRating": false,
+        "sourcesList": [
+          "https://18birdies.com/golf-courses/club/9cd06f00-86ac-11e4-8c28-020000005b00/delaware-golf-club"
+        ]
+      }
+    ],
+    "commits": 2,
+    "errors": 0,
+    "totalIn": 2804,
+    "totalOut": 6647,
+    "totalCost": 0.04445,
+    "avgMs": 5927
+  },
+  {
+    "model": "perplexity/sonar-pro",
+    "results": [
+      {
+        "course": "The Links at Groveport",
+        "state": "OH",
+        "ok": true,
+        "ms": 13251,
+        "confidence": "high",
+        "validTees": 3,
+        "sources": 3,
+        "hasRating": true,
+        "sourcesList": [
+          "https://www.golfify.io/courses/the-links-at-groveport"
+        ]
+      },
+      {
+        "course": "Norwood Hills Country Club",
+        "state": "MO",
+        "ok": true,
+        "ms": 15485,
+        "confidence": "high",
+        "validTees": 6,
+        "sources": 2,
+        "hasRating": true,
+        "sourcesList": [
+          "https://www.golfify.io/courses/norwood-hills-country-club-east"
+        ]
+      },
+      {
+        "course": "Springvale Golf Club",
+        "state": "OH",
+        "ok": true,
+        "ms": 5654,
+        "confidence": "high",
+        "validTees": 2,
+        "sources": 3,
+        "hasRating": true,
+        "sourcesList": [
+          "https://www.springvalegolfcourseandballroom.com/wp-content/uploads/sites/3483/2020/11/scorecard-2020.pdf"
+        ]
+      },
+      {
+        "course": "Turnberry Golf Club",
+        "state": "OH",
+        "ok": true,
+        "ms": 5978,
+        "confidence": "parse-fail",
+        "validTees": 0,
+        "sources": 0,
+        "sourcesList": []
+      },
+      {
+        "course": "The Medallion Club",
+        "state": "OH",
+        "ok": true,
+        "ms": 13687,
+        "confidence": "high",
+        "validTees": 5,
+        "sources": 3,
+        "hasRating": true,
+        "sourcesList": [
+          "https://www.golfpass.com/travel-advisor/courses/1317-preserve-rookery-at-medallion-club"
+        ]
+      },
+      {
+        "course": "Royal American Links",
+        "state": "OH",
+        "ok": true,
+        "ms": 5056,
+        "confidence": "medium",
+        "validTees": 1,
+        "sources": 3,
+        "hasRating": true,
+        "sourcesList": [
+          "https://18birdies.com/golf-courses/club/9be4fd90-86ac-11e4-8c28-020000005b00/royal-american-links"
+        ]
+      },
+      {
+        "course": "Delaware Golf Club",
+        "state": "OH",
+        "ok": true,
+        "ms": 8729,
+        "confidence": "high",
+        "validTees": 6,
+        "sources": 3,
+        "hasRating": true,
+        "sourcesList": [
+          "https://www.golfpass.com/travel-advisor/courses/10625-delaware-golf-club"
+        ]
+      }
+    ],
+    "commits": 6,
+    "errors": 0,
+    "totalIn": 2804,
+    "totalOut": 15830,
+    "totalCost": 0.28785,
+    "avgMs": 9691
+  },
+  {
+    "model": "anthropic/claude-sonnet-4.5:online",
+    "results": [
+      {
+        "course": "The Links at Groveport",
+        "state": "OH",
+        "ok": true,
+        "ms": 25601,
+        "confidence": "high",
+        "validTees": 4,
+        "sources": 1,
+        "hasRating": true,
+        "sourcesList": [
+          "https://course.bluegolf.com/bluegolf/course/course/linksatgroveport/detailedscorecard.htm"
+        ]
+      },
+      {
+        "course": "Norwood Hills Country Club",
+        "state": "MO",
+        "ok": true,
+        "ms": 19819,
+        "confidence": "high",
+        "validTees": 3,
+        "sources": 3,
+        "hasRating": true,
+        "sourcesList": [
+          "https://www.norwoodhills.com/golf/westcourse"
+        ]
+      },
+      {
+        "course": "Springvale Golf Club",
+        "state": "OH",
+        "ok": true,
+        "ms": 28898,
+        "confidence": "high",
+        "validTees": 5,
+        "sources": 1,
+        "hasRating": true,
+        "sourcesList": [
+          "https://www.golfpass.com/travel-advisor/courses/10900-springvale-golf-club"
+        ]
+      },
+      {
+        "course": "Turnberry Golf Club",
+        "state": "OH",
+        "ok": true,
+        "ms": 33728,
+        "confidence": "high",
+        "validTees": 6,
+        "sources": 3,
+        "hasRating": true,
+        "sourcesList": [
+          "https://www.golfpass.com/courses/1305-turnberry-golf-course/"
+        ]
+      },
+      {
+        "course": "The Medallion Club",
+        "state": "OH",
+        "ok": true,
+        "ms": 51544,
+        "confidence": "high",
+        "validTees": 10,
+        "sources": 2,
+        "hasRating": true,
+        "sourcesList": [
+          "https://course.bluegolf.com/bluegolf/course/course/medallioncmeadowsroo/detailedscorecard.htm"
+        ]
+      },
+      {
+        "course": "Royal American Links",
+        "state": "OH",
+        "ok": true,
+        "ms": 28193,
+        "confidence": "high",
+        "validTees": 5,
+        "sources": 3,
+        "hasRating": true,
+        "sourcesList": [
+          "https://www.royalamericanlinks.com/scorecard/"
+        ]
+      },
+      {
+        "course": "Delaware Golf Club",
+        "state": "OH",
+        "ok": true,
+        "ms": 46766,
+        "confidence": "high",
+        "validTees": 9,
+        "sources": 2,
+        "hasRating": true,
+        "sourcesList": [
+          "https://course.bluegolf.com/bluegolf/course/course/delawaregc/detailedscorecard.htm"
+        ]
+      }
+    ],
+    "commits": 7,
+    "errors": 0,
+    "totalIn": 98569,
+    "totalOut": 29002,
+    "totalCost": 0.8707370000000001,
+    "avgMs": 33507
+  },
+  {
+    "model": "anthropic/claude-haiku-4.5:online",
+    "results": [
+      {
+        "course": "The Links at Groveport",
+        "state": "OH",
+        "ok": true,
+        "ms": 12945,
+        "confidence": "high",
+        "validTees": 4,
+        "sources": 1,
+        "hasRating": true,
+        "sourcesList": [
+          "https://course.bluegolf.com/bluegolf/course/course/linksatgroveport/detailedscorecard.htm"
+        ]
+      },
+      {
+        "course": "Norwood Hills Country Club",
+        "state": "MO",
+        "ok": true,
+        "ms": 12928,
+        "confidence": "high",
+        "validTees": 4,
+        "sources": 4,
+        "hasRating": true,
+        "sourcesList": [
+          "[norwoodhills.com](https://www.norwoodhills.com/golf/eastcourse)"
+        ]
+      },
+      {
+        "course": "Springvale Golf Club",
+        "state": "OH",
+        "ok": true,
+        "ms": 12754,
+        "confidence": "high",
+        "validTees": 4,
+        "sources": 2,
+        "hasRating": true,
+        "sourcesList": [
+          "https://www.golfpass.com/travel-advisor/courses/10900-springvale-golf-club"
+        ]
+      },
+      {
+        "course": "Turnberry Golf Club",
+        "state": "OH",
+        "ok": true,
+        "ms": 19027,
+        "confidence": "high",
+        "validTees": 6,
+        "sources": 4,
+        "hasRating": true,
+        "sourcesList": [
+          "[golfpass.com](https://www.golfpass.com/courses/1305-turnberry-golf-course/)"
+        ]
+      },
+      {
+        "course": "The Medallion Club",
+        "state": "OH",
+        "ok": true,
+        "ms": 13520,
+        "confidence": "high",
+        "validTees": 4,
+        "sources": 4,
+        "hasRating": true,
+        "sourcesList": [
+          "[bluegolf.com](https://course.bluegolf.com/bluegolf/course/course/medallioncmeadowsroo/detailedscorecard.htm)"
+        ]
+      },
+      {
+        "course": "Royal American Links",
+        "state": "OH",
+        "ok": true,
+        "ms": 12758,
+        "confidence": "high",
+        "validTees": 4,
+        "sources": 4,
+        "hasRating": true,
+        "sourcesList": [
+          "[18birdies.com](https://18birdies.com/golf-courses/club/9be4fd90-86ac-11e4-8c28-020000005b00/royal-american-links)"
+        ]
+      },
+      {
+        "course": "Delaware Golf Club",
+        "state": "OH",
+        "ok": true,
+        "ms": 24244,
+        "confidence": "high",
+        "validTees": 10,
+        "sources": 2,
+        "hasRating": true,
+        "sourcesList": [
+          "https://course.bluegolf.com/bluegolf/course/course/delawaregc/detailedscorecard.htm"
+        ]
+      }
+    ],
+    "commits": 7,
+    "errors": 0,
+    "totalIn": 93807,
+    "totalOut": 25371,
+    "totalCost": 0.36066200000000004,
+    "avgMs": 15454
+  }
+]

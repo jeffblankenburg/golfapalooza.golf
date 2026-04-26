@@ -12,6 +12,7 @@ import {
 } from "@/lib/course-data";
 import { getTeeColorClasses } from "@/lib/tee-colors";
 import { HoleDetailModal } from "./HoleDetailModal";
+import { formatCourseName } from "@/lib/utils/course-display";
 
 function NineTable({
   label,
@@ -118,7 +119,7 @@ export function CourseScorecard({ course }: { course: CourseData }) {
       {/* Header */}
       <div>
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold text-gray-900">{course.name}</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{formatCourseName(course)}</h1>
           <PinnedNoteButton pinnedTo="course" />
         </div>
         <p className="text-gray-500 mt-1">{course.location}</p>

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/simulator";
 import RoundCard from "@/components/my-rounds/RoundCard";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
+import { formatCourseName } from "@/lib/utils/course-display";
 
 export default async function MyRoundsPage() {
   const supabase = await createClient();
@@ -19,7 +20,7 @@ export default async function MyRoundsPage() {
       round_date,
       round_type,
       status,
-      course:courses(id, name, city, state),
+      course:courses(id, name, club_name, city, state),
       tee:course_tees(id, tee_name, tee_color, par),
       round_players!inner(
         user_id,
@@ -48,7 +49,7 @@ export default async function MyRoundsPage() {
       round_date: r.round_date,
       round_type: r.round_type,
       status: r.status,
-      course_name: course?.name || "Unknown",
+      course_name: course ? formatCourseName(course) : "Unknown",
       course_city: course?.city,
       course_state: course?.state,
       tee_name: tee?.tee_name || "",

@@ -18,6 +18,7 @@ export interface TeeInfo {
 
 export interface CourseData {
   name: string;
+  club_name?: string | null;
   location: string;
   tees: TeeInfo[];
   holesByTee: Record<string, HoleData[]>;

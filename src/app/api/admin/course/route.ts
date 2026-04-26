@@ -21,13 +21,20 @@ export async function GET(request: Request) {
   if (listAll === "true") {
     const { data: courses, error } = await adminClient
       .from("courses")
-      .select("id, name, city, state, hole_count, locked")
+      .select("id, name, club_name, city, state, hole_count, locked, source, verified")
       .order("name");
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    return NextResponse.json({ courses: courses || [] });
+
+    // Surface a count of unverified courses so the page can highlight the queue.
+    const { count: unverifiedCount } = await adminClient
+      .from("courses")
+      .select("id", { count: "exact", head: true })
+      .eq("verified", false);
+
+    return NextResponse.json({ courses: courses || [], unverified_count: unverifiedCount || 0 });
   }
 
   // Resolve course_id: either from direct param or from active trip
@@ -236,6 +243,7 @@ export async function PUT(request: Request) {
       course_id,
       tee_id,
       name,
+      club_name,
       city,
       state,
       address,
@@ -260,13 +268,18 @@ export async function PUT(request: Request) {
     const coords = await geocodeAddress({ address, city, state, name });
 
     // Update course
+    // Strip city/state/zip suffix so the address column only holds the
+    // street address — city and state live in their own columns.
+    const cleanAddress = address ? (address.split(",")[0]?.trim() || null) : null;
+
     const { error: courseError } = await adminClient
       .from("courses")
       .update({
         name,
+        club_name: club_name?.trim() ? club_name.trim() : null,
         city: city || null,
         state: state || null,
-        address: address || null,
+        address: cleanAddress,
         phone: phone || null,
         website: website || null,
         latitude: coords ? coords[0] : undefined,

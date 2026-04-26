@@ -246,9 +246,11 @@ export default function HoleMapView({
         };
 
         // Distinguish user gestures from programmatic camera moves: only
-        // user-initiated events have an originalEvent on them.
-        const onUserGesture = (e: { originalEvent?: Event }) => {
-          if (e.originalEvent) userMapOverrideRef.current = true;
+        // user-initiated events have an originalEvent on them. Mapbox's
+        // typed event signatures vary by event name, so we widen here.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const onUserGesture = (e: any) => {
+          if (e?.originalEvent) userMapOverrideRef.current = true;
         };
         map.on("dragstart", onUserGesture);
         map.on("zoomstart", onUserGesture);

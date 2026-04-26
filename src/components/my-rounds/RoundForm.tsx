@@ -2,17 +2,54 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import ScorecardEntry from "./ScorecardEntry";
 import LiveScoringEntry from "./LiveScoringEntry";
+import CourseLookupModal from "./CourseLookupModal";
 import { calculateDifferential } from "@/lib/golf/calculator";
 import { getTeeDotStyle } from "@/lib/utils/tee-colors";
+import { formatCourseName } from "@/lib/utils/course-display";
 
 interface CourseSummary {
   id: string;
   name: string;
+  club_name?: string | null;
   city: string | null;
   state: string | null;
+  distance_mi?: number;
+}
+
+const NEARBY_RADIUS_MI = 25;
+const GEO_CACHE_KEY = "gp_geo_v1";
+const GEO_CACHE_TTL_MS = 15 * 60 * 1000;
+
+interface GeoCache { lat: number; lng: number; capturedAt: number; }
+
+function readGeoCache(): GeoCache | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(GEO_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as GeoCache;
+    if (Date.now() - parsed.capturedAt > GEO_CACHE_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeGeoCache(lat: number, lng: number) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(
+      GEO_CACHE_KEY,
+      JSON.stringify({ lat, lng, capturedAt: Date.now() } satisfies GeoCache)
+    );
+  } catch {}
+}
+
+function formatDistance(mi: number): string {
+  if (mi < 10) return `${(Math.round(mi * 10) / 10).toFixed(1)} mi`;
+  return `${Math.round(mi)} mi`;
 }
 
 interface Tee {
@@ -23,6 +60,7 @@ interface Tee {
   slope_rating: number;
   par: number;
   total_yards: number | null;
+  gender?: "men" | "women" | "all" | null;
 }
 
 interface HoleData {
@@ -88,19 +126,37 @@ export default function RoundForm() {
   // Per-player tee overrides: playerId -> teeId (defaults to selectedTee)
   const [playerTees, setPlayerTees] = useState<Record<string, string>>({});
   const [editingPlayerTee, setEditingPlayerTee] = useState<string | null>(null);
+  const [teeTab, setTeeTab] = useState<"mens" | "womens">("mens");
+
+  const hasWomensTees = tees.some((t) => t.gender === "women");
+  const visibleTees = hasWomensTees
+    ? tees.filter((t) => (teeTab === "mens" ? t.gender !== "women" : t.gender !== "men"))
+    : tees;
 
   const [totalScores, setTotalScores] = useState<Record<string, string>>({});
   const [holes, setHoles] = useState<HoleData[]>([]);
   const [saving, setSaving] = useState(false);
+
+  const [lookupOpen, setLookupOpen] = useState(false);
+
+  // Nearby search state. `nearbyActive` means the visible list is
+  // distance-sorted around the user's coords, not the alphabetic default.
+  // We hide the "Near me" button when permission is explicitly denied so
+  // we don't badger users; "prompt"/"granted"/unknown all show it.
+  const [nearbyActive, setNearbyActive] = useState(false);
+  const [geoStatus, setGeoStatus] = useState<"unknown" | "granted" | "denied" | "prompt">("unknown");
+  const [locating, setLocating] = useState(false);
 
   const allPlayerIds = selectedPlayerIds;
   const getPlayerName = (id: string) => allLoozers.find((l) => l.id === id)?.display_name || "Unknown";
   const getPlayerTee = (id: string) => tees.find((t) => t.id === (playerTees[id] || selectedTee?.id)) || selectedTee;
   const currentStepIndex = getStepIndex(step);
 
-  // Search courses (only when on course step)
+  // Search courses (only when on course step). Skipped while nearbyActive
+  // so the geo-sorted list isn't clobbered by a no-op text query.
   useEffect(() => {
     if (step !== "course") return;
+    if (nearbyActive) return;
     const timer = setTimeout(async () => {
       setLoading(true);
       const params = searchQuery ? `?q=${encodeURIComponent(searchQuery)}` : "";
@@ -110,7 +166,71 @@ export default function RoundForm() {
       setLoading(false);
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, step]);
+  }, [searchQuery, step, nearbyActive]);
+
+  // Probe geolocation permission once so we can decide whether to render
+  // the "Near me" button. Browsers without Permissions API (older Safari)
+  // fall through to "prompt" — show the button, let the native dialog
+  // handle the rest.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    if (!navigator.permissions?.query) {
+      setGeoStatus("prompt");
+      return;
+    }
+    let status: PermissionStatus | null = null;
+    navigator.permissions
+      .query({ name: "geolocation" as PermissionName })
+      .then((s) => {
+        status = s;
+        setGeoStatus(s.state);
+        s.onchange = () => setGeoStatus(s.state);
+      })
+      .catch(() => setGeoStatus("prompt"));
+    return () => {
+      if (status) status.onchange = null;
+    };
+  }, []);
+
+  async function fetchNearby(lat: number, lng: number) {
+    setNearbyActive(true);
+    setSearchQuery("");
+    setLoading(true);
+    const res = await fetch(`/api/courses?lat=${lat}&lng=${lng}&radius=${NEARBY_RADIUS_MI}`);
+    const data = await res.json();
+    setCourses(data.courses || []);
+    setLoading(false);
+  }
+
+  function findNearby() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+
+    const cached = readGeoCache();
+    if (cached) {
+      fetchNearby(cached.lat, cached.lng);
+      return;
+    }
+
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        writeGeoCache(latitude, longitude);
+        setGeoStatus("granted");
+        setLocating(false);
+        fetchNearby(latitude, longitude);
+      },
+      (err) => {
+        setLocating(false);
+        if (err.code === err.PERMISSION_DENIED) setGeoStatus("denied");
+      },
+      { enableHighAccuracy: false, maximumAge: GEO_CACHE_TTL_MS, timeout: 8000 }
+    );
+  }
+
+  function exitNearby() {
+    setNearbyActive(false);
+  }
 
   useEffect(() => {
     async function fetchLoozers() {
@@ -130,9 +250,12 @@ export default function RoundForm() {
     const courseTees = data.tees || [];
     setTees(courseTees);
 
-    // Default to first tee and load its holes
+    // Default to highest-rated non-women's tee — protects male players from
+    // a silent handicap bug if a women's tee is the highest-rated of all.
+    // The tees endpoint already sorts by course_rating desc, so the first
+    // non-women's row is the right pick.
     if (courseTees.length > 0) {
-      const defaultTee = courseTees[0];
+      const defaultTee = courseTees.find((t: Tee) => t.gender !== "women") || courseTees[0];
       setSelectedTee(defaultTee);
       const holesRes = await fetch(`/api/courses/${course.id}/tees/${defaultTee.id}/holes`);
       const holesData = await holesRes.json();
@@ -304,7 +427,7 @@ export default function RoundForm() {
         <div className="flex items-start gap-3">
           <div className={`w-8 h-8 rounded-full shrink-0 mt-0.5 ${dot.className || ""}`} style={dot.style} />
           <div className="flex-1 min-w-0">
-            <div className="font-semibold text-gray-900 leading-snug">{selectedCourse.name}</div>
+            <div className="font-semibold text-gray-900 leading-snug">{formatCourseName(selectedCourse)}</div>
             {(selectedCourse.city || selectedCourse.state) && (
               <div className="text-sm text-gray-500 leading-snug">
                 {[selectedCourse.city, selectedCourse.state].filter(Boolean).join(", ")}
@@ -398,23 +521,59 @@ export default function RoundForm() {
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                if (nearbyActive) setNearbyActive(false);
+              }}
               autoFocus
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent mb-3 text-sm"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent mb-2 text-sm"
               placeholder="Search by name, city, or state..."
             />
+
+            {geoStatus !== "denied" && (
+              <div className="mb-3 flex items-center justify-between">
+                <button
+                  onClick={nearbyActive ? exitNearby : findNearby}
+                  disabled={locating}
+                  aria-pressed={nearbyActive}
+                  className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full disabled:opacity-60 ${
+                    nearbyActive
+                      ? "text-green-800 bg-green-50 border border-green-300"
+                      : "text-green-700 border border-green-200 hover:bg-green-50"
+                  }`}
+                >
+                  <span aria-hidden>📍</span>
+                  {locating
+                    ? "Locating…"
+                    : nearbyActive
+                      ? `Within ${NEARBY_RADIUS_MI} mi`
+                      : "Near me"}
+                </button>
+              </div>
+            )}
 
             {loading ? (
               <div className="text-center py-4 text-sm text-gray-500">Searching...</div>
             ) : (
               <div className="space-y-1.5 max-h-80 overflow-y-auto">
-                {courses.map((c) => (
+                {/* In nearby mode the API already returns distance-sorted
+                    results, so we render in order; otherwise sort by the
+                    formatted name we display. */}
+                {(nearbyActive
+                  ? courses
+                  : [...courses].sort((a, b) => formatCourseName(a).localeCompare(formatCourseName(b)))
+                ).map((c) => (
                   <button
                     key={c.id}
                     onClick={() => selectCourse(c)}
                     className="w-full text-left rounded-lg px-3 py-2.5 hover:bg-green-50 transition-colors"
                   >
-                    <div className="text-sm font-medium text-gray-900">{c.name}</div>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <div className="text-sm font-medium text-gray-900 min-w-0">{formatCourseName(c)}</div>
+                      {nearbyActive && c.distance_mi != null && (
+                        <div className="text-xs text-gray-500 shrink-0 tabular-nums">{formatDistance(c.distance_mi)}</div>
+                      )}
+                    </div>
                     {(c.city || c.state) && (
                       <div className="text-xs text-gray-500">{[c.city, c.state].filter(Boolean).join(", ")}</div>
                     )}
@@ -422,20 +581,73 @@ export default function RoundForm() {
                 ))}
                 {courses.length === 0 && (
                   <div className="text-center py-6">
-                    <p className="text-sm text-gray-500 mb-2">{searchQuery ? "No courses found" : "No courses yet"}</p>
-                    <Link href="/my-rounds/courses/new" className="text-sm text-green-700 font-medium">+ Add a New Course</Link>
+                    {nearbyActive ? (
+                      <>
+                        <p className="text-sm text-gray-500 mb-3">No courses within {NEARBY_RADIUS_MI} miles.</p>
+                        <button
+                          onClick={exitNearby}
+                          className="text-xs text-green-700 font-medium"
+                        >
+                          Search by name instead →
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-gray-500 mb-3">
+                          {searchQuery
+                            ? <>&lsquo;{searchQuery.trim()}&rsquo; hasn&apos;t been added yet.</>
+                            : "No courses yet"}
+                        </p>
+                        <button
+                          onClick={() => setLookupOpen(true)}
+                          className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg active:bg-green-700"
+                        >
+                          {searchQuery ? `Add ${searchQuery.trim()}` : "Add a new course"}
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
             )}
 
-            <div className="text-center pt-3 border-t border-gray-100 mt-3">
-              <Link href="/my-rounds/courses/new" className="text-xs text-green-700 font-medium">
-                Don&apos;t see your course? Add it →
-              </Link>
-            </div>
+            {courses.length > 0 && (
+              <div className="text-center pt-3 border-t border-gray-100 mt-3">
+                <button
+                  onClick={() => setLookupOpen(true)}
+                  className="text-xs text-green-700 font-medium"
+                >
+                  Don&apos;t see your course? Add it →
+                </button>
+              </div>
+            )}
           </div>
         </div>
+
+        {lookupOpen && (
+          <CourseLookupModal
+            initialName={searchQuery}
+            onClose={() => setLookupOpen(false)}
+            onCourseReady={(c) => {
+              setLookupOpen(false);
+              selectCourse({
+                id: c.id,
+                name: c.name,
+                club_name: c.club_name ?? null,
+                city: c.city,
+                state: c.state,
+              });
+            }}
+            onManualFallback={(prefill) => {
+              setLookupOpen(false);
+              const params = new URLSearchParams();
+              if (prefill.name) params.set("name", prefill.name);
+              if (prefill.city) params.set("city", prefill.city);
+              if (prefill.state) params.set("state", prefill.state);
+              router.push(`/my-rounds/courses/new?${params.toString()}`);
+            }}
+          />
+        )}
       </div>
     );
   }
@@ -547,28 +759,50 @@ export default function RoundForm() {
                     </button>
                   </div>
                   {isEditingTee && (
-                    <div className="px-3 pb-2 flex flex-wrap gap-1.5">
-                      {tees.map((t) => {
-                        const isActive = (playerTees[l.id] || selectedTee?.id) === t.id;
-                        const tDot = getTeeDotStyle(t.tee_color);
-                        return (
+                    <div className="px-3 pb-2">
+                      {hasWomensTees && (
+                        <div className="flex gap-1 mb-2 border-b border-gray-200">
                           <button
-                            key={t.id}
-                            onClick={() => {
-                              setPlayerTees((prev) => ({ ...prev, [l.id]: t.id }));
-                              setEditingPlayerTee(null);
-                            }}
-                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                              isActive
-                                ? "bg-green-600 text-white"
-                                : "bg-white border border-gray-200 text-gray-700 hover:border-green-300"
+                            onClick={() => setTeeTab("mens")}
+                            className={`px-2.5 py-1 text-[11px] font-semibold border-b-2 -mb-px ${
+                              teeTab === "mens" ? "border-green-600 text-green-700" : "border-transparent text-gray-500"
                             }`}
                           >
-                            {!isActive && <span className={`w-2.5 h-2.5 rounded-full inline-block ${tDot.className || ""}`} style={tDot.style} />}
-                            {t.tee_name}
+                            Men&apos;s
                           </button>
-                        );
-                      })}
+                          <button
+                            onClick={() => setTeeTab("womens")}
+                            className={`px-2.5 py-1 text-[11px] font-semibold border-b-2 -mb-px ${
+                              teeTab === "womens" ? "border-green-600 text-green-700" : "border-transparent text-gray-500"
+                            }`}
+                          >
+                            Women&apos;s
+                          </button>
+                        </div>
+                      )}
+                      <div className="flex flex-wrap gap-1.5">
+                        {visibleTees.map((t) => {
+                          const isActive = (playerTees[l.id] || selectedTee?.id) === t.id;
+                          const tDot = getTeeDotStyle(t.tee_color);
+                          return (
+                            <button
+                              key={t.id}
+                              onClick={() => {
+                                setPlayerTees((prev) => ({ ...prev, [l.id]: t.id }));
+                                setEditingPlayerTee(null);
+                              }}
+                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                                isActive
+                                  ? "bg-green-600 text-white"
+                                  : "bg-white border border-gray-200 text-gray-700 hover:border-green-300"
+                              }`}
+                            >
+                              {!isActive && <span className={`w-2.5 h-2.5 rounded-full inline-block ${tDot.className || ""}`} style={tDot.style} />}
+                              {t.tee_name}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -753,7 +987,7 @@ export default function RoundForm() {
         holes={holes}
         players={livePlayers}
         roundType={roundType}
-        courseName={selectedCourse?.name || ""}
+        courseName={selectedCourse ? formatCourseName(selectedCourse) : ""}
         courseId={selectedCourse?.id}
         teeId={selectedTee?.id}
         effectiveTeeId={effectiveTeeId}

@@ -5,10 +5,12 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import TeeList from "@/components/my-rounds/TeeList";
 import CourseForm from "@/components/my-rounds/CourseForm";
+import { formatCourseName } from "@/lib/utils/course-display";
 
 interface CourseData {
   id: string;
   name: string;
+  club_name: string | null;
   city: string | null;
   state: string | null;
   address: string | null;
@@ -93,7 +95,7 @@ export default function CourseDetailPage() {
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-bold text-gray-900">{course.name}</h1>
+                  <h1 className="text-2xl font-bold text-gray-900">{formatCourseName(course)}</h1>
                   {locked && (
                     <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
                       Locked

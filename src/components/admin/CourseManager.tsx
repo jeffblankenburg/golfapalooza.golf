@@ -14,6 +14,14 @@ interface TeeData {
   course_rating: number;
   slope_rating: number;
   par: number;
+  gender: "men" | "women" | "all";
+}
+
+// Strips the parenthetical gender suffix that persistScorecard appends to
+// disambiguate same-name tees (e.g., "White (women)"). With the gender tabs
+// providing context, the suffix is just noise in the UI.
+function displayTeeName(name: string): string {
+  return name.replace(/\s*\((?:men|women|all)\)$/i, "");
 }
 
 interface HoleData {
@@ -39,6 +47,7 @@ interface HoleData {
 interface CourseInfo {
   id: string;
   name: string;
+  club_name: string | null;
   city: string | null;
   state: string | null;
   address: string | null;
@@ -47,6 +56,8 @@ interface CourseInfo {
   latitude: number | null;
   longitude: number | null;
   locked: boolean;
+  source: "manual" | "gcapi" | "ai";
+  verified: boolean;
 }
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -63,6 +74,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
 
   // Course info form
   const [courseName, setCourseName] = useState("");
+  const [courseClubName, setCourseClubName] = useState("");
   const [courseCity, setCourseCity] = useState("");
   const [courseState, setCourseState] = useState("");
   const [courseAddress, setCourseAddress] = useState("");
@@ -82,6 +94,12 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
 
   // Holes form
   const [holesStatus, setHolesStatus] = useState<SaveStatus>("idle");
+
+  // Gender tab for the tee box bar (only meaningful when the course has
+  // any women's tees). Synced from the loaded selected tee on first load,
+  // then driven explicitly by the user clicking a tab.
+  const [teeGenderTab, setTeeGenderTab] = useState<"mens" | "womens">("mens");
+  const teeTabInitialized = useRef(false);
 
   // Confirm modal
   const [confirmModal, setConfirmModal] = useState<{
@@ -125,6 +143,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
         setSelectedTeeId(data.selected_tee_id || null);
 
         setCourseName(data.course.name || "");
+        setCourseClubName(data.course.club_name || "");
         setCourseCity(data.course.city || "");
         setCourseState(data.course.state || "");
         setCourseAddress(data.course.address || "");
@@ -141,6 +160,25 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
   useEffect(() => {
     loadCourse();
   }, [loadCourse]);
+
+  // Always default to the Men's tab. The server picks the highest-rated
+  // tee as initially selected, which can be a women's tee on courses where
+  // the women's rating tops the men's — in that case, snap the selection
+  // to the top men's/unisex tee so the chip bar in the default tab isn't
+  // empty-looking. The user can still flip to Women's manually.
+  useEffect(() => {
+    if (teeTabInitialized.current) return;
+    if (!tees.length || !selectedTeeId) return;
+    const sel = tees.find((t) => t.id === selectedTeeId);
+    if (!sel) return;
+    if (sel.gender === "women") {
+      const fallback = tees
+        .filter((t) => t.gender !== "women")
+        .sort((a, b) => b.course_rating - a.course_rating)[0];
+      if (fallback) switchTee(fallback.id);
+    }
+    teeTabInitialized.current = true;
+  }, [tees, selectedTeeId]);
 
   async function switchTee(teeId: string) {
     setSelectedTeeId(teeId);
@@ -193,6 +231,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
         body: JSON.stringify({
           course_id: course.id,
           name: courseName,
+          club_name: courseClubName.trim() || null,
           city: courseCity || null,
           state: courseState || null,
           address: courseAddress || null,
@@ -527,6 +566,15 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
   const sortedTees = [...tees].sort((a, b) => b.course_rating - a.course_rating);
   const selectedTee = sortedTees.find((t) => t.id === selectedTeeId);
 
+  // Gender tabs separate men's and women's tees so two "White" tees don't
+  // sit side-by-side without context. Unisex ("all") tees appear in both.
+  const hasWomensTees = sortedTees.some((t) => t.gender === "women");
+  const mensTees = sortedTees.filter((t) => t.gender !== "women");
+  const womensTees = sortedTees.filter((t) => t.gender !== "men");
+  const visibleTees = hasWomensTees
+    ? (teeGenderTab === "mens" ? mensTees : womensTees)
+    : sortedTees;
+
   return (
     <div className="space-y-6">
       {error && (
@@ -548,9 +596,16 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
         </div>
         <div className="p-4 space-y-3">
           <Field
+            label="Club Name"
+            value={courseClubName}
+            onChange={setCourseClubName}
+            placeholder="Norwood Hills Country Club (leave blank for single-course clubs)"
+          />
+          <Field
             label="Course Name"
             value={courseName}
             onChange={setCourseName}
+            placeholder="West Course"
           />
           <div className="grid grid-cols-2 gap-3">
             <Field label="City" value={courseCity} onChange={setCourseCity} />
@@ -602,6 +657,43 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
               {course?.locked ? "Unlock" : "Lock"}
             </button>
           </div>
+          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+            <div>
+              <div className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+                {course?.verified ? "Verified" : "Unverified"}
+                {course && course.source !== "manual" && (
+                  <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${
+                    course.source === "ai" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+                  }`}>{course.source}</span>
+                )}
+              </div>
+              <div className="text-xs text-gray-500">
+                {course?.verified
+                  ? "An admin has spot-checked this course."
+                  : "Awaiting admin spot-check against the source."}
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                if (!course) return;
+                const method = course.verified ? "DELETE" : "POST";
+                const res = await fetch(`/api/admin/courses/${course.id}/verify`, { method });
+                if (res.ok) {
+                  setCourse({ ...course, verified: !course.verified });
+                } else {
+                  const data = await res.json().catch(() => ({}));
+                  setError(data.error || "Verify toggle failed");
+                }
+              }}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                course?.verified
+                  ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  : "bg-green-600 text-white hover:bg-green-700"
+              }`}
+            >
+              {course?.verified ? "Mark unverified" : "Verify"}
+            </button>
+          </div>
         </div>
       </section>
 
@@ -611,9 +703,49 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
           <h2 className="text-sm font-semibold text-gray-700">Tee Boxes</h2>
         </div>
 
+        {/* Gender tab bar — only shown when the course has any women's tees.
+            Unisex ("all") tees appear in both tabs. Clicking a tab snaps the
+            selection to the highest-rated tee available in that tab. */}
+        {hasWomensTees && (
+          <div className="px-4 pt-3 pb-1">
+            <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+              <button
+                onClick={() => {
+                  setTeeGenderTab("mens");
+                  if (mensTees.length > 0 && !mensTees.some((t) => t.id === selectedTeeId)) {
+                    switchTee(mensTees[0].id);
+                  }
+                }}
+                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                  teeGenderTab === "mens"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500"
+                }`}
+              >
+                Men&apos;s ({mensTees.length})
+              </button>
+              <button
+                onClick={() => {
+                  setTeeGenderTab("womens");
+                  if (womensTees.length > 0 && !womensTees.some((t) => t.id === selectedTeeId)) {
+                    switchTee(womensTees[0].id);
+                  }
+                }}
+                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                  teeGenderTab === "womens"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500"
+                }`}
+              >
+                Women&apos;s ({womensTees.length})
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Tee tab bar */}
         <div className="flex items-center gap-2 px-4 py-3 overflow-x-auto border-b border-gray-100">
-          {sortedTees.map((tee) => {
+          {visibleTees.map((tee) => {
             const colors = getTeeColorClasses(tee.tee_color);
             const isSelected = tee.id === selectedTeeId;
             return (
@@ -634,7 +766,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
                 ...(isSelected ? { outlineColor: colors.hex || "#9ca3af", outlineWidth: "2px", outlineStyle: "solid", outlineOffset: "2px" } : {}),
               } : undefined}
             >
-              {tee.tee_name}
+              {displayTeeName(tee.tee_name)}
               {isSelected && (
                 <span
                   role="button"
@@ -843,7 +975,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
       {selectedTee && tees.length > 1 && (
         <CompositionTeeEditor
           teeId={selectedTee.id}
-          teeName={selectedTee.tee_name}
+          teeName={displayTeeName(selectedTee.tee_name)}
           otherTees={tees.filter((t) => t.id !== selectedTee.id)}
           onCompositionChange={setSelectedTeeIsComposition}
           onTeeColorChange={(color) => {
@@ -861,7 +993,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
             {selectedTee && (
               <span className="font-normal text-gray-400">
                 {" "}
-                — {selectedTee.tee_name}
+                — {displayTeeName(selectedTee.tee_name)}
               </span>
             )}
           </h2>
@@ -892,7 +1024,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
               totalHoles={holes.length}
               courseId={course.id}
               courseName={courseName}
-              teeName={selectedTee?.tee_name || ""}
+              teeName={selectedTee ? displayTeeName(selectedTee.tee_name) : ""}
               showImages
               onUpdate={(field, value) => updateHole(i, field, value)}
               onUpload={(imageType) =>
@@ -1504,7 +1636,7 @@ function CompositionTeeEditor({
       .filter((t): t is { id: string; tee_name: string; course_rating: number } => !!t)
       .sort((a, b) => b.course_rating - a.course_rating);
     if (sourceTees.length >= 2) {
-      const gradientColor = sourceTees.map((t) => t.tee_name).join("/");
+      const gradientColor = sourceTees.map((t) => displayTeeName(t.tee_name)).join("/");
       await fetch("/api/admin/course/tees", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -1561,7 +1693,7 @@ function CompositionTeeEditor({
                     >
                       {eligibleTees.map((t) => (
                         <option key={t.id} value={t.id}>
-                          {t.tee_name}
+                          {displayTeeName(t.tee_name)}
                         </option>
                       ))}
                     </select>

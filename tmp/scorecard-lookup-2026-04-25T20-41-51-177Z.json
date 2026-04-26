@@ -1,0 +1,307 @@
+{
+  "model": "perplexity/sonar",
+  "totalMs": 16539,
+  "results": [
+    {
+      "course": {
+        "name": "Augusta National Golf Club",
+        "city": "Augusta",
+        "state": "GA",
+        "expected": {
+          "par": 72,
+          "hole_count": 18
+        },
+        "notes": "Famous, but no public scorecard — par/yards likely; rating/slope unknown to public."
+      },
+      "ok": true,
+      "latencyMs": 1478,
+      "confidence": "medium",
+      "teeCount": 2,
+      "sourceCount": 4,
+      "schemaErrors": [],
+      "warnings": [],
+      "expectationDiffs": [],
+      "parsed": {
+        "course": {
+          "name": "Augusta National Golf Club",
+          "city": "Augusta",
+          "state": "GA",
+          "address": null,
+          "website": null
+        },
+        "hole_count": 18,
+        "tees": [
+          {
+            "tee_name": "Masters",
+            "tee_color": null,
+            "gender": "all",
+            "course_rating": null,
+            "slope_rating": null,
+            "total_yards": 7555,
+            "par": 72,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 445
+              },
+              {
+                "hole_number": 2,
+                "par": 5,
+                "handicap_index": 1,
+                "yards": 585
+              },
+              {
+                "hole_number": 3,
+                "par": 4,
+                "handicap_index": 13,
+                "yards": 350
+              },
+              {
+                "hole_number": 4,
+                "par": 3,
+                "handicap_index": 15,
+                "yards": 240
+              },
+              {
+                "hole_number": 5,
+                "par": 4,
+                "handicap_index": 5,
+                "yards": 495
+              },
+              {
+                "hole_number": 6,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 180
+              },
+              {
+                "hole_number": 7,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 450
+              },
+              {
+                "hole_number": 8,
+                "par": 5,
+                "handicap_index": 3,
+                "yards": 570
+              },
+              {
+                "hole_number": 9,
+                "par": 4,
+                "handicap_index": 7,
+                "yards": 460
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 495
+              },
+              {
+                "hole_number": 11,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": 520
+              },
+              {
+                "hole_number": 12,
+                "par": 3,
+                "handicap_index": 16,
+                "yards": 155
+              },
+              {
+                "hole_number": 13,
+                "par": 5,
+                "handicap_index": 4,
+                "yards": 545
+              },
+              {
+                "hole_number": 14,
+                "par": 4,
+                "handicap_index": 12,
+                "yards": 440
+              },
+              {
+                "hole_number": 15,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": 550
+              },
+              {
+                "hole_number": 16,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": 170
+              },
+              {
+                "hole_number": 17,
+                "par": 4,
+                "handicap_index": 14,
+                "yards": 440
+              },
+              {
+                "hole_number": 18,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": 465
+              }
+            ]
+          },
+          {
+            "tee_name": "Member",
+            "tee_color": null,
+            "gender": "all",
+            "course_rating": null,
+            "slope_rating": null,
+            "total_yards": 6365,
+            "par": 72,
+            "holes": [
+              {
+                "hole_number": 1,
+                "par": 4,
+                "handicap_index": 9,
+                "yards": 365
+              },
+              {
+                "hole_number": 2,
+                "par": 5,
+                "handicap_index": 1,
+                "yards": 515
+              },
+              {
+                "hole_number": 3,
+                "par": 4,
+                "handicap_index": 13,
+                "yards": 340
+              },
+              {
+                "hole_number": 4,
+                "par": 3,
+                "handicap_index": 15,
+                "yards": 170
+              },
+              {
+                "hole_number": 5,
+                "par": 4,
+                "handicap_index": 5,
+                "yards": 400
+              },
+              {
+                "hole_number": 6,
+                "par": 3,
+                "handicap_index": 17,
+                "yards": 165
+              },
+              {
+                "hole_number": 7,
+                "par": 4,
+                "handicap_index": 11,
+                "yards": 330
+              },
+              {
+                "hole_number": 8,
+                "par": 5,
+                "handicap_index": 3,
+                "yards": 480
+              },
+              {
+                "hole_number": 9,
+                "par": 4,
+                "handicap_index": 7,
+                "yards": 395
+              },
+              {
+                "hole_number": 10,
+                "par": 4,
+                "handicap_index": 6,
+                "yards": 450
+              },
+              {
+                "hole_number": 11,
+                "par": 4,
+                "handicap_index": 8,
+                "yards": 400
+              },
+              {
+                "hole_number": 12,
+                "par": 3,
+                "handicap_index": 16,
+                "yards": 145
+              },
+              {
+                "hole_number": 13,
+                "par": 5,
+                "handicap_index": 4,
+                "yards": 455
+              },
+              {
+                "hole_number": 14,
+                "par": 4,
+                "handicap_index": 12,
+                "yards": 380
+              },
+              {
+                "hole_number": 15,
+                "par": 5,
+                "handicap_index": 2,
+                "yards": 475
+              },
+              {
+                "hole_number": 16,
+                "par": 3,
+                "handicap_index": 18,
+                "yards": 145
+              },
+              {
+                "hole_number": 17,
+                "par": 4,
+                "handicap_index": 14,
+                "yards": 370
+              },
+              {
+                "hole_number": 18,
+                "par": 4,
+                "handicap_index": 10,
+                "yards": 385
+              }
+            ]
+          }
+        ],
+        "confidence": "medium",
+        "source_urls": [
+          "https://www.nationalclubgolfer.com/tour/the-masters/masters-scorecard-augusta-national-holes/",
+          "https://www.golfcompendium.com/2019/03/augusta-national-scorecard.html",
+          "https://pgatourmedia.pgatourhq.com/static-assets/page/files/tours/2025/pgatour/masterstournament/scorecards/Scorecard.pdf",
+          "https://18birdies.com/golf-courses/club/93febe40-86ac-11e4-8c28-020000005b00/augusta-national"
+        ],
+        "notes": "No official course website scorecard found; data from tournament and reputable golf sites. Minor yardage variations across sources (e.g., hole 2 Masters 575-585). Used most consistent values. No slope or course ratings available."
+      },
+      "usage": {
+        "prompt_tokens": 687,
+        "completion_tokens": 1401,
+        "total_tokens": 2088,
+        "cost": 0.00709,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00709,
+          "upstream_inference_prompt_cost": 0.000687,
+          "upstream_inference_completions_cost": 0.006403
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    }
+  ]
+}

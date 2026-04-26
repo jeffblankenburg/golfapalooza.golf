@@ -1,0 +1,21 @@
+{
+  "model": "perplexity/sonar",
+  "totalMs": 312,
+  "results": [
+    {
+      "course": {
+        "name": "Augusta National Golf Club",
+        "city": "Augusta",
+        "state": "GA",
+        "expected": {
+          "par": 72,
+          "hole_count": 18
+        },
+        "notes": "Famous, but no public scorecard — par/yards likely; rating/slope unknown to public."
+      },
+      "ok": false,
+      "latencyMs": 310,
+      "error": "HTTP 400: {\"error\":{\"message\":\"Provider returned error\",\"code\":400,\"metadata\":{\"raw\":\"{\\\"error\\\":{\\\"message\\\":\\\"[\\\\\\\"At body -> response_format -> ResponseFormatText -> type: Input should be 'text'\\\\\\\",\\\\\\\"At b"
+    }
+  ]
+}

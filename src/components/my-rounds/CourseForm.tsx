@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const TEE_COLORS: Record<string, string> = {
   Black: "bg-gray-900",
@@ -28,11 +28,14 @@ interface CourseFormProps {
 
 export default function CourseForm({ course }: CourseFormProps) {
   const router = useRouter();
+  // When the lookup modal falls through to manual entry it sends the user
+  // here with ?name&city&state so they don't have to retype.
+  const params = useSearchParams();
   const isEditing = !!course;
 
-  const [name, setName] = useState(course?.name || "");
-  const [city, setCity] = useState(course?.city || "");
-  const [state, setState] = useState(course?.state || "");
+  const [name, setName] = useState(course?.name || params.get("name") || "");
+  const [city, setCity] = useState(course?.city || params.get("city") || "");
+  const [state, setState] = useState(course?.state || params.get("state") || "");
   const [address, setAddress] = useState(course?.address || "");
   const [phone, setPhone] = useState(course?.phone || "");
   const [website, setWebsite] = useState(course?.website || "");

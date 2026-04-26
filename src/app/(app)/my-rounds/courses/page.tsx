@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { formatCourseName } from "@/lib/utils/course-display";
 
 export default async function CoursesPage() {
   const supabase = await createClient();
@@ -9,7 +10,7 @@ export default async function CoursesPage() {
 
   const { data: courses } = await supabase
     .from("courses")
-    .select("id, name, city, state, hole_count")
+    .select("id, name, club_name, city, state, hole_count")
     .order("name");
 
   return (
@@ -28,13 +29,13 @@ export default async function CoursesPage() {
       </div>
 
       <div className="space-y-2">
-        {(courses || []).map((course) => (
+        {(courses || []).slice().sort((a, b) => formatCourseName(a).localeCompare(formatCourseName(b))).map((course) => (
           <Link
             key={course.id}
             href={`/my-rounds/courses/${course.id}`}
             className="block bg-white border border-gray-200 rounded-lg p-3 hover:border-green-300 transition-colors"
           >
-            <div className="font-medium text-gray-900">{course.name}</div>
+            <div className="font-medium text-gray-900">{formatCourseName(course)}</div>
             <div className="flex gap-2 text-sm text-gray-500 mt-0.5">
               {(course.city || course.state) && (
                 <span>{[course.city, course.state].filter(Boolean).join(", ")}</span>

@@ -438,18 +438,77 @@ export function SelectionDashboard({ tripId }: { tripId: string }) {
 
   // ── Summary row counts ──
 
-  const getColumnSummary = (opt: TripOption): string | null => {
-    if (opt.option_type === "text" || opt.option_type === "number") return null;
+  const getColumnSummary = (opt: TripOption) => {
+    if (opt.option_type === "text") return null;
 
-    let count = 0;
+    if (opt.option_type === "number") {
+      const values: number[] = [];
+      for (const p of participants) {
+        const sel = selections[p.user_id]?.[opt.id];
+        if (sel?.value == null || sel.value === "") continue;
+        const n = Number(sel.value);
+        if (!Number.isNaN(n)) values.push(n);
+      }
+      if (values.length === 0) return null;
+      const sum = values.reduce((a, b) => a + b, 0);
+      const avg = sum / values.length;
+      return (
+        <div className="flex flex-col gap-0.5 items-center">
+          <div className="whitespace-nowrap">
+            Total: <span className="font-semibold text-gray-700">{sum.toLocaleString()}</span>
+          </div>
+          {values.length > 1 && (
+            <div className="whitespace-nowrap">
+              Avg: <span className="font-semibold text-gray-700">{avg.toFixed(avg % 1 === 0 ? 0 : 1)}</span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (opt.option_type === "checkbox") {
+      let count = 0;
+      for (const p of participants) {
+        const sel = selections[p.user_id]?.[opt.id];
+        if (sel?.value === true) count++;
+      }
+      return `${count}/${participants.length}`;
+    }
+
+    // select / multi_select: per-choice counts
+    const choices = (opt.choices || []) as Choice[];
+    const counts = new Map<string, number>();
+    for (const c of choices) counts.set(c.value, 0);
+
     for (const p of participants) {
       const sel = selections[p.user_id]?.[opt.id];
       if (!sel) continue;
-      if (opt.option_type === "checkbox" && sel.value === true) count++;
-      if (opt.option_type === "select" && sel.value) count++;
-      if (opt.option_type === "multi_select" && Array.isArray(sel.value) && sel.value.length > 0) count++;
+      if (opt.option_type === "select") {
+        const v = sel.value as string;
+        if (v && counts.has(v)) counts.set(v, (counts.get(v) ?? 0) + 1);
+      } else if (opt.option_type === "multi_select") {
+        const arr = Array.isArray(sel.value) ? (sel.value as string[]) : [];
+        for (const v of arr) {
+          if (counts.has(v)) counts.set(v, (counts.get(v) ?? 0) + 1);
+        }
+      }
     }
-    return `${count}/${participants.length}`;
+
+    const lines = choices
+      .map((c) => ({ label: c.label, count: counts.get(c.value) ?? 0 }))
+      .filter((x) => x.count > 0);
+
+    if (lines.length === 0) return null;
+
+    return (
+      <div className="flex flex-col gap-0.5 items-center">
+        {lines.map((l) => (
+          <div key={l.label} className="whitespace-nowrap">
+            {l.label}: <span className="font-semibold text-gray-700">{l.count}</span>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   // ── Grand total ──

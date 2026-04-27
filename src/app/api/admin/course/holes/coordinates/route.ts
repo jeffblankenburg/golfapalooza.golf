@@ -19,6 +19,7 @@ export async function PUT(request: Request) {
       drive_latitude, drive_longitude,
       green_front_latitude, green_front_longitude,
       green_back_latitude, green_back_longitude,
+      center_line,
     } = await request.json();
 
     if (!hole_id) {
@@ -42,6 +43,11 @@ export async function PUT(request: Request) {
     if (green_front_longitude !== undefined) sharedUpdate.green_front_longitude = green_front_longitude ?? null;
     if (green_back_latitude !== undefined) sharedUpdate.green_back_latitude = green_back_latitude ?? null;
     if (green_back_longitude !== undefined) sharedUpdate.green_back_longitude = green_back_longitude ?? null;
+    // center_line is per-hole geometry, not per-tee, so it propagates to all
+    // tees alongside the green/drive coords. An empty array clears it.
+    if (center_line !== undefined) {
+      sharedUpdate.center_line = Array.isArray(center_line) && center_line.length > 0 ? center_line : null;
+    }
 
     // Always update tee on this specific hole
     const { error: teeError } = await adminClient

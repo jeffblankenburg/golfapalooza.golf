@@ -9,6 +9,7 @@ interface HoleMapViewProps {
   driveLatLng: [number, number] | null;
   greenFrontLatLng: [number, number] | null;
   greenBackLatLng: [number, number] | null;
+  centerLine?: [number, number][] | null;
   holeNumber: number;
   par: number;
   teeColor?: string | null;
@@ -100,6 +101,7 @@ export default function HoleMapView({
   driveLatLng,
   greenFrontLatLng,
   greenBackLatLng,
+  centerLine,
   holeNumber,
   teeColor,
 }: HoleMapViewProps) {
@@ -123,11 +125,13 @@ export default function HoleMapView({
   const driveRef = useRef(driveLatLng);
   const greenFrontRef = useRef(greenFrontLatLng);
   const greenBackRef = useRef(greenBackLatLng);
+  const centerLineRef = useRef(centerLine);
   teeRef.current = teeLatLng;
   greenRef.current = greenLatLng;
   driveRef.current = driveLatLng;
   greenFrontRef.current = greenFrontLatLng;
   greenBackRef.current = greenBackLatLng;
+  centerLineRef.current = centerLine;
 
   const teeColorRef = useRef(teeColor);
   teeColorRef.current = teeColor;
@@ -277,6 +281,27 @@ export default function HoleMapView({
           new mapboxgl.Marker({ element: greenEl, anchor: "center" })
             .setLngLat([green[1], green[0]])
             .addTo(map);
+        }
+
+        // Center line — playable corridor laid down beneath the
+        // distance markers so they stay readable on top.
+        const cl = centerLineRef.current && centerLineRef.current.length >= 2 ? centerLineRef.current : null;
+        if (cl) {
+          map.addSource("center-line", {
+            type: "geojson",
+            data: {
+              type: "Feature",
+              properties: {},
+              geometry: { type: "LineString", coordinates: cl.map(([lat, lng]) => [lng, lat]) },
+            },
+          });
+          map.addLayer({
+            id: "center-line",
+            type: "line",
+            source: "center-line",
+            layout: { "line-cap": "round", "line-join": "round" },
+            paint: { "line-color": "#ec4899", "line-width": 3, "line-opacity": 0.55 },
+          });
         }
 
         // Front/back green perpendicular lines

@@ -31,6 +31,7 @@ export interface HoleInfo {
   green_front_longitude?: number | null;
   green_back_latitude?: number | null;
   green_back_longitude?: number | null;
+  center_line?: [number, number][] | null;
   source_tee_color?: string | null;
 }
 
@@ -431,6 +432,7 @@ export default function ScoringShell({
                 greenBackLatLng={hole.green_back_latitude != null && hole.green_back_longitude != null
                   ? [hole.green_back_latitude, hole.green_back_longitude]
                   : null}
+                centerLine={hole.center_line ?? null}
                 holeNumber={hole.hole_number}
                 par={hole.par}
                 teeColor={hole.source_tee_color || hole.tee_color || roundTeeColor}

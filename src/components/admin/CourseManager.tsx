@@ -42,6 +42,7 @@ interface HoleData {
   green_front_longitude: number | null;
   green_back_latitude: number | null;
   green_back_longitude: number | null;
+  center_line: [number, number][] | null;
 }
 
 interface CourseInfo {
@@ -1258,6 +1259,7 @@ function HoleRow({
             green_front_longitude: hole.green_front_longitude,
             green_back_latitude: hole.green_back_latitude,
             green_back_longitude: hole.green_back_longitude,
+            center_line: hole.center_line,
           }}
           onSave={(coords) => {
             onMapSave(hole.id, coords as unknown as Record<string, number | null>);

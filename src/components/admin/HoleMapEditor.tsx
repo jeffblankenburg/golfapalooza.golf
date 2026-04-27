@@ -13,6 +13,22 @@ interface Coordinates {
   green_front_longitude: number | null;
   green_back_latitude: number | null;
   green_back_longitude: number | null;
+  // Ordered polyline of [lat, lng] points defining the playable corridor.
+  // Empty array or null = no center line set.
+  center_line: [number, number][] | null;
+}
+
+type LatLng = [number, number];
+
+function lineFeature(points: LatLng[]) {
+  return {
+    type: "Feature" as const,
+    geometry: {
+      type: "LineString" as const,
+      coordinates: points.map(([lat, lng]) => [lng, lat]),
+    },
+    properties: {},
+  };
 }
 
 interface HoleMapEditorProps {
@@ -67,7 +83,10 @@ export default function HoleMapEditor({
   onSave,
   onClose,
 }: HoleMapEditorProps) {
-  const [placing, setPlacing] = useState<"tee" | "green" | "drive" | "green_front" | "green_back" | null>(null);
+  const [placing, setPlacing] = useState<"tee" | "green" | "drive" | "green_front" | "green_back" | "center_line" | null>(null);
+  const [centerLine, setCenterLine] = useState<LatLng[]>(coordinates.center_line || []);
+  const centerLineRef = useRef<LatLng[]>(centerLine);
+  centerLineRef.current = centerLine;
   const [tee, setTee] = useState<[number, number] | null>(
     coordinates.tee_latitude != null && coordinates.tee_longitude != null
       ? [coordinates.tee_latitude, coordinates.tee_longitude]
@@ -102,6 +121,8 @@ export default function HoleMapEditor({
   const driveMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const greenFrontMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const greenBackMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const centerLineSourceRef = useRef<mapboxgl.GeoJSONSource | null>(null);
+  const centerLineMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const placingRef = useRef(placing);
   placingRef.current = placing;
 
@@ -201,9 +222,32 @@ export default function HoleMapEditor({
         if (greenFront) addMarker(mapboxgl, map, greenFront, "green_front");
         if (greenBack) addMarker(mapboxgl, map, greenBack, "green_back");
 
+        // Center-line line layer + numbered point markers. The polyline
+        // sits beneath the markers so the dots remain readable.
+        map.addSource("center-line", { type: "geojson", data: lineFeature(centerLineRef.current) });
+        map.addLayer({
+          id: "center-line-layer",
+          type: "line",
+          source: "center-line",
+          layout: { "line-cap": "round", "line-join": "round" },
+          paint: { "line-color": "#ec4899", "line-width": 4, "line-opacity": 0.7 },
+        });
+        centerLineSourceRef.current = map.getSource("center-line") as mapboxgl.GeoJSONSource;
+        centerLineRef.current.forEach((p, i) => {
+          centerLineMarkersRef.current.push(addCenterLinePointMarker(mapboxgl, map, p, i + 1));
+        });
+
         map.on("click", (e) => {
           const latLng: [number, number] = [e.lngLat.lat, e.lngLat.lng];
           const mode = placingRef.current;
+          if (mode === "center_line") {
+            const next = [...centerLineRef.current, latLng];
+            centerLineRef.current = next;
+            setCenterLine(next);
+            centerLineSourceRef.current?.setData(lineFeature(next));
+            centerLineMarkersRef.current.push(addCenterLinePointMarker(mapboxgl, map, latLng, next.length));
+            return;
+          }
           const handlers: Record<string, () => void> = {
             tee: () => { setTee(latLng); teeMarkerRef.current?.remove(); addMarker(mapboxgl, map, latLng, "tee"); },
             green: () => { setGreen(latLng); greenMarkerRef.current?.remove(); addMarker(mapboxgl, map, latLng, "green"); },
@@ -217,6 +261,17 @@ export default function HoleMapEditor({
           }
         });
       });
+
+      function addCenterLinePointMarker(gl: typeof mapboxgl, m: mapboxgl.Map, pos: LatLng, n: number) {
+        const el = document.createElement("div");
+        el.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18">
+          <circle cx="9" cy="9" r="7" fill="#ec4899" stroke="white" stroke-width="2"/>
+          <text x="9" y="12.5" font-size="9" font-weight="700" text-anchor="middle" fill="white">${n}</text>
+        </svg>`;
+        return new gl.Marker({ element: el, anchor: "center" })
+          .setLngLat([pos[1], pos[0]])
+          .addTo(m);
+      }
 
       function makeDotEl(color: string, label: string, hollow = false) {
         const el = document.createElement("div");
@@ -272,6 +327,7 @@ export default function HoleMapEditor({
       green_front_longitude: greenFront ? greenFront[1] : null,
       green_back_latitude: greenBack ? greenBack[0] : null,
       green_back_longitude: greenBack ? greenBack[1] : null,
+      center_line: centerLine.length > 0 ? centerLine : null,
     });
   }
 
@@ -289,6 +345,23 @@ export default function HoleMapEditor({
     teeMarkerRef.current = null;
     greenMarkerRef.current = null;
     driveMarkerRef.current = null;
+    handleClearCenterLine();
+  }
+
+  function handleUndoCenterLinePoint() {
+    const next = centerLineRef.current.slice(0, -1);
+    centerLineRef.current = next;
+    setCenterLine(next);
+    centerLineSourceRef.current?.setData(lineFeature(next));
+    centerLineMarkersRef.current.pop()?.remove();
+  }
+
+  function handleClearCenterLine() {
+    centerLineRef.current = [];
+    setCenterLine([]);
+    centerLineSourceRef.current?.setData(lineFeature([]));
+    centerLineMarkersRef.current.forEach((m) => m.remove());
+    centerLineMarkersRef.current = [];
   }
 
   return (
@@ -368,6 +441,43 @@ export default function HoleMapEditor({
             >
               {placing === "green_back" ? "Tap map..." : greenBack ? "Move Back" : "Green Back"}
             </button>
+          </div>
+          {/* Center line — multi-point polyline that traces the playable
+              corridor. Stays in placing mode after each click so the admin
+              can drop a sequence of points without re-tapping the button. */}
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={() => setPlacing(placing === "center_line" ? null : "center_line")}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                placing === "center_line"
+                  ? "bg-pink-600 text-white ring-2 ring-pink-300"
+                  : centerLine.length > 0
+                    ? "bg-pink-50 text-pink-700 border border-pink-200"
+                    : "bg-gray-100 text-gray-500"
+              }`}
+            >
+              {placing === "center_line"
+                ? `Tap to add (${centerLine.length})…`
+                : centerLine.length > 0
+                  ? `Edit Center Line (${centerLine.length})`
+                  : "Center Line"}
+            </button>
+            {placing === "center_line" && centerLine.length > 0 && (
+              <button
+                onClick={handleUndoCenterLinePoint}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 active:bg-gray-200"
+              >
+                Undo
+              </button>
+            )}
+            {centerLine.length > 0 && (
+              <button
+                onClick={handleClearCenterLine}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-300 text-gray-600 active:bg-gray-50"
+              >
+                Clear line
+              </button>
+            )}
           </div>
           {(teeToGreen != null || teeToDrive != null || greenDepth != null) && (
             <div className="flex flex-wrap justify-center gap-3 text-xs text-gray-500 mt-2">

@@ -5,6 +5,7 @@ import { getEffectiveUserId, getEffectiveDate, getSimDate, isSimulating } from "
 import { isFeatureVisible } from "@/lib/visibility";
 import { stripMarkdown } from "@/lib/strip-markdown";
 import { getBirthdaysToday } from "@/lib/birthday/today";
+import { userHasClosedPolls } from "@/lib/polls";
 
 export { zoomableViewport as viewport } from "@/lib/viewport";
 
@@ -596,6 +597,7 @@ export default async function HomePage() {
   if (!isFeatureVisible("daily_games", visCtx, effectiveDate)) hiddenQuickLinks.push("/daily-games");
   if (!isFeatureVisible("rooms", visCtx, effectiveDate)) hiddenQuickLinks.push("/rooms");
   if (!optionsDeadline) hiddenQuickLinks.push("/options");
+  if (!(await userHasClosedPolls(adminClient, effectiveUserId))) hiddenQuickLinks.push("/polls");
 
   return (
     <HomeContent

@@ -183,6 +183,41 @@ export async function loadPollResults(
 }
 
 /**
+ * Returns true if the given user is in the audience of at least one closed
+ * poll. Used by the home page to hide the "Polls" quick link when there's
+ * no history to show.
+ */
+export async function userHasClosedPolls(
+  client: SupabaseClient,
+  userId: string
+): Promise<boolean> {
+  const { data: tripRows } = await client
+    .from("event_participants")
+    .select("trip_id")
+    .eq("user_id", userId);
+  const tripIds = (tripRows || []).map((r: { trip_id: string }) => r.trip_id);
+
+  const orParts = [
+    "audience_type.eq.everyone",
+    `audience_user_ids.cs.{${userId}}`,
+  ];
+  if (tripIds.length > 0) {
+    orParts.push(
+      `and(audience_type.eq.event,trip_id.in.(${tripIds.join(",")}))`
+    );
+  }
+
+  const { data } = await client
+    .from("polls")
+    .select("id")
+    .eq("status", "closed")
+    .or(orParts.join(","))
+    .limit(1);
+
+  return (data?.length || 0) > 0;
+}
+
+/**
  * Returns any polls whose [starts_at, ends_at] overlaps the given window.
  * Excludes drafts (no window) and closed polls. Optionally excludes a poll by id.
  */

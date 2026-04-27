@@ -100,6 +100,9 @@ export default function VerifyPage() {
     setError("");
     setResending(true);
 
+    const networkBlockedMessage =
+      "Couldn't reach the server. If you're on a work or school network, it may be blocking us — try a personal device or your phone's hotspot.";
+
     try {
       const res = await fetch("/api/auth/send-otp", {
         method: "POST",
@@ -107,13 +110,17 @@ export default function VerifyPage() {
         body: JSON.stringify({ phone }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        setError(data.error || "Failed to resend code");
+        if (!data) {
+          setError(networkBlockedMessage);
+        } else {
+          setError(data.error || "Failed to resend code");
+        }
       }
     } catch {
-      setError("Failed to resend code");
+      setError(networkBlockedMessage);
     } finally {
       setResending(false);
     }

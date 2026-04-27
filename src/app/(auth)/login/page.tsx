@@ -39,6 +39,9 @@ export default function LoginPage() {
 
     setLoading(true);
 
+    const networkBlockedMessage =
+      "Couldn't reach the server. If you're on a work or school network, it may be blocking us — try a personal device or your phone's hotspot.";
+
     try {
       const res = await fetch("/api/auth/send-otp", {
         method: "POST",
@@ -46,17 +49,21 @@ export default function LoginPage() {
         body: JSON.stringify({ phone: phoneNumbers }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        setError(data.error || "Failed to send verification code");
+        if (!data) {
+          setError(networkBlockedMessage);
+        } else {
+          setError(data.error || "Failed to send verification code");
+        }
         return;
       }
 
       sessionStorage.setItem("pendingPhone", phoneNumbers);
       router.push("/verify");
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(networkBlockedMessage);
     } finally {
       setLoading(false);
     }

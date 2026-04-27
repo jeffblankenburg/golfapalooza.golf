@@ -16,6 +16,13 @@ interface User {
   is_active: boolean;
 }
 
+interface BroadcastList {
+  id: string;
+  name: string;
+  user_ids: string[];
+  user_count: number;
+}
+
 interface DraftOption {
   id?: string;
   option_text: string;
@@ -98,6 +105,63 @@ export function PollEditor({
   const [conflicts, setConflicts] = useState<{ id: string; title: string; ends_at: string }[]>([]);
   const [confirm, setConfirm] = useState(false);
   const [showAudiencePicker, setShowAudiencePicker] = useState(false);
+
+  const [broadcastLists, setBroadcastLists] = useState<BroadcastList[]>([]);
+  const [expandedListId, setExpandedListId] = useState<string | null>(null);
+  const [showSaveList, setShowSaveList] = useState(false);
+  const [saveListName, setSaveListName] = useState("");
+  const [savingList, setSavingList] = useState(false);
+
+  const refreshLists = async () => {
+    try {
+      const res = await fetch("/api/admin/broadcast-lists");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.lists) setBroadcastLists(data.lists);
+    } catch {
+      // silent — lists are optional
+    }
+  };
+
+  useEffect(() => {
+    refreshLists();
+  }, []);
+
+  const handleApplyList = (list: BroadcastList) => {
+    setSelectedUserIds(new Set(list.user_ids));
+    setExpandedListId(null);
+  };
+
+  const handleSaveList = async () => {
+    if (!saveListName.trim() || selectedUserIds.size === 0) return;
+    setSavingList(true);
+    try {
+      const res = await fetch("/api/admin/broadcast-lists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: saveListName.trim(),
+          user_ids: Array.from(selectedUserIds),
+        }),
+      });
+      if (res.ok) {
+        setSaveListName("");
+        setShowSaveList(false);
+        await refreshLists();
+      }
+    } finally {
+      setSavingList(false);
+    }
+  };
+
+  const handleDeleteList = async (id: string) => {
+    await fetch("/api/admin/broadcast-lists", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    await refreshLists();
+  };
 
   // Pre-populate window for editing scheduled/active polls
   useEffect(() => {
@@ -353,12 +417,124 @@ export function PollEditor({
           ))}
         </div>
         {audience === "custom" && (
-          <button
-            onClick={() => setShowAudiencePicker(!showAudiencePicker)}
-            className="mt-2 text-xs text-green-700 font-medium"
-          >
-            {showAudiencePicker ? "Hide" : "Pick recipients"}
-          </button>
+          <div className="mt-2 space-y-2">
+            {broadcastLists.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-xs text-gray-400 font-medium">Saved lists</p>
+                {broadcastLists.map((list) => {
+                  const isExpanded = expandedListId === list.id;
+                  const listUsers = allUsers.filter((u) =>
+                    Array.isArray(list.user_ids) && list.user_ids.includes(u.id)
+                  );
+                  return (
+                    <div
+                      key={list.id}
+                      className="rounded-lg border border-gray-200 overflow-hidden"
+                    >
+                      <button
+                        onClick={() =>
+                          setExpandedListId(isExpanded ? null : list.id)
+                        }
+                        className="w-full flex items-center justify-between px-3 py-2 text-left active:bg-gray-50"
+                      >
+                        <span className="text-xs font-semibold text-gray-700">
+                          {list.name}
+                          <span className="ml-1 text-gray-400 font-normal">
+                            ({list.user_count})
+                          </span>
+                        </span>
+                        <svg
+                          className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </button>
+                      {isExpanded && (
+                        <div className="border-t border-gray-100">
+                          <div className="flex flex-wrap gap-1.5 px-3 py-2">
+                            {listUsers.map((u) => (
+                              <span
+                                key={u.id}
+                                className="text-[11px] font-medium text-gray-700 bg-gray-50 rounded-full px-2 py-0.5"
+                              >
+                                {u.display_name}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="flex gap-3 px-3 py-2 border-t border-gray-100">
+                            <button
+                              onClick={() => handleApplyList(list)}
+                              className="text-xs font-semibold text-green-700"
+                            >
+                              Use this list
+                            </button>
+                            <button
+                              onClick={() => handleDeleteList(list.id)}
+                              className="text-xs font-semibold text-red-600"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {selectedUserIds.size > 0 &&
+              (!showSaveList ? (
+                <button
+                  onClick={() => setShowSaveList(true)}
+                  className="text-xs text-green-700 font-medium"
+                >
+                  Save current selection as a list
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="List name"
+                    autoFocus
+                    value={saveListName}
+                    onChange={(e) => setSaveListName(e.target.value)}
+                    className="flex-1 border border-gray-300 rounded-lg px-2 py-1 text-xs"
+                  />
+                  <button
+                    onClick={handleSaveList}
+                    disabled={!saveListName.trim() || savingList}
+                    className="px-2 py-1 bg-green-600 text-white text-xs font-medium rounded-lg disabled:opacity-50"
+                  >
+                    {savingList ? "..." : "Save"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSaveList(false);
+                      setSaveListName("");
+                    }}
+                    className="px-2 py-1 text-xs text-gray-500"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ))}
+
+            <button
+              onClick={() => setShowAudiencePicker(!showAudiencePicker)}
+              className="text-xs text-green-700 font-medium"
+            >
+              {showAudiencePicker ? "Hide" : "Pick recipients"}
+            </button>
+          </div>
         )}
         {audience === "custom" && showAudiencePicker && (
           <div className="mt-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">

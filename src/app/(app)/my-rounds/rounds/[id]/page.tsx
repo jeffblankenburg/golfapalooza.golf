@@ -21,6 +21,7 @@ interface RoundData {
     final_gross_score: number | null;
     score_differential: number | null;
     user: { id: string; display_name: string; full_name: string | null } | null;
+    player_tee: { tee_name: string; tee_color: string | null; course_rating: number; slope_rating: number; par: number } | null;
     scores: { hole_number: number; strokes: number; putts: number | null }[];
   }[];
 }
@@ -121,8 +122,13 @@ export default function RoundDetailPage() {
   }
 
   const course = Array.isArray(round.course) ? round.course[0] : round.course;
-  const tee = Array.isArray(round.tee) ? round.tee[0] : round.tee;
+  const roundTee = Array.isArray(round.tee) ? round.tee[0] : round.tee;
   const players = round.round_players || [];
+  const currentPlayer = players.find((p) => p.user_id === currentUserId);
+  const currentPlayerTee = currentPlayer?.player_tee
+    ? (Array.isArray(currentPlayer.player_tee) ? currentPlayer.player_tee[0] : currentPlayer.player_tee)
+    : null;
+  const tee = currentPlayerTee || roundTee;
   const par = tee?.par || 72;
 
   // Resolve creator name from players list

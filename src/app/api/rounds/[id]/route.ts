@@ -27,6 +27,7 @@ export async function GET(
       round_players(
         *,
         user:users(id, display_name, full_name),
+        player_tee:course_tees(id, tee_name, tee_color, course_rating, slope_rating, par),
         scores:round_scores(*)
       )
     `)

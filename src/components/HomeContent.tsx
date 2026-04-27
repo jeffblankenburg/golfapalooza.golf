@@ -7,6 +7,7 @@ import { subscribeToPush } from "@/lib/notifications/push-client";
 import { getTimezoneAbbreviation } from "@/lib/utils/timezone";
 import { FakeAdCarousel } from "@/components/FakeAdCarousel";
 import { BirthdayBanner } from "@/components/BirthdayBanner";
+import { PollHomeButton } from "@/components/polls/PollHomeButton";
 
 interface TripData {
   trip_name: string;
@@ -891,6 +892,11 @@ export function HomeContent({
           </svg>
         </Link>
       )}
+
+      {/* Active poll CTA — hidden when no active poll exists for this user */}
+      <div className="mt-3">
+        <PollHomeButton />
+      </div>
 
       {/* Quick Links */}
       <div className="mt-3">

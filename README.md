@@ -151,6 +151,18 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - View counts displayed in admin
 - Latest article card on home page with hero image
 
+### Polls
+- Admin-authored polls with single-choice, multi-choice, or free-text questions
+- Same audience targeting as announcements (everyone, current event, custom)
+- Optional anonymity (results show counts only — admins included)
+- Schedule for the future or publish now; only one poll active at a time
+- Optional push notification when a poll launches
+- Single home-page CTA when an active poll exists for the user; hidden otherwise
+- Modal drawer to vote; users can change or withdraw their vote until close
+- Results visible to voters and audience members after the poll closes
+- `/polls` shows past polls and their results
+- Admins can edit, close early, or reopen closed polls with a new end time
+
 ### Financials
 - Per-user balance tracking (charges and payments)
 - Transaction history by trip
@@ -303,6 +315,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Readership tracking with per-article view counts
 - Notebook notes with categories and pinning
 - Announcement broadcasting with scheduling
+- Polls with single/multi/free-text questions, audience targeting, anonymity toggle, scheduling, and reopen support
 
 ### Daily Games & Contests
 - Daily winner recording (CTP, Long Drive, Long Putt)

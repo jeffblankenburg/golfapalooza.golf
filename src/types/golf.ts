@@ -268,3 +268,89 @@ export interface RookieNomination {
   created_at: string;
   updated_at: string;
 }
+
+// ===========================================
+// Polls
+// ===========================================
+
+export type PollAudienceType = "everyone" | "event" | "custom";
+export type PollStatus = "draft" | "scheduled" | "active" | "closed";
+export type PollQuestionType = "single" | "multi" | "text";
+
+export interface PollOption {
+  id: string;
+  question_id: string;
+  option_text: string;
+  order_index: number;
+}
+
+export interface PollQuestion {
+  id: string;
+  poll_id: string;
+  question_text: string;
+  question_type: PollQuestionType;
+  max_selections: number | null;
+  max_length: number | null;
+  order_index: number;
+  options: PollOption[];
+}
+
+export interface Poll {
+  id: string;
+  title: string;
+  description: string | null;
+  audience_type: PollAudienceType;
+  audience_user_ids: string[] | null;
+  trip_id: string | null;
+  is_anonymous: boolean;
+  send_notification_on_launch: boolean;
+  status: PollStatus;
+  starts_at: string | null;
+  ends_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  questions: PollQuestion[];
+}
+
+export interface PollAnswer {
+  question_id: string;
+  option_id: string | null;
+  text_answer: string | null;
+}
+
+export interface PollResponse {
+  id: string;
+  poll_id: string;
+  user_id: string;
+  submitted_at: string;
+  updated_at: string;
+  answers: PollAnswer[];
+}
+
+export interface PollOptionResult {
+  option_id: string;
+  option_text: string;
+  count: number;
+}
+
+export interface PollTextAnswer {
+  text: string;
+  // Only present when admin is viewing a non-anonymous poll
+  user_id?: string;
+  display_name?: string;
+}
+
+export interface PollQuestionResults {
+  question_id: string;
+  question_text: string;
+  question_type: PollQuestionType;
+  options?: PollOptionResult[];
+  text_answers?: PollTextAnswer[];
+}
+
+export interface PollResults {
+  poll_id: string;
+  total_respondents: number;
+  questions: PollQuestionResults[];
+}

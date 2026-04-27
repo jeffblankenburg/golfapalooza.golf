@@ -5,7 +5,7 @@ import { useEffect } from "react";
 interface BottomDrawerProps {
   open: boolean;
   onClose: () => void;
-  title: string;
+  title?: string;
   subtitle?: string;
   children: React.ReactNode;
 }
@@ -36,10 +36,14 @@ export function BottomDrawer({ open, onClose, title, subtitle, children }: Botto
         <div className="px-6 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
           <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
           <div className="flex items-start justify-between">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-xl font-bold text-gray-900 truncate">{title}</h2>
-              {subtitle && <p className="text-xs text-gray-500 truncate">{subtitle}</p>}
-            </div>
+            {title ? (
+              <div className="min-w-0 flex-1">
+                <h2 className="text-xl font-bold text-gray-900 truncate">{title}</h2>
+                {subtitle && <p className="text-xs text-gray-500 truncate">{subtitle}</p>}
+              </div>
+            ) : (
+              <div className="flex-1" />
+            )}
             <button
               onClick={onClose}
               className="ml-3 px-4 py-1.5 bg-green-600 text-white text-sm font-semibold rounded-lg active:bg-green-700 flex-shrink-0"

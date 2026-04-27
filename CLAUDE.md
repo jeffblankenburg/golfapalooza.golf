@@ -89,11 +89,22 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 |--------|----------|-------------|
 | GET | `/api/birthdays/today` | List Loozers whose birthday falls on today (in the active trip's timezone). Returns `{id, display_name, avatar_url, age}[]`. |
 
+#### Polls (`/api/polls`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/polls/active` | Returns the currently active poll for the current user (or `{poll: null}` if none/not eligible). Includes the user's existing response when present. |
+| GET | `/api/polls/{id}` | Get a poll the current user is eligible for. Drafts are admin-only. Includes results when `status='closed'`. |
+| POST | `/api/polls/{id}/respond` | Submit or update the user's full response. Body: `{answers: [{question_id, option_id?, text_answer?}]}`. Multi-select submits multiple answers per question_id. Validates audience, status, single/multi/text constraints. |
+| DELETE | `/api/polls/{id}/respond` | Withdraw the current user's response (only while poll is active). |
+| GET | `/api/polls/history` | List closed polls visible to the current user. |
+
 #### Cron (`/api/cron`)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/cron/birthday-posts` | Bearer-authed cron. Posts a randomly chosen birthday message to the "All Loozers" chat room for each Loozer with a birthday today. Idempotent via `birthday_posts(user_id, year, room_id)`. |
+| GET | `/api/cron/polls-lifecycle` | Bearer-authed cron, runs every minute. Promotes scheduled→active polls (one at a time, DB-enforced) and closes active polls past their `ends_at`. Sends launch notifications to the resolved audience when `send_notification_on_launch` is true. |
 
 #### Admin (`/api/admin`)
 
@@ -112,6 +123,15 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 | POST | `/api/admin/courses/{id}/verify` | Mark an AI/GCAPI-imported course as verified |
 | DELETE | `/api/admin/courses/{id}/verify` | Revert a course to community-submitted |
 | DELETE | `/api/admin/courses/{id}` | Delete a course (cascades to tees/holes; 409 if any rounds reference it) |
+| GET | `/api/admin/polls` | List all polls (every status) with response counts |
+| POST | `/api/admin/polls` | Create a poll as a draft. Body: `{title, description?, audience_type, audience_user_ids?, trip_id?, is_anonymous?, send_notification_on_launch?, questions: [{question_text, question_type, max_selections?, max_length?, options?}]}` |
+| GET | `/api/admin/polls/{id}` | Get a poll with questions + admin results (counts only when anonymous) |
+| PUT | `/api/admin/polls/{id}` | Update a poll. Smart-syncs questions/options (delete missing ones cascades to answers). Status transitions go through `/publish`, `/close`, `/reopen`. |
+| DELETE | `/api/admin/polls/{id}` | Delete a poll (cascades to all responses) |
+| POST | `/api/admin/polls/{id}/publish` | Promote a draft to scheduled or active. Body: `{starts_at, ends_at}`. 409 with `conflicts` array if window overlaps another scheduled/active poll. |
+| POST | `/api/admin/polls/{id}/close` | Close an active or scheduled poll immediately |
+| POST | `/api/admin/polls/{id}/reopen` | Reopen a closed poll. Body: `{ends_at}`. Existing responses preserved; no launch notification fires. |
+| GET | `/api/admin/polls/conflicts?starts_at=&ends_at=&exclude_id=` | Returns `{conflicts, next_free_start}` for the requested window |
 
 ## Database Schema
 
@@ -131,6 +151,11 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 - `fake_ad_loozers` - Many-to-many tags linking fake ads to Loozers
 - `birthday_posts` - Idempotency log for the daily birthday chat auto-post (user_id, year, room_id)
 - `ai_generations` - Audit log for every OpenRouter call (task, model, input_hash, output, confidence, cost_usd, latency_ms, committed). RLS-locked; server-only access via service role.
+- `polls` - Admin-authored polls. Same audience model as announcements. `status` ∈ ('draft','scheduled','active','closed'). Partial unique index enforces only one active poll at a time; application enforces no scheduled-window overlap.
+- `poll_questions` - Per-poll questions. `question_type` ∈ ('single','multi','text'). `max_selections` (multi) and `max_length` (text) are optional caps.
+- `poll_options` - Choices for select-type questions
+- `poll_responses` - One row per (poll, user) tracking who voted
+- `poll_answers` - Per-question answers; multi-select uses N rows. `option_id` XOR `text_answer` is enforced via CHECK.
 
 ### Migrations
 
@@ -140,6 +165,7 @@ Located in `supabase/migrations/`:
 - `00003_fix_rls_recursion.sql` - Fix RLS recursion for SELECT policies
 - `00004_fix_rls_all_operations.sql` - Fix RLS recursion for INSERT/UPDATE/DELETE
 - `00112_ai_course_import.sql` - `lookup_key`/`source`/`verified` on courses, `confidence` on tees, `ai_generations` audit table
+- `00114_polls.sql` - Polls feature: `polls`, `poll_questions`, `poll_options`, `poll_responses`, `poll_answers`. RLS-locked (server-only access via service role).
 
 **IMPORTANT: Always create NEW migration files.** Never modify existing migrations that may have already been run. Use sequential numbering (00004, 00005, etc.) for new migrations. Each migration should be atomic and handle its own rollback safety (use `DROP ... IF EXISTS` before `CREATE`).
 
@@ -197,6 +223,36 @@ Surface area:
 - Admin: founder toggle + searchable sponsor picker in the user edit modal
 - Profile pages: "Sponsor: [avatar] X" line, or "★ Founding Father" badge
 - `/loozers` and `/spectator/loozers`: Grid | Tree toggle (persisted in localStorage). Tree is a vertical org chart with pinch-zoom + pan. Authenticated tree centers on the current user's node and highlights it.
+
+### Polls
+
+Admin-authored polls reuse the announcements audience model (`everyone` / `event` / `custom`). One poll can be **active** at a time — enforced by a partial unique index on `polls.status='active'`. Scheduled-window overlap is rejected at the API layer with a 409 + `conflicts` array + `next_free_start`.
+
+Question types (v1):
+- `single` — radio buttons; exactly one answer
+- `multi` — checkboxes; optional `max_selections` cap
+- `text` — free-text; optional `max_length` (default 500)
+
+Lifecycle:
+- **Draft** → **Scheduled** or **Active** via `POST /api/admin/polls/{id}/publish` (status depends on whether `starts_at` is in the future)
+- Cron at `/api/cron/polls-lifecycle` runs every minute: promotes scheduled→active and active→closed when their windows hit. Only one scheduled poll is activated per tick (the earliest pending).
+- **Reopen** via `POST /api/admin/polls/{id}/reopen` with a new `ends_at`. Existing responses preserved; no re-launch notification.
+
+Anonymity:
+- Per-poll `is_anonymous` flag. Results never expose `user_id` to anyone (including admins) when set. Free-text answers in admin view show name only when `is_anonymous=false`.
+- The DB always records `user_id` to enforce one-vote-per-user and allow vote changes; the API just omits it from results responses.
+
+Eligibility:
+- Audience is evaluated **live** (not snapshotted at launch) — see `src/lib/audience.ts`. Anyone added to the audience after launch sees the poll; anyone removed loses access (their submitted votes remain in results).
+
+Surface area:
+- `/admin/polls` (admin): list, create, edit, publish, schedule, close, reopen, view results
+- Home page: `<PollHomeButton />` shows a CTA only when there's an active poll for the current user; opens a `BottomDrawer` with `<PollForm />`
+- `/polls` (player): history of closed polls visible to the current user
+- Spectator page: **no polls** (consistent with personalization rule)
+
+Launch notifications:
+- Triggered by `send_notification_on_launch` (default true). Sent via `sendBulkNotifications` with `type: "poll"` and `data: { poll_id }`. Reopen does NOT re-notify.
 
 ## Development Commands
 

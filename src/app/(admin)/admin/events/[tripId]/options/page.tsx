@@ -5,13 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { OptionBuilder } from "@/components/admin/OptionBuilder";
 import { SelectionDashboard } from "@/components/admin/SelectionDashboard";
+import { SelectionSummary } from "@/components/admin/SelectionSummary";
 
 export default function OptionsAdminPage() {
   const params = useParams();
   const tripId = params.tripId as string;
   const router = useRouter();
   const [allowed, setAllowed] = useState<boolean | null>(null);
-  const [tab, setTab] = useState<"builder" | "selections">("builder");
+  const [tab, setTab] = useState<"builder" | "selections" | "summary">("builder");
   const [selectionExporter, setSelectionExporter] = useState<(() => void) | null>(null);
   const handleExportReady = useCallback((exporter: (() => void) | null) => {
     setSelectionExporter(() => exporter);
@@ -52,7 +53,7 @@ export default function OptionsAdminPage() {
 
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Trip Options</h1>
-        {tab === "selections" && (
+        {tab !== "builder" && (
           <button
             onClick={() => selectionExporter?.()}
             disabled={!selectionExporter}
@@ -87,7 +88,7 @@ export default function OptionsAdminPage() {
               : "text-gray-500"
           }`}
         >
-          Option Builder
+          Builder
         </button>
         <button
           onClick={() => setTab("selections")}
@@ -99,11 +100,24 @@ export default function OptionsAdminPage() {
         >
           Selections
         </button>
+        <button
+          onClick={() => setTab("summary")}
+          className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
+            tab === "summary"
+              ? "bg-white text-gray-900 shadow-sm"
+              : "text-gray-500"
+          }`}
+        >
+          Summary
+        </button>
       </div>
 
       {tab === "builder" && <OptionBuilder tripId={tripId} />}
       {tab === "selections" && (
         <SelectionDashboard tripId={tripId} onExportReady={handleExportReady} />
+      )}
+      {tab === "summary" && (
+        <SelectionSummary tripId={tripId} onExportReady={handleExportReady} />
       )}
     </div>
   );

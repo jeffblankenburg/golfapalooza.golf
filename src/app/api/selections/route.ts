@@ -4,6 +4,37 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { syncContestEnrollment } from "@/lib/option-contest-sync";
 import { getEffectiveUserId } from "@/lib/simulator";
 
+function normalizeQuantityValue(
+  raw: unknown,
+  option: { choices?: Array<{ value: string }> | null; max_total?: number | null }
+): { value: Record<string, number> | null; error?: string } {
+  if (raw === null || raw === undefined) return { value: null };
+  if (typeof raw !== "object" || Array.isArray(raw)) {
+    return { value: null, error: "quantity value must be an object of {choice: count}" };
+  }
+  const choiceValues = new Set((option.choices || []).map((c) => c.value));
+  const out: Record<string, number> = {};
+  let total = 0;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!choiceValues.has(k)) continue;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0) {
+      return { value: null, error: `invalid quantity for ${k}` };
+    }
+    const intN = Math.floor(n);
+    if (intN > 0) {
+      out[k] = intN;
+      total += intN;
+    }
+  }
+  if (option.max_total != null && total > option.max_total) {
+    return { value: null, error: `total quantity exceeds the limit of ${option.max_total}` };
+  }
+  // Preserve {} as the "explicitly chose zero" marker; client sends null
+  // when the user truly wants to clear the row.
+  return { value: out };
+}
+
 export async function GET(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -40,7 +71,7 @@ export async function PUT(request: Request) {
 
   const effectiveUserId = await getEffectiveUserId(user.id);
 
-  const { trip_id, option_id, value } = await request.json();
+  const { trip_id, option_id, value: rawValue } = await request.json();
   if (!trip_id || !option_id) {
     return NextResponse.json({ error: "trip_id and option_id are required" }, { status: 400 });
   }
@@ -63,6 +94,23 @@ export async function PUT(request: Request) {
     if (settings.selection_deadline && new Date() > new Date(settings.selection_deadline)) {
       return NextResponse.json({ error: "Selection deadline has passed" }, { status: 403 });
     }
+  }
+
+  // Load the option upfront so we can validate quantity-shaped values
+  const { data: option, error: optionError } = await adminClient
+    .from("trip_options")
+    .select("*")
+    .eq("id", option_id)
+    .single();
+  if (optionError) return NextResponse.json({ error: optionError.message }, { status: 500 });
+
+  let value = rawValue;
+  if (option.option_type === "quantity" && rawValue != null) {
+    const normalized = normalizeQuantityValue(rawValue, option);
+    if (normalized.error) {
+      return NextResponse.json({ error: normalized.error }, { status: 400 });
+    }
+    value = normalized.value;
   }
 
   // 1. Upsert or delete the selection
@@ -91,14 +139,6 @@ export async function PUT(request: Request) {
     .eq("option_id", option_id)
     .eq("source", "option");
   if (deleteChargeError) return NextResponse.json({ error: deleteChargeError.message }, { status: 500 });
-
-  // Look up the trip_options row (needed for both charge calc and contest sync)
-  const { data: option, error: optionError } = await adminClient
-    .from("trip_options")
-    .select("*")
-    .eq("id", option_id)
-    .single();
-  if (optionError) return NextResponse.json({ error: optionError.message }, { status: 500 });
 
   // If value is null (deletion), cascade-clear dependent options, sync contest enrollment, and we're done
   if (value === null || value === undefined) {

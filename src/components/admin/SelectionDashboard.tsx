@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { downloadOptionsExcel } from "@/lib/options-export";
+import { ConfirmModal } from "@/components/admin/ConfirmModal";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -32,11 +33,12 @@ interface TripOption {
   group_id: string;
   name: string;
   description?: string;
-  option_type: "checkbox" | "select" | "multi_select" | "text" | "number";
+  option_type: "checkbox" | "select" | "multi_select" | "text" | "number" | "quantity";
   choices?: Choice[];
   cost?: number;
   is_required?: boolean;
   sort_order: number;
+  max_total?: number | null;
   option_groups?: { id: string; name: string; sort_order: number };
 }
 
@@ -247,6 +249,179 @@ function NumberCell({
   );
 }
 
+function QuantityCell({
+  opt,
+  value,
+  hasRow,
+  saving,
+  onChange,
+}: {
+  opt: TripOption;
+  value: Record<string, number>;
+  hasRow: boolean;
+  saving: boolean;
+  onChange: (v: Record<string, number> | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const choices = (opt.choices || []) as Choice[];
+  const max = opt.max_total ?? null;
+  const total = Object.values(value).reduce((a, b) => a + (Number(b) || 0), 0);
+  const optedZero = hasRow && total === 0;
+
+  const summary = choices
+    .map((c) => ({ label: c.label, n: Number(value[c.value]) || 0 }))
+    .filter((x) => x.n > 0);
+
+  const update = (choiceValue: string, next: number) => {
+    const safe = Math.max(0, Math.floor(Number.isFinite(next) ? next : 0));
+    const otherSum = total - (Number(value[choiceValue]) || 0);
+    const clamped = max != null ? Math.min(safe, Math.max(0, max - otherSum)) : safe;
+    const nextMap: Record<string, number> = { ...value };
+    if (clamped <= 0) delete nextMap[choiceValue];
+    else nextMap[choiceValue] = clamped;
+    onChange(Object.keys(nextMap).length > 0 ? nextMap : null);
+  };
+
+  return (
+    <div className={saving ? "opacity-50" : ""}>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full text-left rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs hover:bg-gray-50"
+      >
+        {summary.length === 0 ? (
+          optedZero ? (
+            <span className="text-gray-700 italic">None</span>
+          ) : (
+            <span className="text-gray-400">Tap to set</span>
+          )
+        ) : (
+          <span className="text-gray-700">
+            {summary.map((s) => `${s.label}×${s.n}`).join(", ")}
+          </span>
+        )}
+        {max != null && (
+          <span className={`ml-1 tabular-nums ${total >= max ? "text-amber-700" : "text-gray-400"}`}>
+            ({total}/{max})
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-4 max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900">{opt.name}</h3>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            {max != null && (
+              <div className="flex items-baseline justify-between text-xs px-1 mb-2">
+                <span className="text-gray-500">Total</span>
+                <span className={`font-semibold tabular-nums ${total >= max ? "text-amber-700" : "text-gray-700"}`}>
+                  {total} / {max}
+                </span>
+              </div>
+            )}
+            <div className="space-y-2">
+              {choices.map((c) => {
+                const qty = Number(value[c.value]) || 0;
+                const incDisabled = max != null && total >= max;
+                return (
+                  <div
+                    key={c.value}
+                    className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 ${
+                      qty > 0
+                        ? "bg-green-50 border border-green-200"
+                        : "bg-gray-50 border border-transparent"
+                    }`}
+                  >
+                    <span className="text-sm text-gray-800 truncate">{c.label}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        disabled={qty <= 0}
+                        onClick={() => update(c.value, qty - 1)}
+                        className="w-8 h-8 rounded-full font-semibold text-lg leading-none flex items-center justify-center bg-white border border-gray-300 text-gray-700 disabled:bg-gray-100 disabled:text-gray-300 disabled:cursor-not-allowed"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        max={max ?? undefined}
+                        value={qty === 0 ? "" : qty}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          update(c.value, raw === "" ? 0 : Number(raw));
+                        }}
+                        placeholder="0"
+                        className="w-12 text-center rounded-lg border border-gray-200 bg-white px-1 py-1 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                      <button
+                        type="button"
+                        disabled={incDisabled}
+                        onClick={() => update(c.value, qty + 1)}
+                        className="w-8 h-8 rounded-full font-semibold text-lg leading-none flex items-center justify-center bg-white border border-gray-300 text-gray-700 disabled:bg-gray-100 disabled:text-gray-300 disabled:cursor-not-allowed"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {opt.is_required && (
+              <button
+                type="button"
+                onClick={() => onChange(optedZero ? null : {})}
+                className={`mt-3 w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition-colors ${
+                  optedZero
+                    ? "bg-green-50 border border-green-200 text-gray-800"
+                    : "bg-gray-50 border border-transparent text-gray-700 hover:bg-gray-100"
+                }`}
+              >
+                <span
+                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 ${
+                    optedZero ? "border-green-600 bg-green-600" : "border-gray-300"
+                  }`}
+                >
+                  {optedZero && (
+                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </span>
+                <span>Not having any</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="mt-3 w-full bg-green-600 text-white font-semibold rounded-xl py-2.5 active:bg-green-700"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────
 
 export function SelectionDashboard({
@@ -262,6 +437,8 @@ export function SelectionDashboard({
   const [selections, setSelections] = useState<SelectionsMap>({});
   const [loading, setLoading] = useState(true);
   const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   // ── Data fetching ──
 
@@ -461,6 +638,21 @@ export function SelectionDashboard({
           />
         );
 
+      case "quantity": {
+        const v = sel?.value;
+        const isObj = v !== null && v !== undefined && typeof v === "object" && !Array.isArray(v);
+        const map = isObj ? (v as Record<string, number>) : {};
+        return (
+          <QuantityCell
+            opt={opt}
+            value={map}
+            hasRow={isObj}
+            saving={saving}
+            onChange={(next) => saveSelection(userId, opt.id, next)}
+          />
+        );
+      }
+
       default:
         return null;
     }
@@ -505,7 +697,7 @@ export function SelectionDashboard({
       return `${count}/${participants.length}`;
     }
 
-    // select / multi_select: per-choice counts
+    // select / multi_select / quantity: per-choice counts (or summed quantities)
     const choices = (opt.choices || []) as Choice[];
     const counts = new Map<string, number>();
     for (const c of choices) counts.set(c.value, 0);
@@ -520,6 +712,15 @@ export function SelectionDashboard({
         const arr = Array.isArray(sel.value) ? (sel.value as string[]) : [];
         for (const v of arr) {
           if (counts.has(v)) counts.set(v, (counts.get(v) ?? 0) + 1);
+        }
+      } else if (opt.option_type === "quantity") {
+        const v = sel.value;
+        if (!v || typeof v !== "object" || Array.isArray(v)) continue;
+        for (const [k, n] of Object.entries(v as Record<string, unknown>)) {
+          const num = Number(n);
+          if (Number.isFinite(num) && num > 0 && counts.has(k)) {
+            counts.set(k, (counts.get(k) ?? 0) + num);
+          }
         }
       }
     }
@@ -576,7 +777,25 @@ export function SelectionDashboard({
 
   // ── Table ──
 
+  const handleResetAll = async () => {
+    setResetting(true);
+    try {
+      const res = await fetch(`/api/admin/selections?trip_id=${tripId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        console.error("Failed to reset selections", data);
+      }
+      await fetchAll();
+    } finally {
+      setResetting(false);
+      setConfirmReset(false);
+    }
+  };
+
   return (
+    <>
     <div className="overflow-x-auto border border-gray-200 rounded-2xl">
       <table className="min-w-full text-sm">
         {/* ── Group header row ── */}
@@ -684,5 +903,35 @@ export function SelectionDashboard({
         </tfoot>
       </table>
     </div>
+
+    <div className="mt-6 flex justify-end">
+      <button
+        type="button"
+        onClick={() => setConfirmReset(true)}
+        disabled={resetting}
+        className="text-xs font-medium text-red-600 hover:text-red-700 underline underline-offset-2 disabled:opacity-50"
+      >
+        Reset all responses
+      </button>
+    </div>
+
+    <ConfirmModal
+      open={confirmReset}
+      title="Reset all responses?"
+      destructive
+      confirmLabel={resetting ? "Resetting…" : "Yes, delete everything"}
+      message={
+        <div className="space-y-2">
+          <p>
+            This will permanently delete <span className="font-semibold">every Loozer&apos;s</span> answers
+            for this event&apos;s options, plus any option-sourced charges on their accounts.
+          </p>
+          <p>The options themselves are not affected. This cannot be undone.</p>
+        </div>
+      }
+      onCancel={() => setConfirmReset(false)}
+      onConfirm={handleResetAll}
+    />
+    </>
   );
 }

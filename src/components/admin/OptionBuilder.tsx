@@ -50,12 +50,13 @@ interface Option {
   name: string;
   description?: string;
   icon?: string | null;
-  option_type: "checkbox" | "select" | "multi_select" | "text" | "number";
+  option_type: "checkbox" | "select" | "multi_select" | "text" | "number" | "quantity";
   cost?: number;
   choices?: OptionChoice[];
   is_required: boolean;
   sort_order: number;
   depends_on_option_id?: string | null;
+  max_total?: number | null;
 }
 
 interface OptionSettings {
@@ -67,6 +68,7 @@ const TYPE_OPTIONS = [
   { value: "checkbox", label: "Checkbox", icon: "CheckSquare" },
   { value: "select", label: "Select One", icon: "ChevronDown" },
   { value: "multi_select", label: "Multi-Select", icon: "ListChecks" },
+  { value: "quantity", label: "Quantity", icon: "Hash" },
   { value: "text", label: "Text", icon: "Type" },
   { value: "number", label: "Number", icon: "Hash" },
 ];
@@ -119,6 +121,16 @@ const TYPE_META: Record<string, { label: string; color: string; bg: string; icon
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+      </svg>
+    ),
+  },
+  quantity: {
+    label: "Quantity",
+    color: "text-emerald-600",
+    bg: "bg-emerald-50",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h2m4 0h2m4 0h2M4 6h16M4 14h16M6 18h12" />
       </svg>
     ),
   },
@@ -190,6 +202,7 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
   const [optionType, setOptionType] = useState<Option["option_type"]>("checkbox");
   const [optionCost, setOptionCost] = useState<number | "">("");
   const [optionChoices, setOptionChoices] = useState<ChoiceWithId[]>([]);
+  const [optionMaxTotal, setOptionMaxTotal] = useState<number | "">("");
   const [optionIsRequired, setOptionIsRequired] = useState(false);
   const [optionIcon, setOptionIcon] = useState<string | null>(null);
   const [optionDependsOn, setOptionDependsOn] = useState<string | null>(null);
@@ -391,6 +404,7 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
     setOptionType("checkbox");
     setOptionCost("");
     setOptionChoices([]);
+    setOptionMaxTotal("");
     setOptionIsRequired(false);
     setOptionIcon(null);
     setOptionDependsOn(null);
@@ -413,6 +427,7 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
     setOptionType(option.option_type);
     setOptionCost(option.cost ?? "");
     setOptionChoices((option.choices || []).map(attachDragId));
+    setOptionMaxTotal(option.max_total ?? "");
     setOptionIsRequired(option.is_required);
     setOptionIcon(option.icon || null);
     setOptionDependsOn(option.depends_on_option_id || null);
@@ -432,12 +447,18 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
       option_type: optionType,
       cost: optionType === "checkbox" && optionCost !== "" ? Number(optionCost) : null,
       choices:
-        optionType === "select" || optionType === "multi_select"
+        optionType === "select" || optionType === "multi_select" || optionType === "quantity"
           ? optionChoices.map(({ _dragId: _drop, ...rest }) => {
               void _drop;
+              if (optionType === "quantity") {
+                const { cost: _cost, ...withoutCost } = rest;
+                void _cost;
+                return withoutCost;
+              }
               return rest;
             })
           : null,
+      max_total: optionType === "quantity" && optionMaxTotal !== "" ? Number(optionMaxTotal) : null,
       is_required: optionIsRequired,
       depends_on_option_id: optionDependsOn,
     };
@@ -688,7 +709,7 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
           )}
         </div>
 
-        {(optionType === "select" || optionType === "multi_select") && (
+        {(optionType === "select" || optionType === "multi_select" || optionType === "quantity") && (
           <div className="space-y-2">
             <label className="block text-xs font-medium text-gray-500">Choices</label>
             <DndContext
@@ -707,6 +728,7 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
                     index={idx}
                     updateChoice={updateChoice}
                     removeChoice={removeChoice}
+                    showCost={optionType !== "quantity"}
                   />
                 ))}
               </SortableContext>
@@ -720,6 +742,24 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
               </svg>
               Add Choice
             </button>
+          </div>
+        )}
+
+        {optionType === "quantity" && (
+          <div className="w-44">
+            <label className="block text-xs font-medium text-gray-500 mb-1">
+              Max total per Loozer (optional)
+            </label>
+            <input
+              type="number"
+              min={1}
+              placeholder="No limit"
+              value={optionMaxTotal}
+              onChange={(e) =>
+                setOptionMaxTotal(e.target.value === "" ? "" : Number(e.target.value))
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            />
           </div>
         )}
 
@@ -1263,6 +1303,16 @@ const TYPE_META_LOOKUP: Record<string, { label: string; color: string; bg: strin
       </svg>
     ),
   },
+  quantity: {
+    label: "Quantity",
+    color: "text-emerald-600",
+    bg: "bg-emerald-50",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h2m4 0h2m4 0h2M4 6h16M4 14h16M6 18h12" />
+      </svg>
+    ),
+  },
 };
 
 function SortableOptionRow({
@@ -1357,11 +1407,13 @@ function SortableChoiceRow({
   index,
   updateChoice,
   removeChoice,
+  showCost = true,
 }: {
   choice: ChoiceWithId;
   index: number;
   updateChoice: (index: number, field: keyof OptionChoice, val: string | number) => void;
   removeChoice: (index: number) => void;
+  showCost?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: choice._dragId });
   const style = {
@@ -1380,16 +1432,18 @@ function SortableChoiceRow({
         onChange={(e) => updateChoice(index, "label", e.target.value)}
         className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
       />
-      <div className="w-24 relative flex-shrink-0">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
-        <input
-          type="number"
-          placeholder="0"
-          value={choice.cost ?? ""}
-          onChange={(e) => updateChoice(index, "cost", e.target.value)}
-          className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
-        />
-      </div>
+      {showCost && (
+        <div className="w-24 relative flex-shrink-0">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
+          <input
+            type="number"
+            placeholder="0"
+            value={choice.cost ?? ""}
+            onChange={(e) => updateChoice(index, "cost", e.target.value)}
+            className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+          />
+        </div>
+      )}
       <button
         onClick={() => removeChoice(index)}
         className="p-1 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors flex-shrink-0"

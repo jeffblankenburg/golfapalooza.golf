@@ -4,6 +4,37 @@ import { createClient } from "@/lib/supabase/server";
 import { checkPermissionAccess } from "@/lib/permissions-server";
 import { syncContestEnrollment } from "@/lib/option-contest-sync";
 
+function normalizeQuantityValue(
+  raw: unknown,
+  option: { choices?: Array<{ value: string }> | null; max_total?: number | null }
+): { value: Record<string, number> | null; error?: string } {
+  if (raw === null || raw === undefined) return { value: null };
+  if (typeof raw !== "object" || Array.isArray(raw)) {
+    return { value: null, error: "quantity value must be an object of {choice: count}" };
+  }
+  const choiceValues = new Set((option.choices || []).map((c) => c.value));
+  const out: Record<string, number> = {};
+  let total = 0;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!choiceValues.has(k)) continue;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0) {
+      return { value: null, error: `invalid quantity for ${k}` };
+    }
+    const intN = Math.floor(n);
+    if (intN > 0) {
+      out[k] = intN;
+      total += intN;
+    }
+  }
+  if (option.max_total != null && total > option.max_total) {
+    return { value: null, error: `total quantity exceeds the limit of ${option.max_total}` };
+  }
+  // Preserve {} as the "explicitly chose zero" marker; client sends null
+  // when the user truly wants to clear the row.
+  return { value: out };
+}
+
 export async function GET(request: Request) {
   const admin = await checkPermissionAccess("manage_finances");
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -34,7 +65,7 @@ export async function PUT(request: Request) {
   const admin = await checkPermissionAccess("manage_finances");
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { trip_id, user_id, option_id, value } = await request.json();
+  const { trip_id, user_id, option_id, value: rawValue } = await request.json();
   if (!trip_id || !user_id || !option_id) {
     return NextResponse.json({ error: "trip_id, user_id, and option_id are required" }, { status: 400 });
   }
@@ -45,6 +76,23 @@ export async function PUT(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Load option early so we can validate quantity-shaped values
+  const { data: optionPre, error: optionPreError } = await adminClient
+    .from("trip_options")
+    .select("*")
+    .eq("id", option_id)
+    .single();
+  if (optionPreError) return NextResponse.json({ error: optionPreError.message }, { status: 500 });
+
+  let value = rawValue;
+  if (optionPre.option_type === "quantity" && rawValue != null) {
+    const normalized = normalizeQuantityValue(rawValue, optionPre);
+    if (normalized.error) {
+      return NextResponse.json({ error: normalized.error }, { status: 400 });
+    }
+    value = normalized.value;
+  }
 
   // 1. Upsert or delete the selection
   if (value === null || value === undefined) {
@@ -75,13 +123,7 @@ export async function PUT(request: Request) {
     .eq("source", "option");
   if (deleteChargeError) return NextResponse.json({ error: deleteChargeError.message }, { status: 500 });
 
-  // Look up the trip_options row (needed for both charge calc and contest sync)
-  const { data: option, error: optionError } = await adminClient
-    .from("trip_options")
-    .select("*")
-    .eq("id", option_id)
-    .single();
-  if (optionError) return NextResponse.json({ error: optionError.message }, { status: 500 });
+  const option = optionPre;
 
   // If value is null (deletion), sync contest enrollment (unenroll) and we're done
   if (value === null || value === undefined) {
@@ -141,6 +183,34 @@ export async function PUT(request: Request) {
 
   // 3. Sync contest enrollment
   await syncContestEnrollment(adminClient, user_id, option, value);
+
+  return NextResponse.json({ success: true });
+}
+
+// Wipes every user's selections for a trip plus the option-sourced
+// financial charges. Stale contest_participants will resync as users
+// re-answer their options. Intended for resetting test data.
+export async function DELETE(request: Request) {
+  const admin = await checkPermissionAccess("manage_finances");
+  if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { searchParams } = new URL(request.url);
+  const tripId = searchParams.get("trip_id");
+  if (!tripId) return NextResponse.json({ error: "trip_id is required" }, { status: 400 });
+
+  const adminClient = createAdminClient();
+
+  const [selResult, txResult] = await Promise.all([
+    adminClient.from("user_option_selections").delete().eq("trip_id", tripId),
+    adminClient
+      .from("financial_transactions")
+      .delete()
+      .eq("trip_id", tripId)
+      .eq("source", "option"),
+  ]);
+
+  if (selResult.error) return NextResponse.json({ error: selResult.error.message }, { status: 500 });
+  if (txResult.error) return NextResponse.json({ error: txResult.error.message }, { status: 500 });
 
   return NextResponse.json({ success: true });
 }

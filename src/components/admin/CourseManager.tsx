@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import { BottomDrawer } from "@/components/admin/BottomDrawer";
 import { TEE_COLOR_OPTIONS, isHexColor, getContrastText, getTeeColorClasses } from "@/lib/tee-colors";
 import dynamic from "next/dynamic";
 
@@ -27,6 +28,7 @@ function displayTeeName(name: string): string {
 interface HoleData {
   id: string;
   hole_number: number;
+  hole_name: string | null;
   par: number;
   handicap_index: number;
   yards: number;
@@ -391,6 +393,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
             par: h.par,
             handicap_index: h.handicap_index,
             yards: h.yards,
+            hole_name: h.hole_name,
           })),
         }),
       });
@@ -408,13 +411,37 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
     }
   }
 
+  // Persists just the hole_name for one hole. Server mirrors the value
+  // across every tee row for that (course, hole_number).
+  async function saveHoleName(holeId: string, name: string) {
+    try {
+      const res = await fetch("/api/admin/course/holes", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          holes: [{ id: holeId, hole_name: name }],
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setError(data.error);
+      }
+    } catch {
+      setError("Failed to save hole name");
+    }
+  }
+
   function updateHole(
     index: number,
-    field: "par" | "handicap_index" | "yards",
+    field: "par" | "handicap_index" | "yards" | "hole_name",
     value: string
   ) {
     const updated = [...holes];
-    updated[index] = { ...updated[index], [field]: parseInt(value) || 0 };
+    if (field === "hole_name") {
+      updated[index] = { ...updated[index], hole_name: value };
+    } else {
+      updated[index] = { ...updated[index], [field]: parseInt(value) || 0 };
+    }
     setHoles(updated);
   }
 
@@ -1028,6 +1055,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
               teeName={selectedTee ? displayTeeName(selectedTee.tee_name) : ""}
               showImages
               onUpdate={(field, value) => updateHole(i, field, value)}
+              onSaveHoleName={saveHoleName}
               onUpload={(imageType) =>
                 triggerUpload(hole.id, hole.hole_number, imageType)
               }
@@ -1120,6 +1148,7 @@ function HoleRow({
   teeName,
   showImages,
   onUpdate,
+  onSaveHoleName,
   onUpload,
   onDelete,
   onMapSave,
@@ -1138,7 +1167,8 @@ function HoleRow({
   courseName: string;
   teeName: string;
   showImages: boolean;
-  onUpdate: (field: "par" | "handicap_index" | "yards", value: string) => void;
+  onUpdate: (field: "par" | "handicap_index" | "yards" | "hole_name", value: string) => void;
+  onSaveHoleName: (holeId: string, name: string) => Promise<void>;
   onUpload: (imageType: "overhead" | "green") => void;
   onDelete: (imageType: "overhead" | "green") => void;
   onMapSave: (holeId: string, coords: Record<string, number | null>) => void;
@@ -1151,49 +1181,88 @@ function HoleRow({
   previousHoleGreen: [number, number] | null;
 }) {
   const [showMap, setShowMap] = useState(false);
+  const [showNameDrawer, setShowNameDrawer] = useState(false);
+  const [nameDraft, setNameDraft] = useState(hole.hole_name ?? "");
   const isUploadingOverhead = uploadingKey === `${hole.id}-overhead`;
   const isUploadingGreen = uploadingKey === `${hole.id}-green`;
   const modalSubtitle = `${courseName} · ${teeName} · Hole ${hole.hole_number}`;
   const hasCoordinates = hole.tee_latitude != null || hole.green_latitude != null;
+  const trimmedName = (hole.hole_name ?? "").trim();
+
+  const openNameDrawer = () => {
+    setNameDraft(hole.hole_name ?? "");
+    setShowNameDrawer(true);
+  };
+
+  const closeNameDrawer = () => {
+    const trimmed = nameDraft.trim();
+    const previous = (hole.hole_name ?? "").trim();
+    setShowNameDrawer(false);
+    if (trimmed !== previous) {
+      onUpdate("hole_name", trimmed);
+      onSaveHoleName(hole.id, trimmed);
+    }
+  };
 
   return (
     <div className="px-4 py-3">
-      <div className="flex items-center gap-3 mb-2">
-        <span className="flex items-center justify-center w-8 h-8 rounded-full bg-green-50 text-green-700 text-sm font-bold shrink-0">
-          {hole.hole_number}
-        </span>
-        <div className="grid grid-cols-3 gap-2 flex-1">
-          <div>
-            <label className="text-[10px] text-gray-400 uppercase">Par</label>
-            <input
-              type="number"
-              tabIndex={holeIndex + 1}
-              value={hole.par}
-              onChange={(e) => onUpdate("par", e.target.value)}
-              className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] text-gray-400 uppercase">Hdcp</label>
-            <input
-              type="number"
-              tabIndex={totalHoles + holeIndex + 1}
-              value={hole.handicap_index}
-              onChange={(e) => onUpdate("handicap_index", e.target.value)}
-              className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] text-gray-400 uppercase">
-              Yards
-            </label>
-            <input
-              type="number"
-              tabIndex={totalHoles * 2 + holeIndex + 1}
-              value={hole.yards}
-              onChange={(e) => onUpdate("yards", e.target.value)}
-              className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center"
-            />
+      <div className="flex items-start gap-3 mb-2">
+        <div className="flex flex-col items-center gap-1 shrink-0 w-10">
+          <span className="flex items-center justify-center w-8 h-8 rounded-full bg-green-50 text-green-700 text-sm font-bold">
+            {hole.hole_number}
+          </span>
+          <button
+            type="button"
+            onClick={openNameDrawer}
+            title={trimmedName ? "Edit hole name" : "Add hole name"}
+            className={trimmedName ? "text-green-600 hover:text-green-700" : "text-gray-300 hover:text-gray-500"}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+          </button>
+        </div>
+        <div className="flex-1 min-w-0">
+          {trimmedName && (
+            <button
+              type="button"
+              onClick={openNameDrawer}
+              className="brass-plate brass-plate-button max-w-full truncate mb-1.5"
+            >
+              {trimmedName}
+            </button>
+          )}
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="text-[10px] text-gray-400 uppercase">Par</label>
+              <input
+                type="number"
+                tabIndex={holeIndex + 1}
+                value={hole.par}
+                onChange={(e) => onUpdate("par", e.target.value)}
+                className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-400 uppercase">Hdcp</label>
+              <input
+                type="number"
+                tabIndex={totalHoles + holeIndex + 1}
+                value={hole.handicap_index}
+                onChange={(e) => onUpdate("handicap_index", e.target.value)}
+                className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-400 uppercase">Yards</label>
+              <input
+                type="number"
+                tabIndex={totalHoles * 2 + holeIndex + 1}
+                value={hole.yards}
+                onChange={(e) => onUpdate("yards", e.target.value)}
+                className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -1268,6 +1337,42 @@ function HoleRow({
           onClose={() => setShowMap(false)}
         />
       )}
+
+      <BottomDrawer
+        open={showNameDrawer}
+        onClose={closeNameDrawer}
+        title={`Hole ${hole.hole_number} Name`}
+        subtitle="Used in the live scoring view above the map"
+      >
+        <div className="px-6 py-5 space-y-3">
+          <input
+            type="text"
+            autoFocus
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                closeNameDrawer();
+              }
+            }}
+            placeholder="e.g., Azalea"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          />
+          <p className="text-xs text-gray-400">
+            The name applies to this hole on every tee. Leave blank to remove it.
+          </p>
+          {nameDraft.trim() && (
+            <button
+              type="button"
+              onClick={() => setNameDraft("")}
+              className="text-xs text-red-600 hover:text-red-700 font-medium"
+            >
+              Clear name
+            </button>
+          )}
+        </div>
+      </BottomDrawer>
     </div>
   );
 }

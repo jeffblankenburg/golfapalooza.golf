@@ -11,6 +11,7 @@ export interface NormalizedHole {
   par: number;
   handicap_index: number;
   yards: number | null;
+  hole_name: string | null;
 }
 
 export interface NormalizedTee {
@@ -143,6 +144,7 @@ export function normalizeFromGcApi(course: GcApiCourse): NormalizedScorecard | n
         par: h.par,
         handicap_index: h.handicap,
         yards: h.yardage > 0 ? h.yardage : null,
+        hole_name: null,
       })),
     }));
 
@@ -240,11 +242,13 @@ export function normalizeFromAi(payload: unknown): {
       }
       handicaps.add(h.handicap_index);
       parSum += h.par;
+      const rawName = typeof h.hole_name === "string" ? h.hole_name.trim() : "";
       holes.push({
         hole_number: h.hole_number,
         par: h.par,
         handicap_index: h.handicap_index,
         yards: typeof h.yards === "number" && h.yards > 0 ? h.yards : null,
+        hole_name: rawName.length > 0 ? rawName : null,
       });
     }
     if (!holeOk) continue;

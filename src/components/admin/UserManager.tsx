@@ -261,6 +261,7 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
             setError(data.error || "Failed to delete user");
             return;
           }
+          closeModal();
           fetchUsers();
         } catch {
           setError("Failed to delete user");
@@ -725,22 +726,34 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
             </div>
 
             {/* Fixed footer */}
-            <div className="px-6 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0">
-              <button
-                type="submit"
-                form="user-form"
-                disabled={saving}
-                className="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold text-[15px] disabled:bg-gray-300 active:bg-green-700"
-              >
-                {saving ? "Saving..." : "Save"}
-              </button>
-              <button
-                type="button"
-                onClick={closeModal}
-                className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600 active:bg-gray-50"
-              >
-                Cancel
-              </button>
+            <div className="px-6 py-4 border-t border-gray-100 flex flex-col gap-2 flex-shrink-0">
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  form="user-form"
+                  disabled={saving}
+                  className="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold text-[15px] disabled:bg-gray-300 active:bg-green-700"
+                >
+                  {saving ? "Saving..." : "Save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600 active:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+              {editingUser && (
+                <button
+                  type="button"
+                  onClick={() => handleDelete(editingUser)}
+                  disabled={saving}
+                  className="w-full py-2.5 text-sm font-semibold text-red-600 border border-red-200 rounded-xl active:bg-red-50 disabled:opacity-50"
+                >
+                  Delete Loozer
+                </button>
+              )}
             </div>
           </div>
         </div>

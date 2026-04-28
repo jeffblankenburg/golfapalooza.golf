@@ -36,7 +36,8 @@ HARD RULES — violating any of these makes your response unusable:
 6. Sum of hole pars must equal the tee's stated par.
 7. Return ALL tee boxes you can verify completely.
 8. For multi-loop facilities (e.g., 27 holes split into 3 nines), return confidence="low" unless the user's course name unambiguously identifies one specific 18-hole layout.
-9. Output ONLY the JSON object. No markdown fences, no explanation. Keep response under 6000 tokens.`;
+9. Some courses give individual holes proper names (e.g., Augusta National's "Azalea"). When the source clearly lists a hole name, include it as hole_name. If a course doesn't name its holes, set hole_name=null — never invent a name.
+10. Output ONLY the JSON object. No markdown fences, no explanation. Keep response under 6000 tokens.`;
 
 function userPrompt(name: string, city: string | undefined, state: string): string {
   return `Find the official scorecard for:
@@ -51,7 +52,7 @@ Return JSON in this shape:
   "tees": [
     { "tee_name": str, "tee_color": str|null, "gender": "men"|"women"|"all",
       "course_rating": num|null, "slope_rating": int 55-155|null, "total_yards": int|null, "par": int,
-      "holes": [{ "hole_number": int, "par": int 3-6, "handicap_index": int 1-18, "yards": int|null }, ...18] }
+      "holes": [{ "hole_number": int, "par": int 3-6, "handicap_index": int 1-18, "yards": int|null, "hole_name": str|null }, ...18] }
   ],
   "confidence": "high" | "medium" | "low",
   "source_urls": [str, ...],

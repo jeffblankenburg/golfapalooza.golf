@@ -170,6 +170,7 @@ export default async function KgbCupScoringPage() {
   // Fetch course holes (with images)
   let holes: {
     hole_number: number;
+    hole_name: string | null;
     par: number;
     handicap_index: number;
     yards: number;
@@ -197,7 +198,7 @@ export default async function KgbCupScoringPage() {
         .order("hole_number"),
       adminClient
         .from("course_holes")
-        .select("tee_id, hole_number, par, yards, handicap_index, overhead_image_url, green_image_url, tee_latitude, tee_longitude, green_latitude, green_longitude, drive_latitude, drive_longitude, green_front_latitude, green_front_longitude, green_back_latitude, green_back_longitude")
+        .select("tee_id, hole_number, hole_name, par, yards, handicap_index, overhead_image_url, green_image_url, tee_latitude, tee_longitude, green_latitude, green_longitude, drive_latitude, drive_longitude, green_front_latitude, green_front_longitude, green_back_latitude, green_back_longitude")
         .eq("course_id", trip.course_id),
       adminClient
         .from("course_tees")
@@ -215,6 +216,7 @@ export default async function KgbCupScoringPage() {
 
       const holeMap = new Map<string, {
         par: number; yards: number; handicap_index: number;
+        hole_name: string | null;
         overhead_image_url: string | null; green_image_url: string | null;
         tee_latitude: number | null; tee_longitude: number | null;
         green_latitude: number | null; green_longitude: number | null;
@@ -227,6 +229,7 @@ export default async function KgbCupScoringPage() {
           par: h.par,
           yards: h.yards || 0,
           handicap_index: h.handicap_index || 0,
+          hole_name: h.hole_name ?? null,
           overhead_image_url: h.overhead_image_url || null,
           green_image_url: h.green_image_url || null,
           tee_latitude: h.tee_latitude ?? null,
@@ -246,6 +249,7 @@ export default async function KgbCupScoringPage() {
         const data = holeMap.get(`${ta.tee_id}-${ta.hole_number}`);
         return {
           hole_number: ta.hole_number,
+          hole_name: data?.hole_name ?? null,
           par: data?.par || 4,
           yards: data?.yards || 0,
           handicap_index: data?.handicap_index || 0,

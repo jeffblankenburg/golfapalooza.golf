@@ -108,7 +108,7 @@ export async function GET(request: Request) {
     const { data: teams } = await adminClient
       .from("scramble_teams")
       .select(
-        "id, team_handicap, scramble_team_members(user_id, user:users(display_name))"
+        "id, team_handicap, verified_at, scramble_team_members(user_id, user:users(display_name))"
       )
       .eq("contest_id", contestId);
 
@@ -168,6 +168,7 @@ export async function GET(request: Request) {
         par_through: parThrough,
         rel_par: relPar,
         scores: scoresByHole,
+        verified_at: (team as { verified_at?: string | null }).verified_at ?? null,
       };
     });
 

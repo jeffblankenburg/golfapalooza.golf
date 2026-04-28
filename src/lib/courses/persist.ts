@@ -133,6 +133,7 @@ export async function persistScorecard(
         course_id: course.id,
         tee_id: teeId,
         hole_number: h.hole_number,
+        hole_name: h.hole_name,
         par: h.par,
         handicap_index: h.handicap_index,
         yards: h.yards,

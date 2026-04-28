@@ -191,21 +191,11 @@ export async function computeBspitwLeaderboard(
     }
   }
 
-  // Only players with a scored team (non-null gross_score) in ALL scramble contests qualify
-  const playerScoredContests: Record<string, Set<string>> = {};
-  for (const m of members || []) {
-    const team = teams.find((t) => t.id === m.team_id);
-    if (team && team.gross_score !== null) {
-      if (!playerScoredContests[m.user_id]) {
-        playerScoredContests[m.user_id] = new Set();
-      }
-      playerScoredContests[m.user_id].add(team.contest_id);
-    }
-  }
-
-  const totalScrambleContests = contestIds.length;
-
+  // Show progressive standings: include any player with at least one bonus
+  // point recorded or any team that has a scored gross. This lets BSPITW
+  // populate as soon as the first hole is recorded — finals wait until every
+  // round wraps, but the live board updates in real time.
   return Object.values(playerMap)
-    .filter((p) => (playerScoredContests[p.user_id]?.size || 0) === totalScrambleContests)
+    .filter((p) => p.total_points > 0)
     .sort((a, b) => b.total_points - a.total_points || a.display_name.localeCompare(b.display_name));
 }

@@ -15,6 +15,7 @@ type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 export interface HoleInfo {
   hole_number: number;
+  hole_name?: string | null;
   par: number;
   handicap_index: number;
   yards: number | null;
@@ -333,22 +334,10 @@ export default function ScoringShell({
       {/* Status banners */}
       {statusBanner}
 
-      {/* View Toggle */}
-      {availableViews.length > 1 && (
+      {/* Hole name strip — sits in the slot the view toggle used to occupy */}
+      {hole.hole_name && (
         <div className="flex justify-center py-1.5 bg-white border-t border-gray-100 shrink-0">
-          <div className="flex bg-gray-100 rounded-lg p-0.5">
-            {availableViews.map((v) => (
-              <button
-                key={v.key}
-                onClick={() => setImageView(v.key)}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                  activeView === v.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-                }`}
-              >
-                {v.label}
-              </button>
-            ))}
-          </div>
+          <span className="brass-plate">{hole.hole_name}</span>
         </div>
       )}
 
@@ -458,6 +447,27 @@ export default function ScoringShell({
             </div>
           )}
         </div>
+
+        {/* View toggle — overlays the bottom-center of the map */}
+        {availableViews.length > 1 && (
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-[6]">
+            <div className="flex bg-black/55 backdrop-blur-sm rounded-lg p-0.5 shadow-lg">
+              {availableViews.map((v) => (
+                <button
+                  key={v.key}
+                  onClick={() => setImageView(v.key)}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                    activeView === v.key
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-white/80 active:bg-white/10"
+                  }`}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Course strip */}

@@ -43,6 +43,7 @@ interface LeaderboardEntry {
   par_through: number;
   rel_par: number;
   scores: Record<number, number>;
+  verified_at: string | null;
 }
 
 interface LeaderboardHole {
@@ -377,8 +378,20 @@ function LeaderboardPopup({
                       >
                         {entry.members.join(", ")}
                       </p>
-                      <p className="text-xs text-gray-400">
-                        thru {entry.holes_completed}
+                      <p className="text-xs text-gray-400 flex items-center gap-1.5">
+                        <span>thru {entry.holes_completed}</span>
+                        {entry.verified_at ? (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-px rounded-full bg-green-100 text-green-700 text-[10px] font-semibold">
+                            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Verified
+                          </span>
+                        ) : entry.holes_completed >= 18 ? (
+                          <span className="px-1.5 py-px rounded-full bg-amber-100 text-amber-700 text-[10px] font-semibold">
+                            Unverified
+                          </span>
+                        ) : null}
                       </p>
                     </div>
                     <span
@@ -390,9 +403,7 @@ function LeaderboardPopup({
                           : "text-gray-900"
                       }`}
                     >
-                      {entry.holes_completed > 0
-                        ? formatRelPar(entry.rel_par)
-                        : "\u00b7"}
+                      {formatRelPar(entry.rel_par)}
                     </span>
                     <svg
                       className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
@@ -450,6 +461,224 @@ function LeaderboardPopup({
   );
 }
 
+// ── CompleteRoundModal ────────────────────────────────────────────────────
+
+function CompleteRoundModal({
+  holes,
+  scores,
+  bonuses,
+  members,
+  coursePar,
+  teamHandicap,
+  attestStatus,
+  attestError,
+  onConfirm,
+  onClose,
+}: {
+  holes: HoleInfo[];
+  scores: Record<number, number>;
+  bonuses: Record<string, { on_green: boolean; holed_out: boolean }>;
+  members: Member[];
+  coursePar: number;
+  teamHandicap: number;
+  attestStatus: "idle" | "saving" | "error";
+  attestError: string | null;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const sortedHoles = [...holes].sort((a, b) => a.hole_number - b.hole_number);
+  const hasBothNines = sortedHoles.length > 9 && sortedHoles[0]?.hole_number <= 9;
+  const front9 = hasBothNines ? sortedHoles.filter((h) => h.hole_number <= 9) : sortedHoles;
+  const back9 = hasBothNines ? sortedHoles.filter((h) => h.hole_number > 9) : [];
+
+  const sumPar = (list: HoleInfo[]) => list.reduce((s, h) => s + h.par, 0);
+  const sumScore = (list: HoleInfo[]) =>
+    list.reduce((s, h) => s + (scores[h.hole_number] ?? 0), 0);
+
+  const grossScore = sumScore(sortedHoles);
+  const totalPar = sumPar(sortedHoles);
+  const relPar = grossScore - totalPar;
+  const netScore = grossScore - teamHandicap;
+  const underParPoints = Math.max(0, coursePar - netScore);
+
+  // Per-player bonus tallies
+  const perPlayer = members.map((m) => {
+    let onGreen = 0;
+    let holedOut = 0;
+    for (const h of sortedHoles) {
+      const b = bonuses[`${h.hole_number}-${m.user_id}`];
+      if (b?.on_green) onGreen++;
+      if (b?.holed_out) holedOut++;
+    }
+    return {
+      user_id: m.user_id,
+      display_name: m.display_name,
+      on_green: onGreen,
+      holed_out: holedOut,
+      under_par: underParPoints,
+      total: underParPoints + onGreen + holedOut,
+    };
+  });
+
+  const renderNine = (list: HoleInfo[], label: string) => {
+    const gridCols = `40px repeat(${list.length}, 1fr) 36px`;
+    return (
+      <div className="mb-3 overflow-x-auto">
+        <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">{label}</p>
+        <div className="border border-gray-200 rounded-lg overflow-hidden min-w-max">
+          {/* Hole row */}
+          <div
+            className="grid items-center py-1.5 px-2 bg-gray-50 border-b border-gray-200"
+            style={{ gridTemplateColumns: gridCols }}
+          >
+            <div className="text-[10px] font-semibold text-gray-400 uppercase">Hole</div>
+            {list.map((h) => (
+              <div key={`h-${h.hole_number}`} className="text-[11px] text-center text-gray-500 tabular-nums">
+                {h.hole_number}
+              </div>
+            ))}
+            <div className="text-[10px] text-center font-semibold text-gray-400 uppercase">Tot</div>
+          </div>
+
+          {/* Par row */}
+          <div
+            className="grid items-center py-1.5 px-2 border-b border-gray-200"
+            style={{ gridTemplateColumns: gridCols }}
+          >
+            <div className="text-[10px] font-semibold text-gray-400 uppercase">Par</div>
+            {list.map((h) => (
+              <div key={`p-${h.hole_number}`} className="text-[11px] text-center text-gray-400 tabular-nums">
+                {h.par}
+              </div>
+            ))}
+            <div className="text-[11px] text-center text-gray-400 tabular-nums">{sumPar(list)}</div>
+          </div>
+
+          {/* Score row */}
+          <div
+            className="grid items-center py-1.5 px-2"
+            style={{ gridTemplateColumns: gridCols }}
+          >
+            <div className="text-[10px] font-semibold text-gray-500 uppercase">Score</div>
+            {list.map((h) => (
+              <div key={`s-${h.hole_number}`} className="flex items-center justify-center min-h-[22px]">
+                <ScorecardCell score={scores[h.hole_number]} par={h.par} />
+              </div>
+            ))}
+            <div className="text-[12px] text-center font-bold text-gray-900 tabular-nums">{sumScore(list)}</div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end justify-center">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-white rounded-t-3xl p-5 pb-6 animate-slide-up max-h-[90vh] overflow-y-auto">
+        <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3" />
+
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Complete Round</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Once you confirm, your card is <strong>final and verified</strong>. No more
+          edits — only an admin can make corrections after this.
+        </p>
+
+        {/* Scorecard */}
+        {renderNine(front9, hasBothNines ? "Front 9" : "Holes")}
+        {hasBothNines && back9.length > 0 && renderNine(back9, "Back 9")}
+
+        {/* Totals */}
+        <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
+          <div className="rounded-xl bg-gray-50 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-gray-400">Gross</p>
+            <p className="text-xl font-bold text-gray-900 tabular-nums">{grossScore}</p>
+          </div>
+          <div className="rounded-xl bg-gray-50 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-gray-400">vs Par</p>
+            <p
+              className={`text-xl font-bold tabular-nums ${
+                relPar < 0 ? "text-green-700" : relPar > 0 ? "text-red-600" : "text-gray-900"
+              }`}
+            >
+              {formatRelPar(relPar)}
+            </p>
+          </div>
+          <div className="rounded-xl bg-gray-50 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-gray-400">Team Handicap</p>
+            <p className="text-xl font-bold text-gray-900 tabular-nums">{teamHandicap}</p>
+          </div>
+          <div className="rounded-xl bg-gray-50 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-gray-400">Net</p>
+            <p className="text-xl font-bold text-gray-900 tabular-nums">{netScore}</p>
+          </div>
+        </div>
+
+        {/* Per-player BSPITW summary */}
+        <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">
+          BSPITW Points
+        </p>
+        <div className="rounded-xl border border-gray-200 overflow-hidden mb-5">
+          <table className="w-full text-sm tabular-nums">
+            <thead>
+              <tr className="bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500">
+                <th className="text-left px-3 py-1.5">Player</th>
+                <th className="text-center px-2 py-1.5">Score</th>
+                <th className="text-center px-2 py-1.5">On Green</th>
+                <th className="text-center px-2 py-1.5">Holed Out</th>
+                <th className="text-right px-3 py-1.5">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {perPlayer.map((p) => (
+                <tr key={p.user_id} className="border-t border-gray-100">
+                  <td className="text-left px-3 py-1.5 text-gray-900 font-medium truncate max-w-[120px]">
+                    {p.display_name}
+                  </td>
+                  <td className="text-center px-2 py-1.5 text-gray-700">{p.under_par}</td>
+                  <td className="text-center px-2 py-1.5 text-gray-700">{p.on_green}</td>
+                  <td className="text-center px-2 py-1.5 text-gray-700">{p.holed_out}</td>
+                  <td className="text-right px-3 py-1.5 font-bold text-gray-900">{p.total}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {attestError && (
+          <p className="text-sm text-red-600 mb-3 text-center">{attestError}</p>
+        )}
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={attestStatus === "saving"}
+            className="flex-1 py-3 rounded-xl bg-gray-100 text-gray-700 font-semibold active:bg-gray-200 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={attestStatus === "saving"}
+            className="flex-1 py-3 rounded-xl bg-green-600 text-white font-bold active:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {attestStatus === "saving" ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Confirm Scorecard"
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── LiveScorer ────────────────────────────────────────────────────────────
 
 export function LiveScorer({
@@ -464,11 +693,15 @@ export function LiveScorer({
   contestVerified = false,
 }: Props) {
   const router = useRouter();
-  const isVerified = !!team.verified_at;
+  const [verifiedAt, setVerifiedAt] = useState<string | null>(team.verified_at);
+  const isVerified = !!verifiedAt;
   const isLocked = scoringClosed || isVerified;
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [attestStatus, setAttestStatus] = useState<"idle" | "saving" | "error">("idle");
+  const [attestError, setAttestError] = useState<string | null>(null);
 
   // Track current hole via ref so score panel always has access without re-rendering the shell
   const currentHoleRef = useRef<HoleInfo>(
@@ -624,6 +857,41 @@ export function LiveScorer({
       }
     };
   }, [team.id]);
+
+  // ── Attestation ──
+
+  const handleAttestRound = useCallback(async () => {
+    setAttestStatus("saving");
+    setAttestError(null);
+    try {
+      // Force a flush of any pending dirty edits before attesting,
+      // so the server has the final 18 holes when it counts.
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
+      await flushSaves();
+
+      const res = await fetch("/api/scoring/attest-round", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ team_id: team.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAttestStatus("error");
+        setAttestError(data.error || "Failed to complete round");
+        return;
+      }
+      setVerifiedAt(data.verified_at || new Date().toISOString());
+      setAttestStatus("idle");
+      setShowCompleteModal(false);
+      router.refresh();
+    } catch {
+      setAttestStatus("error");
+      setAttestError("Network error — please try again");
+    }
+  }, [team.id, flushSaves, router]);
 
   // ── Score Handlers ──
 
@@ -798,6 +1066,18 @@ export function LiveScorer({
                 Verified — Scores Official
               </div>
             )}
+            {!isVerified && !contestVerified && !scoringClosed && Object.keys(scores).length === 18 && (
+              <button
+                type="button"
+                onClick={() => setShowCompleteModal(true)}
+                className="w-full flex items-center justify-center gap-2 py-2 bg-green-600 text-white text-sm font-bold shrink-0 active:bg-green-700"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Complete Round
+              </button>
+            )}
             {scoringClosed && !contestVerified && !isVerified && (
               <div className="flex items-center justify-center gap-1.5 py-1.5 bg-gray-100 text-gray-600 text-xs font-medium shrink-0">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -943,7 +1223,7 @@ export function LiveScorer({
                     return (
                       <div className="text-right shrink-0">
                         <div className="text-[10px] uppercase tracking-wide text-gray-400">Round</div>
-                        <div className="text-2xl font-bold text-gray-300 tabular-nums">·</div>
+                        <div className="text-2xl font-bold text-gray-900 tabular-nums">E</div>
                       </div>
                     );
                   }
@@ -1035,6 +1315,26 @@ export function LiveScorer({
           contestId={team.contest_id}
           currentTeamId={team.id}
           onClose={() => setShowLeaderboard(false)}
+        />
+      )}
+
+      {/* Complete Round Modal */}
+      {showCompleteModal && (
+        <CompleteRoundModal
+          holes={holes}
+          scores={scores}
+          bonuses={bonuses}
+          members={members}
+          coursePar={team.course_par}
+          teamHandicap={team.team_handicap}
+          attestStatus={attestStatus}
+          attestError={attestError}
+          onConfirm={handleAttestRound}
+          onClose={() => {
+            if (attestStatus === "saving") return;
+            setShowCompleteModal(false);
+            setAttestError(null);
+          }}
         />
       )}
     </>

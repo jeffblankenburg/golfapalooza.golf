@@ -46,6 +46,7 @@ export interface CourseHole {
   course_id: string;
   tee_id: string;
   hole_number: number;
+  hole_name: string | null;
   par: number;
   handicap_index: number;
   yards: number | null;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { downloadOptionsExcel } from "@/lib/options-export";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -248,7 +249,13 @@ function NumberCell({
 
 // ── Main Component ─────────────────────────────────────────────────────
 
-export function SelectionDashboard({ tripId }: { tripId: string }) {
+export function SelectionDashboard({
+  tripId,
+  onExportReady,
+}: {
+  tripId: string;
+  onExportReady?: (exporter: (() => void) | null) => void;
+}) {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [options, setOptions] = useState<TripOption[]>([]);
   const [groups, setGroups] = useState<OptionGroup[]>([]);
@@ -302,6 +309,29 @@ export function SelectionDashboard({ tripId }: { tripId: string }) {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  // Expose a current-state Excel exporter to the parent. The closure captures
+  // the latest data via the function call site each render.
+  useEffect(() => {
+    if (!onExportReady) return;
+    if (loading || participants.length === 0 || options.length === 0) {
+      onExportReady(null);
+      return;
+    }
+    const exporter = () => {
+      downloadOptionsExcel({
+        participants: participants.map((p) => ({
+          user_id: p.user_id,
+          display_name: p.user.display_name,
+        })),
+        options,
+        groups,
+        selections,
+      });
+    };
+    onExportReady(exporter);
+    return () => onExportReady(null);
+  }, [onExportReady, loading, participants, options, groups, selections]);
 
   // ── Save handler ──
 

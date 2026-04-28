@@ -954,8 +954,18 @@ function HoleScoringCards({
 
                       {isLocked ? (
                         <>
-                          {isOnGreen && <span className="text-[10px] font-semibold text-green-600 uppercase">Green</span>}
-                          {isHoledOut && <span className="text-[10px] font-semibold text-blue-600 uppercase">Holed</span>}
+                          <span className="flex items-center gap-1.5" aria-hidden={!isOnGreen}>
+                            <span className="w-4 h-4 inline-block" />
+                            <span className={`text-[10px] font-semibold uppercase tracking-wide ${isOnGreen ? "text-green-600" : "text-transparent"}`}>
+                              Green
+                            </span>
+                          </span>
+                          <span className="flex items-center gap-1.5" aria-hidden={!isHoledOut}>
+                            <span className="w-4 h-4 inline-block" />
+                            <span className={`text-[10px] font-semibold uppercase tracking-wide ${isHoledOut ? "text-blue-600" : "text-transparent"}`}>
+                              Holed
+                            </span>
+                          </span>
                         </>
                       ) : (
                         <>

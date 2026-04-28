@@ -156,6 +156,8 @@ export async function GET(request: Request) {
         0
       );
       const relPar = grossSoFar - parThrough;
+      const scoresByHole: Record<number, number> = {};
+      for (const s of teamScores) scoresByHole[s.hole_number] = s.strokes;
 
       return {
         team_id: team.id,
@@ -165,6 +167,7 @@ export async function GET(request: Request) {
         gross_so_far: grossSoFar,
         par_through: parThrough,
         rel_par: relPar,
+        scores: scoresByHole,
       };
     });
 
@@ -174,7 +177,16 @@ export async function GET(request: Request) {
       return b.holes_completed - a.holes_completed;
     });
 
-    return NextResponse.json({ leaderboard, day_name: dayName });
+    const holes = (teeAssignments || [])
+      .map((ta) => ({ hole_number: ta.hole_number, par: parMap.get(ta.hole_number) ?? 4 }))
+      .sort((a, b) => a.hole_number - b.hole_number);
+
+    return NextResponse.json({
+      leaderboard,
+      day_name: dayName,
+      holes,
+      trip_id: contest.trip_id,
+    });
   } catch (error) {
     console.error("Leaderboard error:", error);
     return NextResponse.json(

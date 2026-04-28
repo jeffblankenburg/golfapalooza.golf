@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { logActivity } from "@/components/ActivityTracker";
 import ScoringShell, { type HoleInfo } from "@/components/scoring/ScoringShell";
@@ -646,31 +646,71 @@ export function KgbCupLiveScorer({
           const currentSection = getSection(currentHoleNumber);
           const isInCurrentSection = (holeNum: number) => getSection(holeNum) === currentSection;
 
+          const hasBothNines = holeList.length > 9 && holeList[0]?.hole_number <= 9;
+          const front9 = hasBothNines ? holeList.filter((h) => h.hole_number <= 9) : [];
+          const back9 = hasBothNines ? holeList.filter((h) => h.hole_number > 9) : [];
+          const front9Par = front9.reduce((s, h) => s + h.par, 0);
+          const back9Par = back9.reduce((s, h) => s + h.par, 0);
+          const totalPar = holeList.reduce((s, h) => s + h.par, 0);
+
           return (
             <>
               {/* Handicap */}
               <tr className="border-t border-gray-100">
                 {holeList.map((h) => (
-                  <td key={h.hole_number} className={`px-0 py-0.5 text-center text-gray-300${isInCurrentSection(h.hole_number) ? " bg-indigo-50" : ""}`}>
-                    {h.handicap_index}
-                  </td>
+                  <Fragment key={h.hole_number}>
+                    {h.hole_number === 10 && hasBothNines && (
+                      <td className="px-0 py-0.5 text-center text-gray-300 border-l border-r border-gray-200" />
+                    )}
+                    <td className={`px-0 py-0.5 text-center text-gray-300${isInCurrentSection(h.hole_number) ? " bg-indigo-50" : ""}`}>
+                      {h.handicap_index}
+                    </td>
+                  </Fragment>
                 ))}
+                {hasBothNines && (
+                  <td className="px-0 py-0.5 text-center text-gray-300 border-l border-r border-gray-200" />
+                )}
+                <td className="px-0 py-0.5 text-center text-gray-300 border-l border-gray-200" />
               </tr>
               {/* Par */}
               <tr className="border-t border-gray-100">
                 {holeList.map((h) => (
-                  <td key={h.hole_number} className={`px-0 py-0.5 text-center text-gray-400${isInCurrentSection(h.hole_number) ? " bg-indigo-50" : ""}`}>
-                    {h.par}
-                  </td>
+                  <Fragment key={h.hole_number}>
+                    {h.hole_number === 10 && hasBothNines && (
+                      <td className="px-0 py-0.5 text-center font-bold text-gray-400 border-l border-r border-gray-200">
+                        {front9Par}
+                      </td>
+                    )}
+                    <td className={`px-0 py-0.5 text-center text-gray-400${isInCurrentSection(h.hole_number) ? " bg-indigo-50" : ""}`}>
+                      {h.par}
+                    </td>
+                  </Fragment>
                 ))}
+                {hasBothNines && (
+                  <td className="px-0 py-0.5 text-center font-bold text-gray-400 border-l border-r border-gray-200">
+                    {back9Par}
+                  </td>
+                )}
+                <td className="px-0 py-0.5 text-center font-bold text-gray-400 border-l border-gray-200">
+                  {totalPar}
+                </td>
               </tr>
               {/* Hole winner indicators */}
               <tr className="border-t border-gray-100">
                 {holeList.map((h) => (
-                  <td key={h.hole_number} className={`px-0 py-0.5 text-center${isInCurrentSection(h.hole_number) ? " bg-indigo-50" : ""}`}>
-                    {renderHoleIndicator(h.hole_number)}
-                  </td>
+                  <Fragment key={h.hole_number}>
+                    {h.hole_number === 10 && hasBothNines && (
+                      <td className="px-0 py-0.5 text-center border-l border-r border-gray-200" />
+                    )}
+                    <td className={`px-0 py-0.5 text-center${isInCurrentSection(h.hole_number) ? " bg-indigo-50" : ""}`}>
+                      {renderHoleIndicator(h.hole_number)}
+                    </td>
+                  </Fragment>
                 ))}
+                {hasBothNines && (
+                  <td className="px-0 py-0.5 text-center border-l border-r border-gray-200" />
+                )}
+                <td className="px-0 py-0.5 text-center border-l border-gray-200" />
               </tr>
             </>
           );

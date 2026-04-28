@@ -904,12 +904,12 @@ export function SelectionDashboard({
       </table>
     </div>
 
-    <div className="mt-6 flex justify-end">
+    <div className="mt-6 flex justify-center">
       <button
         type="button"
         onClick={() => setConfirmReset(true)}
         disabled={resetting}
-        className="text-xs font-medium text-red-600 hover:text-red-700 underline underline-offset-2 disabled:opacity-50"
+        className="w-full max-w-xs px-4 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl shadow-sm active:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Reset all responses
       </button>

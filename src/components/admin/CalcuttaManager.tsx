@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { BottomDrawer } from "@/components/admin/BottomDrawer";
 import { CollapsibleSection } from "@/components/admin/CollapsibleSection";
@@ -934,21 +934,12 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
 
                 <div>
                   <label className="text-xs font-medium text-gray-500 uppercase">Buyer</label>
-                  <select
+                  <BuyerCombobox
+                    users={allUsers}
                     value={bidOwnerId}
-                    onChange={(e) => setBidOwnerId(e.target.value)}
-                    className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="">Select buyer...</option>
-                    {allUsers
-                      .sort((a, b) => a.display_name.localeCompare(b.display_name))
-                      .map((u) => (
-                        <option key={u.user_id} value={u.user_id}>
-                          {u.display_name}
-                          {u.user_id === current.user_id ? " (self)" : ""}
-                        </option>
-                      ))}
-                  </select>
+                    onChange={setBidOwnerId}
+                    currentUserId={current.user_id}
+                  />
                 </div>
               </div>
 
@@ -1397,4 +1388,158 @@ function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
   const v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function BuyerCombobox({
+  users,
+  value,
+  onChange,
+  currentUserId,
+  placeholder = "Type a name…",
+}: {
+  users: EventUser[];
+  value: string;
+  onChange: (id: string) => void;
+  currentUserId: string;
+  placeholder?: string;
+}) {
+  const sorted = useMemo(
+    () => [...users].sort((a, b) => a.display_name.localeCompare(b.display_name)),
+    [users]
+  );
+  const selected = useMemo(() => sorted.find((u) => u.user_id === value), [sorted, value]);
+  const [query, setQuery] = useState(selected?.display_name ?? "");
+  const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  // Sync query with the externally controlled value when the dropdown is closed
+  useEffect(() => {
+    if (!open) setQuery(selected?.display_name ?? "");
+  }, [selected, open]);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q || (selected && q === selected.display_name.toLowerCase())) return sorted;
+    return sorted.filter((u) => u.display_name.toLowerCase().includes(q));
+  }, [query, sorted, selected]);
+
+  // Reset highlight when the filter changes
+  useEffect(() => {
+    setHighlight(0);
+  }, [query]);
+
+  // Scroll the highlighted item into view
+  useEffect(() => {
+    if (!open) return;
+    const el = listRef.current?.children[highlight] as HTMLElement | undefined;
+    el?.scrollIntoView({ block: "nearest" });
+  }, [highlight, open]);
+
+  const select = (u: EventUser) => {
+    onChange(u.user_id);
+    setQuery(u.display_name);
+    setOpen(false);
+  };
+
+  const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!open) {
+        setOpen(true);
+        return;
+      }
+      setHighlight((h) => Math.min(filtered.length - 1, h + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!open) return;
+      setHighlight((h) => Math.max(0, h - 1));
+    } else if (e.key === "Enter") {
+      if (open && filtered[highlight]) {
+        e.preventDefault();
+        select(filtered[highlight]);
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+      setQuery(selected?.display_name ?? "");
+      inputRef.current?.blur();
+    } else if (e.key === "Tab") {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        ref={inputRef}
+        type="text"
+        role="combobox"
+        aria-expanded={open}
+        aria-autocomplete="list"
+        autoComplete="off"
+        value={query}
+        placeholder={placeholder}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+          if (e.target.value === "" && value) onChange("");
+        }}
+        onFocus={() => {
+          setOpen(true);
+          inputRef.current?.select();
+        }}
+        onKeyDown={handleKey}
+        className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-purple-500"
+      />
+      {open && (
+        filtered.length > 0 ? (
+          <ul
+            ref={listRef}
+            role="listbox"
+            className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-64 overflow-y-auto py-1"
+          >
+            {filtered.map((u, i) => (
+              <li
+                key={u.user_id}
+                role="option"
+                aria-selected={i === highlight}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  select(u);
+                }}
+                onMouseEnter={() => setHighlight(i)}
+                className={`px-3 py-2 text-sm cursor-pointer ${
+                  i === highlight ? "bg-purple-50 text-purple-900" : "text-gray-700"
+                }`}
+              >
+                {u.display_name}
+                {u.user_id === currentUserId ? (
+                  <span className="text-gray-400"> (self)</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-3 py-2 text-sm text-gray-400">
+            No matches
+          </div>
+        )
+      )}
+    </div>
+  );
 }

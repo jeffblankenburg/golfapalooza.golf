@@ -112,14 +112,17 @@ export const FBS_TEAMS: FBSTeam[] = [
   { name: "UTSA Roadrunners", shortName: "UTSA", abbreviation: "UTSA", conference: "AAC", primaryColor: "#0C2340", secondaryColor: "#F47321", espnId: 2636 },
 
   // === Conference USA ===
+  { name: "Delaware Fightin' Blue Hens", shortName: "Delaware", abbreviation: "DEL", conference: "C-USA", primaryColor: "#00539F", secondaryColor: "#FFD200", espnId: 48 },
   { name: "FIU Panthers", shortName: "FIU", abbreviation: "FIU", conference: "C-USA", primaryColor: "#081E3F", secondaryColor: "#B6862C", espnId: 2229 },
   { name: "Jacksonville State Gamecocks", shortName: "Jax State", abbreviation: "JVST", conference: "C-USA", primaryColor: "#CC0000", secondaryColor: "#FFFFFF", espnId: 55 },
   { name: "Kennesaw State Owls", shortName: "Kennesaw St", abbreviation: "KENN", conference: "C-USA", primaryColor: "#FDBB30", secondaryColor: "#000000", espnId: 338 },
   { name: "Liberty Flames", shortName: "Liberty", abbreviation: "LIB", conference: "C-USA", primaryColor: "#002D62", secondaryColor: "#C41230", espnId: 2335 },
   { name: "Louisiana Tech Bulldogs", shortName: "La Tech", abbreviation: "LT", conference: "C-USA", primaryColor: "#002F8B", secondaryColor: "#CF0A2C", espnId: 2348 },
   { name: "Middle Tennessee Blue Raiders", shortName: "Middle Tenn", abbreviation: "MTSU", conference: "C-USA", primaryColor: "#0066CC", secondaryColor: "#FFFFFF", espnId: 2393 },
+  { name: "Missouri State Bears", shortName: "Missouri St", abbreviation: "MOST", conference: "C-USA", primaryColor: "#6F263D", secondaryColor: "#FFFFFF", espnId: 2623 },
   { name: "New Mexico State Aggies", shortName: "New Mexico St", abbreviation: "NMSU", conference: "C-USA", primaryColor: "#8B0000", secondaryColor: "#FFFFFF", espnId: 166 },
   { name: "Sam Houston Bearkats", shortName: "Sam Houston", abbreviation: "SHSU", conference: "C-USA", primaryColor: "#F58025", secondaryColor: "#FFFFFF", espnId: 2534 },
+  { name: "UTEP Miners", shortName: "UTEP", abbreviation: "UTEP", conference: "C-USA", primaryColor: "#FF8200", secondaryColor: "#041E42", espnId: 2638 },
   { name: "Western Kentucky Hilltoppers", shortName: "WKU", abbreviation: "WKU", conference: "C-USA", primaryColor: "#B01E24", secondaryColor: "#FFFFFF", espnId: 98 },
 
   // === MAC ===
@@ -130,6 +133,7 @@ export const FBS_TEAMS: FBSTeam[] = [
   { name: "Central Michigan Chippewas", shortName: "Central Mich", abbreviation: "CMU", conference: "MAC", primaryColor: "#6A0032", secondaryColor: "#FFC82E", espnId: 2117 },
   { name: "Eastern Michigan Eagles", shortName: "Eastern Mich", abbreviation: "EMU", conference: "MAC", primaryColor: "#006633", secondaryColor: "#FFFFFF", espnId: 2199 },
   { name: "Kent State Golden Flashes", shortName: "Kent State", abbreviation: "KENT", conference: "MAC", primaryColor: "#002664", secondaryColor: "#EAAB00", espnId: 2309 },
+  { name: "UMass Minutemen", shortName: "UMass", abbreviation: "MASS", conference: "MAC", primaryColor: "#881C1C", secondaryColor: "#FFFFFF", espnId: 113 },
   { name: "Miami (OH) RedHawks", shortName: "Miami (OH)", abbreviation: "M-OH", conference: "MAC", primaryColor: "#B61E2E", secondaryColor: "#FFFFFF", espnId: 193 },
   { name: "Northern Illinois Huskies", shortName: "N Illinois", abbreviation: "NIU", conference: "MAC", primaryColor: "#BA0C2F", secondaryColor: "#000000", espnId: 2459 },
   { name: "Ohio Bobcats", shortName: "Ohio", abbreviation: "OHIO", conference: "MAC", primaryColor: "#00694E", secondaryColor: "#FFFFFF", espnId: 195 },
@@ -166,7 +170,14 @@ export const FBS_TEAMS: FBSTeam[] = [
   { name: "Troy Trojans", shortName: "Troy", abbreviation: "TROY", conference: "Sun Belt", primaryColor: "#8B2332", secondaryColor: "#000000", espnId: 2653 },
   { name: "UL Monroe Warhawks", shortName: "UL Monroe", abbreviation: "ULM", conference: "Sun Belt", primaryColor: "#840029", secondaryColor: "#FFB300", espnId: 2433 },
 
+  // === Pac-12 ===
+  { name: "Oregon State Beavers", shortName: "Oregon St", abbreviation: "ORST", conference: "Pac-12", primaryColor: "#DC4405", secondaryColor: "#000000", espnId: 204 },
+  { name: "Washington State Cougars", shortName: "Washington St", abbreviation: "WSU", conference: "Pac-12", primaryColor: "#981E32", secondaryColor: "#5E6A71", espnId: 265 },
+
   // === Independents ===
   { name: "Notre Dame Fighting Irish", shortName: "Notre Dame", abbreviation: "ND", conference: "Ind", primaryColor: "#0C2340", secondaryColor: "#C99700", espnId: 87 },
   { name: "UConn Huskies", shortName: "UConn", abbreviation: "CONN", conference: "Ind", primaryColor: "#002868", secondaryColor: "#FFFFFF", espnId: 41 },
+
+  // === FCS opponents (added for cross-division pick'em matchups) ===
+  { name: "Indiana State Sycamores", shortName: "Indiana St", abbreviation: "INST", conference: "FCS", primaryColor: "#0033A0", secondaryColor: "#FFFFFF", espnId: 282 },
 ];

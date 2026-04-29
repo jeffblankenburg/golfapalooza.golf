@@ -479,8 +479,10 @@ export function ChatRoom({
 function formatTimestamp(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
-  const diffDays = Math.floor(
-    (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
+  const startOfDay = (d: Date) =>
+    new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diffDays = Math.round(
+    (startOfDay(now) - startOfDay(date)) / (1000 * 60 * 60 * 24)
   );
 
   const time = date.toLocaleTimeString(undefined, {

@@ -1079,6 +1079,11 @@ function HoleScoringCards({
               </tbody>
             </table>
           </div>
+          {teams.length > 1 && (
+            <p className="px-3 py-1.5 text-[10px] text-gray-400 border-t border-gray-100">
+              HDCP shown is the raw value. On the public Scorecards view, all team handicaps are offset so the lowest-handicap team plays at 0.
+            </p>
+          )}
         </div>
       )}
 

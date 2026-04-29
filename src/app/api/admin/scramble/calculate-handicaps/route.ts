@@ -12,122 +12,148 @@ const SCRAMBLE_WEIGHTS: Record<number, number[]> = {
   5: [0.18, 0.14, 0.10, 0.05, 0.03],
 };
 
-/**
- * POST - Calculate team handicaps for all scramble teams in a contest.
- *
- * For each team, converts player Handicap Indexes to Course Handicaps,
- * sorts lowest to highest, and applies the weighted formula.
- */
-export async function POST(request: Request) {
-  const isAdmin = await checkIsAdmin();
-  if (!isAdmin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 
-  const { contest_id } = await request.json();
-  if (!contest_id) {
-    return NextResponse.json({ error: "contest_id is required" }, { status: 400 });
-  }
+interface TeeContext {
+  source: "contest_tee" | "hole_tee" | "trip_default";
+  tee_name: string | null;
+  course_rating: number;
+  slope_rating: number;
+  par: number;
+}
 
-  const admin = createAdminClient();
+interface MemberBreakdown {
+  user_id: string;
+  display_name: string;
+  handicap_index: number | null;
+  handicap_source: "event" | "live" | "missing";
+  course_handicap: number;
+  weight: number;
+  contribution: number;
+}
 
-  // Get contest and trip
-  const { data: contest } = await admin
-    .from("contests")
-    .select("trip_id")
-    .eq("id", contest_id)
-    .single();
+interface TeamBreakdown {
+  team_id: string;
+  team_handicap: number;
+  member_count: number;
+  members: MemberBreakdown[];
+}
 
-  if (!contest) {
-    return NextResponse.json({ error: "Contest not found" }, { status: 404 });
-  }
-
-  // Get tee ratings — try contest_tees, then contest_hole_tees, then trip default
-  let courseRating: number | null = null;
-  let slopeRating: number | null = null;
-  let par: number | null = null;
-
+async function fetchTeeContext(
+  admin: SupabaseAdmin,
+  contestId: string,
+  tripId: string
+): Promise<TeeContext | null> {
   const { data: contestTee } = await admin
     .from("contest_tees")
-    .select("tee:course_tees!inner(course_rating, slope_rating, par)")
-    .eq("contest_id", contest_id)
+    .select("tee:course_tees!inner(tee_name, course_rating, slope_rating, par)")
+    .eq("contest_id", contestId)
     .maybeSingle();
 
   if (contestTee) {
     const t = Array.isArray(contestTee.tee) ? contestTee.tee[0] : contestTee.tee;
-    courseRating = t.course_rating;
-    slopeRating = t.slope_rating;
-    par = t.par;
+    return {
+      source: "contest_tee",
+      tee_name: t.tee_name ?? null,
+      course_rating: t.course_rating,
+      slope_rating: t.slope_rating,
+      par: t.par,
+    };
   }
 
-  if (courseRating == null) {
-    const { data: holeTee } = await admin
-      .from("contest_hole_tees")
-      .select("tee:course_tees!inner(course_rating, slope_rating, par)")
-      .eq("contest_id", contest_id)
+  const { data: holeTee } = await admin
+    .from("contest_hole_tees")
+    .select("tee:course_tees!inner(tee_name, course_rating, slope_rating, par)")
+    .eq("contest_id", contestId)
+    .limit(1)
+    .maybeSingle();
+
+  if (holeTee) {
+    const t = Array.isArray(holeTee.tee) ? holeTee.tee[0] : holeTee.tee;
+    return {
+      source: "hole_tee",
+      tee_name: t.tee_name ?? null,
+      course_rating: t.course_rating,
+      slope_rating: t.slope_rating,
+      par: t.par,
+    };
+  }
+
+  const { data: trip } = await admin
+    .from("trip_settings")
+    .select("course_id")
+    .eq("id", tripId)
+    .single();
+
+  if (trip?.course_id) {
+    const { data: defaultTee } = await admin
+      .from("course_tees")
+      .select("tee_name, course_rating, slope_rating, par")
+      .eq("course_id", trip.course_id)
+      .order("slope_rating", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (holeTee) {
-      const t = Array.isArray(holeTee.tee) ? holeTee.tee[0] : holeTee.tee;
-      courseRating = t.course_rating;
-      slopeRating = t.slope_rating;
-      par = t.par;
+    if (defaultTee) {
+      return {
+        source: "trip_default",
+        tee_name: defaultTee.tee_name ?? null,
+        course_rating: defaultTee.course_rating,
+        slope_rating: defaultTee.slope_rating,
+        par: defaultTee.par,
+      };
     }
   }
 
-  if (courseRating == null) {
-    const { data: trip } = await admin
-      .from("trip_settings")
-      .select("course_id")
-      .eq("id", contest.trip_id)
-      .single();
+  return null;
+}
 
-    if (trip?.course_id) {
-      const { data: defaultTee } = await admin
-        .from("course_tees")
-        .select("course_rating, slope_rating, par")
-        .eq("course_id", trip.course_id)
-        .order("slope_rating", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+async function buildBreakdown(
+  admin: SupabaseAdmin,
+  contestId: string
+): Promise<{ tee: TeeContext; teams: TeamBreakdown[] } | { error: string; status: number }> {
+  const { data: contest } = await admin
+    .from("contests")
+    .select("trip_id")
+    .eq("id", contestId)
+    .single();
 
-      if (defaultTee) {
-        courseRating = defaultTee.course_rating;
-        slopeRating = defaultTee.slope_rating;
-        par = defaultTee.par;
-      }
-    }
+  if (!contest) return { error: "Contest not found", status: 404 };
+
+  const tee = await fetchTeeContext(admin, contestId, contest.trip_id);
+  if (!tee) {
+    return {
+      error: "No course tee found. Assign a tee to the contest or set a course on the trip.",
+      status: 400,
+    };
   }
 
-  if (courseRating == null || slopeRating == null || par == null) {
-    return NextResponse.json(
-      { error: "No course tee found. Assign a tee to the contest or set a course on the trip." },
-      { status: 400 }
-    );
-  }
-
-  // Get all teams with members
-  const { data: teams } = await admin
+  const { data: teams, error: teamsError } = await admin
     .from("scramble_teams")
-    .select("id, scramble_team_members(user_id)")
-    .eq("contest_id", contest_id);
+    .select("id, scramble_team_members(user_id, user:users(display_name))")
+    .eq("contest_id", contestId);
 
+  if (teamsError) {
+    return { error: `Team fetch failed: ${teamsError.message}`, status: 500 };
+  }
   if (!teams || teams.length === 0) {
-    return NextResponse.json({ error: "No teams found" }, { status: 400 });
+    return { error: "No teams found", status: 400 };
   }
 
-  // Collect all player IDs
-  const allPlayerIds = [
-    ...new Set(
-      teams.flatMap((t) =>
-        ((t.scramble_team_members as { user_id: string }[]) || []).map((m) => m.user_id)
-      )
-    ),
-  ];
+  // Normalize member rows — Supabase nests the joined user under the alias
+  type MemberRow = { user_id: string; user: { display_name: string } | { display_name: string }[] | null };
+  const teamMembers = teams.map((t) => ({
+    id: t.id as string,
+    members: ((t.scramble_team_members as MemberRow[]) || []).map((m) => ({
+      user_id: m.user_id,
+      display_name: Array.isArray(m.user) ? m.user[0]?.display_name : m.user?.display_name,
+    })),
+  }));
 
-  // Get handicap indexes — prefer event-locked, fall back to live
-  const handicapMap = new Map<string, number>();
+  const allPlayerIds = [...new Set(teamMembers.flatMap((t) => t.members.map((m) => m.user_id)))];
+
+  // Prefer event-locked handicap, fall back to live; track which source
+  const handicapMap = new Map<string, { hi: number; source: "event" | "live" }>();
 
   if (allPlayerIds.length > 0) {
     const { data: eventSnaps } = await admin
@@ -137,7 +163,7 @@ export async function POST(request: Request) {
       .in("user_id", allPlayerIds);
 
     for (const s of eventSnaps || []) {
-      if (s.handicap_index != null) handicapMap.set(s.user_id, s.handicap_index);
+      if (s.handicap_index != null) handicapMap.set(s.user_id, { hi: s.handicap_index, source: "event" });
     }
 
     const missingIds = allPlayerIds.filter((id) => !handicapMap.has(id));
@@ -147,52 +173,123 @@ export async function POST(request: Request) {
         .select("user_id, handicap_index")
         .in("user_id", missingIds);
       for (const h of liveHandicaps || []) {
-        if (h.handicap_index != null) handicapMap.set(h.user_id, h.handicap_index);
+        if (h.handicap_index != null) handicapMap.set(h.user_id, { hi: h.handicap_index, source: "live" });
       }
     }
   }
 
-  // Calculate team handicaps
-  const results: { team_id: string; team_handicap: number; member_count: number }[] = [];
-
-  for (const team of teams) {
-    const members = (team.scramble_team_members as { user_id: string }[]) || [];
-    if (members.length === 0) {
-      results.push({ team_id: team.id, team_handicap: 0, member_count: 0 });
-      continue;
+  const breakdowns: TeamBreakdown[] = teamMembers.map((team) => {
+    if (team.members.length === 0) {
+      return { team_id: team.id, team_handicap: 0, member_count: 0, members: [] };
     }
 
-    // Convert each player's index to Course Handicap, sort lowest first
-    const courseHandicaps = members
-      .map((m) => {
-        const hi = handicapMap.get(m.user_id) ?? 0;
-        return calculateCourseHandicap(hi, slopeRating!, courseRating!, par!);
-      })
-      .sort((a, b) => a - b);
+    // Compute course handicap for each member, then sort lowest first to apply weights.
+    const withCH = team.members.map((m) => {
+      const entry = handicapMap.get(m.user_id);
+      const hi = entry?.hi ?? 0;
+      return {
+        user_id: m.user_id,
+        display_name: m.display_name ?? "Unknown",
+        handicap_index: entry ? entry.hi : null,
+        handicap_source: (entry?.source ?? "missing") as "event" | "live" | "missing",
+        course_handicap: calculateCourseHandicap(hi, tee.slope_rating, tee.course_rating, tee.par),
+      };
+    });
 
-    const weights = SCRAMBLE_WEIGHTS[courseHandicaps.length] || SCRAMBLE_WEIGHTS[4];
+    withCH.sort((a, b) => a.course_handicap - b.course_handicap);
 
+    const weights = SCRAMBLE_WEIGHTS[withCH.length] || SCRAMBLE_WEIGHTS[4];
     let teamHC = 0;
-    for (let i = 0; i < courseHandicaps.length && i < weights.length; i++) {
-      teamHC += courseHandicaps[i] * weights[i];
-    }
+    const members: MemberBreakdown[] = withCH.map((m, i) => {
+      const w = weights[i] ?? 0;
+      const contribution = m.course_handicap * w;
+      teamHC += contribution;
+      return { ...m, weight: w, contribution };
+    });
 
-    results.push({
+    return {
       team_id: team.id,
       team_handicap: Math.round(teamHC),
       member_count: members.length,
-    });
-  }
+      members,
+    };
+  });
 
-  // Batch update all teams
+  return { tee, teams: breakdowns };
+}
+
+/**
+ * @swagger
+ * /api/admin/scramble/calculate-handicaps:
+ *   get:
+ *     summary: Preview team handicap calculation for a scramble contest
+ *     description: |
+ *       Returns the per-player breakdown that would be applied if Calculate Team
+ *       Handicaps were run, without writing to the database. Used by the admin UI
+ *       to show how each team's handicap was derived.
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: query
+ *         name: contest_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Per-team breakdown with the tee context used
+ *       400:
+ *         description: Missing contest_id, no teams, or no tee available
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Contest not found
+ */
+export async function GET(request: Request) {
+  const isAdmin = await checkIsAdmin();
+  if (!isAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { searchParams } = new URL(request.url);
+  const contestId = searchParams.get("contest_id");
+  if (!contestId) return NextResponse.json({ error: "contest_id is required" }, { status: 400 });
+
+  const result = await buildBreakdown(createAdminClient(), contestId);
+  if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
+
+  return NextResponse.json({ tee: result.tee, teams: result.teams });
+}
+
+/**
+ * @swagger
+ * /api/admin/scramble/calculate-handicaps:
+ *   post:
+ *     summary: Calculate and persist team handicaps for a scramble contest
+ *     description: |
+ *       Converts each team member's Handicap Index to a Course Handicap using the
+ *       contest's tee, sorts lowest first, and applies weighted percentages by team
+ *       size (e.g., 4-man = 20/15/10/5). Writes the rounded total to
+ *       scramble_teams.team_handicap and returns the per-player breakdown.
+ *     tags: [Admin]
+ *     responses:
+ *       200:
+ *         description: Updated team handicaps with breakdown
+ */
+export async function POST(request: Request) {
+  const isAdmin = await checkIsAdmin();
+  if (!isAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { contest_id } = await request.json();
+  if (!contest_id) return NextResponse.json({ error: "contest_id is required" }, { status: 400 });
+
+  const admin = createAdminClient();
+  const result = await buildBreakdown(admin, contest_id);
+  if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
+
   await Promise.all(
-    results.map((r) =>
-      admin
-        .from("scramble_teams")
-        .update({ team_handicap: r.team_handicap })
-        .eq("id", r.team_id)
+    result.teams.map((t) =>
+      admin.from("scramble_teams").update({ team_handicap: t.team_handicap }).eq("id", t.team_id)
     )
   );
 
-  return NextResponse.json({ success: true, teams: results });
+  return NextResponse.json({ success: true, tee: result.tee, teams: result.teams });
 }

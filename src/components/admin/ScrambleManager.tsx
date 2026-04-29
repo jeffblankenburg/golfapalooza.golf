@@ -35,6 +35,31 @@ interface Contest {
   team_count: number;
 }
 
+interface TeeContext {
+  source: "contest_tee" | "hole_tee" | "trip_default";
+  tee_name: string | null;
+  course_rating: number;
+  slope_rating: number;
+  par: number;
+}
+
+interface MemberBreakdown {
+  user_id: string;
+  display_name: string;
+  handicap_index: number | null;
+  handicap_source: "event" | "live" | "missing";
+  course_handicap: number;
+  weight: number;
+  contribution: number;
+}
+
+interface TeamBreakdown {
+  team_id: string;
+  team_handicap: number;
+  member_count: number;
+  members: MemberBreakdown[];
+}
+
 type View = "days" | "teams";
 
 export function ScrambleManager({ tripId, contestId: externalContestId }: { tripId: string; contestId?: string | null }) {
@@ -54,6 +79,9 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
   const [participantDrawerOpen, setParticipantDrawerOpen] = useState(false);
   const [attendees, setAttendees] = useState<{ id: string; display_name: string; full_name: string | null; avatar_url: string | null; is_participating: boolean }[]>([]);
   const [participantIds, setParticipantIds] = useState<Set<string>>(new Set());
+  const [tee, setTee] = useState<TeeContext | null>(null);
+  const [breakdownByTeam, setBreakdownByTeam] = useState<Record<string, TeamBreakdown>>({});
+  const [expandedBreakdowns, setExpandedBreakdowns] = useState<Set<string>>(new Set());
 
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
@@ -73,12 +101,25 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
 
   // Fetch teams for a contest
   const fetchTeams = useCallback(async (contestId: string) => {
-    const res = await fetch(`/api/admin/scramble?contest_id=${contestId}`);
-    const data = await res.json();
+    const [teamsRes, breakdownRes] = await Promise.all([
+      fetch(`/api/admin/scramble?contest_id=${contestId}`),
+      fetch(`/api/admin/scramble/calculate-handicaps?contest_id=${contestId}`),
+    ]);
+    const data = await teamsRes.json();
     setTeams(data.teams || []);
     setUnassigned(data.unassigned || []);
     setParticipantCount(data.participant_count ?? 0);
     if (data.course_par) setCoursePar(data.course_par);
+
+    if (breakdownRes.ok) {
+      const bd: { tee: TeeContext; teams: TeamBreakdown[] } = await breakdownRes.json();
+      setTee(bd.tee);
+      setBreakdownByTeam(Object.fromEntries(bd.teams.map((t) => [t.team_id, t])));
+    } else {
+      // No tee yet, no teams, etc. — clear so the UI shows nothing.
+      setTee(null);
+      setBreakdownByTeam({});
+    }
   }, []);
 
   useEffect(() => {
@@ -652,20 +693,33 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
         {teams.length > 0 && teams.some((t) => t.members.length > 0) && (
           <CalculateHandicapsButton
             contestId={selectedContest!.id}
-            onCalculated={async () => {
-              if (selectedContest) {
-                const res = await fetch(`/api/admin/scramble?contest_id=${selectedContest.id}`);
-                const data = await res.json();
-                setTeams(data.teams || []);
-              }
+            tee={tee}
+            onCalculated={async (result) => {
+              if (!selectedContest) return;
+              setTeams((prev) =>
+                prev.map((t) => {
+                  const updated = result.teams.find((r) => r.team_id === t.id);
+                  return updated ? { ...t, team_handicap: updated.team_handicap } : t;
+                })
+              );
+              setTee(result.tee);
+              setBreakdownByTeam(Object.fromEntries(result.teams.map((r) => [r.team_id, r])));
             }}
           />
         )}
 
         {/* Teams */}
+        {(() => {
+          const lowestHC = teams.length > 0
+            ? Math.min(...teams.map((t) => t.team_handicap ?? 0))
+            : 0;
+          return (
         <div className="space-y-3">
           {teams.map((team, index) => {
             const scoreVsPar = calcScoreVsPar(team);
+            const breakdown = breakdownByTeam[team.id];
+            const expanded = expandedBreakdowns.has(team.id);
+            const adjHC = Math.max(0, (team.team_handicap ?? 0) - lowestHC);
             return (
               <div
                 key={team.id}
@@ -762,6 +816,14 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
                   </div>
                   <div className="flex-1 text-center">
                     <label className="block text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">
+                      Adj Hdcp
+                    </label>
+                    <div className="text-sm font-medium text-gray-700" title="What this team plays at after the lowest team is shifted to 0">
+                      {adjHC}
+                    </div>
+                  </div>
+                  <div className="flex-1 text-center">
+                    <label className="block text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">
                       Gross
                     </label>
                     <div className="text-sm font-medium text-gray-700">
@@ -785,10 +847,95 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
                     </div>
                   </div>
                 </div>
+
+                {/* Calculation breakdown */}
+                {breakdown && breakdown.members.length > 0 && (
+                  <div className="border-t border-gray-100">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedBreakdowns((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(team.id)) next.delete(team.id);
+                          else next.add(team.id);
+                          return next;
+                        })
+                      }
+                      className="w-full px-4 py-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-gray-500 hover:bg-gray-50"
+                    >
+                      <span>Handicap Calculation</span>
+                      <svg
+                        className={`w-3.5 h-3.5 text-gray-400 transition-transform ${expanded ? "rotate-180" : ""}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {expanded && (
+                      <div className="px-4 pb-3 bg-gray-50/40">
+                    <table className="w-full text-[11px]">
+                      <thead>
+                        <tr className="text-gray-400 border-b border-gray-200">
+                          <th className="text-left py-1 font-medium">Player</th>
+                          <th className="text-right py-1 font-medium">HI</th>
+                          <th className="text-right py-1 font-medium">CH</th>
+                          <th className="text-right py-1 font-medium">Weight</th>
+                          <th className="text-right py-1 font-medium">Stroke</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {breakdown.members.map((m) => (
+                          <tr key={m.user_id} className="border-b border-gray-100 last:border-b-0">
+                            <td className="py-1 text-gray-700">
+                              {m.display_name}
+                              {m.handicap_source === "missing" && (
+                                <span className="ml-1 text-amber-600" title="No handicap on file — treated as 0">⚠</span>
+                              )}
+                              {m.handicap_source === "live" && (
+                                <span className="ml-1 text-blue-500" title="Live handicap (no event-locked snapshot)">·</span>
+                              )}
+                            </td>
+                            <td className="py-1 text-right tabular-nums text-gray-600">
+                              {m.handicap_index != null ? m.handicap_index.toFixed(1) : "—"}
+                            </td>
+                            <td className="py-1 text-right tabular-nums text-gray-700">{m.course_handicap}</td>
+                            <td className="py-1 text-right tabular-nums text-gray-500">
+                              {Math.round(m.weight * 100)}%
+                            </td>
+                            <td className="py-1 text-right tabular-nums text-gray-700">
+                              {m.contribution.toFixed(2)}
+                            </td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <td colSpan={4} className="pt-1.5 text-right text-gray-500 font-medium">
+                            Sum → rounded
+                          </td>
+                          <td className="pt-1.5 text-right tabular-nums font-semibold text-gray-900">
+                            {breakdown.members
+                              .reduce((s, m) => s + m.contribution, 0)
+                              .toFixed(2)}
+                            <span className="text-gray-400 mx-1">→</span>
+                            {breakdown.team_handicap}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                        <p className="text-[10px] text-gray-400 mt-2 leading-snug">
+                          Players sorted by Course Handicap (lowest first). HI source: event-locked snapshot when present, otherwise live (·). ⚠ = no handicap on file.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
+          );
+        })()}
 
         <ConfirmModal
           open={!!confirmModal}
@@ -919,10 +1066,12 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
 
 function CalculateHandicapsButton({
   contestId,
+  tee,
   onCalculated,
 }: {
   contestId: string;
-  onCalculated: () => void;
+  tee: TeeContext | null;
+  onCalculated: (result: { tee: TeeContext; teams: TeamBreakdown[] }) => void;
 }) {
   const [calculating, setCalculating] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
@@ -936,11 +1085,18 @@ function CalculateHandicapsButton({
         body: JSON.stringify({ contest_id: contestId }),
       });
       if (res.ok) {
-        onCalculated();
+        const result: { tee: TeeContext; teams: TeamBreakdown[] } = await res.json();
+        onCalculated(result);
       }
     } finally {
       setCalculating(false);
     }
+  };
+
+  const teeSourceLabel: Record<TeeContext["source"], string> = {
+    contest_tee: "contest tee",
+    hole_tee: "per-hole tee",
+    trip_default: "trip default tee",
   };
 
   return (
@@ -967,6 +1123,14 @@ function CalculateHandicapsButton({
           {calculating ? "Calculating..." : "Calculate Team Handicaps"}
         </button>
       </div>
+      {tee && (
+        <p className="text-[11px] text-gray-500 mb-1.5">
+          Using {tee.tee_name ? <span className="font-medium text-gray-700">{tee.tee_name}</span> : "tee"}
+          {": "}
+          <span className="tabular-nums">{tee.course_rating.toFixed(1)} / {tee.slope_rating} / par {tee.par}</span>
+          <span className="text-gray-400"> ({teeSourceLabel[tee.source]})</span>
+        </p>
+      )}
       {showInfo && (
         <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5 text-xs text-blue-800 space-y-1.5 mb-2">
           <p className="font-semibold">Scramble Team Handicap Formula</p>

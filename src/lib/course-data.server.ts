@@ -4,12 +4,18 @@ import { CourseData, HoleData } from "./course-data";
 
 interface DbHole {
   hole_number: number;
+  hole_name: string | null;
   par: number;
   handicap_index: number;
   yards: number;
   tee_id: string;
   overhead_image_url: string | null;
   green_image_url: string | null;
+  tee_latitude: number | null;
+  tee_longitude: number | null;
+  green_latitude: number | null;
+  green_longitude: number | null;
+  center_line: [number, number][] | null;
 }
 
 export async function getCourseData(client?: SupabaseClient): Promise<CourseData | null> {
@@ -66,7 +72,8 @@ export async function getCourseData(client?: SupabaseClient): Promise<CourseData
     }
   }
 
-  // Group holes by tee, applying shared images
+  // Group holes by tee, applying shared images. GPS coords / hole names live on
+  // course_holes too — propagate so the course view can show maps + brass plates.
   const holesByTee: Record<string, HoleData[]> = {};
   for (const tee of tees) {
     holesByTee[tee.id] = ((allHoles || []) as DbHole[])
@@ -78,6 +85,13 @@ export async function getCourseData(client?: SupabaseClient): Promise<CourseData
         yards: h.yards || 0,
         overheadImageUrl: imageMap[h.hole_number]?.overhead || null,
         greenImageUrl: imageMap[h.hole_number]?.green || null,
+        holeName: h.hole_name ?? null,
+        teeColor: tee.tee_color ?? null,
+        teeLatitude: h.tee_latitude,
+        teeLongitude: h.tee_longitude,
+        greenLatitude: h.green_latitude,
+        greenLongitude: h.green_longitude,
+        centerLine: h.center_line,
       }));
   }
 

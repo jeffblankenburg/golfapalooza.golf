@@ -1,133 +1,145 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
+import { useRouter } from "next/navigation";
+import ScoringShell, { type HoleInfo } from "@/components/scoring/ScoringShell";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 import {
   CourseData,
   HoleData,
-  getFrontNine,
-  getBackNine,
-  getNinePar,
-  getNineYards,
 } from "@/lib/course-data";
 import { getTeeColorClasses } from "@/lib/tee-colors";
-import { HoleDetailModal } from "./HoleDetailModal";
 import { formatCourseName } from "@/lib/utils/course-display";
 
-function NineTable({
-  label,
-  holes,
-  totalLabel,
-  onHoleSelect,
-}: {
-  label: string;
-  holes: HoleData[];
-  totalLabel: string;
-  onHoleSelect: (hole: number) => void;
-}) {
-  const totalPar = getNinePar(holes);
-  const totalYards = getNineYards(holes);
-
-  return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200">
-        <h3 className="text-sm font-semibold text-gray-700">{label}</h3>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-center text-[11px]">
-          <thead>
-            <tr className="border-b border-gray-100">
-              <th className="py-2 px-1.5 text-left text-gray-500 font-medium w-10">
-                Hole
-              </th>
-              {holes.map((hole) => (
-                <th key={hole.number} className="py-2 px-0.5 min-w-[30px]">
-                  <button
-                    onClick={() => onHoleSelect(hole.number)}
-                    className="w-full py-1 px-1 rounded-lg bg-emerald-50 text-emerald-700 font-bold active:bg-emerald-100 transition-colors"
-                  >
-                    {hole.number}
-                  </button>
-                </th>
-              ))}
-              <th className="py-2 px-1.5 text-gray-500 font-semibold bg-gray-50 min-w-[36px]">
-                {totalLabel}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b border-gray-50">
-              <td className="py-2 px-1.5 text-left text-gray-500 font-medium">
-                Par
-              </td>
-              {holes.map((hole) => (
-                <td
-                  key={hole.number}
-                  className="py-2 px-0.5 font-semibold text-gray-900"
-                >
-                  {hole.par}
-                </td>
-              ))}
-              <td className="py-2 px-1.5 font-bold text-gray-900 bg-gray-50">
-                {totalPar}
-              </td>
-            </tr>
-            <tr className="border-b border-gray-50">
-              <td className="py-2 px-1.5 text-left text-gray-500 font-medium">
-                Hdcp
-              </td>
-              {holes.map((hole) => (
-                <td key={hole.number} className="py-2 px-0.5 text-gray-600">
-                  {hole.handicap}
-                </td>
-              ))}
-              <td className="py-2 px-1.5 bg-gray-50" />
-            </tr>
-            <tr>
-              <td className="py-2 px-1.5 text-left text-gray-500 font-medium">
-                Yds
-              </td>
-              {holes.map((hole) => (
-                <td key={hole.number} className="py-2 px-0.5 text-gray-600">
-                  {hole.yards}
-                </td>
-              ))}
-              <td className="py-2 px-1.5 font-bold text-gray-900 bg-gray-50">
-                {totalYards}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+function toHoleInfo(h: HoleData, fallbackTeeColor: string | null): HoleInfo {
+  return {
+    hole_number: h.number,
+    hole_name: h.holeName ?? null,
+    par: h.par,
+    handicap_index: h.handicap,
+    yards: h.yards,
+    tee_color: h.teeColor ?? fallbackTeeColor,
+    overhead_image_url: h.overheadImageUrl,
+    green_image_url: h.greenImageUrl,
+    tee_latitude: h.teeLatitude ?? null,
+    tee_longitude: h.teeLongitude ?? null,
+    green_latitude: h.greenLatitude ?? null,
+    green_longitude: h.greenLongitude ?? null,
+    center_line: h.centerLine ?? null,
+  };
 }
 
-export function CourseScorecard({ course }: { course: CourseData }) {
+export function CourseScorecard({ course, closeHref = "/" }: { course: CourseData; closeHref?: string }) {
+  const router = useRouter();
   const [selectedTeeId, setSelectedTeeId] = useState(course.defaultTeeId);
-  const [selectedHole, setSelectedHole] = useState<number | null>(null);
 
   const selectedTee = course.tees.find((t) => t.id === selectedTeeId);
   const holes = course.holesByTee[selectedTeeId] || [];
-  const front = getFrontNine(holes);
-  const back = getBackNine(holes);
-  const totalPar = selectedTee?.par || getNinePar(front) + getNinePar(back);
-  const totalYards = getNineYards(front) + getNineYards(back);
+  const holeInfos = holes.map((h) => toHoleInfo(h, selectedTee?.color ?? null));
 
-  return (
-    <div className="px-4 pt-4 space-y-5">
-      {/* Header */}
-      <div>
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold text-gray-900">{formatCourseName(course)}</h1>
-          <PinnedNoteButton pinnedTo="course" />
-        </div>
-        <p className="text-gray-500 mt-1">{course.location}</p>
+  if (holeInfos.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <p className="text-gray-500 text-lg font-medium">No holes set up for this tee.</p>
       </div>
+    );
+  }
 
-      {/* Tee Selector */}
+  // Mini scorecard rows: par, handicap, yards (no scores). Mirrors LiveScorer's
+  // structure, including Out / In / Tot separator cells.
+  const renderScorecardRows = (rowHoles: HoleInfo[]) => {
+    const hasBothNines = rowHoles.length > 9 && rowHoles[0]?.hole_number <= 9;
+    const front = hasBothNines ? rowHoles.filter((h) => h.hole_number <= 9) : [];
+    const back = hasBothNines ? rowHoles.filter((h) => h.hole_number > 9) : [];
+
+    const front9Par = front.reduce((s, h) => s + h.par, 0);
+    const back9Par = back.reduce((s, h) => s + h.par, 0);
+    const totalPar = rowHoles.reduce((s, h) => s + h.par, 0);
+
+    const front9Yds = front.reduce((s, h) => s + (h.yards ?? 0), 0);
+    const back9Yds = back.reduce((s, h) => s + (h.yards ?? 0), 0);
+    const totalYds = rowHoles.reduce((s, h) => s + (h.yards ?? 0), 0);
+
+    return (
+      <>
+        {/* Par row */}
+        <tr className="border-t border-gray-100">
+          {rowHoles.map((h) => (
+            <Fragment key={`par-${h.hole_number}`}>
+              {h.hole_number === 10 && hasBothNines && (
+                <td className="px-0 py-0.5 text-center font-bold text-gray-400 border-l border-r border-gray-200">
+                  {front9Par}
+                </td>
+              )}
+              <td className="px-0 py-0.5 text-center text-gray-400">{h.par}</td>
+            </Fragment>
+          ))}
+          {hasBothNines && (
+            <td className="px-0 py-0.5 text-center font-bold text-gray-400 border-l border-r border-gray-200">
+              {back9Par}
+            </td>
+          )}
+          <td className="px-0 py-0.5 text-center font-bold text-gray-400 border-l border-gray-200">
+            {totalPar}
+          </td>
+        </tr>
+        {/* Handicap row */}
+        <tr className="border-t border-gray-100">
+          {rowHoles.map((h) => (
+            <Fragment key={`hdcp-${h.hole_number}`}>
+              {h.hole_number === 10 && hasBothNines && (
+                <td className="px-0 py-0.5 text-center text-gray-300 border-l border-r border-gray-200" />
+              )}
+              <td className="px-0 py-0.5 text-center text-gray-300">{h.handicap_index}</td>
+            </Fragment>
+          ))}
+          {hasBothNines && (
+            <td className="px-0 py-0.5 text-center text-gray-300 border-l border-r border-gray-200" />
+          )}
+          <td className="px-0 py-0.5 text-center text-gray-300 border-l border-gray-200" />
+        </tr>
+        {/* Yards row */}
+        <tr className="border-t border-gray-100">
+          {rowHoles.map((h) => (
+            <Fragment key={`yds-${h.hole_number}`}>
+              {h.hole_number === 10 && hasBothNines && (
+                <td className="px-0 py-0.5 text-center text-[9px] text-gray-400 border-l border-r border-gray-200">
+                  {front9Yds || ""}
+                </td>
+              )}
+              <td className="px-0 py-0.5 text-center text-[9px] text-gray-400">
+                {h.yards ?? "—"}
+              </td>
+            </Fragment>
+          ))}
+          {hasBothNines && (
+            <td className="px-0 py-0.5 text-center text-[9px] text-gray-400 border-l border-r border-gray-200">
+              {back9Yds || ""}
+            </td>
+          )}
+          <td className="px-0 py-0.5 text-center text-[9px] text-gray-400 border-l border-gray-200">
+            {totalYds || ""}
+          </td>
+        </tr>
+      </>
+    );
+  };
+
+  // Bottom panel: course/tee context — no score inputs.
+  const renderBottomPanel = () => (
+    <div className="px-4 py-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold text-gray-900 truncate">
+          {formatCourseName(course)}
+        </h2>
+        <PinnedNoteButton pinnedTo="course" />
+      </div>
+      {course.location && (
+        <p className="text-xs text-gray-500">{course.location}</p>
+      )}
+
       {course.tees.length > 1 ? (
-        <div className="flex items-center gap-2 overflow-x-auto py-1 px-1 -mx-1">
+        <div className="flex items-center gap-1.5 overflow-x-auto py-1 -mx-1 px-1">
           {course.tees.map((tee) => {
             const colors = getTeeColorClasses(tee.color);
             const isSelected = tee.id === selectedTeeId;
@@ -135,7 +147,7 @@ export function CourseScorecard({ course }: { course: CourseData }) {
               <button
                 key={tee.id}
                 onClick={() => setSelectedTeeId(tee.id)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors shrink-0 ${
+                className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${
                   isSelected
                     ? `${colors.isCustom ? "" : colors.bg} ${colors.text} ring-2 ${colors.isCustom ? "" : colors.ring} ring-offset-1`
                     : `${colors.isCustom ? "" : colors.bg} ${colors.text} opacity-50`
@@ -150,67 +162,25 @@ export function CourseScorecard({ course }: { course: CourseData }) {
             );
           })}
         </div>
-      ) : selectedTee ? (() => {
-        const colors = getTeeColorClasses(selectedTee.color);
-        return (
-          <div className="flex items-center gap-3 text-sm">
-            <span
-              className={`px-3 py-1 rounded-full font-semibold ${colors.isCustom ? "" : colors.bg} ${colors.text}`}
-              style={colors.isCustom ? { backgroundColor: colors.hex! } : undefined}
-            >
-              {selectedTee.name} Tees
-            </span>
-          </div>
-        );
-      })() : null}
+      ) : null}
 
-      {/* Tee info */}
       {selectedTee && (
-        <div className="flex items-center gap-4 text-xs text-gray-500">
-          <span>Rating {selectedTee.rating}</span>
-          <span>Slope {selectedTee.slope}</span>
-          <span>Par {selectedTee.par}</span>
+        <div className="flex items-center gap-3 text-[11px] text-gray-500">
+          <span>Rating <span className="font-semibold text-gray-700">{selectedTee.rating}</span></span>
+          <span>Slope <span className="font-semibold text-gray-700">{selectedTee.slope}</span></span>
+          <span>Par <span className="font-semibold text-gray-700">{selectedTee.par}</span></span>
         </div>
-      )}
-
-      {/* Hint */}
-      <p className="text-xs text-gray-400">
-        Tap a hole number to see the overhead view
-      </p>
-
-      {/* Front Nine */}
-      <NineTable
-        label="Front Nine"
-        holes={front}
-        totalLabel="Out"
-        onHoleSelect={setSelectedHole}
-      />
-
-      {/* Back Nine */}
-      <NineTable
-        label="Back Nine"
-        holes={back}
-        totalLabel="In"
-        onHoleSelect={setSelectedHole}
-      />
-
-      {/* Total */}
-      <div className="flex justify-between items-center px-4 py-3 bg-emerald-700 rounded-2xl text-white">
-        <span className="font-semibold">Total</span>
-        <div className="flex gap-6 text-sm">
-          <span>Par {totalPar}</span>
-          <span>{totalYards} yds</span>
-        </div>
-      </div>
-
-      {/* Hole Detail Modal */}
-      {selectedHole !== null && (
-        <HoleDetailModal
-          holes={holes}
-          initialHole={selectedHole}
-          onClose={() => setSelectedHole(null)}
-        />
       )}
     </div>
+  );
+
+  return (
+    <ScoringShell
+      holes={holeInfos}
+      onClose={() => router.push(closeHref)}
+      teeColor={selectedTee?.color ?? null}
+      renderScorecardRows={renderScorecardRows}
+      renderScorePanel={renderBottomPanel}
+    />
   );
 }

@@ -5,6 +5,13 @@ export interface HoleData {
   yards: number;
   overheadImageUrl: string | null;
   greenImageUrl: string | null;
+  holeName?: string | null;
+  teeColor?: string | null;
+  teeLatitude?: number | null;
+  teeLongitude?: number | null;
+  greenLatitude?: number | null;
+  greenLongitude?: number | null;
+  centerLine?: [number, number][] | null;
 }
 
 export interface TeeInfo {

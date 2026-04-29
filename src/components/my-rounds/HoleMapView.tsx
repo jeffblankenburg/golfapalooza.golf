@@ -164,6 +164,16 @@ export default function HoleMapView({
   userPosRef.current = userPos;
 
   // ───────────────────────── Map init (per hole) ─────────────────────────
+  // Pull primitives out so the effect deps stay statically analyzable. Triggers
+  // re-init when coords actually change (e.g., switching tees on /course or
+  // changing contest tee assignments mid-round).
+  const teeLat = teeLatLng[0];
+  const teeLng = teeLatLng[1];
+  const greenLat = greenLatLng?.[0] ?? null;
+  const greenLng = greenLatLng?.[1] ?? null;
+  const driveLat = driveLatLng?.[0] ?? null;
+  const driveLng = driveLatLng?.[1] ?? null;
+
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -496,7 +506,7 @@ export default function HoleMapView({
       applyAutoCameraRef.current = null;
       userMapOverrideRef.current = false;
     };
-  }, [holeNumber]);
+  }, [holeNumber, teeLat, teeLng, greenLat, greenLng, driveLat, driveLng]);
 
   // ───────────────────────── GPS watcher ─────────────────────────
   useEffect(() => {

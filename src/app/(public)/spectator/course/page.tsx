@@ -32,5 +32,5 @@ export default async function SpectatorCoursePage() {
     );
   }
 
-  return <CourseScorecard course={course} />;
+  return <CourseScorecard course={course} closeHref="/spectator" />;
 }

@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 import { KgbCupScoreboard, KgbCupGroupResults, type KgbGroupData } from "@/components/kgb-cup/KgbCupResultsView";
+import { KgbCupHeader } from "@/components/kgb-cup/KgbCupHeader";
 import type { FoursomeResult, OverallResult } from "@/lib/kgb-cup/match-logic";
 
 interface TeamInfo {
@@ -38,6 +40,21 @@ export function KgbCupResults({ contestId, headerAction }: { contestId: string; 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const topBar = (
+    <div className="flex items-center justify-between">
+      <Link
+        href="/"
+        className="flex items-center gap-1 text-indigo-700 text-sm font-medium"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Home
+      </Link>
+      {headerAction}
+    </div>
+  );
+
   useEffect(() => {
     async function fetchResults() {
       try {
@@ -67,11 +84,9 @@ export function KgbCupResults({ contestId, headerAction }: { contestId: string; 
 
   if (error || !data) {
     return (
-      <div className="px-4 pt-6">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold text-gray-900">KGB Cup</h1>
-          {headerAction}
-        </div>
+      <div className="px-4 pt-6 space-y-4">
+        {topBar}
+        <KgbCupHeader />
         <p className="text-gray-500 text-center py-8">{error || "No data available."}</p>
       </div>
     );
@@ -97,18 +112,17 @@ export function KgbCupResults({ contestId, headerAction }: { contestId: string; 
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">
+      {topBar}
+      <KgbCupHeader size={120}>
+        <PinnedNoteButton pinnedTo="kgb_cup" />
+      </KgbCupHeader>
+
       <KgbCupScoreboard
         team1={{ team_number: 1, team_name: team1?.team_name || "Team 1", team_color: team1Color }}
         team2={{ team_number: 2, team_name: team2?.team_name || "Team 2", team_color: team2Color }}
         overall={overall}
         verified={data.verified}
-      >
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <h1 className="text-lg font-bold text-gray-900">KGB Cup</h1>
-          {headerAction}
-          <PinnedNoteButton pinnedTo="kgb_cup" />
-        </div>
-      </KgbCupScoreboard>
+      />
 
       <KgbCupGroupResults groups={groups} team1Color={team1Color} team2Color={team2Color} />
     </div>

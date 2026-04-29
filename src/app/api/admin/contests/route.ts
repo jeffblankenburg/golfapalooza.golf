@@ -55,6 +55,7 @@ export async function GET(request: Request) {
     scoring_closed_at: c.scoring_closed_at,
     verified_at: c.verified_at,
     winners_locked_at: c.winners_locked_at,
+    tee_sheet_published_at: c.tee_sheet_published_at ?? null,
     participant_count:
       Array.isArray(c.contest_participants) && c.contest_participants.length > 0
         ? (c.contest_participants[0] as { count: number }).count

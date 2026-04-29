@@ -29,7 +29,7 @@ export default async function KgbCupPage() {
   // Find ryder_cup contest
   const { data: contest } = await supabase
     .from("contests")
-    .select("id, name, day_number, scoring_closed_at, verified_at")
+    .select("id, name, day_number, scoring_closed_at, verified_at, tee_sheet_published_at")
     .eq("trip_id", trip.id)
     .eq("contest_type", "ryder_cup")
     .single();
@@ -74,6 +74,17 @@ export default async function KgbCupPage() {
         .in("team_id", teamIds)
         .order("sort_order")
     : { data: [] };
+
+  // Has any actual scoring happened? Used to pick teesheet vs leaderboard view pre-verification.
+  const pairIds = (pairsResult.data || []).map((p) => p.id);
+  let hasAnyScores = false;
+  if (pairIds.length > 0) {
+    const { count } = await supabase
+      .from("kgb_cup_hole_scores")
+      .select("foursome_id", { count: "exact", head: true })
+      .in("foursome_id", pairIds);
+    hasAnyScores = (count ?? 0) > 0;
+  }
 
   // Build tee time groups
   interface TeeSheetGroup {
@@ -139,8 +150,10 @@ export default async function KgbCupPage() {
       firstTeeTime={firstTeeTime}
       teeSheetGroups={teeSheetGroups}
       hasTeams={hasTeams}
+      hasAnyScores={hasAnyScores}
       scoringLive={!contest.scoring_closed_at}
       contestComplete={!!contest.verified_at}
+      teeSheetPublished={!!contest.tee_sheet_published_at}
       simulatedDate={simDate}
       timezone={trip.timezone}
       headerAction={<AdminLink permissionKey="manage_kgb_cup" href={`/admin/events/${trip.id}/kgb-cup`} />}

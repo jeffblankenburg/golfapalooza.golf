@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { CollapsibleSection } from "@/components/admin/CollapsibleSection";
@@ -9,6 +9,7 @@ import { ContestParticipants } from "@/components/admin/ContestParticipants";
 import { RyderCupManager } from "@/components/admin/RyderCupManager";
 import { KgbCupScoringManager } from "@/components/admin/KgbCupScoringManager";
 import { TeeTimeManager } from "@/components/admin/TeeTimeManager";
+import { VisibilityToggle } from "@/components/admin/VisibilityToggle";
 
 export default function KgbCupAdminPage() {
   const params = useParams();
@@ -19,6 +20,7 @@ export default function KgbCupAdminPage() {
   const [resetting, setResetting] = useState(false);
   const [contestId, setContestId] = useState<string | null>(null);
   const [dayNumber, setDayNumber] = useState<number | null>(null);
+  const [teeSheetPublishedAt, setTeeSheetPublishedAt] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -33,22 +35,23 @@ export default function KgbCupAdminPage() {
       .catch(() => router.replace("/admin"));
   }, [router, tripId]);
 
-  useEffect(() => {
-    async function fetchContest() {
-      const res = await fetch(`/api/admin/contests?trip_id=${tripId}`);
-      if (res.ok) {
-        const data = await res.json();
-        const ryderCup = (data.contests || []).find(
-          (c: { contest_type: string }) => c.contest_type === "ryder_cup"
-        );
-        if (ryderCup) {
-          setContestId(ryderCup.id);
-          setDayNumber(ryderCup.day_number || 1);
-        }
-      }
+  const fetchContest = useCallback(async () => {
+    const res = await fetch(`/api/admin/contests?trip_id=${tripId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const ryderCup = (data.contests || []).find(
+      (c: { contest_type: string }) => c.contest_type === "ryder_cup"
+    );
+    if (ryderCup) {
+      setContestId(ryderCup.id);
+      setDayNumber(ryderCup.day_number || 1);
+      setTeeSheetPublishedAt(ryderCup.tee_sheet_published_at ?? null);
     }
-    fetchContest();
   }, [tripId]);
+
+  useEffect(() => {
+    fetchContest();
+  }, [fetchContest]);
 
   const handleReset = async () => {
     if (!contestId || !dayNumber) return;
@@ -128,6 +131,13 @@ export default function KgbCupAdminPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
         }
+        badge={contestId && (
+          <VisibilityToggle
+            contestId={contestId}
+            publishedAt={teeSheetPublishedAt}
+            onChanged={fetchContest}
+          />
+        )}
       >
         <RyderCupManager tripId={tripId} />
       </CollapsibleSection>

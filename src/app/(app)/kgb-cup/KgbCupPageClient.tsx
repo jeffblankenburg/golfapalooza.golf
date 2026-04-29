@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { KgbCupResults } from "./KgbCupResults";
+import { KgbCupHeader } from "@/components/kgb-cup/KgbCupHeader";
 import { getTimezoneAbbreviation } from "@/lib/utils/timezone";
 
 interface TeeSheetPlayer {
@@ -19,7 +20,7 @@ interface TeeSheetGroup {
   players: TeeSheetPlayer[];
 }
 
-type DisplayMode = "forming" | "leaderboard" | "teesheet";
+type DisplayMode = "forming" | "leaderboard" | "teesheet" | "hidden";
 
 function formatTeeTime(time: string): string {
   const [h, m] = time.split(":");
@@ -36,8 +37,10 @@ export function KgbCupPageClient({
   firstTeeTime,
   teeSheetGroups,
   hasTeams,
+  hasAnyScores,
   scoringLive,
   contestComplete,
+  teeSheetPublished,
   simulatedDate,
   timezone,
   headerAction,
@@ -48,43 +51,77 @@ export function KgbCupPageClient({
   firstTeeTime: string | null;
   teeSheetGroups: TeeSheetGroup[];
   hasTeams: boolean;
+  hasAnyScores: boolean;
   scoringLive: boolean;
   contestComplete: boolean;
+  teeSheetPublished: boolean;
   simulatedDate: string | null;
   timezone: string | null;
   headerAction?: React.ReactNode;
 }) {
+  // `scoringLive` is retained in the props contract but isn't load-bearing anymore —
+  // we drive teesheet/leaderboard off actual score presence instead.
+  void scoringLive;
+
   const [displayMode, setDisplayMode] = useState<DisplayMode>("forming");
 
   useEffect(() => {
-    if (!hasTeams) {
+    // Verified always wins — once the contest is officially over, show the leaderboard.
+    if (contestComplete) {
+      setDisplayMode("leaderboard");
+    } else if (!hasTeams) {
       setDisplayMode("forming");
-    } else if (scoringLive || contestComplete) {
+    } else if (!teeSheetPublished) {
+      // Admin explicitly chose to hide.
+      setDisplayMode("hidden");
+    } else if (hasAnyScores) {
+      // At least one score has been entered — round is underway.
       setDisplayMode("leaderboard");
     } else {
+      // Pairings shared but no scores yet — show the tee sheet.
       setDisplayMode("teesheet");
     }
-  }, [hasTeams, scoringLive, contestComplete]);
+  }, [hasTeams, hasAnyScores, contestComplete, teeSheetPublished]);
+
+  const topBar = (
+    <div className="flex items-center justify-between">
+      <Link
+        href="/"
+        className="flex items-center gap-1 text-indigo-700 text-sm font-medium"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Home
+      </Link>
+      {headerAction}
+    </div>
+  );
 
   // State 1: Teams not yet formed
   if (displayMode === "forming") {
     return (
       <div className="px-4 pt-6 pb-8 space-y-4">
-        <Link
-          href="/"
-          className="flex items-center gap-1 text-indigo-700 text-sm font-medium"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Home
-        </Link>
+        {topBar}
         <div className="text-center">
-          <div className="flex items-center justify-center gap-2">
-            <h1 className="text-2xl font-bold text-gray-900">KGB Cup</h1>
-            {headerAction}
-          </div>
+          <KgbCupHeader size={280} />
           <p className="text-gray-500 py-8">Teams are still being formed.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // State 1b: Teams exist but admin hasn't published pairings yet
+  if (displayMode === "hidden") {
+    return (
+      <div className="px-4 pt-6 pb-8 space-y-4">
+        {topBar}
+        <div className="text-center">
+          <KgbCupHeader />
+          <div className="mt-8 mx-auto max-w-md py-12 px-4 bg-white rounded-2xl border-2 border-dashed border-gray-300">
+            <p className="text-sm font-semibold text-gray-700 mb-1">Pairings haven&apos;t been shared yet</p>
+            <p className="text-xs text-gray-400">Check back when the pairings are released.</p>
+          </div>
         </div>
       </div>
     );
@@ -98,21 +135,10 @@ export function KgbCupPageClient({
   // State 3: Tee sheet
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">
-      <Link
-        href="/"
-        className="flex items-center gap-1 text-indigo-700 text-sm font-medium"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Home
-      </Link>
+      {topBar}
 
       <div className="text-center">
-        <div className="flex items-center justify-center gap-2">
-          <h1 className="text-2xl font-bold text-gray-900">KGB Cup</h1>
-          {headerAction}
-        </div>
+        <KgbCupHeader />
         <p className="text-sm text-gray-500 mt-1">Tee Sheet</p>
       </div>
 

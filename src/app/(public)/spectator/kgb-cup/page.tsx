@@ -21,7 +21,7 @@ export default async function SpectatorKgbCupPage() {
 
   const { data: contest } = await adminClient
     .from("contests")
-    .select("id, name, day_number, scoring_closed_at, verified_at")
+    .select("id, name, day_number, scoring_closed_at, verified_at, tee_sheet_published_at")
     .eq("trip_id", trip.id)
     .eq("contest_type", "ryder_cup")
     .single();
@@ -59,6 +59,16 @@ export default async function SpectatorKgbCupPage() {
         .in("team_id", teamIds)
         .order("sort_order")
     : { data: [] };
+
+  const pairIds = (pairsResult.data || []).map((p) => p.id);
+  let hasAnyScores = false;
+  if (pairIds.length > 0) {
+    const { count } = await adminClient
+      .from("kgb_cup_hole_scores")
+      .select("foursome_id", { count: "exact", head: true })
+      .in("foursome_id", pairIds);
+    hasAnyScores = (count ?? 0) > 0;
+  }
 
   interface TeeSheetGroup {
     id: string;
@@ -120,8 +130,10 @@ export default async function SpectatorKgbCupPage() {
       firstTeeTime={firstTeeTime}
       teeSheetGroups={teeSheetGroups}
       hasTeams={hasTeams}
+      hasAnyScores={hasAnyScores}
       scoringLive={!contest.scoring_closed_at}
       contestComplete={!!contest.verified_at}
+      teeSheetPublished={!!contest.tee_sheet_published_at}
       simulatedDate={null}
       timezone={trip.timezone}
     />

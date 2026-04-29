@@ -36,11 +36,21 @@ export function CollapsibleSection({
   const iconText = iconColor || "text-green-700";
   const iconBg = bgMap[iconText] || "bg-green-50";
 
+  const toggle = () => setOpen(!open);
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50 transition-colors"
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={toggle}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggle();
+          }
+        }}
+        className="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-gray-50 transition-colors cursor-pointer select-none"
       >
         <div className={`flex-shrink-0 w-8 h-8 rounded-lg ${iconBg} ${iconText} flex items-center justify-center`}>
           {icon}
@@ -65,7 +75,7 @@ export function CollapsibleSection({
             d="M19 9l-7 7-7-7"
           />
         </svg>
-      </button>
+      </div>
       {open && (
         <div className="border-t border-gray-100 px-4 py-4">{children}</div>
       )}

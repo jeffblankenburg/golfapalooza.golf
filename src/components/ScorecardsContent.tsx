@@ -13,6 +13,7 @@ interface Contest {
 }
 
 interface TeamMember {
+  user_id: string;
   display_name: string;
   avatar_url: string | null;
 }
@@ -45,6 +46,7 @@ interface ScorecardData {
   holeScores: HoleScore[];
   holes: HoleInfo[];
   contest_verified?: boolean;
+  tee_sheet_published_at?: string | null;
   tiebreaker_notes?: Record<string, string>; // team_id -> tiebreaker explanation
   ranked_order?: string[]; // team IDs in tiebreak-resolved order
 }
@@ -189,11 +191,20 @@ export function ScorecardsContent({
   const [selectedDay, setSelectedDay] = useState<number>(initialDay);
   const [data, setData] = useState<ScorecardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => setCurrentUserId(d?.user?.id ?? null))
+      .catch(() => setCurrentUserId(null));
+  }, []);
 
   const selectedContest = contests.find((c) => c.day_number === selectedDay);
-  const scoringLive = !selectedContest?.scoring_closed_at;
   const contestComplete = !!selectedContest?.verified_at;
-  const showLeaderboard = scoringLive || contestComplete;
+  const hasAnyScores = (data?.holeScores?.length ?? 0) > 0;
+  const showLeaderboard = contestComplete || hasAnyScores;
+  const teeSheetPublished = !!data?.tee_sheet_published_at;
 
   const fetchData = useCallback(async () => {
     if (!selectedContest) {
@@ -329,12 +340,33 @@ export function ScorecardsContent({
         <p className="text-gray-500 text-center py-8">No teams or scores yet.</p>
       )}
 
-      {/* Tee sheet — shown when scoring is not live and contest is not complete */}
-      {!loading && teams.length > 0 && !showLeaderboard && (
+      {/* Tee sheet — shown when no scores yet AND admin has published the tee sheet for this day */}
+      {!loading && teams.length > 0 && !showLeaderboard && !teeSheetPublished && (
+        <div className="w-full py-12 px-4 bg-white rounded-2xl border-2 border-dashed border-gray-300 text-center">
+          <p className="text-sm font-semibold text-gray-700 mb-1">Teams & tee times haven&apos;t been shared yet</p>
+          <p className="text-xs text-gray-400">Check back when the pairings are released.</p>
+        </div>
+      )}
+
+      {!loading && teams.length > 0 && !showLeaderboard && teeSheetPublished && (
         <div className="space-y-3">
-          <p className="text-sm text-gray-500 text-center">Tee Sheet</p>
-          {teams.map((team) => (
-            <div key={team.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          {[...teams]
+            .sort((a, b) => {
+              if (a.tee_time && b.tee_time) return a.tee_time.localeCompare(b.tee_time);
+              if (a.tee_time) return -1;
+              if (b.tee_time) return 1;
+              return 0;
+            })
+            .map((team) => {
+              const isMyTeam =
+                !!currentUserId && team.members.some((m) => m.user_id === currentUserId);
+              return (
+            <div
+              key={team.id}
+              className={`rounded-2xl shadow-sm overflow-hidden border ${
+                isMyTeam ? "bg-sky-50 border-sky-300 ring-2 ring-sky-200" : "bg-white border-gray-200"
+              }`}
+            >
               <div className="px-4 py-3 flex items-center gap-3">
                 <div className="flex-shrink-0 w-20">
                   {team.tee_time ? (
@@ -347,6 +379,9 @@ export function ScorecardsContent({
                   {team.starting_hole && (
                     <p className="text-[10px] text-gray-400 mt-0.5">Hole {team.starting_hole}</p>
                   )}
+                  <p className="text-sm font-bold text-gray-700 mt-0.5">
+                    Hcp {team.team_handicap}
+                  </p>
                 </div>
                 <div className="flex-1 flex flex-wrap gap-1.5">
                   {team.members.map((m, i) => (
@@ -364,7 +399,8 @@ export function ScorecardsContent({
                 </div>
               </div>
             </div>
-          ))}
+              );
+            })}
         </div>
       )}
 

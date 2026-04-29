@@ -138,10 +138,10 @@ export async function GET(request: Request) {
     }),
   }));
 
-  // Fetch contest verification state
+  // Fetch contest verification state + tee sheet publish flag
   const { data: contestState } = await supabase
     .from("contests")
-    .select("verified_at")
+    .select("verified_at, tee_sheet_published_at")
     .eq("id", contestId)
     .single();
 
@@ -267,6 +267,7 @@ export async function GET(request: Request) {
     holeScores: holeScores || [],
     holes: holes.sort((a, b) => a.hole_number - b.hole_number),
     contest_verified: !!contestState?.verified_at,
+    tee_sheet_published_at: contestState?.tee_sheet_published_at ?? null,
     tiebreaker_notes,
     // Correct ordering with tiebreakers applied (team IDs in order)
     ranked_order: ranked.map((r) => r.id),

@@ -97,12 +97,7 @@ export function ContestSetup({
       </div>
 
       {/* Tee assignments (only for golf contests) */}
-      {hasTees && (
-        <div>
-          <label className="text-xs text-gray-500 block mb-2">Tee Assignments</label>
-          <ContestTeeAssigner contestId={contestId} />
-        </div>
-      )}
+      {hasTees && <ContestTeeAssigner contestId={contestId} />}
     </div>
   );
 }

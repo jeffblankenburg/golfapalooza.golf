@@ -244,9 +244,12 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-gray-400">
-        <div className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
-        Loading tee assignments...
+      <div>
+        <label className="text-xs text-gray-500 block mb-2">Tee Assignments</label>
+        <div className="flex items-center gap-2 text-sm text-gray-400">
+          <div className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+          Loading tee assignments...
+        </div>
       </div>
     );
   }
@@ -261,37 +264,40 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
 
   return (
     <div className="space-y-4">
-      {/* Auto-save status */}
-      {saveState !== "idle" && (
-        <div className={`flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-lg ${
-          saveState === "saving" ? "bg-blue-50 text-blue-600" :
-          saveState === "saved" ? "bg-green-50 text-green-600" :
-          "bg-red-50 text-red-600"
-        }`}>
-          {saveState === "saving" && (
-            <>
-              <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-              Saving...
-            </>
-          )}
-          {saveState === "saved" && (
-            <>
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Saved
-            </>
-          )}
-          {saveState === "error" && (
-            <>
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              Save failed
-            </>
-          )}
-        </div>
-      )}
+      {/* Header: label + inline auto-save status (reserves height to prevent layout shift) */}
+      <div className="flex items-center gap-2 min-h-[1.5rem]">
+        <label className="text-xs text-gray-500">Tee Assignments</label>
+        {saveState !== "idle" && (
+          <span className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+            saveState === "saving" ? "bg-blue-50 text-blue-600" :
+            saveState === "saved" ? "bg-green-50 text-green-600" :
+            "bg-red-50 text-red-600"
+          }`}>
+            {saveState === "saving" && (
+              <>
+                <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                Saving...
+              </>
+            )}
+            {saveState === "saved" && (
+              <>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Saved
+              </>
+            )}
+            {saveState === "error" && (
+              <>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Save failed
+              </>
+            )}
+          </span>
+        )}
+      </div>
 
       {/* Quick-fill row (shown for both modes — for Ryder Cup it IS the picker) */}
         <div>

@@ -1,6 +1,37 @@
+import Link from "next/link";
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { PickemContent } from "@/components/PickemContent";
 import { AdminLink } from "@/components/AdminLink";
+import { PickemHeader } from "@/components/pickem/PickemHeader";
+
+function HomeButton() {
+  return (
+    <Link
+      href="/"
+      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 active:bg-gray-200 transition-colors"
+    >
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+      </svg>
+      Home
+    </Link>
+  );
+}
+
+function EmptyState({ headerAction, message }: { headerAction?: React.ReactNode; message: string }) {
+  return (
+    <div className="px-4 pt-6 pb-8 space-y-4">
+      <div className="flex items-center justify-between">
+        <HomeButton />
+        {headerAction}
+      </div>
+      <div className="text-center">
+        <PickemHeader size={280} />
+        <p className="text-gray-500 text-sm mt-4">{message}</p>
+      </div>
+    </div>
+  );
+}
 
 export default async function PickemPage() {
   const user = await getAuthUser();
@@ -17,12 +48,12 @@ export default async function PickemPage() {
     .single();
 
   if (!trip) {
-    return (
-      <div className="px-4 pt-6 text-center text-gray-500">
-        No active event found.
-      </div>
-    );
+    return <EmptyState message="No active event found." />;
   }
+
+  const adminLink = (
+    <AdminLink permissionKey="manage_pickem" href={`/admin/events/${trip.id}/pickem`} />
+  );
 
   // Get pickem contest
   const { data: contest } = await supabase
@@ -33,11 +64,7 @@ export default async function PickemPage() {
     .single();
 
   if (!contest) {
-    return (
-      <div className="px-4 pt-6 text-center text-gray-500">
-        No Pick&apos;em contest found.
-      </div>
-    );
+    return <EmptyState headerAction={adminLink} message="No Pick'em contest found." />;
   }
 
   // Check if pick'em is open (pickem_settings has SELECT for authenticated)
@@ -49,19 +76,12 @@ export default async function PickemPage() {
 
   if (!settings?.is_open) {
     return (
-      <div className="px-4 pt-6 pb-8 text-center">
-        <div className="mt-12">
-          <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
-          <h2 className="text-xl font-bold text-gray-900 mb-1">Pick&apos;em Not Open Yet</h2>
-          <p className="text-sm text-gray-500">Whitey hasn&apos;t opened the picks yet. Check back soon!</p>
-        </div>
-      </div>
+      <EmptyState
+        headerAction={adminLink}
+        message="Whitey hasn't opened the picks yet. Check back soon!"
+      />
     );
   }
 
-  return (
-    <PickemContent contestId={contest.id} contestName={contest.name} headerAction={<AdminLink permissionKey="manage_pickem" href={`/admin/events/${trip.id}/pickem`} />} />
-  );
+  return <PickemContent contestId={contest.id} headerAction={adminLink} />;
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
+import { PickemHeader } from "@/components/pickem/PickemHeader";
 import { logActivity } from "@/components/ActivityTracker";
 
 interface Game {
@@ -46,11 +47,9 @@ interface LeaderboardEntry {
 
 export function PickemContent({
   contestId,
-  contestName,
   headerAction,
 }: {
   contestId: string;
-  contestName: string;
   headerAction?: React.ReactNode;
 }) {
   const [games, setGames] = useState<Game[]>([]);
@@ -191,10 +190,24 @@ export function PickemContent({
 
   return (
     <div className="px-4 pt-6 pb-24">
-      <div className="flex items-center gap-2">
-        <h1 className="text-2xl font-bold text-gray-900">{contestName}</h1>
-        {headerAction}
-        <PinnedNoteButton pinnedTo="pickem" />
+      <div className="flex items-center justify-between mb-4">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 active:bg-gray-200 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Home
+        </Link>
+        <div className="flex items-center gap-2">
+          {headerAction}
+          <PinnedNoteButton pinnedTo="pickem" />
+        </div>
+      </div>
+
+      <div className="text-center mb-4">
+        <PickemHeader size={120} />
       </div>
 
       {/* Stats bar */}

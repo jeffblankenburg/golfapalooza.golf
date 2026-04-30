@@ -40,15 +40,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "All Loozers room not found" }, { status: 500 });
   }
 
+  // Birthday messages are posted as the system bot ("Al Pine") so they don't
+  // appear to come from a real Loozer. See scripts/create-al-pine.mjs.
   const { data: sender } = await adminClient
     .from("users")
     .select("id")
-    .eq("is_admin", true)
-    .order("created_at", { ascending: true })
+    .eq("is_system", true)
     .limit(1)
     .maybeSingle();
   if (!sender) {
-    return NextResponse.json({ error: "No admin available to send birthday post" }, { status: 500 });
+    return NextResponse.json(
+      { error: "No system user (Al Pine) found — run scripts/create-al-pine.mjs" },
+      { status: 500 }
+    );
   }
 
   const year = currentYearInTimezone(tz);

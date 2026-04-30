@@ -24,7 +24,9 @@ export async function GET() {
   const { data: users, error } = await adminClient
     .from("users")
     .select("*, player_handicaps(handicap_index)")
-    .order("display_name");
+    // Bots sort to the bottom — admins rarely touch them.
+    .order("is_system", { ascending: true })
+    .order("display_name", { ascending: true });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

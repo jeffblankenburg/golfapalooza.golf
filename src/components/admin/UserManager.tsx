@@ -15,6 +15,7 @@ interface User {
   is_active: boolean;
   is_financial_only: boolean;
   is_founder: boolean;
+  is_system: boolean;
   sponsor_id: string | null;
   permissions: Record<string, boolean> | null;
   handicap_index: number | null;
@@ -340,21 +341,27 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
               <p className="font-semibold text-gray-900 text-sm truncate">
                 {user.display_name}
               </p>
-              <p className="text-xs text-gray-400 truncate">
-                {user.phone ? formatPhone(user.phone) : "No phone"}
-              </p>
+              {!user.is_system && (
+                <p className="text-xs text-gray-400 truncate">
+                  {user.phone ? formatPhone(user.phone) : "No phone"}
+                </p>
+              )}
             </div>
-            {user.is_financial_only && (
+            {!user.is_system && user.is_financial_only && (
               <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 bg-amber-50 text-amber-700">
                 $
               </span>
             )}
-            {user.handicap_index !== null && (
+            {!user.is_system && user.handicap_index !== null && (
               <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 bg-blue-50 text-blue-700">
                 {user.handicap_index}
               </span>
             )}
-            {!user.is_financial_only && (
+            {user.is_system ? (
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 bg-purple-100 text-purple-700">
+                Bot
+              </span>
+            ) : !user.is_financial_only && (
               <span
                 className={`px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 ${
                   user.is_admin
@@ -381,7 +388,9 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
       </div>
 
       {/* Add/Edit Modal */}
-      {showModal && (
+      {showModal && (() => {
+        const isBot = !!editingUser?.is_system;
+        return (
         <div className="fixed top-14 bottom-16 left-0 right-0 z-35 flex items-end justify-center">
           <div
             className="absolute inset-0 bg-black/50"
@@ -392,7 +401,7 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
             <div className="px-6 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
               <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
               <h2 className="text-xl font-bold text-gray-900">
-                {editingUser ? `Edit '${editingUser.display_name}'` : "New Loozer"}
+                {editingUser ? `Edit '${editingUser.display_name}'${isBot ? " (Bot)" : ""}` : "New Loozer"}
               </h2>
             </div>
 
@@ -458,19 +467,21 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                 onSubmit={handleSubmit}
                 className="space-y-4"
               >
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">
-                    Phone Number
-                    <span className="text-gray-400 font-normal ml-1">(leave blank for financial-only)</span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={handlePhoneChange}
-                    placeholder="(555) 123-4567"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
-                  />
-                </div>
+                {!isBot && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1">
+                      Phone Number
+                      <span className="text-gray-400 font-normal ml-1">(leave blank for financial-only)</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={handlePhoneChange}
+                      placeholder="(555) 123-4567"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
                     Display Name
@@ -486,88 +497,92 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                     required
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">
-                    Full Name (optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.fullName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, fullName: e.target.value })
-                    }
-                    placeholder="John Smith"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">
-                    Birthday (optional)
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.birthday}
-                    onChange={(e) =>
-                      setFormData({ ...formData, birthday: e.target.value })
-                    }
-                    style={{ backgroundColor: "transparent" }}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">
-                    Handicap Index (optional)
-                  </label>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    min="0"
-                    max="54"
-                    value={formData.handicapIndex}
-                    onChange={(e) =>
-                      setFormData({ ...formData, handicapIndex: e.target.value })
-                    }
-                    placeholder="e.g. 12.4"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">
-                      8 Bag Avg
-                    </label>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      step="0.1"
-                      value={formData.eightBagAverage}
-                      onChange={(e) =>
-                        setFormData({ ...formData, eightBagAverage: e.target.value })
-                      }
-                      placeholder="e.g. 82.5"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">
-                      Avg Scramble
-                    </label>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      step="0.1"
-                      value={formData.avgScrambleScore}
-                      onChange={(e) =>
-                        setFormData({ ...formData, avgScrambleScore: e.target.value })
-                      }
-                      placeholder="e.g. 72.3"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
-                    />
-                  </div>
-                </div>
+                {!isBot && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">
+                        Full Name (optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.fullName}
+                        onChange={(e) =>
+                          setFormData({ ...formData, fullName: e.target.value })
+                        }
+                        placeholder="John Smith"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">
+                        Birthday (optional)
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.birthday}
+                        onChange={(e) =>
+                          setFormData({ ...formData, birthday: e.target.value })
+                        }
+                        style={{ backgroundColor: "transparent" }}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">
+                        Handicap Index (optional)
+                      </label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        max="54"
+                        value={formData.handicapIndex}
+                        onChange={(e) =>
+                          setFormData({ ...formData, handicapIndex: e.target.value })
+                        }
+                        placeholder="e.g. 12.4"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">
+                          8 Bag Avg
+                        </label>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.1"
+                          value={formData.eightBagAverage}
+                          onChange={(e) =>
+                            setFormData({ ...formData, eightBagAverage: e.target.value })
+                          }
+                          placeholder="e.g. 82.5"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">
+                          Avg Scramble
+                        </label>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.1"
+                          value={formData.avgScrambleScore}
+                          onChange={(e) =>
+                            setFormData({ ...formData, avgScrambleScore: e.target.value })
+                          }
+                          placeholder="e.g. 72.3"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
 
-                {editingUser && (() => {
+                {!isBot && editingUser && (() => {
                   const descendants = computeDescendants(editingUser.id, users);
                   const eligibleSponsors = users.filter(
                     (u) =>
@@ -694,7 +709,7 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                   );
                 })()}
 
-                {editingUser && (
+                {!isBot && editingUser && (
                   <div className="pt-3 border-t border-gray-100 space-y-3">
                     <button
                       type="button"
@@ -744,7 +759,7 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                   Cancel
                 </button>
               </div>
-              {editingUser && (
+              {!isBot && editingUser && (
                 <button
                   type="button"
                   onClick={() => handleDelete(editingUser)}
@@ -757,7 +772,8 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       <ConfirmModal
         open={!!confirmModal}

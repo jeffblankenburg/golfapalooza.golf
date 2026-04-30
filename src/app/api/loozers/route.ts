@@ -36,6 +36,7 @@ export async function GET() {
     adminClient
       .from("users")
       .select("id, display_name, full_name, avatar_url, sponsor_id, is_founder, is_financial_only")
+      .eq("is_system", false)
       .order("display_name"),
     adminClient
       .from("loozer_bios")

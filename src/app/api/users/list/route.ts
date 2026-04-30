@@ -14,6 +14,7 @@ export async function GET() {
     .from("users")
     .select("id, display_name, full_name")
     .eq("is_financial_only", false)
+    .eq("is_system", false)
     .order("display_name");
 
   if (error) {

@@ -13,25 +13,34 @@ export default async function MyRoundsPage() {
 
   const effectiveUserId = await getEffectiveUserId(user.id);
 
-  const { data: rounds } = await supabase
-    .from("rounds")
-    .select(`
-      id,
-      round_date,
-      round_type,
-      status,
-      course:courses(id, name, club_name, city, state),
-      tee:course_tees(id, tee_name, tee_color, par),
-      round_players!inner(
-        user_id,
-        tee_id,
-        final_gross_score,
-        score_differential,
-        player_tee:course_tees(id, tee_name, tee_color, par)
-      )
-    `)
-    .eq("round_players.user_id", effectiveUserId)
-    .order("round_date", { ascending: false });
+  const [{ data: rounds }, { data: handicapRow }] = await Promise.all([
+    supabase
+      .from("rounds")
+      .select(`
+        id,
+        round_date,
+        round_type,
+        status,
+        course:courses(id, name, club_name, city, state),
+        tee:course_tees(id, tee_name, tee_color, par),
+        round_players!inner(
+          user_id,
+          tee_id,
+          final_gross_score,
+          score_differential,
+          player_tee:course_tees(id, tee_name, tee_color, par)
+        )
+      `)
+      .eq("round_players.user_id", effectiveUserId)
+      .order("round_date", { ascending: false }),
+    supabase
+      .from("player_handicaps")
+      .select("handicap_index")
+      .eq("user_id", effectiveUserId)
+      .maybeSingle(),
+  ]);
+
+  const handicapIndex = handicapRow?.handicap_index ?? null;
 
   const roundSummaries = (rounds || []).map((r) => {
     const allPlayers = Array.isArray(r.round_players) ? r.round_players : [r.round_players];
@@ -69,6 +78,11 @@ export default async function MyRoundsPage() {
     ? Math.min(...completedRounds.map((r) => r.final_score || 999))
     : null;
 
+  const currentYear = new Date().getFullYear();
+  const currentYearRoundsCount = completedRounds.filter(
+    (r) => r.round_date && new Date(r.round_date).getFullYear() === currentYear
+  ).length;
+
   return (
     <div className="px-4 py-6 max-w-lg mx-auto">
       <div className="flex items-center justify-between mb-5">
@@ -87,10 +101,16 @@ export default async function MyRoundsPage() {
       </div>
 
       {completedRounds.length > 0 && (
-        <div className="grid grid-cols-3 gap-3 mb-5">
+        <div className="grid grid-cols-4 gap-2 mb-5">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+            <div className="text-xs text-blue-700">HCP</div>
+            <div className="text-lg font-bold text-blue-700">
+              {handicapIndex != null ? handicapIndex.toFixed(1) : "—"}
+            </div>
+          </div>
           <div className="bg-white border border-gray-200 rounded-lg p-3 text-center">
-            <div className="text-xs text-gray-500">Rounds</div>
-            <div className="text-lg font-bold text-gray-900">{completedRounds.length}</div>
+            <div className="text-xs text-gray-500">{currentYear} Rounds</div>
+            <div className="text-lg font-bold text-gray-900">{currentYearRoundsCount}</div>
           </div>
           <div className="bg-white border border-gray-200 rounded-lg p-3 text-center">
             <div className="text-xs text-gray-500">Average</div>
@@ -117,6 +137,16 @@ export default async function MyRoundsPage() {
           </div>
         )}
       </div>
+
+      <Link
+        href="/my-rounds/courses"
+        className="mt-5 w-full inline-flex items-center justify-between px-4 py-3 rounded-xl bg-white border border-gray-200 active:bg-gray-50 transition-colors shadow-sm"
+      >
+        <span className="text-sm font-medium text-gray-900">View all courses</span>
+        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </Link>
     </div>
   );
 }

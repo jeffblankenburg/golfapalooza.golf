@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { BracketView, BracketMatchData, computeChampionId } from "@/components/BracketView";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
+import { CornholeHeader } from "@/components/cornhole/CornholeHeader";
 
 const POLL_INTERVAL = 5000; // 5 seconds
 
@@ -63,7 +65,6 @@ export function CornholeBrackets({
   const [expanded, setExpanded] = useState<"singles" | "doubles" | null>(
     singlesContestId ? "singles" : doublesContestId ? "doubles" : null
   );
-  const [showRealNames, setShowRealNames] = useState(false);
 
   const singles = useLiveBracket(singlesContestId);
   const doubles = useLiveBracket(doublesContestId);
@@ -71,33 +72,52 @@ export function CornholeBrackets({
   const hasSingles = !!singlesContestId;
   const hasDoubles = !!doublesContestId;
 
+  const singlesReady = singles.matches.length > 0;
+  const doublesReady = doubles.matches.length > 0;
+  const anyReady = singlesReady || doublesReady;
+
+  const topBar = (
+    <div className="flex items-center justify-between">
+      <Link
+        href="/"
+        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 active:bg-gray-200 transition-colors"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Home
+      </Link>
+      <div className="flex items-center gap-2">
+        {headerAction}
+        <PinnedNoteButton pinnedTo="cornhole" />
+      </div>
+    </div>
+  );
+
+  // No contests at all
   if (!hasSingles && !hasDoubles) {
     return (
-      <div className="px-4 pt-6 text-center text-gray-500 text-sm">
-        No cornhole contests set up yet.
+      <div className="px-4 pt-6 pb-8 space-y-4">
+        {topBar}
+        <div className="text-center">
+          <CornholeHeader size={280} />
+          <p className="text-gray-500 text-sm mt-4">No cornhole contests set up yet.</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="px-4 pt-6 pb-8 space-y-3">
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg font-bold text-gray-900">Cornhole</h1>
-          {headerAction}
-          <PinnedNoteButton pinnedTo="cornhole" />
-        </div>
-        {Object.values({ ...singles.nameMap, ...doubles.nameMap }).some((n) => n.full_name) && (
-          <button
-            onClick={() => setShowRealNames(!showRealNames)}
-            className="text-xs text-orange-700 font-medium"
-          >
-            Show {showRealNames ? "nicknames" : "real names"}
-          </button>
+    <div className="px-4 pt-6 pb-8 space-y-4">
+      {topBar}
+      <div className="text-center">
+        <CornholeHeader size={anyReady ? 120 : 280} />
+        {!anyReady && (
+          <p className="text-gray-500 text-sm mt-4">Brackets coming soon.</p>
         )}
       </div>
 
-      {hasSingles && (
+      {hasSingles && singlesReady && (
         <BracketAccordion
           label="Singles"
           expanded={expanded === "singles"}
@@ -107,11 +127,11 @@ export function CornholeBrackets({
           loading={singles.loading}
           matches={singles.matches}
           nameMap={singles.nameMap}
-          showRealNames={showRealNames}
+          showRealNames={false}
         />
       )}
 
-      {hasDoubles && (
+      {hasDoubles && doublesReady && (
         <BracketAccordion
           label="Doubles"
           expanded={expanded === "doubles"}
@@ -121,7 +141,7 @@ export function CornholeBrackets({
           loading={doubles.loading}
           matches={doubles.matches}
           nameMap={doubles.nameMap}
-          showRealNames={showRealNames}
+          showRealNames={false}
         />
       )}
     </div>

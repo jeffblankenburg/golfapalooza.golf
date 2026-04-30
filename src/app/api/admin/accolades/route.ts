@@ -36,23 +36,79 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { trip_id, title, user_id, sort_order } = await request.json();
+    const {
+      trip_id,
+      title,
+      user_id,
+      sort_order,
+      category,
+      partner_user_id,
+    } = (await request.json()) as {
+      trip_id?: string;
+      title?: string | null;
+      user_id?: string;
+      sort_order?: number;
+      category?: string;
+      partner_user_id?: string | null;
+    };
 
-    if (!trip_id || !title || !user_id) {
+    if (!trip_id || !user_id) {
       return NextResponse.json(
-        { error: "Trip ID, title, and user are required" },
+        { error: "trip_id and user_id are required" },
         { status: 400 }
       );
     }
 
     const adminClient = createAdminClient();
+
+    // Title resolution: caller value wins; otherwise inherit from the
+    // category's metadata. Required for legacy callers that pass `category`
+    // implicitly as 'custom' — they must provide a title.
+    let resolvedTitle = title?.trim() || null;
+    const resolvedCategory = category?.trim() || "custom";
+    if (!resolvedTitle) {
+      const { data: cat } = await adminClient
+        .from("accolade_categories")
+        .select("title")
+        .eq("category", resolvedCategory)
+        .maybeSingle();
+      if (!cat) {
+        return NextResponse.json(
+          { error: `Unknown category "${resolvedCategory}"` },
+          { status: 400 }
+        );
+      }
+      resolvedTitle = cat.title;
+    }
+    if (resolvedCategory === "custom" && !title?.trim()) {
+      return NextResponse.json(
+        { error: "Custom accolades require a title" },
+        { status: 400 }
+      );
+    }
+
     const { data, error } = await adminClient
       .from("accolades")
-      .insert({ trip_id, title, user_id, sort_order: sort_order || 0 })
-      .select("*, user:users(id, display_name, avatar_url)")
+      .insert({
+        trip_id,
+        title: resolvedTitle,
+        user_id,
+        sort_order: sort_order || 0,
+        category: resolvedCategory,
+        partner_user_id: partner_user_id || null,
+      })
+      .select(
+        "*, user:users!accolades_user_id_fkey(id, display_name, full_name, avatar_url), partner:users!accolades_partner_user_id_fkey(id, display_name, full_name, avatar_url), trip:trip_settings(trip_year, trip_name)"
+      )
       .single();
 
     if (error) {
+      if (error.code === "23505") {
+        return NextResponse.json(
+          { error: "This person already has this award for this trip" },
+          { status: 409 }
+        );
+      }
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 

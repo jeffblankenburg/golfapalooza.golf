@@ -8,6 +8,7 @@ import remarkBreaks from "remark-breaks";
 import rehypeRaw from "rehype-raw";
 import { useMusicPlayerOptional, Song } from "@/contexts/MusicPlayerContext";
 import { FakeAdCarousel } from "@/components/FakeAdCarousel";
+import { AccoladesList, type AccoladeData } from "@/components/profile/AccoladesList";
 
 interface ProfileData {
   id: string;
@@ -23,12 +24,6 @@ interface ProfileData {
   fun_fact: string | null;
   best_shot: string | null;
   occupation: string | null;
-}
-
-interface AccoladeData {
-  id: string;
-  title: string;
-  trip: { trip_year: number }[] | { trip_year: number } | null;
 }
 
 interface TaggedPhoto {
@@ -110,7 +105,7 @@ export function LoozerProfile({
   const [startingChat, setStartingChat] = useState(false);
 
   // Accordion state — bio open by default, others closed
-  const [openSections, setOpenSections] = useState<Set<string>>(new Set(["bio"]));
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(["bio", "accolades"]));
 
   useEffect(() => {
     if (initialData) return; // already have data
@@ -329,6 +324,23 @@ export function LoozerProfile({
 
       {/* ── Accordion Sections ── */}
 
+      {/* Accolades — top-of-stack so the trophy case is the first thing you see */}
+      {accolades.length > 0 && (
+        <Accordion
+          title="Accolades"
+          count={accolades.length}
+          isOpen={openSections.has("accolades")}
+          onToggle={() => toggleSection("accolades")}
+        >
+          <AccoladesList
+            accolades={accolades}
+            profileUserId={profile.id}
+            accoladeHrefBase={spectator ? "/spectator/accolades" : "/accolades"}
+            loozerHrefBase={spectator ? "/spectator/loozers" : "/loozers"}
+          />
+        </Accordion>
+      )}
+
       {/* Bio — only shown if bio exists */}
       {bio && bio.content && (
         <Accordion
@@ -484,31 +496,6 @@ export function LoozerProfile({
         )}
       </Accordion>
 
-      {/* Accolades */}
-      {accolades.length > 0 && (
-        <Accordion
-          title="Accolades"
-          count={accolades.length}
-          isOpen={openSections.has("accolades")}
-          onToggle={() => toggleSection("accolades")}
-        >
-          <div className="space-y-2">
-            {accolades.map((a) => {
-              const trip = Array.isArray(a.trip) ? a.trip[0] : a.trip;
-              return (
-                <div key={a.id} className="flex items-center gap-2">
-                  <span className="text-amber-500">&#127942;</span>
-                  <span className="text-sm font-medium text-gray-900">{a.title}</span>
-                  {trip?.trip_year && (
-                    <span className="text-xs text-gray-400">({trip.trip_year})</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </Accordion>
-      )}
-
       {/* About */}
       {(profile.occupation || profile.fun_fact || profile.best_shot || profile.playing_since || profile.swings || profile.typical_shot) && (
         <Accordion
@@ -594,3 +581,4 @@ function InfoRow({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+

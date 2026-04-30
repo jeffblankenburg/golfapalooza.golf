@@ -32,11 +32,16 @@ export default async function ProfilePage() {
   const ph = Array.isArray(profile.player_handicaps) ? profile.player_handicaps[0] : profile.player_handicaps;
   const handicapIndex: number | null = ph?.handicap_index ?? null;
 
-  // Fetch accolades
+  // Fetch accolades — same shape as the LoozerProfile component expects so
+  // the shared <AccoladesList /> can render category icons, partner links,
+  // and rows where this user is the doubles-cornhole partner (not the
+  // primary winner).
   const { data: accolades } = await queryClient
     .from("accolades")
-    .select("id, title, trip:trip_settings(trip_year)")
-    .eq("user_id", effectiveUserId)
+    .select(
+      "id, title, category, user_id, partner_user_id, trip:trip_settings(trip_year), winner:users!accolades_user_id_fkey(id, display_name, full_name, avatar_url), partner:users!accolades_partner_user_id_fkey(id, display_name, full_name, avatar_url), category_meta:accolade_categories!accolades_category_fkey(category, title, short_label, icon, icon_url, description, sort_order)",
+    )
+    .or(`user_id.eq.${effectiveUserId},partner_user_id.eq.${effectiveUserId}`)
     .order("created_at", { ascending: false });
 
   const eightBagAverage: number | null = profile.eight_bag_average ?? null;

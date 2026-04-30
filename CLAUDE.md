@@ -132,12 +132,22 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 | POST | `/api/admin/polls/{id}/close` | Close an active or scheduled poll immediately |
 | POST | `/api/admin/polls/{id}/reopen` | Reopen a closed poll. Body: `{ends_at}`. Existing responses preserved; no launch notification fires. |
 | GET | `/api/admin/polls/conflicts?starts_at=&ends_at=&exclude_id=` | Returns `{conflicts, next_free_start}` for the requested window |
+| GET | `/api/admin/history/state` | Snapshot used by the historical-import matcher: parsed workbook + every users row + per-trip accolade counts. Issue #114 Phase 1a. |
+| PUT | `/api/admin/history/match` | Body: `{workbookName, userId\|null}`. Sets `users.workbook_name` (or clears it). Idempotent; first NULLs any user already holding that workbook_name to keep the unique index happy. |
+| POST | `/api/admin/history/auto-match` | One-shot: applies every unambiguous workbook-name → user match (squashed-name comparison against `full_name` and `display_name`). Returns counts of applied vs. skipped (with reason). |
+| GET | `/api/admin/history/import-accolades` | Dry-run preview of the accolade import. Returns rows that would insert + rows skipped because their winner isn't matched yet + doubles-partner fallbacks. |
+| POST | `/api/admin/history/import-accolades` | Run the accolade import. Idempotent on `(trip_id, category, user_id, COALESCE(partner_user_id, '0…'::uuid))`. Skips awards whose winner workbook_name isn't matched; partner_user_id falls back to NULL when the partner isn't matched. Safe to re-run as more users get matched. |
+| GET | `/api/admin/history/verify` | Cross-check imported accolades against the workbook's Summary sheet. Per-category and per-user diff. Cornhole doubles imports are doubled in the Summary comparison (Summary credits both teammates; Awards sheet stores one row per team). |
+| GET | `/api/admin/accolades/categories` | List the editable accolade category metadata (title, short_label, icon, description, sort_order) used by profile pages and the public `/accolades` gallery. |
+| PUT | `/api/admin/accolades/categories/{category}` | Update one category's display fields. Body: `{title?, short_label?, icon?, description?, sort_order?}`. |
+| POST | `/api/admin/accolades/categories/{category}/badge` | Upload a badge image (multipart, `file`). Replaces the existing badge; sets `icon_url`. |
+| DELETE | `/api/admin/accolades/categories/{category}/badge` | Remove the badge image and revert to the emoji icon. |
 
 ## Database Schema
 
 ### Tables
 
-- `users` - User profiles (display_name, phone, full_name, `is_founder`, `sponsor_id` self-FK for the Loozer family tree)
+- `users` - User profiles (display_name, phone, full_name, `is_founder`, `sponsor_id` self-FK for the Loozer family tree, `workbook_name` join key from the historical Golfapalooza workbook for issue #114 — unique when set)
 - `courses` - Cached golf courses; `source` ∈ ('manual','gcapi','ai'), `verified` flag, `lookup_key` for cross-user dedup
 - `course_tees` - Tee boxes with ratings (course_rating, slope_rating); `confidence` jsonb for AI-extracted ratings
 - `course_holes` - Hole details (par, handicap_index, yards)
@@ -156,6 +166,8 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 - `poll_options` - Choices for select-type questions
 - `poll_responses` - One row per (poll, user) tracking who voted
 - `poll_answers` - Per-question answers; multi-select uses N rows. `option_id` XOR `text_answer` is enforced via CHECK.
+- `accolades` - Per-trip awards. `category` is a FK to `accolade_categories.category`; `partner_user_id` is set for doubles cornhole (one row per team). Partial unique index `(trip_id, category, user_id, COALESCE(partner_user_id, '0…'))` for `category != 'custom'` makes the historical importer (issue #114) idempotent.
+- `accolade_categories` - Editable display metadata for award categories: `title`, `short_label`, `icon` (emoji), `description`, `sort_order`. Seeded with the canonical 8 (mvl/roy/melc/bspitw/green_jacket/cornhole_singles/cornhole_doubles/custom). Admins manage at `/admin/accolades`.
 
 ### Migrations
 
@@ -166,6 +178,9 @@ Located in `supabase/migrations/`:
 - `00004_fix_rls_all_operations.sql` - Fix RLS recursion for INSERT/UPDATE/DELETE
 - `00112_ai_course_import.sql` - `lookup_key`/`source`/`verified` on courses, `confidence` on tees, `ai_generations` audit table
 - `00114_polls.sql` - Polls feature: `polls`, `poll_questions`, `poll_options`, `poll_responses`, `poll_answers`. RLS-locked (server-only access via service role).
+- `00119_history_accolades.sql` - Phase 1a of historical import (issue #114): `users.workbook_name` join key, `accolades.category` enum + check constraint, `accolades.partner_user_id` for doubles cornhole, partial unique index for importer idempotency.
+- `00120_accolade_categories.sql` - `accolade_categories` table for admin-editable award metadata. Replaces the CHECK constraint on `accolades.category` with a FK so new categories can be added without migrations.
+- `00121_accolade_badge_images.sql` - Optional badge images for awards. `accolade_categories.icon_url` + `accolade-badges` storage bucket (public read, admin-only write).
 
 **IMPORTANT: Always create NEW migration files.** Never modify existing migrations that may have already been run. Use sequential numbering (00004, 00005, etc.) for new migrations. Each migration should be atomic and handle its own rollback safety (use `DROP ... IF EXISTS` before `CREATE`).
 
@@ -206,6 +221,21 @@ Handicap Index = Average of best 8 of last 20 differentials
 - `18` - Full 18 holes
 - `9-front` - Front nine (holes 1-9)
 - `9-back` - Back nine (holes 10-18)
+
+### Historical Import (issue #114)
+
+28+ years of Golfapalooza history land in the live tables (no parallel `historical_*` namespace). Workbook lives at `Golfapalooza History.xlsx` in the repo root and the parser at `src/lib/history/parse-workbook.ts` is pure-data (no DB).
+
+Phase 1a (accolades only) is in:
+- Schema: migration `00119_history_accolades.sql`
+- Trip seeding: `node scripts/seed-historical-trips.mjs` (idempotent — already run for 1997–2024 with course = Alpine Lake, status = `archived`)
+- Admin UI under `/admin/history`:
+  - `/admin/history/users` — workbook-name → user matcher (auto-match unambiguous + manual picker for the rest)
+  - `/admin/history/import` — accolade importer; gracefully skips awards whose winner isn't matched yet, doubles partner falls back to NULL when partner isn't matched
+  - `/admin/history/verify` — cross-checks per-category and per-user counts against the workbook's Summary sheet
+- User-facing payoff: profile page accolades section now shows category-aware icons and links the doubles cornhole partner
+
+Phases 1b (individual rounds + attendance) and 1c (scramble rounds) are not yet built. See issue #114 for the full multi-phase plan.
 
 ### Loozer Sponsorship Tree
 

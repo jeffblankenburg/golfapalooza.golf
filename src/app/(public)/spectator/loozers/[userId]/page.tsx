@@ -29,8 +29,10 @@ export default async function SpectatorLoozerProfilePage({
       .single(),
     adminClient
       .from("accolades")
-      .select("id, title, trip:trip_settings(trip_year)")
-      .eq("user_id", userId)
+      .select(
+        "id, title, category, user_id, partner_user_id, trip:trip_settings(trip_year), winner:users!accolades_user_id_fkey(id, display_name, full_name, avatar_url), partner:users!accolades_partner_user_id_fkey(id, display_name, full_name, avatar_url), category_meta:accolade_categories!accolades_category_fkey(category, title, short_label, icon, icon_url, description, sort_order)",
+      )
+      .or(`user_id.eq.${userId},partner_user_id.eq.${userId}`)
       .order("created_at", { ascending: false }),
     adminClient
       .from("gallery_tags")
@@ -118,7 +120,8 @@ export default async function SpectatorLoozerProfilePage({
         spectator
         data={{
           profile,
-          accolades: (accolades || []) as { id: string; title: string; trip: { trip_year: number }[] | { trip_year: number } | null }[],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          accolades: (accolades || []) as any,
           taggedPhotos,
           taggedPhotosCount: taggedPhotosCount ?? 0,
           handicapIndex: handicapRow?.handicap_index ?? null,

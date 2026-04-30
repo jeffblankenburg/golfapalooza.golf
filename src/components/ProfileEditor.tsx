@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatPhoneDisplay } from "@/lib/utils/phone";
 import { AvatarCropModal } from "@/components/AvatarCropModal";
+import { AccoladesList, type AccoladeData } from "@/components/profile/AccoladesList";
 
 interface ProfileData {
   id: string;
@@ -39,12 +40,6 @@ function getInitials(name: string): string {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
   return (name[0] || "?").toUpperCase();
-}
-
-interface AccoladeData {
-  id: string;
-  title: string;
-  trip: { trip_year: number }[] | { trip_year: number } | null;
 }
 
 export function ProfileEditor({
@@ -282,24 +277,7 @@ export function ProfileEditor({
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
             Accolades
           </h3>
-          <div className="space-y-2">
-            {accolades.map((a) => (
-              <div key={a.id} className="flex items-center gap-2">
-                <span className="text-amber-500">&#127942;</span>
-                <span className="text-sm font-medium text-gray-900">
-                  {a.title}
-                </span>
-                {(() => {
-                  const trip = Array.isArray(a.trip) ? a.trip[0] : a.trip;
-                  return trip?.trip_year ? (
-                    <span className="text-xs text-gray-400">
-                      ({trip.trip_year})
-                    </span>
-                  ) : null;
-                })()}
-              </div>
-            ))}
-          </div>
+          <AccoladesList accolades={accolades} profileUserId={profile.id} />
         </div>
       )}
 

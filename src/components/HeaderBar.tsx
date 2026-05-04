@@ -6,6 +6,7 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { NotificationDrawer } from "./NotificationDrawer";
 import { isPushSupported, getPermissionStatus, subscribeToPush } from "@/lib/notifications/push-client";
+import { syncBadge } from "@/lib/notifications/badge";
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -42,6 +43,11 @@ export function HeaderBar({
       subscribeToPush();
     }
   }, []);
+
+  // Keep the OS app-icon badge in sync with unread totals (notifications + chat).
+  useEffect(() => {
+    syncBadge(unreadCount + chatUnreadCount);
+  }, [unreadCount, chatUnreadCount]);
 
   const refetchCount = useCallback(() => {
     const supabase = createClient();

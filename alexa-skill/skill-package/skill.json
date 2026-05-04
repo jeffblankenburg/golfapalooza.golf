@@ -12,15 +12,19 @@
             "Alexa, ask Golfapalooza to shuffle",
             "Alexa, ask Golfapalooza to play the Alpine Lake song"
           ],
-          "keywords": ["golf", "music", "golfapalooza"],
-          "smallIconUri": "https://golfapalooza.golf/alexa/icon-108.png",
-          "largeIconUri": "https://golfapalooza.golf/alexa/icon-512.png"
+          "keywords": [
+            "golf",
+            "music",
+            "golfapalooza"
+          ]
         }
       },
       "isAvailableWorldwide": false,
-      "distributionCountries": ["US"],
+      "distributionCountries": [
+        "US"
+      ],
       "distributionMode": "PUBLIC",
-      "category": "MUSIC_AND_AUDIO",
+      "category": "STREAMING_SERVICE",
       "testingInstructions": "Say \"open Golfapalooza\" to launch and start music."
     },
     "apis": {
@@ -29,7 +33,9 @@
           "uri": "https://golfapalooza.golf/api/alexa"
         },
         "interfaces": [
-          { "type": "AUDIO_PLAYER" }
+          {
+            "type": "AUDIO_PLAYER"
+          }
         ]
       }
     },

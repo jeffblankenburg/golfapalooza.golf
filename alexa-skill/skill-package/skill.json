@@ -1,0 +1,50 @@
+{
+  "manifest": {
+    "manifestVersion": "1.0",
+    "publishingInformation": {
+      "locales": {
+        "en-US": {
+          "name": "Golfapalooza",
+          "summary": "Listen to original Golfapalooza songs.",
+          "description": "Play, shuffle, and request Golfapalooza songs by name. Try saying \"Alexa, open Golfapalooza\", \"Alexa, ask Golfapalooza to shuffle\", or \"Alexa, ask Golfapalooza to play [song name]\".",
+          "examplePhrases": [
+            "Alexa, open Golfapalooza",
+            "Alexa, ask Golfapalooza to shuffle",
+            "Alexa, ask Golfapalooza to play the Alpine Lake song"
+          ],
+          "keywords": ["golf", "music", "golfapalooza"],
+          "smallIconUri": "https://golfapalooza.golf/alexa/icon-108.png",
+          "largeIconUri": "https://golfapalooza.golf/alexa/icon-512.png"
+        }
+      },
+      "isAvailableWorldwide": false,
+      "distributionCountries": ["US"],
+      "distributionMode": "PUBLIC",
+      "category": "MUSIC_AND_AUDIO",
+      "testingInstructions": "Say \"open Golfapalooza\" to launch and start music."
+    },
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "uri": "https://golfapalooza.golf/api/alexa"
+        },
+        "interfaces": [
+          { "type": "AUDIO_PLAYER" }
+        ]
+      }
+    },
+    "privacyAndCompliance": {
+      "allowsPurchases": false,
+      "usesPersonalInfo": false,
+      "isChildDirected": false,
+      "isExportCompliant": true,
+      "containsAds": false,
+      "locales": {
+        "en-US": {
+          "privacyPolicyUrl": "https://golfapalooza.golf/privacy",
+          "termsOfUseUrl": "https://golfapalooza.golf/terms"
+        }
+      }
+    }
+  }
+}

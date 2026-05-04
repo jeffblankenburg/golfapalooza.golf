@@ -1,0 +1,55 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "golfapalooza",
+      "intents": [
+        { "name": "AMAZON.CancelIntent", "samples": [] },
+        { "name": "AMAZON.StopIntent", "samples": [] },
+        { "name": "AMAZON.HelpIntent", "samples": [] },
+        { "name": "AMAZON.PauseIntent", "samples": [] },
+        { "name": "AMAZON.ResumeIntent", "samples": [] },
+        { "name": "AMAZON.NextIntent", "samples": [] },
+        { "name": "AMAZON.PreviousIntent", "samples": [] },
+        { "name": "AMAZON.StartOverIntent", "samples": [] },
+        { "name": "AMAZON.LoopOnIntent", "samples": [] },
+        { "name": "AMAZON.LoopOffIntent", "samples": [] },
+        { "name": "AMAZON.ShuffleOnIntent", "samples": [] },
+        { "name": "AMAZON.ShuffleOffIntent", "samples": [] },
+        {
+          "name": "PlayMusicIntent",
+          "samples": [
+            "play music",
+            "play golfapalooza music",
+            "play some music",
+            "play",
+            "start playing",
+            "start the music"
+          ]
+        },
+        {
+          "name": "PlaySongIntent",
+          "slots": [
+            { "name": "song", "type": "AMAZON.SearchQuery" }
+          ],
+          "samples": [
+            "play the song {song}",
+            "play song {song}",
+            "play {song}",
+            "I want to hear {song}"
+          ]
+        },
+        {
+          "name": "ShuffleIntent",
+          "samples": [
+            "shuffle",
+            "shuffle music",
+            "shuffle songs",
+            "shuffle the songs",
+            "play shuffle",
+            "play shuffled"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -36,7 +36,10 @@ export async function updateSession(request: NextRequest) {
   const isAuthRoute =
     request.nextUrl.pathname.startsWith("/login") ||
     request.nextUrl.pathname.startsWith("/verify");
-  const isPublicRoute = request.nextUrl.pathname.startsWith("/spectator");
+  const isPublicRoute =
+    request.nextUrl.pathname.startsWith("/spectator") ||
+    request.nextUrl.pathname === "/privacy" ||
+    request.nextUrl.pathname === "/terms";
   const isProtectedRoute =
     !isAuthRoute &&
     !isPublicRoute &&

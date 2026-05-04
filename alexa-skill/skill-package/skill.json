@@ -47,8 +47,8 @@
       "containsAds": false,
       "locales": {
         "en-US": {
-          "privacyPolicyUrl": "https://golfapalooza.golf/privacy",
-          "termsOfUseUrl": "https://golfapalooza.golf/terms"
+          "privacyPolicyUrl": "https://www.golfapalooza.app/privacy",
+          "termsOfUseUrl": "https://www.golfapalooza.app/terms"
         }
       }
     }

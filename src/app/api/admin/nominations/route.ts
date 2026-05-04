@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkPermissionAccess } from "@/lib/permissions-server";
+import { sendSms } from "@/lib/sms/twilio";
 
 /**
  * @swagger
@@ -211,21 +212,26 @@ export async function PATCH(request: Request) {
       console.error("Failed to update nomination status:", updateError);
     }
 
-    // 5. Send invitation OTP to the new user
-    const { error: otpError } = await adminClient.auth.signInWithOtp({
-      phone: `+1${phone10}`,
-    });
-
-    if (otpError) {
-      console.error("Failed to send invitation OTP:", otpError);
-      // Non-fatal — user is created, they can request OTP from login page
+    // 5. Send the custom invitation SMS via Twilio (skip if no message provided).
+    //    The rookie will receive the standard Supabase OTP later, when they
+    //    open the app and enter their phone number to log in.
+    let smsSent = false;
+    let smsError: string | null = null;
+    if (inviteMessage && inviteMessage.trim()) {
+      const result = await sendSms(`+1${phone10}`, inviteMessage.trim());
+      smsSent = result.ok;
+      if (!result.ok) {
+        smsError = result.error || "Unknown SMS error";
+        console.error("Failed to send invitation SMS:", smsError);
+      }
     }
 
     return NextResponse.json({
       success: true,
       action: "approved",
       userId: authUser.user.id,
-      otpSent: !otpError,
+      smsSent,
+      smsError,
       phone: phone10,
       inviteMessage: inviteMessage || null,
     });

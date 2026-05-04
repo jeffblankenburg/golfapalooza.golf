@@ -88,10 +88,10 @@ export function NominationManager() {
         return;
       }
 
-      // Open native SMS with the invite message
-      if (inviteMessage.trim() && data.phone) {
-        const smsUrl = `sms:+1${data.phone}&body=${encodeURIComponent(inviteMessage.trim())}`;
-        window.open(smsUrl, "_blank");
+      if (inviteMessage.trim() && !data.smsSent) {
+        setError(
+          `Account created, but the invitation SMS failed to send${data.smsError ? `: ${data.smsError}` : ""}.`
+        );
       }
 
       setApproveModal(null);
@@ -326,7 +326,7 @@ export function NominationManager() {
                 rows={3}
               />
               <p className="text-xs text-gray-400 mt-1">
-                This message will be sent to the new rookie via SMS. Leave blank to skip.
+                Sent directly via Twilio to the new rookie&apos;s phone. Leave blank to skip.
               </p>
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex gap-2">

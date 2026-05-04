@@ -30,7 +30,7 @@
     "apis": {
       "custom": {
         "endpoint": {
-          "uri": "https://golfapalooza.golf/api/alexa"
+          "uri": "https://www.golfapalooza.app/api/alexa"
         },
         "interfaces": [
           {

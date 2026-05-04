@@ -35,7 +35,20 @@ const timestampVerifier = new TimestampVerifier();
  *       403:
  *         description: Invalid signature or stale timestamp
  */
+// Temporary diagnostic — confirms the route is deployed and that
+// ALEXA_SKILL_ID is wired up in this environment. Remove once verified.
+export async function GET() {
+  const expected = "amzn1.ask.skill.52d1842a-dff0-4292-90f3-ef9d2f52bd3f";
+  return NextResponse.json({
+    routeDeployed: true,
+    nodeEnv: process.env.NODE_ENV,
+    hasSkillId: Boolean(process.env.ALEXA_SKILL_ID),
+    skillIdMatches: process.env.ALEXA_SKILL_ID === expected,
+  });
+}
+
 export async function POST(req: NextRequest) {
+  console.log("[alexa] POST received");
   const rawBody = await req.text();
   const headers: Record<string, string> = {};
   req.headers.forEach((value, key) => {
@@ -48,6 +61,7 @@ export async function POST(req: NextRequest) {
         signatureVerifier.verify(rawBody, headers),
         timestampVerifier.verify(rawBody),
       ]);
+      console.log("[alexa] verification passed");
     } catch (err) {
       console.error("[alexa] verification failed", err);
       return new NextResponse("Forbidden", { status: 403 });
@@ -61,8 +75,17 @@ export async function POST(req: NextRequest) {
     return new NextResponse("Bad Request", { status: 400 });
   }
 
+  console.log("[alexa] request type:", envelope?.request?.type);
+  console.log(
+    "[alexa] envelope skillId:",
+    envelope?.session?.application?.applicationId ??
+      envelope?.context?.System?.application?.applicationId
+  );
+  console.log("[alexa] env skillId set:", Boolean(process.env.ALEXA_SKILL_ID));
+
   try {
     const response = await skill.invoke(envelope);
+    console.log("[alexa] invoke ok");
     return NextResponse.json(response);
   } catch (err) {
     console.error("[alexa] skill.invoke failed", err);

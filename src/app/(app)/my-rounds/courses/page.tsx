@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatCourseName } from "@/lib/utils/course-display";
+import AddCourseButton from "@/components/my-rounds/AddCourseButton";
 
 export default async function CoursesPage() {
   const supabase = await createClient();
@@ -20,12 +21,7 @@ export default async function CoursesPage() {
           <Link href="/my-rounds" className="text-sm text-gray-500 hover:text-gray-700">← My Rounds</Link>
           <h1 className="text-2xl font-bold text-gray-900 mt-1">Courses</h1>
         </div>
-        <Link
-          href="/my-rounds/courses/new"
-          className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors"
-        >
-          + Add
-        </Link>
+        <AddCourseButton />
       </div>
 
       <div className="space-y-2">
@@ -50,9 +46,9 @@ export default async function CoursesPage() {
         {(!courses || courses.length === 0) && (
           <div className="text-center py-12">
             <p className="text-gray-500 mb-3">No courses yet</p>
-            <Link href="/my-rounds/courses/new" className="text-green-700 font-medium">
+            <AddCourseButton className="text-green-700 font-medium">
               Add your first course →
-            </Link>
+            </AddCourseButton>
           </div>
         )}
       </div>

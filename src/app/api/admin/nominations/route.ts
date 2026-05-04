@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkPermissionAccess } from "@/lib/permissions-server";
-import { sendSms } from "@/lib/sms/twilio";
 
 /**
  * @swagger
@@ -212,26 +211,14 @@ export async function PATCH(request: Request) {
       console.error("Failed to update nomination status:", updateError);
     }
 
-    // 5. Send the custom invitation SMS via Twilio (skip if no message provided).
-    //    The rookie will receive the standard Supabase OTP later, when they
-    //    open the app and enter their phone number to log in.
-    let smsSent = false;
-    let smsError: string | null = null;
-    if (inviteMessage && inviteMessage.trim()) {
-      const result = await sendSms(`+1${phone10}`, inviteMessage.trim());
-      smsSent = result.ok;
-      if (!result.ok) {
-        smsError = result.error || "Unknown SMS error";
-        console.error("Failed to send invitation SMS:", smsError);
-      }
-    }
-
+    // 5. Return the phone + message so the admin's browser can launch the
+    //    native Messages app via `sms:` URL. The admin sends the invite from
+    //    their own number — zero ongoing SMS-provider cost. The rookie gets
+    //    the standard Supabase OTP later, when they log in for the first time.
     return NextResponse.json({
       success: true,
       action: "approved",
       userId: authUser.user.id,
-      smsSent,
-      smsError,
       phone: phone10,
       inviteMessage: inviteMessage || null,
     });

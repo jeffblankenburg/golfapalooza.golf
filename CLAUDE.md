@@ -25,10 +25,6 @@ OPENROUTER_SITE_URL=https://golfapalooza.golf # Optional OpenRouter attribution
 OPENROUTER_APP_NAME=Golfapalooza              # Optional OpenRouter attribution
 NEXT_PUBLIC_GIPHY_API_KEY=your-giphy-api-key  # For GIF search in chat
 NEXT_PUBLIC_MAPBOX_TOKEN=your-mapbox-token    # For satellite maps in scoring
-TWILIO_ACCOUNT_SID=your-twilio-account-sid    # Same Twilio account Supabase uses for OTP
-TWILIO_AUTH_TOKEN=your-twilio-auth-token
-TWILIO_MESSAGING_SERVICE_SID=your-twilio-msg-svc-sid # Preferred sender (matches Supabase setup)
-TWILIO_FROM_NUMBER=+1XXXXXXXXXX               # Fallback if no Messaging Service SID
 ```
 
 ## API Documentation

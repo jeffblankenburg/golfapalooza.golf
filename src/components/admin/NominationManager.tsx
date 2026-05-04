@@ -93,10 +93,13 @@ export function NominationManager() {
         return;
       }
 
-      if (inviteMessage.trim() && !data.smsSent) {
-        setError(
-          `Account created, but the invitation SMS failed to send${data.smsError ? `: ${data.smsError}` : ""}.`
-        );
+      // Open the admin's native Messages app with the invite pre-filled.
+      // iOS expects `&body=`, Android expects `?body=` — pick the right one.
+      if (inviteMessage.trim() && data.phone) {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const sep = isIOS ? "&" : "?";
+        const smsUrl = `sms:+1${data.phone}${sep}body=${encodeURIComponent(inviteMessage.trim())}`;
+        window.location.href = smsUrl;
       }
 
       setApproveModal(null);
@@ -386,7 +389,7 @@ export function NominationManager() {
                 rows={3}
               />
               <p className="text-xs text-gray-400 mt-1">
-                Sent directly via Twilio to the new rookie&apos;s phone. Leave blank to skip.
+                Opens your phone&apos;s Messages app with this text pre-filled — you tap Send. Leave blank to skip.
               </p>
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex gap-2">

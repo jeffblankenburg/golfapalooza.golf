@@ -1,6 +1,6 @@
 import type { HandlerInput, RequestHandler, ErrorHandler } from "ask-sdk-core";
 import type { interfaces } from "ask-sdk-model";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@supabase/supabase-js";
 
 type Song = {
   id: string;
@@ -10,12 +10,19 @@ type Song = {
   duration_seconds: number | null;
 };
 
-type PlaybackToken = {
-  songId: string;
-  queue: string[];
-  index: number;
-  shuffle: boolean;
-};
+// Alexa caps stream tokens at 1024 chars, so we keep them slim and
+// reconstruct the queue deterministically each request.
+type PlaybackToken =
+  | { m: "seq"; s: string }
+  | { m: "shuf"; seed: number; s: string };
+
+function supabase() {
+  return createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 const encodeToken = (t: PlaybackToken) =>
   Buffer.from(JSON.stringify(t)).toString("base64url");
@@ -29,9 +36,45 @@ const decodeToken = (s: string | undefined): PlaybackToken | null => {
   }
 };
 
+function mulberry32(seed: number) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = seed;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  const rng = mulberry32(seed);
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function buildQueue(songs: Song[], token: PlaybackToken): Song[] {
+  return token.m === "shuf" ? seededShuffle(songs, token.seed) : songs;
+}
+
+function findNeighbor(
+  songs: Song[],
+  token: PlaybackToken,
+  delta: 1 | -1
+): Song | null {
+  const queue = buildQueue(songs, token);
+  const idx = queue.findIndex((s) => s.id === token.s);
+  if (idx < 0) return null;
+  const next = idx + delta;
+  if (next < 0 || next >= queue.length) return null;
+  return queue[next];
+}
+
 async function loadCatalog(): Promise<Song[]> {
-  const supabase = createAdminClient();
-  const { data, error } = await supabase
+  const { data, error } = await supabase()
     .from("songs")
     .select("id, title, mp3_url, art_url, duration_seconds")
     .order("sort_order", { ascending: true });
@@ -40,8 +83,7 @@ async function loadCatalog(): Promise<Song[]> {
 }
 
 async function recordPlay(songId: string) {
-  const supabase = createAdminClient();
-  await supabase
+  await supabase()
     .from("song_plays")
     .insert({ song_id: songId, source: "alexa", user_id: null });
 }
@@ -56,15 +98,6 @@ function findSong(query: string, songs: Song[]): Song | null {
     return t.includes(q) || q.includes(t);
   });
   return contains ?? null;
-}
-
-function shuffle<T>(arr: T[]): T[] {
-  const out = [...arr];
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
 }
 
 function buildPlay(
@@ -95,8 +128,6 @@ function buildPlay(
   };
 }
 
-// ---------- intent handlers ----------
-
 const LaunchRequestHandler: RequestHandler = {
   canHandle(input) {
     return input.requestEnvelope.request.type === "LaunchRequest";
@@ -109,14 +140,8 @@ const LaunchRequestHandler: RequestHandler = {
         .withShouldEndSession(true)
         .getResponse();
     }
-    const queue = songs.map((s) => s.id);
     const first = songs[0];
-    const token: PlaybackToken = {
-      songId: first.id,
-      queue,
-      index: 0,
-      shuffle: false,
-    };
+    const token: PlaybackToken = { m: "seq", s: first.id };
     return input.responseBuilder
       .speak(`Playing ${first.title}.`)
       .addDirective(buildPlay(first, token))
@@ -129,7 +154,7 @@ const PlayMusicIntentHandler: RequestHandler = {
     const r = input.requestEnvelope.request;
     return r.type === "IntentRequest" && r.intent.name === "PlayMusicIntent";
   },
-  async handle(input) {
+  handle(input) {
     return LaunchRequestHandler.handle(input);
   },
 };
@@ -151,15 +176,10 @@ const ShuffleIntentHandler: RequestHandler = {
         .withShouldEndSession(true)
         .getResponse();
     }
-    const shuffled = shuffle(songs);
-    const queue = shuffled.map((s) => s.id);
+    const seed = (Math.random() * 0x7fffffff) | 0;
+    const shuffled = seededShuffle(songs, seed);
     const first = shuffled[0];
-    const token: PlaybackToken = {
-      songId: first.id,
-      queue,
-      index: 0,
-      shuffle: true,
-    };
+    const token: PlaybackToken = { m: "shuf", seed, s: first.id };
     return input.responseBuilder
       .speak(`Shuffling. Playing ${first.title}.`)
       .addDirective(buildPlay(first, token))
@@ -191,18 +211,7 @@ const PlaySongIntentHandler: RequestHandler = {
         .speak(`I couldn't find a song called ${query}.`)
         .getResponse();
     }
-    // Queue: start at match, then continue with the rest in catalog order.
-    const startIdx = songs.findIndex((s) => s.id === match.id);
-    const queue = [
-      ...songs.slice(startIdx).map((s) => s.id),
-      ...songs.slice(0, startIdx).map((s) => s.id),
-    ];
-    const token: PlaybackToken = {
-      songId: match.id,
-      queue,
-      index: 0,
-      shuffle: false,
-    };
+    const token: PlaybackToken = { m: "seq", s: match.id };
     return input.responseBuilder
       .speak(`Playing ${match.title}.`)
       .addDirective(buildPlay(match, token))
@@ -238,10 +247,9 @@ const ResumeIntentHandler: RequestHandler = {
     const offsetMs = ctx?.offsetInMilliseconds ?? 0;
     const songs = await loadCatalog();
     if (!decoded) {
-      // No prior token — fall back to launch behavior.
       return LaunchRequestHandler.handle(input);
     }
-    const song = songs.find((s) => s.id === decoded.songId);
+    const song = songs.find((s) => s.id === decoded.s);
     if (!song) {
       return input.responseBuilder
         .speak("That song is no longer available.")
@@ -259,22 +267,14 @@ async function step(input: HandlerInput, delta: 1 | -1) {
   if (!decoded) {
     return input.responseBuilder.speak("Nothing is playing.").getResponse();
   }
-  const newIndex = decoded.index + delta;
-  if (newIndex < 0 || newIndex >= decoded.queue.length) {
+  const songs = await loadCatalog();
+  const next = findNeighbor(songs, decoded, delta);
+  if (!next) {
     return input.responseBuilder
       .speak(delta > 0 ? "End of the playlist." : "Already at the start.")
       .getResponse();
   }
-  const songs = await loadCatalog();
-  const next = songs.find((s) => s.id === decoded.queue[newIndex]);
-  if (!next) {
-    return input.responseBuilder.speak("Song not found.").getResponse();
-  }
-  const token: PlaybackToken = {
-    ...decoded,
-    songId: next.id,
-    index: newIndex,
-  };
+  const token: PlaybackToken = { ...decoded, s: next.id };
   return input.responseBuilder.addDirective(buildPlay(next, token)).getResponse();
 }
 
@@ -322,8 +322,6 @@ const SessionEndedRequestHandler: RequestHandler = {
   },
 };
 
-// ---------- AudioPlayer event handlers (no session/voice response) ----------
-
 const PlaybackNearlyFinishedHandler: RequestHandler = {
   canHandle(input) {
     return (
@@ -337,18 +335,10 @@ const PlaybackNearlyFinishedHandler: RequestHandler = {
     };
     const decoded = decodeToken(r.token);
     if (!decoded) return input.responseBuilder.getResponse();
-    const nextIndex = decoded.index + 1;
-    if (nextIndex >= decoded.queue.length) {
-      return input.responseBuilder.getResponse();
-    }
     const songs = await loadCatalog();
-    const next = songs.find((s) => s.id === decoded.queue[nextIndex]);
+    const next = findNeighbor(songs, decoded, 1);
     if (!next) return input.responseBuilder.getResponse();
-    const token: PlaybackToken = {
-      ...decoded,
-      songId: next.id,
-      index: nextIndex,
-    };
+    const token: PlaybackToken = { ...decoded, s: next.id };
     return input.responseBuilder
       .addDirective(buildPlay(next, token, { enqueueAfter: r.token }))
       .getResponse();
@@ -365,7 +355,7 @@ const PlaybackFinishedHandler: RequestHandler = {
       token: string;
     };
     const decoded = decodeToken(r.token);
-    if (decoded) await recordPlay(decoded.songId);
+    if (decoded) await recordPlay(decoded.s);
     return input.responseBuilder.getResponse();
   },
 };

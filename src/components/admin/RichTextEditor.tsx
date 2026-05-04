@@ -9,6 +9,62 @@ import { Markdown } from "tiptap-markdown";
 import { useEffect, useCallback, useState } from "react";
 import { ArticleImageDrawer } from "./ArticleImageDrawer";
 
+const SIZE_PRESETS: { label: string; value: string | null }[] = [
+  { label: "Small", value: "33%" },
+  { label: "Medium", value: "66%" },
+  { label: "Full", value: null },
+];
+
+// Image extension with a `width` attribute that round-trips through markdown.
+// When width is set, the image serializes as inline HTML so the `style` survives;
+// when null, it falls back to the standard `![alt](src)` markdown output.
+const ResizableImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null as string | null,
+        parseHTML: (el) => {
+          const style = (el as HTMLElement).getAttribute("style") || "";
+          const m = style.match(/width:\s*([^;]+)/i);
+          if (m) return m[1].trim();
+          return (el as HTMLElement).getAttribute("width") || null;
+        },
+        renderHTML: (attrs: { width?: string | null }) => {
+          if (!attrs.width) return {};
+          return { style: `width: ${attrs.width}` };
+        },
+      },
+    };
+  },
+  addStorage() {
+    const parent = this.parent?.() ?? {};
+    return {
+      ...parent,
+      markdown: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        serialize(state: any, node: any) {
+          const src: string | null = node.attrs.src;
+          const alt: string = node.attrs.alt || "";
+          const width: string | null = node.attrs.width;
+          if (!src) return;
+          if (width) {
+            const escAlt = alt.replace(/"/g, "&quot;");
+            const escSrc = src.replace(/"/g, "&quot;");
+            state.write(
+              `<img src="${escSrc}" alt="${escAlt}" style="width: ${width}">`
+            );
+          } else {
+            const altText = alt.replace(/[\[\]]/g, "");
+            state.write(`![${altText}](${src})`);
+          }
+        },
+        parse: {},
+      },
+    };
+  },
+});
+
 interface RichTextEditorProps {
   content: string; // markdown
   onChange: (markdown: string) => void;
@@ -18,6 +74,8 @@ export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
   const [linkUrl, setLinkUrl] = useState("");
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [showImagePicker, setShowImagePicker] = useState(false);
+  const [imageSelected, setImageSelected] = useState(false);
+  const [imageWidth, setImageWidth] = useState<string | null>(null);
 
   const editor = useEditor({
     extensions: [
@@ -29,7 +87,7 @@ export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
         openOnClick: false,
         HTMLAttributes: { class: "text-green-700 underline font-medium" },
       }),
-      Image.configure({
+      ResizableImage.configure({
         HTMLAttributes: { class: "rounded-xl max-w-full" },
       }),
       Markdown.configure({
@@ -59,6 +117,33 @@ export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
       editor.commands.setContent(content);
     }
   }, [content, editor]);
+
+  // Track whether an image is selected so we can show the size bar.
+  useEffect(() => {
+    if (!editor) return;
+    const update = () => {
+      const active = editor.isActive("image");
+      setImageSelected(active);
+      setImageWidth(
+        active ? (editor.getAttributes("image").width as string | null) ?? null : null
+      );
+    };
+    update();
+    editor.on("selectionUpdate", update);
+    editor.on("transaction", update);
+    return () => {
+      editor.off("selectionUpdate", update);
+      editor.off("transaction", update);
+    };
+  }, [editor]);
+
+  const setImageSize = useCallback(
+    (width: string | null) => {
+      if (!editor) return;
+      editor.chain().focus().updateAttributes("image", { width }).run();
+    },
+    [editor]
+  );
 
   const addLink = useCallback(() => {
     if (!editor || !linkUrl) return;
@@ -194,6 +279,30 @@ export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
         }}
         onClose={() => setShowImagePicker(false)}
       />
+
+      {/* Image size bar — appears when an image is selected */}
+      {imageSelected && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 border-x border-gray-300">
+          <span className="text-xs font-medium text-gray-500">Image size:</span>
+          {SIZE_PRESETS.map((preset) => {
+            const active = (imageWidth ?? null) === preset.value;
+            return (
+              <button
+                key={preset.label}
+                type="button"
+                onClick={() => setImageSize(preset.value)}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors ${
+                  active
+                    ? "bg-green-100 text-green-700"
+                    : "text-gray-600 hover:bg-gray-200 active:bg-gray-300"
+                }`}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Editor area */}
       <div className="border border-gray-300 rounded-b-xl overflow-hidden">

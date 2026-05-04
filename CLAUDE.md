@@ -119,6 +119,7 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 | DELETE | `/api/admin/users?id={userId}` | Delete a user |
 | GET | `/api/admin/nominations` | List all rookie nominations |
 | PATCH | `/api/admin/nominations` | Approve or reject a nomination |
+| DELETE | `/api/admin/nominations?id={nominationId}` | Delete a rejected nomination (only when `status='rejected'`) |
 | GET | `/api/admin/fake-ads` | List all fake ads (includes inactive) |
 | POST | `/api/admin/fake-ads` | Upload a new fake ad (multipart: `file`, `alt_text`, `tagged_user_ids`, `active`) |
 | PATCH | `/api/admin/fake-ads/{id}` | Update alt_text, active, or tags |

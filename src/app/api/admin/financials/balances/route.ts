@@ -35,6 +35,7 @@ export async function GET() {
       adminClient
         .from("users")
         .select("id, display_name, full_name, avatar_url")
+        .eq("is_system", false)
         .order("display_name"),
       adminClient
         .from("financial_contest_participants")

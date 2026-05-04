@@ -243,3 +243,73 @@ export async function PATCH(request: Request) {
     );
   }
 }
+
+/**
+ * @swagger
+ * /api/admin/nominations:
+ *   delete:
+ *     summary: Delete a rejected rookie nomination
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: query
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Nomination deleted
+ *       400:
+ *         description: Nomination is not rejected
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Nomination not found
+ */
+export async function DELETE(request: Request) {
+  const admin = await checkPermissionAccess("manage_nominations");
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return NextResponse.json({ error: "id is required" }, { status: 400 });
+  }
+
+  const adminClient = createAdminClient();
+
+  const { data: nomination, error: fetchError } = await adminClient
+    .from("rookie_nominations")
+    .select("id, status")
+    .eq("id", id)
+    .single();
+
+  if (fetchError || !nomination) {
+    return NextResponse.json(
+      { error: "Nomination not found" },
+      { status: 404 }
+    );
+  }
+
+  if (nomination.status !== "rejected") {
+    return NextResponse.json(
+      { error: "Only rejected nominations can be deleted" },
+      { status: 400 }
+    );
+  }
+
+  const { error: deleteError } = await adminClient
+    .from("rookie_nominations")
+    .delete()
+    .eq("id", id);
+
+  if (deleteError) {
+    return NextResponse.json({ error: deleteError.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}

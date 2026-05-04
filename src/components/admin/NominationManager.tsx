@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { ConfirmModal } from "@/components/admin/ConfirmModal";
 
 interface Nomination {
   id: string;
@@ -37,6 +38,10 @@ export function NominationManager() {
   } | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const fetchNominations = async () => {
     try {
@@ -60,7 +65,7 @@ export function NominationManager() {
 
   const handleApprove = (nom: Nomination) => {
     setInviteMessage(
-      `Hey ${nom.first_name}! You've been invited to join Golfapalooza. Download the app and log in with your phone number to get started!`
+      `Hey ${nom.first_name}! You've been invited to join Golfapalooza. Get started at https://golfapalooza.app!`
     );
     setApproveModal({
       nominationId: nom.id,
@@ -138,6 +143,36 @@ export function NominationManager() {
     }
   };
 
+  const handleDelete = (nom: Nomination) => {
+    setConfirmDelete({
+      id: nom.id,
+      name: `${nom.first_name} ${nom.last_name}`,
+    });
+  };
+
+  const submitDelete = async () => {
+    if (!confirmDelete) return;
+    const target = confirmDelete;
+    setConfirmDelete(null);
+    setProcessing(true);
+    try {
+      const res = await fetch(
+        `/api/admin/nominations?id=${encodeURIComponent(target.id)}`,
+        { method: "DELETE" }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to delete nomination");
+        return;
+      }
+      fetchNominations();
+    } catch {
+      setError("Failed to delete nomination");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const pendingCount = nominations.filter((n) => n.status === "pending").length;
 
   if (loading) {
@@ -174,7 +209,7 @@ export function NominationManager() {
             {nominations.map((nom) => (
               <div
                 key={nom.id}
-                className="bg-white border border-gray-200 rounded-xl p-3"
+                className="relative bg-white border border-gray-200 rounded-xl p-3"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -241,9 +276,34 @@ export function NominationManager() {
                 )}
 
                 {nom.status === "rejected" && nom.rejection_reason && (
-                  <p className="text-xs text-gray-500 mt-1 bg-red-50 p-2 rounded-lg">
+                  <p className="text-xs text-gray-500 mt-1 bg-red-50 p-2 rounded-lg pr-9">
                     {nom.rejection_reason}
                   </p>
+                )}
+
+                {nom.status === "rejected" && (
+                  <button
+                    onClick={() => handleDelete(nom)}
+                    disabled={processing}
+                    aria-label="Delete nomination"
+                    title="Delete nomination"
+                    className="absolute bottom-2 right-2 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg active:scale-95 transition disabled:opacity-50"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.8}
+                      stroke="currentColor"
+                      className="w-4 h-4"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                      />
+                    </svg>
+                  </button>
                 )}
               </div>
             ))}
@@ -347,6 +407,20 @@ export function NominationManager() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={!!confirmDelete}
+        title="Delete Nomination"
+        message={
+          confirmDelete
+            ? `Permanently delete the rejected nomination for ${confirmDelete.name}? This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        destructive
+        onConfirm={submitDelete}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

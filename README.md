@@ -199,7 +199,8 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 ### Fake Ads
 - Admin-uploaded humor banner ads shown on the authenticated home page, spectator home, and Loozer profile pages
 - Ads can be tagged with zero or more Loozers (many-to-many)
-- Home page: random carousel of active ads, auto-advances every 6s with dot navigation and swipe support; clicking a tagged ad jumps to the tagged Loozer's profile (random if multiple tags)
+- Authenticated home page: random carousel of active ads, auto-advances every 6s with dot navigation and swipe support; clicking a tagged ad jumps to the tagged Loozer's profile (random if multiple tags)
+- Spectator home: same carousel but non-clickable, since spectators do not have access to Loozer profiles
 - Loozer profile page: only ads tagged with that Loozer appear, rendered as a non-clickable static carousel after the Bio
 - Admin page at `/admin/fake-ads`: upload a 1200&times;400 image (3:1, min width 1200px for retina sharpness — validated client-side), set alt text, multi-select Loozers to tag, toggle active/inactive, delete
 
@@ -208,6 +209,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Markdown content with internal app links
 - Pinned notes to specific pages (financials, my-rounds, daily-games, options)
 - Expandable/collapsible notes
+- Read-only mirror at `/spectator/notebook` for the public spectator site
 
 ### Player Profiles
 - Display name, full name, email, phone
@@ -225,8 +227,8 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Every Loozer (except the founders) was brought in by another Loozer — that relationship is captured by `is_founder` and `sponsor_id` on `users`
 - Admin sets a Founding Father toggle or picks a sponsor from a searchable list (avatar + name); self and descendants are filtered out to prevent cycles
 - A Loozer with sponsees can't be deleted until those sponsees are reassigned
-- `/loozers` and `/spectator/loozers` have a Grid | Tree toggle (persisted per-device); the Tree view is a vertical org chart with pinch-zoom and pan
-- On the authenticated tree, the view opens centered on the current user's node and highlights it
+- `/loozers` (authenticated only) has a Grid | Tree toggle (persisted per-device); the Tree view is a vertical org chart with pinch-zoom and pan, opens centered on the current user's node and highlights it
+- The spectator site does not expose Loozer profiles or the family tree
 - Financial-only users are excluded from the tree
 
 ### Course Information

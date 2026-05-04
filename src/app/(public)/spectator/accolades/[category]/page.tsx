@@ -13,7 +13,7 @@ export default async function SpectatorAccoladeHistoryPage({
   return (
     <AccoladeHistory
       section={section}
-      loozerHrefBase="/spectator/loozers"
+      loozerHrefBase={null}
       backHref="/spectator/accolades"
     />
   );

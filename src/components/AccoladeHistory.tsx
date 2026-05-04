@@ -13,7 +13,8 @@ export function AccoladeHistory({
   backHref,
 }: {
   section: AccoladeCategorySection;
-  loozerHrefBase: string;
+  /** When null, winner names render as plain text (used by spectator pages where Loozer profiles are not exposed). */
+  loozerHrefBase: string | null;
   backHref: string;
 }) {
   // Reverse-chronological. Undated rows fall to the bottom.
@@ -75,7 +76,7 @@ function Row({
 }: {
   row: AccoladeRow;
   customLabel: boolean;
-  loozerHrefBase: string;
+  loozerHrefBase: string | null;
 }) {
   const teammates = [row.winner, row.partner].filter(
     (u): u is NonNullable<typeof u> => !!u,
@@ -89,13 +90,9 @@ function Row({
         {teammates.length === 0 ? (
           <span className="text-gray-400 italic">unmatched</span>
         ) : (
-          teammates.map((u, i) => (
-            <Fragment key={u.id}>
-              {i > 0 && <span className="text-gray-400">&</span>}
-              <Link
-                href={`${loozerHrefBase}/${u.id}`}
-                className="inline-flex items-center gap-1.5 text-green-700 hover:underline font-medium"
-              >
+          teammates.map((u, i) => {
+            const inner = (
+              <>
                 {u.avatar_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -109,9 +106,26 @@ function Row({
                   </span>
                 )}
                 <span>{u.display_name}</span>
-              </Link>
-            </Fragment>
-          ))
+              </>
+            );
+            return (
+              <Fragment key={u.id}>
+                {i > 0 && <span className="text-gray-400">&</span>}
+                {loozerHrefBase ? (
+                  <Link
+                    href={`${loozerHrefBase}/${u.id}`}
+                    className="inline-flex items-center gap-1.5 text-green-700 hover:underline font-medium"
+                  >
+                    {inner}
+                  </Link>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-gray-900 font-medium">
+                    {inner}
+                  </span>
+                )}
+              </Fragment>
+            );
+          })
         )}
         {customLabel && row.custom_title && (
           <span className="text-gray-500 text-xs">— {row.custom_title}</span>

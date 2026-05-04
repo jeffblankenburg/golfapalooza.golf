@@ -76,12 +76,12 @@ const spectatorQuickLinks = [
     icon: <SvgIcon src="/noun-golf-flag-5010192.svg" />,
   },
   {
-    href: "/spectator/loozers",
-    label: "Loozers",
+    href: "/spectator/notebook",
+    label: "Notebook",
     color: "bg-cyan-50 text-cyan-700",
     icon: (
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
       </svg>
     ),
   },
@@ -212,9 +212,6 @@ export function SpectatorHomeContent({
         </Link>
       )}
 
-      {/* Fake Ads (humor banners) */}
-      <FakeAdCarousel profileHref="/spectator/loozers" />
-
       {/* Quick Links */}
       <div className="mt-3">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
@@ -240,6 +237,9 @@ export function SpectatorHomeContent({
           ))}
         </div>
       </div>
+
+      {/* Fake Ads (humor banners) */}
+      <FakeAdCarousel clickable={false} maxAds={3} />
     </div>
   );
 }

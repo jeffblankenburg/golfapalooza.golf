@@ -252,7 +252,7 @@ Rules enforced by `/api/admin/users`:
 Surface area:
 - Admin: founder toggle + searchable sponsor picker in the user edit modal
 - Profile pages: "Sponsor: [avatar] X" line, or "★ Founding Father" badge
-- `/loozers` and `/spectator/loozers`: Grid | Tree toggle (persisted in localStorage). Tree is a vertical org chart with pinch-zoom + pan. Authenticated tree centers on the current user's node and highlights it.
+- `/loozers` (authenticated only): Grid | Tree toggle (persisted in localStorage). Tree is a vertical org chart with pinch-zoom + pan, centered on the current user's node and highlighted. The spectator site does not expose Loozer profiles or the family tree.
 
 ### Polls
 

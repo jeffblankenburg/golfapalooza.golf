@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { ConfirmModal } from "./ConfirmModal";
 import { BottomDrawer } from "./BottomDrawer";
 import { naiveDatetimeToUTC, formatInTimezone, getTimezoneAbbreviation } from "@/lib/utils/timezone";
+import { BTN_DESTRUCTIVE } from "@/lib/ui/buttons";
 
 interface User {
   id: string;
@@ -926,7 +927,7 @@ export function AnnouncementManager() {
                     )}
                     <button
                       onClick={() => setDeletingId(a.id)}
-                      className="text-xs text-red-600 font-medium"
+                      className={BTN_DESTRUCTIVE}
                     >
                       Delete
                     </button>

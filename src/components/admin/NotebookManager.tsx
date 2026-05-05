@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { RichTextEditor } from "@/components/admin/RichTextEditor";
+import { BTN_PRIMARY } from "@/lib/ui/buttons";
 
 interface Category {
   id: string;
@@ -468,12 +469,11 @@ export function NotebookManager({ tripId }: { tripId: string }) {
             </div>
 
             {/* Add note button */}
-            <button
-              onClick={() => startNewNote(cat.id)}
-              className="w-full px-4 py-2 text-xs text-green-700 font-medium border-t border-gray-100 hover:bg-gray-50"
-            >
-              + Add Note
-            </button>
+            <div className="px-4 py-2 border-t border-gray-100 flex justify-center">
+              <button onClick={() => startNewNote(cat.id)} className={BTN_PRIMARY}>
+                + Add Note
+              </button>
+            </div>
           </div>
         );
       })}

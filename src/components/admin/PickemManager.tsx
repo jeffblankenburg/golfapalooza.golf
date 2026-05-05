@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { CollapsibleSection } from "@/components/admin/CollapsibleSection";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { FBS_TEAMS, getTeamLogoUrl, type FBSTeam } from "@/lib/data/fbs-teams";
+import { BTN_NEUTRAL, BTN_PRIMARY } from "@/lib/ui/buttons";
 
 function SvgIcon({ src, className = "w-5 h-5" }: { src: string; className?: string }) {
   return (
@@ -651,7 +652,7 @@ export function PickemManager({ tripId }: { tripId: string }) {
         <div className="flex justify-end mb-3">
           <button
             onClick={() => setShowAddForm(!showAddForm)}
-            className="text-xs text-green-700 font-medium"
+            className={showAddForm ? BTN_NEUTRAL : BTN_PRIMARY}
           >
             {showAddForm ? "Cancel" : "+ Add Game"}
           </button>

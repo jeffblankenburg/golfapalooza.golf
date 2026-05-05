@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { ConfirmModal } from "./ConfirmModal";
+import { BTN_PRIMARY } from "@/lib/ui/buttons";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -960,7 +961,7 @@ export function FinancialContestsDashboard() {
                           onClick={() =>
                             openFullLedger(u.user_id, u.display_name)
                           }
-                          className="text-xs text-green-700 font-medium active:opacity-70"
+                          className={BTN_PRIMARY}
                         >
                           View full history
                         </button>
@@ -981,7 +982,7 @@ export function FinancialContestsDashboard() {
                             onClick={() =>
                               openFullLedger(u.user_id, u.display_name)
                             }
-                            className="text-xs text-green-700 font-medium active:opacity-70"
+                            className={BTN_PRIMARY}
                           >
                             View older transactions
                           </button>
@@ -1907,7 +1908,7 @@ export function FinancialContestsDashboard() {
                                     setShowAddParticipant(true);
                                     setSelectedUsers({});
                                   }}
-                                  className="text-xs text-green-700 font-medium active:opacity-70"
+                                  className={BTN_PRIMARY}
                                 >
                                   + Add Participants
                                 </button>

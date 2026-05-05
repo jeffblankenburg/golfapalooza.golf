@@ -1001,22 +1001,16 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
           subtitle={`${participantIds.size} of ${attendees.length} attendees`}
         >
           <div className="flex gap-2 px-4 py-2 items-center border-b border-gray-100">
-            <button
-              onClick={selectAllParticipants}
-              className="text-xs text-green-700 font-medium px-2 py-1 rounded-lg hover:bg-green-50"
-            >
+            <button onClick={selectAllParticipants} className={BTN_PRIMARY}>
               All
             </button>
-            <button
-              onClick={deselectAllParticipants}
-              className="text-xs text-red-600 font-medium px-2 py-1 rounded-lg hover:bg-red-50"
-            >
+            <button onClick={deselectAllParticipants} className={BTN_DESTRUCTIVE}>
               None
             </button>
             <div className="flex-1" />
             <button
               onClick={() => setShowRealNames(!showRealNames)}
-              className="text-xs text-green-700 font-medium"
+              className={BTN_PRIMARY}
             >
               Show {showRealNames ? "nicknames" : "real names"}
             </button>

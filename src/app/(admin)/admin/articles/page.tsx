@@ -1,11 +1,13 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { ArticleManager } from "@/components/admin/ArticleManager";
+import { getEffectiveUserId } from "@/lib/simulator";
 
 export default async function AdminArticlesPage() {
   const user = await getAuthUser();
   if (!user) redirect("/login");
 
+  const currentUserId = await getEffectiveUserId(user.id);
   const supabase = await createClient();
   const { data: trip } = await supabase
     .from("trip_settings")
@@ -30,7 +32,7 @@ export default async function AdminArticlesPage() {
           {trip.trip_name} {trip.trip_year}
         </p>
       </div>
-      <ArticleManager tripId={trip.id} />
+      <ArticleManager tripId={trip.id} currentUserId={currentUserId} />
     </div>
   );
 }

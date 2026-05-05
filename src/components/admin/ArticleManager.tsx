@@ -20,6 +20,12 @@ interface Article {
   featured_image: { id: string; media_url: string; thumbnail_url: string | null } | null;
 }
 
+interface AuthorOption {
+  id: string;
+  display_name: string;
+  is_system?: boolean;
+}
+
 type EditorMode = "list" | "edit";
 
 function statusLabel(article: Article): { text: string; color: string } {
@@ -28,9 +34,10 @@ function statusLabel(article: Article): { text: string; color: string } {
   return { text: "Published", color: "bg-green-100 text-green-700" };
 }
 
-export function ArticleManager({ tripId }: { tripId: string }) {
+export function ArticleManager({ tripId, currentUserId }: { tripId: string; currentUserId: string }) {
   const [articles, setArticles] = useState<Article[]>([]);
   const [viewCounts, setViewCounts] = useState<Record<string, number>>({});
+  const [users, setUsers] = useState<AuthorOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<EditorMode>("list");
 
@@ -38,6 +45,7 @@ export function ArticleManager({ tripId }: { tripId: string }) {
   const [editId, setEditId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [authorId, setAuthorId] = useState<string>(currentUserId);
   const [featuredImage, setFeaturedImage] = useState<ArticleImageValue | null>(null);
   const [publishAt, setPublishAt] = useState<string>("");
   const [saving, setSaving] = useState(false);
@@ -45,14 +53,21 @@ export function ArticleManager({ tripId }: { tripId: string }) {
   const [page, setPage] = useState(0);
 
   const fetchArticles = useCallback(async () => {
-    const [articlesRes, viewsRes] = await Promise.all([
+    const [articlesRes, viewsRes, usersRes] = await Promise.all([
       fetch(`/api/admin/articles?trip_id=${tripId}`),
       fetch(`/api/admin/articles/views?trip_id=${tripId}`),
+      fetch(`/api/admin/users`),
     ]);
     const articlesData = await articlesRes.json();
     const viewsData = await viewsRes.json();
+    const usersData = await usersRes.json();
     setArticles(articlesData.articles || []);
     setViewCounts(viewsData.counts || {});
+    setUsers(
+      ((usersData.users || []) as AuthorOption[])
+        .filter((u) => !u.is_system)
+        .sort((a, b) => a.display_name.localeCompare(b.display_name))
+    );
   }, [tripId]);
 
   useEffect(() => {
@@ -64,6 +79,7 @@ export function ArticleManager({ tripId }: { tripId: string }) {
     setEditId(null);
     setTitle("");
     setContent("");
+    setAuthorId(currentUserId);
     setFeaturedImage(null);
     setPublishAt("");
 
@@ -79,6 +95,7 @@ export function ArticleManager({ tripId }: { tripId: string }) {
     setEditId(article.id);
     setTitle(article.title);
     setContent(article.content);
+    setAuthorId(article.author?.id ?? currentUserId);
 
     // Hydrate featured image state from article data
     const source = (article.featured_image_source || "gallery") as "gallery" | "upload" | "song_art";
@@ -120,6 +137,7 @@ export function ArticleManager({ tripId }: { tripId: string }) {
       trip_id: tripId,
       title: title.trim(),
       content,
+      author_id: authorId || currentUserId,
       featured_image_id: featuredImage?.source === "gallery" ? featuredImage.galleryItemId : null,
       featured_image_url: featuredImage && featuredImage.source !== "gallery" ? featuredImage.imageUrl : null,
       featured_image_source: featuredImage?.source || null,
@@ -191,6 +209,25 @@ export function ArticleManager({ tripId }: { tripId: string }) {
           autoFocus
           className="w-full px-3 py-2 border border-gray-300 rounded-xl text-lg font-semibold focus:ring-2 focus:ring-green-500 focus:outline-none"
         />
+
+        {/* Author */}
+        <div>
+          <label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block">
+            Author
+          </label>
+          <select
+            value={authorId}
+            onChange={(e) => setAuthorId(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-green-500 focus:outline-none"
+          >
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.display_name}
+                {u.id === currentUserId ? " (me)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {/* Featured Image */}
         <ArticleImagePicker
@@ -321,6 +358,20 @@ export function ArticleManager({ tripId }: { tripId: string }) {
                         </span>
                       )}
                     </div>
+                    {article.author && (
+                      <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5 min-w-0">
+                        {article.author.avatar_url ? (
+                          <img
+                            src={article.author.avatar_url}
+                            alt=""
+                            className="w-4 h-4 rounded-full object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <span className="w-4 h-4 rounded-full bg-gray-200 flex-shrink-0" />
+                        )}
+                        <span className="truncate">{article.author.display_name}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button

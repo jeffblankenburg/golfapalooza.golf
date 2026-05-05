@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
   const {
     trip_id, title, content, featured_image_id, featured_image_url,
     featured_image_source, featured_image_focal_x, featured_image_focal_y, publish_at,
+    author_id,
   } = body;
 
   if (!trip_id || !title?.trim()) {
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
     .from("articles")
     .insert({
       trip_id,
-      author_id: effectiveUserId,
+      author_id: author_id || effectiveUserId,
       title: title.trim(),
       content: content || "",
       featured_image_id: featured_image_source === "gallery" ? (featured_image_id || null) : null,
@@ -116,6 +117,7 @@ export async function PUT(request: NextRequest) {
   const {
     id, title, content, featured_image_id, featured_image_url,
     featured_image_source, featured_image_focal_x, featured_image_focal_y, publish_at,
+    author_id,
   } = body;
 
   if (!id) {
@@ -135,6 +137,7 @@ export async function PUT(request: NextRequest) {
   if (title !== undefined) updates.title = title.trim();
   if (content !== undefined) updates.content = content;
   if (publish_at !== undefined) updates.publish_at = publish_at || null;
+  if (author_id !== undefined && author_id) updates.author_id = author_id;
 
   // Handle image field updates
   if (featured_image_source !== undefined) {

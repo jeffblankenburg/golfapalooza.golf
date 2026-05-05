@@ -10,6 +10,7 @@ import { RyderCupManager } from "@/components/admin/RyderCupManager";
 import { KgbCupScoringManager } from "@/components/admin/KgbCupScoringManager";
 import { TeeTimeManager } from "@/components/admin/TeeTimeManager";
 import { VisibilityToggle } from "@/components/admin/VisibilityToggle";
+import { BTN_BACK } from "@/lib/ui/buttons";
 
 export default function KgbCupAdminPage() {
   const params = useParams();
@@ -86,10 +87,7 @@ export default function KgbCupAdminPage() {
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">
-      <Link
-        href={`/admin/events/${tripId}`}
-        className="flex items-center gap-1 text-green-700 text-sm font-medium"
-      >
+      <Link href={`/admin/events/${tripId}`} className={BTN_BACK}>
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>

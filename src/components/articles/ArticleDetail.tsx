@@ -5,6 +5,7 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import rehypeRaw from "rehype-raw";
+import { BTN_BACK } from "@/lib/ui/buttons";
 
 interface Article {
   id: string;
@@ -31,7 +32,7 @@ export function ArticleDetail({ article }: { article: Article }) {
     <div className="pb-8">
       {/* Back link */}
       <div className="px-4 pt-4 pb-2">
-        <Link href="/articles" className="text-sm text-green-700 font-medium">
+        <Link href="/articles" className={BTN_BACK}>
           &larr; Articles
         </Link>
       </div>

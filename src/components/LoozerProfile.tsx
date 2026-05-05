@@ -9,6 +9,7 @@ import rehypeRaw from "rehype-raw";
 import { useMusicPlayerOptional, Song } from "@/contexts/MusicPlayerContext";
 import { FakeAdCarousel } from "@/components/FakeAdCarousel";
 import { AccoladesList, type AccoladeData } from "@/components/profile/AccoladesList";
+import { BTN_PRIMARY } from "@/lib/ui/buttons";
 
 interface ProfileData {
   id: string;
@@ -405,7 +406,7 @@ export function LoozerProfile({
             {!spectator && (
               <Link
                 href={`/gallery?tagged=${userId}`}
-                className="block text-center text-xs font-medium text-green-600 mt-2"
+                className={`block text-center mt-2 ${BTN_PRIMARY}`}
               >
                 See All Photos
               </Link>

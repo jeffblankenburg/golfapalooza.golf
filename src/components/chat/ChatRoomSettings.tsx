@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { ChatMember } from "./ChatRoom";
+import { BTN_NEUTRAL, BTN_PRIMARY } from "@/lib/ui/buttons";
 
 export function ChatRoomSettings({
   roomId,
@@ -168,7 +169,7 @@ export function ChatRoomSettings({
               </span>
               <button
                 onClick={() => setShowAddMembers(!showAddMembers)}
-                className="text-sm font-medium text-green-600 active:text-green-700"
+                className={showAddMembers ? BTN_NEUTRAL : BTN_PRIMARY}
               >
                 {showAddMembers ? "Done" : "Add"}
               </button>

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { ArticleImagePicker, ArticleImageValue } from "./ArticleImagePicker";
 import { ConfirmModal } from "./ConfirmModal";
 import { RichTextEditor } from "./RichTextEditor";
+import { BTN_BACK } from "@/lib/ui/buttons";
 
 interface Article {
   id: string;
@@ -192,7 +193,7 @@ export function ArticleManager({ tripId, currentUserId }: { tripId: string; curr
       <div className="space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <button onClick={resetEditor} className="text-sm text-green-700 font-medium">
+          <button onClick={resetEditor} className={BTN_BACK}>
             &larr; Back to list
           </button>
           <span className="text-sm text-gray-400">

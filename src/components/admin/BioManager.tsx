@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { RichTextEditor } from "./RichTextEditor";
+import { BTN_BACK } from "@/lib/ui/buttons";
 
 interface UserWithBio {
   id: string;
@@ -131,7 +132,7 @@ export function BioManager() {
       <div className="space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <button onClick={resetEditor} className="text-sm text-green-700 font-medium">
+          <button onClick={resetEditor} className={BTN_BACK}>
             &larr; Back to list
           </button>
           <div className="flex items-center gap-2">

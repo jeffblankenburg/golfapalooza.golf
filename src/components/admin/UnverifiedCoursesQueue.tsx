@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { formatCourseName } from "@/lib/utils/course-display";
+import { BTN_BACK } from "@/lib/ui/buttons";
 
 interface UnverifiedCourse {
   id: string;
@@ -74,7 +75,7 @@ export default function UnverifiedCoursesQueue() {
             Courses imported via the lookup cascade. Spot-check each against its source, then verify or delete.
           </p>
         </div>
-        <Link href="/admin/courses" className="text-sm text-green-700 font-medium">← All courses</Link>
+        <Link href="/admin/courses" className={BTN_BACK}>← All courses</Link>
       </div>
 
       {error && (

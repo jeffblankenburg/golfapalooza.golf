@@ -19,6 +19,7 @@ import { HandicapManager } from "@/components/admin/HandicapManager";
 import { VisibilityToggles } from "@/components/admin/VisibilityToggles";
 import { DailyWinnersManager } from "@/components/admin/DailyWinnersManager";
 import { EventDaysManager } from "@/components/admin/EventDaysManager";
+import { BTN_BACK } from "@/lib/ui/buttons";
 
 
 function SvgIcon({ src, className = "w-5 h-5" }: { src: string; className?: string }) {
@@ -135,10 +136,7 @@ export default function EventDetailPage() {
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-3">
-      <Link
-        href="/admin"
-        className="flex items-center gap-1 text-green-700 text-sm font-medium"
-      >
+      <Link href="/admin" className={BTN_BACK}>
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>

@@ -8,6 +8,7 @@ import Image from "@tiptap/extension-image";
 import { Markdown } from "tiptap-markdown";
 import { useEffect, useCallback, useState } from "react";
 import { ArticleImageDrawer } from "./ArticleImageDrawer";
+import { BTN_NEUTRAL } from "@/lib/ui/buttons";
 
 const SIZE_PRESETS: { label: string; value: string | null }[] = [
   { label: "Small", value: "33%" },
@@ -264,7 +265,7 @@ export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
           <button onClick={addLink} className="px-3 py-1 bg-green-600 text-white text-xs font-semibold rounded-lg">
             Add
           </button>
-          <button onClick={() => setShowLinkInput(false)} className="px-2 py-1 text-xs text-gray-500">
+          <button onClick={() => setShowLinkInput(false)} className={BTN_NEUTRAL}>
             Cancel
           </button>
         </div>

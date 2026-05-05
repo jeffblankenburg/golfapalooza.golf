@@ -4,6 +4,7 @@ import { getEffectiveUserId } from "@/lib/simulator";
 import RoundCard from "@/components/my-rounds/RoundCard";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 import { formatCourseName } from "@/lib/utils/course-display";
+import { BTN_PRIMARY } from "@/lib/ui/buttons";
 
 export default async function MyRoundsPage() {
   const supabase = await createClient();
@@ -126,7 +127,7 @@ export default async function MyRoundsPage() {
         {roundSummaries.length === 0 && (
           <div className="text-center py-12">
             <p className="text-gray-500 mb-3">No rounds logged yet</p>
-            <Link href="/my-rounds/rounds/new" className="text-green-700 font-medium">
+            <Link href="/my-rounds/rounds/new" className={BTN_PRIMARY}>
               Log your first round →
             </Link>
           </div>

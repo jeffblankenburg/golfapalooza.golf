@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatCourseName } from "@/lib/utils/course-display";
 import AddCourseButton from "@/components/my-rounds/AddCourseButton";
+import { BTN_BACK, BTN_PRIMARY } from "@/lib/ui/buttons";
 
 export default async function CoursesPage() {
   const supabase = await createClient();
@@ -18,7 +19,7 @@ export default async function CoursesPage() {
     <div className="px-4 py-6 max-w-lg mx-auto">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <Link href="/my-rounds" className="text-sm text-gray-500 hover:text-gray-700">← My Rounds</Link>
+          <Link href="/my-rounds" className={BTN_BACK}>← My Rounds</Link>
           <h1 className="text-2xl font-bold text-gray-900 mt-1">Courses</h1>
         </div>
         <AddCourseButton />
@@ -46,7 +47,7 @@ export default async function CoursesPage() {
         {(!courses || courses.length === 0) && (
           <div className="text-center py-12">
             <p className="text-gray-500 mb-3">No courses yet</p>
-            <AddCourseButton className="text-green-700 font-medium">
+            <AddCourseButton className={BTN_PRIMARY}>
               Add your first course →
             </AddCourseButton>
           </div>

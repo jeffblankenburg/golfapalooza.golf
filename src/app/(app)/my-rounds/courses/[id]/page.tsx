@@ -6,6 +6,7 @@ import Link from "next/link";
 import TeeList from "@/components/my-rounds/TeeList";
 import CourseForm from "@/components/my-rounds/CourseForm";
 import { formatCourseName } from "@/lib/utils/course-display";
+import { BTN_BACK, BTN_NEUTRAL, BTN_PRIMARY } from "@/lib/ui/buttons";
 
 interface CourseData {
   id: string;
@@ -73,7 +74,7 @@ export default function CourseDetailPage() {
 
   return (
     <div className="px-4 py-6 max-w-lg mx-auto">
-      <Link href="/my-rounds/courses" className="text-sm text-gray-500 hover:text-gray-700">← Courses</Link>
+      <Link href="/my-rounds/courses" className={BTN_BACK}>← Courses</Link>
 
       {editing ? (
         <div className="mt-4">
@@ -84,7 +85,7 @@ export default function CourseDetailPage() {
               setEditing(false);
               setRefreshKey((k) => k + 1);
             }}
-            className="mt-3 text-sm text-gray-500 hover:text-gray-700"
+            className={`mt-3 ${BTN_NEUTRAL}`}
           >
             Cancel
           </button>
@@ -114,7 +115,7 @@ export default function CourseDetailPage() {
               {!locked && (
                 <button
                   onClick={() => setEditing(true)}
-                  className="text-sm text-green-700 hover:text-green-800 font-medium"
+                  className={BTN_PRIMARY}
                 >
                   Edit
                 </button>

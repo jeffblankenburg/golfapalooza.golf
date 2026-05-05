@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { BTN_PRIMARY } from "@/lib/ui/buttons";
 
 const CROP_ASPECT = 2.2; // width:height ratio matching article card display
 
@@ -112,7 +113,7 @@ export function FocalPointSelector({ imageUrl, focalX, focalY, onChange }: Focal
         <button
           type="button"
           onClick={() => onChange(50, 50)}
-          className="text-xs text-green-700 font-medium"
+          className={BTN_PRIMARY}
         >
           Reset
         </button>

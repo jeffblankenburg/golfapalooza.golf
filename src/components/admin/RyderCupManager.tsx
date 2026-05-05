@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { BottomDrawer } from "@/components/admin/BottomDrawer";
+import { BTN_NEUTRAL } from "@/lib/ui/buttons";
 
 // ── Types ──
 
@@ -593,7 +594,7 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
       {errorMsg && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
           <p className="text-sm text-red-700">{errorMsg}</p>
-          <button onClick={() => setErrorMsg(null)} className="text-xs text-red-500 mt-1">
+          <button onClick={() => setErrorMsg(null)} className={`mt-2 ${BTN_NEUTRAL}`}>
             Dismiss
           </button>
         </div>

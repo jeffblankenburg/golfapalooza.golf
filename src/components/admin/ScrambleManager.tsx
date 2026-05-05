@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { BottomDrawer } from "@/components/admin/BottomDrawer";
+import { BTN_BACK, BTN_DESTRUCTIVE, BTN_PRIMARY } from "@/lib/ui/buttons";
 
 interface TeamMember {
   id: string;
@@ -581,7 +582,7 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
             setView("days");
             setSelectedContest(null);
           }}
-          className="flex items-center gap-1 text-green-700 text-sm font-medium mb-4"
+          className={`mb-4 ${BTN_BACK}`}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -599,7 +600,7 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
           {participantCount > 0 && (
             <button
               onClick={openParticipantDrawer}
-              className="text-xs text-green-700 font-medium"
+              className={BTN_PRIMARY}
             >
               Edit Participants ({participantCount})
             </button>
@@ -784,7 +785,7 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
                     <div className="mt-1 mb-1">
                       <button
                         onClick={() => openDrawer(team.id)}
-                        className="text-xs text-green-700 font-medium"
+                        className={BTN_PRIMARY}
                       >
                         + Add Players
                       </button>
@@ -956,7 +957,7 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
           <div className="flex items-center justify-end px-4 py-2 border-b border-gray-100">
             <button
               onClick={() => setShowRealNames(!showRealNames)}
-              className="text-xs text-green-700 font-medium"
+              className={BTN_PRIMARY}
             >
               Show {showRealNames ? "nicknames" : "real names"}
             </button>

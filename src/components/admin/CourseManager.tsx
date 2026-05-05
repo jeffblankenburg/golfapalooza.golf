@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { BottomDrawer } from "@/components/admin/BottomDrawer";
 import { TEE_COLOR_OPTIONS, isHexColor, getContrastText, getTeeColorClasses } from "@/lib/tee-colors";
+import { BTN_DESTRUCTIVE } from "@/lib/ui/buttons";
 import dynamic from "next/dynamic";
 
 const HoleMapEditor = dynamic(() => import("@/components/admin/HoleMapEditor"), { ssr: false });
@@ -1366,7 +1367,7 @@ function HoleRow({
             <button
               type="button"
               onClick={() => setNameDraft("")}
-              className="text-xs text-red-600 hover:text-red-700 font-medium"
+              className={BTN_DESTRUCTIVE}
             >
               Clear name
             </button>

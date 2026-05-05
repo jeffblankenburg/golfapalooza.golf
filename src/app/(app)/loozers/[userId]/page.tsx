@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getEffectiveUserId } from "@/lib/simulator";
 import { LoozerProfile } from "@/components/LoozerProfile";
 import Link from "next/link";
+import { BTN_BACK } from "@/lib/ui/buttons";
 
 export default async function LoozerProfilePage({
   params,
@@ -19,7 +20,7 @@ export default async function LoozerProfilePage({
 
   return (
     <div className="px-4 pt-6 pb-8">
-      <Link href="/loozers" className="text-sm text-green-700 font-medium mb-3 inline-block">
+      <Link href="/loozers" className={`mb-3 ${BTN_BACK}`}>
         &larr; All Loozers
       </Link>
       <LoozerProfile userId={userId} isOwnProfile={isOwnProfile} />

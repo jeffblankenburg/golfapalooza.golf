@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { BTN_NEUTRAL } from "@/lib/ui/buttons";
 
 interface Comment {
   id: string;
@@ -137,7 +138,7 @@ export function MediaComments({
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
           <h3 className="text-base font-bold text-gray-900">Comments</h3>
-          <button onClick={onClose} className="text-gray-500 text-sm font-medium">
+          <button onClick={onClose} className={BTN_NEUTRAL}>
             Close
           </button>
         </div>

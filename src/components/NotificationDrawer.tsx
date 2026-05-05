@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { BTN_DESTRUCTIVE } from "@/lib/ui/buttons";
 
 interface Notification {
   id: string;
@@ -213,7 +214,7 @@ export function NotificationDrawer({
             {notifications.length > 0 && (
               <button
                 onClick={handleClearAll}
-                className="text-sm text-red-600 font-medium"
+                className={BTN_DESTRUCTIVE}
               >
                 Clear All
               </button>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ConfirmModal } from "./ConfirmModal";
+import { BTN_BACK, BTN_NEUTRAL } from "@/lib/ui/buttons";
 
 interface FakeAd {
   id: string;
@@ -214,7 +215,7 @@ export function FakeAdManager() {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <button onClick={resetForm} className="text-sm text-green-700 font-medium">
+          <button onClick={resetForm} className={BTN_BACK}>
             &larr; Back to list
           </button>
           <span className="text-sm text-gray-400">{editId ? "Edit Ad" : "New Ad"}</span>
@@ -364,7 +365,7 @@ export function FakeAdManager() {
           </button>
           <button
             onClick={resetForm}
-            className="px-4 text-sm text-gray-500"
+            className={BTN_NEUTRAL}
           >
             Cancel
           </button>

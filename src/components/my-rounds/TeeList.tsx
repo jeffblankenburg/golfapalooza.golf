@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import TeeForm from "./TeeForm";
 import HoleEditor from "./HoleEditor";
 import { getTeeDotStyle } from "@/lib/utils/tee-colors";
+import { BTN_NEUTRAL, BTN_PRIMARY } from "@/lib/ui/buttons";
 
 interface Tee {
   id: string;
@@ -65,7 +66,7 @@ export default function TeeList({ courseId, tees, onRefresh, locked = false }: T
         {!showAddForm && !locked && (
           <button
             onClick={() => setShowAddForm(true)}
-            className="text-sm text-green-700 hover:text-green-800 font-medium"
+            className={BTN_PRIMARY}
           >
             + Add Tee
           </button>
@@ -94,18 +95,18 @@ export default function TeeList({ courseId, tees, onRefresh, locked = false }: T
                   })()}
                   <span className="font-medium text-gray-900">{tee.tee_name}</span>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   {!locked && (
                     <button
                       onClick={() => setEditingTee(tee.id)}
-                      className="text-xs text-green-700 hover:text-green-800 font-medium"
+                      className={BTN_PRIMARY}
                     >
                       Edit
                     </button>
                   )}
                   <button
                     onClick={() => toggleExpand(tee.id)}
-                    className="text-xs text-gray-500 hover:text-gray-700 font-medium"
+                    className={BTN_NEUTRAL}
                   >
                     {expandedTee === tee.id ? "Hide Holes" : "Holes"}
                   </button>

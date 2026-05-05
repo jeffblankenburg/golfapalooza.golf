@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { PickemManager } from "@/components/admin/PickemManager";
+import { BTN_BACK } from "@/lib/ui/buttons";
 
 export default function PickemAdminPage() {
   const params = useParams();
@@ -34,10 +35,7 @@ export default function PickemAdminPage() {
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">
-      <Link
-        href={`/admin/events/${tripId}`}
-        className="flex items-center gap-1 text-green-700 text-sm font-medium"
-      >
+      <Link href={`/admin/events/${tripId}`} className={BTN_BACK}>
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>

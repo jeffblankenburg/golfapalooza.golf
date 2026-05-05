@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { BTN_PRIMARY } from "@/lib/ui/buttons";
 
 const TEE_COLORS: Record<string, string> = {
   Black: "bg-gray-900",
@@ -171,7 +172,7 @@ export default function TeeForm({ courseId, tee, onSaved, onCancel }: TeeFormPro
       <button
         type="button"
         onClick={() => setShowAdvanced(!showAdvanced)}
-        className="text-sm text-green-700 hover:text-green-800"
+        className={BTN_PRIMARY}
       >
         {showAdvanced ? "Hide" : "Show"} 9-hole ratings
       </button>

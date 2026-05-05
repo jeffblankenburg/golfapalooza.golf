@@ -8,6 +8,7 @@ import CourseLookupModal from "./CourseLookupModal";
 import { calculateDifferential } from "@/lib/golf/calculator";
 import { getTeeDotStyle } from "@/lib/utils/tee-colors";
 import { formatCourseName } from "@/lib/utils/course-display";
+import { BTN_BACK, BTN_PRIMARY } from "@/lib/ui/buttons";
 
 interface CourseSummary {
   id: string;
@@ -499,7 +500,7 @@ export default function RoundForm() {
           </div>
         </div>
         {onBack && (
-          <button onClick={onBack} className="mt-3 w-full text-sm text-gray-400 hover:text-gray-600">
+          <button onClick={onBack} className={`mt-3 ${BTN_BACK}`}>
             {backLabel || "← Back"}
           </button>
         )}
@@ -586,7 +587,7 @@ export default function RoundForm() {
                         <p className="text-sm text-gray-500 mb-3">No courses within {NEARBY_RADIUS_MI} miles.</p>
                         <button
                           onClick={exitNearby}
-                          className="text-xs text-green-700 font-medium"
+                          className={BTN_PRIMARY}
                         >
                           Search by name instead →
                         </button>
@@ -615,7 +616,7 @@ export default function RoundForm() {
               <div className="text-center pt-3 border-t border-gray-100 mt-3">
                 <button
                   onClick={() => setLookupOpen(true)}
-                  className="text-xs text-green-700 font-medium"
+                  className={BTN_PRIMARY}
                 >
                   Don&apos;t see your course? Add it →
                 </button>
@@ -965,7 +966,7 @@ export default function RoundForm() {
           saving={saving}
         />
 
-        <button onClick={() => setStep("score-mode")} className="mt-3 w-full text-sm text-gray-400 hover:text-gray-600">← Back</button>
+        <button onClick={() => setStep("score-mode")} className={`mt-3 ${BTN_BACK}`}>← Back</button>
       </div>
     );
   }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import { BTN_BACK, BTN_DESTRUCTIVE, BTN_PRIMARY } from "@/lib/ui/buttons";
 
 interface TeeTimePlayer {
   id: string;
@@ -467,7 +468,7 @@ export function TeeTimeManager({ tripId, dayNumber, contestType }: { tripId: str
                 setSelectedDay(null);
                 fetchDayCounts();
               }}
-              className="flex items-center gap-1 text-green-700 text-sm font-medium mb-4"
+              className={`mb-4 ${BTN_BACK}`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -643,7 +644,7 @@ export function TeeTimeManager({ tripId, dayNumber, contestType }: { tripId: str
                         </div>
                         <button
                           onClick={() => unassignTeam(group.id)}
-                          className="text-xs text-red-500 font-medium mt-1"
+                          className={`mt-2 ${BTN_DESTRUCTIVE}`}
                         >
                           Remove Team
                         </button>
@@ -683,7 +684,7 @@ export function TeeTimeManager({ tripId, dayNumber, contestType }: { tripId: str
                         ) : unassignedTeams.length > 0 ? (
                           <button
                             onClick={() => setAddingToGroup(group.id)}
-                            className="text-xs text-green-700 font-medium"
+                            className={BTN_PRIMARY}
                           >
                             + Assign Team
                           </button>
@@ -792,7 +793,7 @@ export function TeeTimeManager({ tripId, dayNumber, contestType }: { tripId: str
                         ) : (
                           <button
                             onClick={() => setAddingToGroup(group.id)}
-                            className="text-xs text-green-700 font-medium"
+                            className={BTN_PRIMARY}
                           >
                             + Add Player
                           </button>

@@ -17,7 +17,7 @@ interface Loozer {
 }
 
 type ViewMode = "grid" | "tree";
-type Scope = "all" | "attending";
+type Scope = "all" | "attending" | "not-attending";
 
 const VIEW_STORAGE_KEY = "loozers-view-mode";
 const SCOPE_STORAGE_KEY = "loozers-scope";
@@ -77,7 +77,7 @@ export function LoozersList({
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem(SCOPE_STORAGE_KEY);
-      if (stored === "all" || stored === "attending") setScope(stored);
+      if (stored === "all" || stored === "attending" || stored === "not-attending") setScope(stored);
     } catch {
       // ignore
     }
@@ -147,7 +147,11 @@ export function LoozersList({
   // Grid view: exclude financial-only loozers; optionally filter to the active trip's roster.
   const gridLoozers = loozers
     .filter((l) => l.is_financial_only !== true)
-    .filter((l) => (scope === "attending" ? l.is_attending === true : true));
+    .filter((l) => {
+      if (scope === "attending") return l.is_attending === true;
+      if (scope === "not-attending") return l.is_attending !== true;
+      return true;
+    });
 
   return (
     <div>
@@ -181,7 +185,7 @@ export function LoozersList({
         )}
         {view === "grid" && (
           <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-            {(["attending", "all"] as const).map((s) => (
+            {(["attending", "not-attending", "all"] as const).map((s) => (
               <button
                 key={s}
                 type="button"
@@ -190,7 +194,7 @@ export function LoozersList({
                   scope === s ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
                 }`}
               >
-                {s === "attending" ? "Attending" : "All"}
+                {s === "attending" ? "Attending" : s === "not-attending" ? "Not Attending" : "All"}
               </button>
             ))}
           </div>
@@ -202,7 +206,9 @@ export function LoozersList({
           <div className="text-center py-12 text-sm text-gray-400">
             {scope === "attending"
               ? "No Loozers on the active roster yet."
-              : "No Loozers to display."}
+              : scope === "not-attending"
+                ? "Every Loozer is on the active roster."
+                : "No Loozers to display."}
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-3">

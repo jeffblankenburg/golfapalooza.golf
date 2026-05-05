@@ -16,7 +16,7 @@ export async function loadAccoladeSections(): Promise<AccoladeCategorySection[]>
     adminClient
       .from("accolades")
       .select(
-        "id, category, title, user_id, partner_user_id, trip:trip_settings(trip_year), winner:users!accolades_user_id_fkey(id, display_name, full_name, avatar_url), partner:users!accolades_partner_user_id_fkey(id, display_name, full_name, avatar_url)",
+        "id, category, title, notes, user_id, partner_user_id, trip:trip_settings(trip_year), winner:users!accolades_user_id_fkey(id, display_name, full_name, avatar_url), partner:users!accolades_partner_user_id_fkey(id, display_name, full_name, avatar_url)",
       ),
   ]);
 
@@ -50,6 +50,7 @@ export async function loadAccoladeSections(): Promise<AccoladeCategorySection[]>
       id: r.id,
       trip_year: trip?.trip_year ?? null,
       custom_title: r.category === "custom" ? r.title : null,
+      notes: (r as { notes?: string | null }).notes ?? null,
       winner,
       partner,
     });

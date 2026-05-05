@@ -15,6 +15,7 @@ export interface AccoladeRow {
   id: string;
   trip_year: number | null;
   custom_title: string | null;
+  notes: string | null;
   winner: UserRef | null;
   partner: UserRef | null;
 }

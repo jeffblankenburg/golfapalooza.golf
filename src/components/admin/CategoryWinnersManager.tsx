@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AwardBadge } from "@/components/AwardBadge";
+import { ConfirmModal } from "@/components/admin/ConfirmModal";
 
 interface UserRef {
   id: string;
@@ -26,6 +27,7 @@ interface Winner {
   trip_id: string;
   user_id: string;
   partner_user_id: string | null;
+  notes: string | null;
   winner: UserRef[] | UserRef | null;
   partner: UserRef[] | UserRef | null;
 }
@@ -58,8 +60,12 @@ function unwrap<T>(v: T[] | T | null | undefined): T | null {
 export function CategoryWinnersManager({ category }: { category: string }) {
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [draftFor, setDraftFor] = useState<Record<string, { user_id: string; partner_user_id: string }>>({});
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [draftFor, setDraftFor] = useState<Record<string, { user_id: string; partner_user_id: string; notes: string }>>({});
   const [savingFor, setSavingFor] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<Winner | null>(null);
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [savingNoteFor, setSavingNoteFor] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,7 +119,7 @@ export function CategoryWinnersManager({ category }: { category: string }) {
         (u.is_system ? 2 : 0) + (u.is_financial_only ? 1 : 0);
       const s = score(a) - score(b);
       if (s !== 0) return s;
-      return (a.full_name ?? a.display_name).localeCompare(b.full_name ?? b.display_name);
+      return (a.display_name ?? a.full_name ?? "").localeCompare(b.display_name ?? b.full_name ?? "");
     });
   }, [state]);
 
@@ -121,6 +127,7 @@ export function CategoryWinnersManager({ category }: { category: string }) {
     const draft = draftFor[tripId];
     if (!draft?.user_id) return;
     setSavingFor(tripId);
+    setActionError(null);
     const res = await fetch("/api/admin/accolades", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -129,11 +136,12 @@ export function CategoryWinnersManager({ category }: { category: string }) {
         category,
         user_id: draft.user_id,
         partner_user_id: draft.partner_user_id || null,
+        notes: draft.notes?.trim() ? draft.notes.trim() : null,
       }),
     });
     const data = await res.json();
     if (!res.ok) {
-      alert(`Failed: ${data.error ?? res.status}`);
+      setActionError(`Failed to add winner: ${data.error ?? res.status}`);
       setSavingFor(null);
       return;
     }
@@ -146,9 +154,43 @@ export function CategoryWinnersManager({ category }: { category: string }) {
     await reload();
   };
 
+  const saveNote = async (winnerId: string) => {
+    const draftValue = noteDrafts[winnerId];
+    if (draftValue === undefined) return;
+    setSavingNoteFor(winnerId);
+    setActionError(null);
+    const res = await fetch("/api/admin/accolades", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: winnerId, notes: draftValue }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setSavingNoteFor(null);
+    if (!res.ok) {
+      setActionError(`Failed to save note: ${data.error ?? res.status}`);
+      return;
+    }
+    const persisted = (data.accolade?.notes ?? null) as string | null;
+    setState((prev) =>
+      prev
+        ? {
+            ...prev,
+            winners: prev.winners.map((w) =>
+              w.id === winnerId ? { ...w, notes: persisted } : w,
+            ),
+          }
+        : prev,
+    );
+    setNoteDrafts((prev) => {
+      const next = { ...prev };
+      delete next[winnerId];
+      return next;
+    });
+  };
+
   const removeWinner = async (winner: Winner) => {
-    if (!confirm("Remove this winner?")) return;
     setSavingFor(winner.id);
+    setActionError(null);
     const res = await fetch("/api/admin/accolades", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
@@ -157,7 +199,7 @@ export function CategoryWinnersManager({ category }: { category: string }) {
     setSavingFor(null);
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      alert(`Failed: ${data.error ?? res.status}`);
+      setActionError(`Failed to remove winner: ${data.error ?? res.status}`);
       return;
     }
     await reload();
@@ -178,8 +220,27 @@ export function CategoryWinnersManager({ category }: { category: string }) {
     );
   }
 
+  const confirmRemoveLabel = (() => {
+    if (!confirmRemove) return "";
+    const win = unwrap(confirmRemove.winner);
+    const part = unwrap(confirmRemove.partner);
+    const who = win ? win.display_name ?? win.full_name ?? "this winner" : "this winner";
+    return part ? `${who} & ${part.display_name ?? part.full_name ?? "partner"}` : who;
+  })();
+
   return (
     <div className="space-y-4">
+      {actionError && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-2 text-sm text-red-800 flex items-center justify-between gap-2">
+          <span>{actionError}</span>
+          <button
+            onClick={() => setActionError(null)}
+            className="text-xs text-red-700 underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex items-center gap-3">
         <AwardBadge
           iconUrl={state.category.icon_url}
@@ -202,7 +263,7 @@ export function CategoryWinnersManager({ category }: { category: string }) {
       <div className="space-y-2">
         {state.trips.map((t) => {
           const winners = winnersByTrip.get(t.id) ?? [];
-          const draft = draftFor[t.id] ?? { user_id: "", partner_user_id: "" };
+          const draft = draftFor[t.id] ?? { user_id: "", partner_user_id: "", notes: "" };
           const saving = savingFor === t.id;
           return (
             <div
@@ -224,27 +285,56 @@ export function CategoryWinnersManager({ category }: { category: string }) {
                     const win = unwrap(w.winner);
                     const part = unwrap(w.partner);
                     const removing = savingFor === w.id;
+                    const persistedNote = w.notes ?? "";
+                    const draftNote = noteDrafts[w.id];
+                    const noteValue = draftNote !== undefined ? draftNote : persistedNote;
+                    const noteDirty =
+                      draftNote !== undefined && draftNote !== persistedNote;
+                    const noteSaving = savingNoteFor === w.id;
                     return (
                       <div
                         key={w.id}
-                        className="flex items-center justify-between bg-gray-50 rounded-lg px-2 py-1.5 text-sm"
+                        className="bg-gray-50 rounded-lg px-2 py-1.5 text-sm space-y-1"
                       >
-                        <span>
-                          {win ? win.full_name ?? win.display_name : "—"}
-                          {part && (
-                            <>
-                              <span className="text-gray-400">{" & "}</span>
-                              {part.full_name ?? part.display_name}
-                            </>
-                          )}
-                        </span>
-                        <button
-                          onClick={() => removeWinner(w)}
-                          disabled={removing}
-                          className="text-xs text-red-600 px-2 py-0.5 rounded hover:bg-red-100 disabled:opacity-50"
-                        >
-                          Remove
-                        </button>
+                        <div className="flex items-center justify-between gap-2">
+                          <span>
+                            {win ? win.display_name ?? win.full_name : "—"}
+                            {part && (
+                              <>
+                                <span className="text-gray-400">{" & "}</span>
+                                {part.display_name ?? part.full_name}
+                              </>
+                            )}
+                          </span>
+                          <button
+                            onClick={() => setConfirmRemove(w)}
+                            disabled={removing}
+                            className="text-xs text-red-600 px-2 py-0.5 rounded hover:bg-red-100 disabled:opacity-50"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <textarea
+                            value={noteValue}
+                            onChange={(e) =>
+                              setNoteDrafts((prev) => ({
+                                ...prev,
+                                [w.id]: e.target.value,
+                              }))
+                            }
+                            placeholder="Notes — how did they win? (optional)"
+                            rows={2}
+                            className="flex-1 border border-gray-200 rounded-md px-2 py-1 text-xs bg-white"
+                          />
+                          <button
+                            onClick={() => saveNote(w.id)}
+                            disabled={!noteDirty || noteSaving}
+                            className="text-xs px-2 py-1 rounded-md bg-green-600 text-white font-medium disabled:opacity-40 active:scale-95 transition-transform shrink-0"
+                          >
+                            {noteSaving ? "Saving…" : noteDirty ? "Save" : "Saved"}
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -265,7 +355,7 @@ export function CategoryWinnersManager({ category }: { category: string }) {
                   <option value="">— Pick a winner —</option>
                   {sortedUsers.map((u) => (
                     <option key={u.id} value={u.id}>
-                      {(u.full_name ?? u.display_name) +
+                      {(u.display_name ?? u.full_name ?? "—") +
                         (u.is_system ? " · bot" : "") +
                         (u.is_financial_only ? " · finOnly" : "")}
                     </option>
@@ -285,12 +375,25 @@ export function CategoryWinnersManager({ category }: { category: string }) {
                     <option value="">— Partner (optional) —</option>
                     {sortedUsers.map((u) => (
                       <option key={u.id} value={u.id}>
-                        {u.full_name ?? u.display_name}
+                        {u.display_name ?? u.full_name ?? "—"}
                       </option>
                     ))}
                   </select>
                 )}
               </div>
+
+              <textarea
+                value={draft.notes}
+                onChange={(e) =>
+                  setDraftFor((prev) => ({
+                    ...prev,
+                    [t.id]: { ...draft, notes: e.target.value },
+                  }))
+                }
+                placeholder="Notes — how did they win? (optional)"
+                rows={2}
+                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs bg-white"
+              />
 
               <div className="flex justify-end">
                 <button
@@ -305,6 +408,20 @@ export function CategoryWinnersManager({ category }: { category: string }) {
           );
         })}
       </div>
+
+      <ConfirmModal
+        open={confirmRemove !== null}
+        title="Remove winner"
+        message={`Remove ${confirmRemoveLabel} from this award?`}
+        confirmLabel="Remove"
+        destructive
+        onConfirm={() => {
+          const w = confirmRemove;
+          setConfirmRemove(null);
+          if (w) void removeWinner(w);
+        }}
+        onCancel={() => setConfirmRemove(null)}
+      />
     </div>
   );
 }

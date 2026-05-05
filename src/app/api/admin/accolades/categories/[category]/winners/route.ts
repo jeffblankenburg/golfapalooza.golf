@@ -39,7 +39,7 @@ export async function GET(
       adminClient
         .from("accolades")
         .select(
-          "id, title, trip_id, user_id, partner_user_id, winner:users!accolades_user_id_fkey(id, display_name, full_name, avatar_url), partner:users!accolades_partner_user_id_fkey(id, display_name, full_name, avatar_url)",
+          "id, title, trip_id, user_id, partner_user_id, notes, winner:users!accolades_user_id_fkey(id, display_name, full_name, avatar_url), partner:users!accolades_partner_user_id_fkey(id, display_name, full_name, avatar_url)",
         )
         .eq("category", category),
       adminClient

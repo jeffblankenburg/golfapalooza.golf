@@ -43,6 +43,7 @@ export async function POST(request: Request) {
       sort_order,
       category,
       partner_user_id,
+      notes,
     } = (await request.json()) as {
       trip_id?: string;
       title?: string | null;
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
       sort_order?: number;
       category?: string;
       partner_user_id?: string | null;
+      notes?: string | null;
     };
 
     if (!trip_id || !user_id) {
@@ -87,6 +89,7 @@ export async function POST(request: Request) {
       );
     }
 
+    const trimmedNotes = typeof notes === "string" ? notes.trim() : null;
     const { data, error } = await adminClient
       .from("accolades")
       .insert({
@@ -96,6 +99,7 @@ export async function POST(request: Request) {
         sort_order: sort_order || 0,
         category: resolvedCategory,
         partner_user_id: partner_user_id || null,
+        notes: trimmedNotes ? trimmedNotes : null,
       })
       .select(
         "*, user:users!accolades_user_id_fkey(id, display_name, full_name, avatar_url), partner:users!accolades_partner_user_id_fkey(id, display_name, full_name, avatar_url), trip:trip_settings(trip_year, trip_name)"
@@ -116,6 +120,43 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Create accolade error:", error);
     return NextResponse.json({ error: "Failed to create accolade" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  const admin = await checkIsAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const { id, notes } = (await request.json()) as {
+      id?: string;
+      notes?: string | null;
+    };
+    if (!id) {
+      return NextResponse.json({ error: "Accolade ID is required" }, { status: 400 });
+    }
+
+    const trimmed = typeof notes === "string" ? notes.trim() : null;
+    const adminClient = createAdminClient();
+    const { data, error } = await adminClient
+      .from("accolades")
+      .update({ notes: trimmed ? trimmed : null })
+      .eq("id", id)
+      .select("id, notes")
+      .maybeSingle();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    if (!data) {
+      return NextResponse.json({ error: "Accolade not found" }, { status: 404 });
+    }
+    return NextResponse.json({ accolade: data });
+  } catch (error) {
+    console.error("Update accolade error:", error);
+    return NextResponse.json({ error: "Failed to update accolade" }, { status: 500 });
   }
 }
 

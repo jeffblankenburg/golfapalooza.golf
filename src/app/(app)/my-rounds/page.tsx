@@ -78,11 +78,6 @@ export default async function MyRoundsPage() {
     ? Math.min(...completedRounds.map((r) => r.final_score || 999))
     : null;
 
-  const currentYear = new Date().getFullYear();
-  const currentYearRoundsCount = completedRounds.filter(
-    (r) => r.round_date && new Date(r.round_date).getFullYear() === currentYear
-  ).length;
-
   return (
     <div className="px-4 py-6 max-w-lg mx-auto">
       <div className="flex items-center justify-between mb-5">
@@ -109,8 +104,8 @@ export default async function MyRoundsPage() {
             </div>
           </div>
           <div className="bg-white border border-gray-200 rounded-lg p-3 text-center">
-            <div className="text-xs text-gray-500">{currentYear} Rounds</div>
-            <div className="text-lg font-bold text-gray-900">{currentYearRoundsCount}</div>
+            <div className="text-xs text-gray-500">Rounds</div>
+            <div className="text-lg font-bold text-gray-900">{completedRounds.length}</div>
           </div>
           <div className="bg-white border border-gray-200 rounded-lg p-3 text-center">
             <div className="text-xs text-gray-500">Average</div>

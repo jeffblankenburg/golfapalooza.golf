@@ -82,11 +82,12 @@ function Row({
     (u): u is NonNullable<typeof u> => !!u,
   );
   return (
-    <div className="px-3 py-2 flex items-center gap-2 text-sm">
-      <span className="text-xs font-mono text-gray-400 w-10 shrink-0">
+    <div className="px-3 py-2 flex items-start gap-2 text-sm">
+      <span className="text-xs font-mono text-gray-400 w-10 shrink-0 pt-0.5">
         {row.trip_year ?? "—"}
       </span>
-      <div className="flex-1 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+      <div className="flex-1 min-w-0 space-y-1">
+       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
         {teammates.length === 0 ? (
           <span className="text-gray-400 italic">unmatched</span>
         ) : (
@@ -129,6 +130,10 @@ function Row({
         )}
         {customLabel && row.custom_title && (
           <span className="text-gray-500 text-xs">— {row.custom_title}</span>
+        )}
+       </div>
+        {row.notes && (
+          <p className="text-xs text-gray-500 italic leading-snug">{row.notes}</p>
         )}
       </div>
     </div>

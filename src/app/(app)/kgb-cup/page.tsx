@@ -70,7 +70,7 @@ export default async function KgbCupPage() {
   const pairsResult = teamIds.length > 0
     ? await supabase
         .from("ryder_cup_pairs")
-        .select("id, team_id, player_a_id, player_b_id, sort_order, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name, avatar_url), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name, avatar_url)")
+        .select("id, team_id, player_a_id, player_b_id, player_c_id, sort_order, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name, avatar_url), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name, avatar_url), player_c:users!ryder_cup_pairs_player_c_id_fkey(id, display_name, avatar_url)")
         .in("team_id", teamIds)
         .order("sort_order")
     : { data: [] };
@@ -106,6 +106,7 @@ export default async function KgbCupPage() {
     const color = team?.team_color || null;
     if (p.player_a_id) playerTeamColor.set(p.player_a_id, color);
     if (p.player_b_id) playerTeamColor.set(p.player_b_id, color);
+    if (p.player_c_id) playerTeamColor.set(p.player_c_id, color);
   }
 
   const teeSheetGroups: TeeSheetGroup[] = (teeTimesResult.data || []).map((tt) => {

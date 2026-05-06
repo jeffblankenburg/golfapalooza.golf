@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     const { data: pairs } = await supabase
       .from("ryder_cup_pairs")
       .select(
-        "id, team_id, player_a_id, player_b_id, sort_order, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name)"
+        "id, team_id, player_a_id, player_b_id, player_c_id, sort_order, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name), player_c:users!ryder_cup_pairs_player_c_id_fkey(id, display_name)"
       )
       .in("team_id", teamIds)
       .order("sort_order");
@@ -59,20 +59,25 @@ export async function GET(request: Request) {
         team_id: string;
         player_a_id: string | null;
         player_b_id: string | null;
+        player_c_id: string | null;
         player_a_name: string;
         player_b_name: string;
+        player_c_name: string;
       }
     >();
     for (const p of pairs || []) {
       const playerA = Array.isArray(p.player_a) ? p.player_a[0] : p.player_a;
       const playerB = Array.isArray(p.player_b) ? p.player_b[0] : p.player_b;
+      const playerC = Array.isArray(p.player_c) ? p.player_c[0] : p.player_c;
       pairMap.set(p.id, {
         id: p.id,
         team_id: p.team_id,
         player_a_id: p.player_a_id,
         player_b_id: p.player_b_id,
-        player_a_name: playerA?.display_name || "TBD",
+        player_c_id: p.player_c_id,
+        player_a_name: playerA?.display_name || "",
         player_b_name: playerB?.display_name || "",
+        player_c_name: playerC?.display_name || "",
       });
     }
 
@@ -208,8 +213,10 @@ export async function GET(request: Request) {
         pair_team2_id: f.pair_team2_id,
         team1_player_a_id: pair1?.player_a_id || null,
         team1_player_b_id: pair1?.player_b_id || null,
+        team1_player_c_id: pair1?.player_c_id || null,
         team2_player_a_id: pair2?.player_a_id || null,
         team2_player_b_id: pair2?.player_b_id || null,
+        team2_player_c_id: pair2?.player_c_id || null,
       };
     });
 
@@ -218,6 +225,7 @@ export async function GET(request: Request) {
     for (const p of pairMap.values()) {
       if (p.player_a_id) playerNames.set(p.player_a_id, p.player_a_name);
       if (p.player_b_id) playerNames.set(p.player_b_id, p.player_b_name);
+      if (p.player_c_id) playerNames.set(p.player_c_id, p.player_c_name);
     }
 
     const foursomeResults = foursomeDataList.map((fd) =>
@@ -234,10 +242,10 @@ export async function GET(request: Request) {
         id: f.id,
         sort_order: f.sort_order,
         team1_pair: pair1
-          ? { id: pair1.id, player_a: pair1.player_a_name, player_b: pair1.player_b_name }
+          ? { id: pair1.id, player_a: pair1.player_a_name, player_b: pair1.player_b_name, player_c: pair1.player_c_name }
           : null,
         team2_pair: pair2
-          ? { id: pair2.id, player_a: pair2.player_a_name, player_b: pair2.player_b_name }
+          ? { id: pair2.id, player_a: pair2.player_a_name, player_b: pair2.player_b_name, player_c: pair2.player_c_name }
           : null,
         results: foursomeResults[i],
       };

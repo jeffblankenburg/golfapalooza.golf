@@ -32,7 +32,7 @@ export async function PUT(request: Request) {
     // Find the pair (team1) and its matching pair (team2, same sort_order).
     const { data: team1Pair } = await adminClient
       .from("ryder_cup_pairs")
-      .select("id, team_id, sort_order, player_a_id, player_b_id")
+      .select("id, team_id, sort_order, player_a_id, player_b_id, player_c_id")
       .eq("id", foursome_id)
       .single();
 
@@ -61,7 +61,7 @@ export async function PUT(request: Request) {
     const { data: team2Pair } = team2
       ? await adminClient
           .from("ryder_cup_pairs")
-          .select("player_a_id, player_b_id")
+          .select("player_a_id, player_b_id, player_c_id")
           .eq("team_id", team2.id)
           .eq("sort_order", team1Pair.sort_order)
           .single()
@@ -70,8 +70,10 @@ export async function PUT(request: Request) {
     const playerIds = new Set<string>();
     if (team1Pair.player_a_id) playerIds.add(team1Pair.player_a_id);
     if (team1Pair.player_b_id) playerIds.add(team1Pair.player_b_id);
+    if (team1Pair.player_c_id) playerIds.add(team1Pair.player_c_id);
     if (team2Pair?.player_a_id) playerIds.add(team2Pair.player_a_id);
     if (team2Pair?.player_b_id) playerIds.add(team2Pair.player_b_id);
+    if (team2Pair?.player_c_id) playerIds.add(team2Pair.player_c_id);
 
     if (!playerIds.has(effectiveUserId)) {
       return NextResponse.json(

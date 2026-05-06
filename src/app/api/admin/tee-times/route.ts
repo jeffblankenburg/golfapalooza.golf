@@ -110,7 +110,7 @@ export async function GET(request: Request) {
       const { data: rcPairs } = rcTeamIds.length > 0
         ? await adminClient
             .from("ryder_cup_pairs")
-            .select("id, team_id, sort_order, player_a_id, player_b_id, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name, avatar_url), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name, avatar_url)")
+            .select("id, team_id, sort_order, player_a_id, player_b_id, player_c_id, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name, avatar_url), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name, avatar_url), player_c:users!ryder_cup_pairs_player_c_id_fkey(id, display_name, avatar_url)")
             .in("team_id", rcTeamIds)
         : { data: [] };
 
@@ -235,7 +235,7 @@ export async function POST(request: Request) {
       // Fetch pair + its team info in one query (join)
       const { data: team1Pair } = await adminClient
         .from("ryder_cup_pairs")
-        .select("id, team_id, sort_order, player_a_id, player_b_id, team:ryder_cup_teams!inner(id, contest_id)")
+        .select("id, team_id, sort_order, player_a_id, player_b_id, player_c_id, team:ryder_cup_teams!inner(id, contest_id)")
         .eq("id", kgb_foursome_id)
         .single();
 
@@ -253,11 +253,11 @@ export async function POST(request: Request) {
           Promise.resolve(null),
         ]);
 
-        let team2Pair: { player_a_id: string | null; player_b_id: string | null } | null = null;
+        let team2Pair: { player_a_id: string | null; player_b_id: string | null; player_c_id: string | null } | null = null;
         if (team2Result.data) {
           const { data: p2 } = await adminClient
             .from("ryder_cup_pairs")
-            .select("player_a_id, player_b_id")
+            .select("player_a_id, player_b_id, player_c_id")
             .eq("team_id", team2Result.data.id)
             .eq("sort_order", team1Pair.sort_order)
             .single();
@@ -267,8 +267,10 @@ export async function POST(request: Request) {
         const playerIds: string[] = [];
         if (team1Pair.player_a_id) playerIds.push(team1Pair.player_a_id);
         if (team1Pair.player_b_id) playerIds.push(team1Pair.player_b_id);
+        if (team1Pair.player_c_id) playerIds.push(team1Pair.player_c_id);
         if (team2Pair?.player_a_id) playerIds.push(team2Pair.player_a_id);
         if (team2Pair?.player_b_id) playerIds.push(team2Pair.player_b_id);
+        if (team2Pair?.player_c_id) playerIds.push(team2Pair.player_c_id);
 
         if (playerIds.length > 0) {
           await adminClient

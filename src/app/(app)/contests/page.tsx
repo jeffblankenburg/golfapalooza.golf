@@ -107,7 +107,7 @@ export default async function ContestsPage() {
         ? supabase
             .from("ryder_cup_pairs")
             .select(
-              "id, contest_id, team_id, sort_order, player_a:users!ryder_cup_pairs_player_a_id_fkey(display_name), player_b:users!ryder_cup_pairs_player_b_id_fkey(display_name)"
+              "id, contest_id, team_id, sort_order, player_a:users!ryder_cup_pairs_player_a_id_fkey(display_name), player_b:users!ryder_cup_pairs_player_b_id_fkey(display_name), player_c:users!ryder_cup_pairs_player_c_id_fkey(display_name)"
             )
             .in("contest_id", ryderContestIds)
         : Promise.resolve({ data: [] }),
@@ -305,6 +305,7 @@ export default async function ContestsPage() {
         sort_order: number;
         player_a: string;
         player_b: string;
+        player_c: string;
       }[];
     }
   > = {};
@@ -330,12 +331,16 @@ export default async function ContestsPage() {
     const playerB = Array.isArray(p.player_b)
       ? p.player_b[0]?.display_name
       : (p.player_b as { display_name: string } | null)?.display_name;
+    const playerC = Array.isArray(p.player_c)
+      ? p.player_c[0]?.display_name
+      : (p.player_c as { display_name: string } | null)?.display_name;
     ryderDataByContest[p.contest_id].pairs.push({
       id: p.id,
       team_id: p.team_id,
       sort_order: p.sort_order,
-      player_a: playerA || "TBD",
-      player_b: playerB || "TBD",
+      player_a: playerA || "",
+      player_b: playerB || "",
+      player_c: playerC || "",
     });
   }
 

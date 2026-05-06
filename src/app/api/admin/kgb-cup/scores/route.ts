@@ -33,7 +33,7 @@ export async function GET(request: Request) {
       ? await adminClient
           .from("ryder_cup_pairs")
           .select(
-            "id, team_id, player_a_id, player_b_id, sort_order, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name, full_name), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name, full_name)"
+            "id, team_id, player_a_id, player_b_id, player_c_id, sort_order, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name, full_name), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name, full_name), player_c:users!ryder_cup_pairs_player_c_id_fkey(id, display_name, full_name)"
           )
           .in("team_id", teamIds)
           .order("sort_order")
@@ -43,17 +43,22 @@ export async function GET(request: Request) {
     const normalizedPairs = (pairs || []).map((p) => {
       const playerA = Array.isArray(p.player_a) ? p.player_a[0] : p.player_a;
       const playerB = Array.isArray(p.player_b) ? p.player_b[0] : p.player_b;
+      const playerC = Array.isArray(p.player_c) ? p.player_c[0] : p.player_c;
       return {
         id: p.id,
         team_id: p.team_id,
         sort_order: p.sort_order,
         player_a_id: p.player_a_id,
         player_b_id: p.player_b_id,
+        player_c_id: p.player_c_id,
         player_a: playerA
           ? { id: playerA.id, display_name: playerA.display_name, full_name: playerA.full_name }
           : null,
         player_b: playerB
           ? { id: playerB.id, display_name: playerB.display_name, full_name: playerB.full_name }
+          : null,
+        player_c: playerC
+          ? { id: playerC.id, display_name: playerC.display_name, full_name: playerC.full_name }
           : null,
       };
     });
@@ -77,6 +82,7 @@ export async function GET(request: Request) {
     for (const p of normalizedPairs) {
       if (p.player_a_id) allPlayerIds.push(p.player_a_id);
       if (p.player_b_id) allPlayerIds.push(p.player_b_id);
+      if (p.player_c_id) allPlayerIds.push(p.player_c_id);
     }
 
     let baseHandicaps: { user_id: string; handicap_index: number }[] = [];

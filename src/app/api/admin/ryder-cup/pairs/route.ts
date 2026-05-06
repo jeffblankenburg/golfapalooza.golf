@@ -59,7 +59,7 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const { pair_id, player_a_id, player_b_id } = await request.json();
+    const { pair_id, player_a_id, player_b_id, player_c_id } = await request.json();
 
     if (!pair_id) {
       return NextResponse.json({ error: "pair_id is required" }, { status: 400 });
@@ -70,7 +70,7 @@ export async function PUT(request: Request) {
     // Get the pair's team to find the contest
     const { data: pair } = await adminClient
       .from("ryder_cup_pairs")
-      .select("id, team_id, player_a_id, player_b_id")
+      .select("id, team_id, player_a_id, player_b_id, player_c_id")
       .eq("id", pair_id)
       .single();
 
@@ -92,9 +92,10 @@ export async function PUT(request: Request) {
     const updates: Record<string, string | null> = {};
     if (player_a_id !== undefined) updates.player_a_id = player_a_id;
     if (player_b_id !== undefined) updates.player_b_id = player_b_id;
+    if (player_c_id !== undefined) updates.player_c_id = player_c_id;
 
     // Validate player not already in another pair for this contest
-    for (const playerId of [player_a_id, player_b_id].filter(Boolean)) {
+    for (const playerId of [player_a_id, player_b_id, player_c_id].filter(Boolean)) {
       // Get all team IDs for this contest
       const { data: contestTeams } = await adminClient
         .from("ryder_cup_teams")
@@ -105,12 +106,12 @@ export async function PUT(request: Request) {
 
       const { data: existingPairs } = await adminClient
         .from("ryder_cup_pairs")
-        .select("id, player_a_id, player_b_id")
+        .select("id, player_a_id, player_b_id, player_c_id")
         .in("team_id", contestTeamIds);
 
       for (const ep of existingPairs || []) {
         if (ep.id === pair_id) continue;
-        if (ep.player_a_id === playerId || ep.player_b_id === playerId) {
+        if (ep.player_a_id === playerId || ep.player_b_id === playerId || ep.player_c_id === playerId) {
           return NextResponse.json(
             { error: "Player is already assigned to another pair" },
             { status: 400 }

@@ -116,7 +116,7 @@ export async function POST(request: Request) {
 
   const { data: pairs } = await admin
     .from("ryder_cup_pairs")
-    .select("id, player_a_id, player_b_id")
+    .select("id, player_a_id, player_b_id, player_c_id")
     .in("team_id", teamIds);
 
   if (!pairs || pairs.length === 0) {
@@ -127,7 +127,7 @@ export async function POST(request: Request) {
   const allPlayerIds = [
     ...new Set(
       pairs
-        .flatMap((p) => [p.player_a_id, p.player_b_id])
+        .flatMap((p) => [p.player_a_id, p.player_b_id, p.player_c_id])
         .filter(Boolean) as string[]
     ),
   ];

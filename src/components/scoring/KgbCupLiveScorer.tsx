@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect, Fragment } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { logActivity } from "@/components/ActivityTracker";
 import ScoringShell, { type HoleInfo } from "@/components/scoring/ScoringShell";
@@ -10,6 +10,7 @@ import {
   type MatchResult,
   type OverallResult,
 } from "@/lib/kgb-cup/match-logic";
+import { kgbCupMatchSchedule, type KgbScheduledSection } from "@/lib/kgb-cup/schedule";
 import { KgbCupScoreboard, KgbCupGroupResults } from "@/components/kgb-cup/KgbCupResultsView";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -38,7 +39,6 @@ interface ScoreEntry {
 interface Props {
   foursomeId: string;
   contestId: string;
-  players: PlayerInfo[];
   pairs: PairInfo[];
   startingHole: number;
   holes: HoleInfo[];
@@ -104,6 +104,7 @@ interface LeaderboardPairData {
   id: string;
   player_a: string;
   player_b: string;
+  player_c: string;
 }
 
 interface LeaderboardFoursome {
@@ -193,11 +194,11 @@ function KgbCupLeaderboardPopup({
               id: f.id,
               sort_order: f.sort_order,
               team1PairLabel: f.team1_pair
-                ? [f.team1_pair.player_a, f.team1_pair.player_b].filter(Boolean).join(" & ")
-                : "TBD",
+                ? [f.team1_pair.player_a, f.team1_pair.player_b, f.team1_pair.player_c].filter(Boolean).join(" & ")
+                : "",
               team2PairLabel: f.team2_pair
-                ? [f.team2_pair.player_a, f.team2_pair.player_b].filter(Boolean).join(" & ")
-                : "TBD",
+                ? [f.team2_pair.player_a, f.team2_pair.player_b, f.team2_pair.player_c].filter(Boolean).join(" & ")
+                : "",
               results: f.results,
             }))}
             team1Color={t1Color}
@@ -214,7 +215,6 @@ function KgbCupLeaderboardPopup({
 export function KgbCupLiveScorer({
   foursomeId,
   contestId,
-  players,
   pairs,
   startingHole,
   holes,
@@ -262,15 +262,39 @@ export function KgbCupLiveScorer({
   const team1Color = pairs[0]?.players[0]?.teamColor || "#3b82f6";
   const team2Color = pairs[1]?.players[0]?.teamColor || "#ef4444";
 
+  // Build the canonical match schedule once for the foursome (or 3some/5some/6some).
+  // Schedule shape varies by group size — see src/lib/kgb-cup/schedule.ts.
+  const team1Players = useMemo(() => pairs[0]?.players || [], [pairs]);
+  const team2Players = useMemo(() => pairs[1]?.players || [], [pairs]);
+  const schedule = useMemo(() => {
+    if (team1Players.length === 0 || team2Players.length === 0) return null;
+    try {
+      return kgbCupMatchSchedule(
+        team1Players.map((p) => ({ id: p.id, displayName: p.displayName })),
+        team2Players.map((p) => ({ id: p.id, displayName: p.displayName })),
+      );
+    } catch {
+      return null;
+    }
+  }, [team1Players, team2Players]);
+
+  const playerLookup = useMemo(() => {
+    const m = new Map<string, PlayerInfo>();
+    for (const p of team1Players) m.set(p.id, p);
+    for (const p of team2Players) m.set(p.id, p);
+    return m;
+  }, [team1Players, team2Players]);
+
   const getHoleHandicapIndex = (holeNum: number): number => {
     return holes.find((h) => h.hole_number === holeNum)?.handicap_index || 0;
   };
 
-  const getSection = (holeNum: number): 1 | 2 | 3 => {
-    if (holeNum <= 6) return 1;
-    if (holeNum <= 12) return 2;
-    return 3;
+  const sectionForHole = (holeNum: number): KgbScheduledSection | null => {
+    if (!schedule) return null;
+    return schedule.sections.find((s) => s.holes.includes(holeNum)) ?? null;
   };
+
+  const getSection = (holeNum: number): 1 | 2 | 3 => sectionForHole(holeNum)?.section ?? 1;
 
   // Track max height of the match panel so it stays stable when switching sections
   useEffect(() => {
@@ -389,54 +413,58 @@ export function KgbCupLiveScorer({
   // ── Match Logic ──
 
   const getMatchesForDisplay = (holeNum: number): MatchDisplay[] => {
-    const section = getSection(holeNum);
+    const sec = sectionForHole(holeNum);
+    if (!sec) return [];
+    const hdcpIdx = getHoleHandicapIndex(holeNum);
 
-    if (section === 3) {
-      const p1 = pairs[0];
-      const p2 = pairs[1];
-      const t1Hc = pairHcMap.get(p1.id) || 0;
-      const t2Hc = pairHcMap.get(p2.id) || 0;
-      const diffHc = Math.abs(t1Hc - t2Hc);
-      const t1Strokes = t1Hc > t2Hc ? getStrokesOnHole(diffHc, getHoleHandicapIndex(holeNum)) : 0;
-      const t2Strokes = t2Hc > t1Hc ? getStrokesOnHole(diffHc, getHoleHandicapIndex(holeNum)) : 0;
-      const t1Score = scores[getScorerKey("pair", p1.id, holeNum)];
-      const t2Score = scores[getScorerKey("pair", p2.id, holeNum)];
+    return sec.matches
+      .map((m): MatchDisplay | null => {
+        if (sec.format === "scramble") {
+          const p1 = pairs[0];
+          const p2 = pairs[1];
+          if (!p1 || !p2) return null;
+          const t1Hc = pairHcMap.get(p1.id) || 0;
+          const t2Hc = pairHcMap.get(p2.id) || 0;
+          const diffHc = Math.abs(t1Hc - t2Hc);
+          const t1Strokes = t1Hc > t2Hc ? getStrokesOnHole(diffHc, hdcpIdx) : 0;
+          const t2Strokes = t2Hc > t1Hc ? getStrokesOnHole(diffHc, hdcpIdx) : 0;
+          const t1Score = scores[getScorerKey("pair", p1.id, holeNum)];
+          const t2Score = scores[getScorerKey("pair", p2.id, holeNum)];
 
-      let winner: "team1" | "team2" | "tie" | null = null;
-      if (t1Score !== undefined && t2Score !== undefined) {
-        const t1Net = t1Score - t1Strokes;
-        const t2Net = t2Score - t2Strokes;
-        if (t1Net < t2Net) winner = "team1";
-        else if (t2Net < t1Net) winner = "team2";
-        else winner = "tie";
-      }
+          let winner: "team1" | "team2" | "tie" | null = null;
+          if (t1Score !== undefined && t2Score !== undefined) {
+            const t1Net = t1Score - t1Strokes;
+            const t2Net = t2Score - t2Strokes;
+            if (t1Net < t2Net) winner = "team1";
+            else if (t2Net < t1Net) winner = "team2";
+            else winner = "tie";
+          }
 
-      return [{
-        team1: {
-          type: "pair", id: p1.id,
-          label: p1.players.map((p) => p.displayName).join(" & "),
-          teamColor: p1.players[0]?.teamColor || null, handicap: t1Hc, strokes: t1Strokes, score: t1Score,
-        },
-        team2: {
-          type: "pair", id: p2.id,
-          label: p2.players.map((p) => p.displayName).join(" & "),
-          teamColor: p2.players[0]?.teamColor || null, handicap: t2Hc, strokes: t2Strokes, score: t2Score,
-        },
-        winner,
-      }];
-    }
+          return {
+            team1: {
+              type: "pair", id: p1.id,
+              label: p1.players.map((p) => p.displayName).join(" & "),
+              teamColor: p1.players[0]?.teamColor || null, handicap: t1Hc, strokes: t1Strokes, score: t1Score,
+            },
+            team2: {
+              type: "pair", id: p2.id,
+              label: p2.players.map((p) => p.displayName).join(" & "),
+              teamColor: p2.players[0]?.teamColor || null, handicap: t2Hc, strokes: t2Strokes, score: t2Score,
+            },
+            winner,
+          };
+        }
 
-    const matchPairings = section === 1 ? [[0, 2], [1, 3]] : [[0, 3], [1, 2]];
-    return matchPairings
-      .filter(([a, b]) => players[a] && players[b])
-      .map(([t1Idx, t2Idx]) => {
-        const p1 = players[t1Idx];
-        const p2 = players[t2Idx];
+        // Individual match — resolve players from the schedule.
+        const p1 = playerLookup.get(m.team1Player.id);
+        const p2 = playerLookup.get(m.team2Player.id);
+        if (!p1 || !p2) return null;
+
         const t1Hc = playerHcMap.get(p1.id) || 0;
         const t2Hc = playerHcMap.get(p2.id) || 0;
         const diffHc = Math.abs(t1Hc - t2Hc);
-        const t1Strokes = t1Hc > t2Hc ? getStrokesOnHole(diffHc, getHoleHandicapIndex(holeNum)) : 0;
-        const t2Strokes = t2Hc > t1Hc ? getStrokesOnHole(diffHc, getHoleHandicapIndex(holeNum)) : 0;
+        const t1Strokes = t1Hc > t2Hc ? getStrokesOnHole(diffHc, hdcpIdx) : 0;
+        const t2Strokes = t2Hc > t1Hc ? getStrokesOnHole(diffHc, hdcpIdx) : 0;
         const t1Score = scores[getScorerKey("player", p1.id, holeNum)];
         const t2Score = scores[getScorerKey("player", p2.id, holeNum)];
 
@@ -462,38 +490,38 @@ export function KgbCupLiveScorer({
           },
           winner,
         };
-      });
+      })
+      .filter((m): m is MatchDisplay => m !== null);
   };
 
   // Get per-match hole results for mini scorecard
   const getHoleMatchResults = (holeNum: number): ("team1" | "team2" | "tie" | null)[] => {
-    const section = getSection(holeNum);
+    const sec = sectionForHole(holeNum);
+    if (!sec) return [];
     const hdcpIdx = getHoleHandicapIndex(holeNum);
 
-    if (section === 3) {
-      const t1Score = scores[getScorerKey("pair", pairs[0].id, holeNum)];
-      const t2Score = scores[getScorerKey("pair", pairs[1].id, holeNum)];
-      if (t1Score === undefined || t2Score === undefined) return [null];
-      const t1Hc = pairHcMap.get(pairs[0].id) || 0;
-      const t2Hc = pairHcMap.get(pairs[1].id) || 0;
-      const diffHc = Math.abs(t1Hc - t2Hc);
-      const t1Strokes = t1Hc > t2Hc ? getStrokesOnHole(diffHc, hdcpIdx) : 0;
-      const t2Strokes = t2Hc > t1Hc ? getStrokesOnHole(diffHc, hdcpIdx) : 0;
-      const t1Net = t1Score - t1Strokes;
-      const t2Net = t2Score - t2Strokes;
-      if (t1Net < t2Net) return ["team1"];
-      if (t2Net < t1Net) return ["team2"];
-      return ["tie"];
-    }
+    return sec.matches.map((m) => {
+      if (sec.format === "scramble") {
+        const t1Score = scores[getScorerKey("pair", pairs[0].id, holeNum)];
+        const t2Score = scores[getScorerKey("pair", pairs[1].id, holeNum)];
+        if (t1Score === undefined || t2Score === undefined) return null;
+        const t1Hc = pairHcMap.get(pairs[0].id) || 0;
+        const t2Hc = pairHcMap.get(pairs[1].id) || 0;
+        const diffHc = Math.abs(t1Hc - t2Hc);
+        const t1Strokes = t1Hc > t2Hc ? getStrokesOnHole(diffHc, hdcpIdx) : 0;
+        const t2Strokes = t2Hc > t1Hc ? getStrokesOnHole(diffHc, hdcpIdx) : 0;
+        const t1Net = t1Score - t1Strokes;
+        const t2Net = t2Score - t2Strokes;
+        if (t1Net < t2Net) return "team1";
+        if (t2Net < t1Net) return "team2";
+        return "tie";
+      }
 
-    const matchPairings = section === 1 ? [[0, 2], [1, 3]] : [[0, 3], [1, 2]];
-    return matchPairings.map(([t1Idx, t2Idx]) => {
-      if (!players[t1Idx] || !players[t2Idx]) return null;
-      const t1Score = scores[getScorerKey("player", players[t1Idx].id, holeNum)];
-      const t2Score = scores[getScorerKey("player", players[t2Idx].id, holeNum)];
+      const t1Score = scores[getScorerKey("player", m.team1Player.id, holeNum)];
+      const t2Score = scores[getScorerKey("player", m.team2Player.id, holeNum)];
       if (t1Score === undefined || t2Score === undefined) return null;
-      const t1Hc = playerHcMap.get(players[t1Idx].id) || 0;
-      const t2Hc = playerHcMap.get(players[t2Idx].id) || 0;
+      const t1Hc = playerHcMap.get(m.team1Player.id) || 0;
+      const t2Hc = playerHcMap.get(m.team2Player.id) || 0;
       const diffHc = Math.abs(t1Hc - t2Hc);
       const t1Strokes = t1Hc > t2Hc ? getStrokesOnHole(diffHc, hdcpIdx) : 0;
       const t2Strokes = t2Hc > t1Hc ? getStrokesOnHole(diffHc, hdcpIdx) : 0;

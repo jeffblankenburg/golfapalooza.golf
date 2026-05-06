@@ -188,15 +188,13 @@ function GroupCard({
 
       {expanded && (
         <div className="border-t border-gray-100">
-          {[1, 2, 3].map((section) => {
-            const sectionMatches = results.matches.filter((m) => m.section === section);
-            if (sectionMatches.length === 0) return null;
-            const sectionLabel = section === 3 ? "Section 3 — Scramble" : `Section ${section} — Individual`;
+          {sectionsFromMatches(results.matches).map(({ section, sectionMatches, firstHole, lastHole, isScramble }) => {
+            const sectionLabel = isScramble ? `Section ${section} — Scramble` : `Section ${section} — Individual`;
             return (
               <div key={section}>
                 <div className="px-4 py-1.5 bg-gray-50">
                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
-                    {sectionLabel} (Holes {(section - 1) * 6 + 1}-{section * 6})
+                    {sectionLabel} (Holes {firstHole}-{lastHole})
                   </p>
                 </div>
                 {sectionMatches.map((m) => (
@@ -214,6 +212,35 @@ function GroupCard({
       )}
     </div>
   );
+}
+
+// Group MatchResults by section number, deriving the hole range and scramble
+// flag from the match data itself. Handles 2v2 (3 sections, §3 scramble),
+// 1v2 (2 sections × 9 holes), 2v3/3v3 (3 sections × 6 holes, all individual).
+function sectionsFromMatches(matches: MatchResult[]): {
+  section: 1 | 2 | 3;
+  sectionMatches: MatchResult[];
+  firstHole: number;
+  lastHole: number;
+  isScramble: boolean;
+}[] {
+  const buckets = new Map<1 | 2 | 3, MatchResult[]>();
+  for (const m of matches) {
+    if (!buckets.has(m.section)) buckets.set(m.section, []);
+    buckets.get(m.section)!.push(m);
+  }
+  return Array.from(buckets.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([section, sectionMatches]) => {
+      const allHoles = sectionMatches.flatMap((m) => m.holeResults.map((hr) => hr.hole));
+      return {
+        section,
+        sectionMatches,
+        firstHole: allHoles.length > 0 ? Math.min(...allHoles) : 0,
+        lastHole: allHoles.length > 0 ? Math.max(...allHoles) : 0,
+        isScramble: sectionMatches.some((m) => m.scorerType === "pair"),
+      };
+    });
 }
 
 // ── Match Row ──

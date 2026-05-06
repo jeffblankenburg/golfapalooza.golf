@@ -24,7 +24,13 @@ interface ScrambleTeam {
 
 interface RyderData {
   teams: { id: string; team_number: number; team_name: string }[];
-  pairs: { id: string; team_id: string; sort_order: number; player_a: string; player_b: string }[];
+  pairs: { id: string; team_id: string; sort_order: number; player_a: string; player_b: string; player_c: string }[];
+}
+
+// Build "X & Y & Z" from up to 3 player names, dropping empty slots so a
+// solo or duo side renders cleanly with no "TBD"/"?" placeholders.
+function pairLabel(pair: { player_a: string; player_b: string; player_c: string }): string {
+  return [pair.player_a, pair.player_b, pair.player_c].filter(Boolean).join(" & ");
 }
 
 interface TeeTimeGroup {
@@ -440,7 +446,7 @@ function RyderCupContent({
                 <div className="space-y-1.5">
                   {teamPairs.map((pair) => (
                     <p key={pair.id} className="text-xs text-gray-600">
-                      {pair.player_a} &amp; {pair.player_b}
+                      {pairLabel(pair)}
                     </p>
                   ))}
                 </div>
@@ -467,9 +473,9 @@ function RyderCupContent({
             <div className="space-y-2">
               {matchups.map((m) => (
                 <div key={m.p1.id} className="bg-gray-50 rounded-xl px-3 py-2.5 text-sm">
-                  <span className="text-gray-900">{m.p1.player_a} & {m.p1.player_b}</span>
+                  <span className="text-gray-900">{pairLabel(m.p1)}</span>
                   <span className="text-gray-400 mx-2">vs</span>
-                  <span className="text-gray-900">{m.p2!.player_a} & {m.p2!.player_b}</span>
+                  <span className="text-gray-900">{pairLabel(m.p2!)}</span>
                 </div>
               ))}
             </div>

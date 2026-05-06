@@ -18,6 +18,7 @@ interface PairData {
   id: string;
   player_a: string;
   player_b: string;
+  player_c: string;
 }
 
 interface EnrichedFoursome {
@@ -102,11 +103,11 @@ export function KgbCupResults({ contestId, headerAction }: { contestId: string; 
     id: f.id,
     sort_order: f.sort_order,
     team1PairLabel: f.team1_pair
-      ? [f.team1_pair.player_a, f.team1_pair.player_b].filter(Boolean).join(" & ")
-      : "TBD",
+      ? [f.team1_pair.player_a, f.team1_pair.player_b, f.team1_pair.player_c].filter(Boolean).join(" & ")
+      : "",
     team2PairLabel: f.team2_pair
-      ? [f.team2_pair.player_a, f.team2_pair.player_b].filter(Boolean).join(" & ")
-      : "TBD",
+      ? [f.team2_pair.player_a, f.team2_pair.player_b, f.team2_pair.player_c].filter(Boolean).join(" & ")
+      : "",
     results: f.results,
   }));
 

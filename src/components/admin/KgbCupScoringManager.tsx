@@ -13,6 +13,7 @@ import {
   type FoursomeResult,
   type MatchResult,
 } from "@/lib/kgb-cup/match-logic";
+import { kgbCupMatchSchedule } from "@/lib/kgb-cup/schedule";
 import { KgbCupScoreboard, KgbCupGroupResults, type KgbGroupData } from "@/components/kgb-cup/KgbCupResultsView";
 
 // ── Types ──
@@ -29,9 +30,14 @@ interface PairInfo {
   sort_order: number;
   player_a_id: string | null;
   player_b_id: string | null;
+  player_c_id: string | null;
   player_a: PlayerInfo | null;
   player_b: PlayerInfo | null;
+  player_c: PlayerInfo | null;
 }
+
+const isPairFilled = (p: PairInfo | undefined) =>
+  !!(p?.player_a_id || p?.player_b_id || p?.player_c_id);
 
 interface TeamInfo {
   id: string;
@@ -54,7 +60,20 @@ interface PairHandicapRow {
   team_id: string;
   player_a: { id: string; display_name: string } | null;
   player_b: { id: string; display_name: string } | null;
+  player_c: { id: string; display_name: string } | null;
   scramble_handicap: number | null;
+}
+
+// Build a "X & Y & Z" pair label from up to 3 player slots, skipping empty
+// slots. A genuinely empty pair (no players) returns an empty string — we
+// never render "TBD" / "?" since uneven sides are legitimate.
+function pairLabel(
+  players: ({ display_name: string } | null | undefined)[],
+): string {
+  return players
+    .map((p) => p?.display_name)
+    .filter((n): n is string => !!n)
+    .join(" & ");
 }
 
 interface FoursomeInfo {
@@ -333,12 +352,8 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
   const getFoursomeLabel = (f: FoursomeInfo): string => {
     const pair1 = pairs.find((p) => p.id === f.pair_team1_id);
     const pair2 = pairs.find((p) => p.id === f.pair_team2_id);
-    const p1a = pair1?.player_a?.display_name || "?";
-    const p1b = pair1?.player_b?.display_name || "";
-    const p2a = pair2?.player_a?.display_name || "?";
-    const p2b = pair2?.player_b?.display_name || "";
-    const t1 = p1b ? `${p1a} & ${p1b}` : p1a;
-    const t2 = p2b ? `${p2a} & ${p2b}` : p2a;
+    const t1 = pairLabel([pair1?.player_a, pair1?.player_b, pair1?.player_c]);
+    const t2 = pairLabel([pair2?.player_a, pair2?.player_b, pair2?.player_c]);
     return `${t1}  vs  ${t2}`;
   };
 
@@ -352,8 +367,10 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
       pair_team2_id: f.pair_team2_id,
       team1_player_a_id: pair1?.player_a_id || null,
       team1_player_b_id: pair1?.player_b_id || null,
+      team1_player_c_id: pair1?.player_c_id || null,
       team2_player_a_id: pair2?.player_a_id || null,
       team2_player_b_id: pair2?.player_b_id || null,
+      team2_player_c_id: pair2?.player_c_id || null,
     };
   };
 
@@ -388,7 +405,11 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
 
   // Determine scoring readiness
   const hasTeeAssignments = holes.length > 0;
-  const hasFoursomesReady = foursomes.length > 0 && pairs.some((p) => p.player_a_id && p.player_b_id);
+  const hasFoursomesReady = foursomes.length > 0 && foursomes.every((f) => {
+    const p1 = pairs.find((p) => p.id === f.pair_team1_id);
+    const p2 = pairs.find((p) => p.id === f.pair_team2_id);
+    return isPairFilled(p1) && isPairFilled(p2);
+  });
 
   return (
     <div className="space-y-4">
@@ -582,7 +603,7 @@ function HandicapsTab({
           <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                Pair Scramble Handicaps (Section 3)
+                Pair Scramble Handicaps (2v2 §3 only)
               </p>
               <button
                 onClick={() => setShowInfo(!showInfo)}
@@ -638,8 +659,7 @@ function HandicapsTab({
                     <div key={pair.id} className="flex items-center gap-3 px-3 py-2">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-gray-700">
-                          {pair.player_a?.display_name || "TBD"}
-                          {pair.player_b ? ` & ${pair.player_b.display_name}` : " (solo)"}
+                          {pairLabel([pair.player_a, pair.player_b, pair.player_c])}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -703,11 +723,12 @@ function ScoringTab({
   const selectedFoursome = foursomes.find((f) => f.id === selectedFoursomeId);
   const selectedResult = foursomeResults.find((r) => r.foursomeId === selectedFoursomeId);
 
-  // Check if pairings are complete (all foursomes have 4 players)
+  // Pairings are complete when every foursome has at least 1 player on each side.
+  // Uneven sides (1v2, 2v3, 3v3, etc.) are valid per issue #107.
   const pairingsComplete = foursomes.length > 0 && foursomes.every((f) => {
     const p1 = pairs.find((p) => p.id === f.pair_team1_id);
     const p2 = pairs.find((p) => p.id === f.pair_team2_id);
-    return p1?.player_a_id && p1?.player_b_id && p2?.player_a_id && p2?.player_b_id;
+    return isPairFilled(p1) && isPairFilled(p2);
   });
 
   if (foursomes.length === 0 || !pairingsComplete) {
@@ -821,22 +842,43 @@ function FoursomeScoreEntry({
     scoreLookup.set(`${s.scorer_type}-${s.scorer_id}-${s.hole_number}`, s.strokes);
   }
 
-  // Gather individual players for sections 1-2
-  const individualPlayers: { id: string; name: string; team: 1 | 2; slot: "a" | "b" }[] = [];
-  if (pair1?.player_a) individualPlayers.push({ id: pair1.player_a.id, name: pair1.player_a.display_name, team: 1, slot: "a" });
-  if (pair1?.player_b) individualPlayers.push({ id: pair1.player_b.id, name: pair1.player_b.display_name, team: 1, slot: "b" });
-  if (pair2?.player_a) individualPlayers.push({ id: pair2.player_a.id, name: pair2.player_a.display_name, team: 2, slot: "a" });
-  if (pair2?.player_b) individualPlayers.push({ id: pair2.player_b.id, name: pair2.player_b.display_name, team: 2, slot: "b" });
+  // Gather individual players (any section that's not a scramble). Each player
+  // records ONE score per hole even if they're in multiple matches that section
+  // (B-player double-duty in 2v3) — the schedule wires the same score into both
+  // matches automatically, so we just list each player once here.
+  const individualPlayers: { id: string; name: string; team: 1 | 2 }[] = [];
+  if (pair1?.player_a) individualPlayers.push({ id: pair1.player_a.id, name: pair1.player_a.display_name, team: 1 });
+  if (pair1?.player_b) individualPlayers.push({ id: pair1.player_b.id, name: pair1.player_b.display_name, team: 1 });
+  if (pair1?.player_c) individualPlayers.push({ id: pair1.player_c.id, name: pair1.player_c.display_name, team: 1 });
+  if (pair2?.player_a) individualPlayers.push({ id: pair2.player_a.id, name: pair2.player_a.display_name, team: 2 });
+  if (pair2?.player_b) individualPlayers.push({ id: pair2.player_b.id, name: pair2.player_b.display_name, team: 2 });
+  if (pair2?.player_c) individualPlayers.push({ id: pair2.player_c.id, name: pair2.player_c.display_name, team: 2 });
 
-  // Scramble pairs for section 3
+  // Scramble pair scorers (used only by 2v2 §3 — non-2v2 groups have no scramble).
   const scramblePairs: { id: string; name: string; team: 1 | 2 }[] = [];
   if (pair1) {
-    const name1 = [pair1.player_a?.display_name, pair1.player_b?.display_name].filter(Boolean).join(" & ");
-    scramblePairs.push({ id: pair1.id, name: name1 || "Team 1 Pair", team: 1 });
+    scramblePairs.push({ id: pair1.id, name: pairLabel([pair1.player_a, pair1.player_b, pair1.player_c]), team: 1 });
   }
   if (pair2) {
-    const name2 = [pair2.player_a?.display_name, pair2.player_b?.display_name].filter(Boolean).join(" & ");
-    scramblePairs.push({ id: pair2.id, name: name2 || "Team 2 Pair", team: 2 });
+    scramblePairs.push({ id: pair2.id, name: pairLabel([pair2.player_a, pair2.player_b, pair2.player_c]), team: 2 });
+  }
+
+  // Generate the schedule for this group so section grids match the actual
+  // format (3×6 for 2v2/2v3/3v3, 2×9 for 1v2/2v1).
+  const team1Roster = [pair1?.player_a, pair1?.player_b, pair1?.player_c]
+    .filter((p): p is NonNullable<typeof p> => !!p)
+    .map((p) => ({ id: p.id, displayName: p.display_name }));
+  const team2Roster = [pair2?.player_a, pair2?.player_b, pair2?.player_c]
+    .filter((p): p is NonNullable<typeof p> => !!p)
+    .map((p) => ({ id: p.id, displayName: p.display_name }));
+
+  let schedule: ReturnType<typeof kgbCupMatchSchedule> | null = null;
+  if (team1Roster.length > 0 && team2Roster.length > 0) {
+    try {
+      schedule = kgbCupMatchSchedule(team1Roster, team2Roster);
+    } catch {
+      schedule = null;
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -856,9 +898,10 @@ function FoursomeScoreEntry({
     sectionNum: 1 | 2 | 3,
     sectionLabel: string,
     scorers: { id: string; name: string; team: 1 | 2 }[],
-    scorerType: "player" | "pair"
+    scorerType: "player" | "pair",
+    sectionHoleNumbers?: number[],
   ) => {
-    const sectionHoles = getSectionHoles(holes, sectionNum);
+    const sectionHoles = getSectionHoles(holes, sectionNum, sectionHoleNumbers);
     const sortedHoles = [...sectionHoles].sort((a, b) => a.hole_number - b.hole_number);
 
     return (
@@ -953,13 +996,18 @@ function FoursomeScoreEntry({
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Match Summary</p>
         </div>
         <div className="divide-y divide-gray-100">
-          {result.matches.map((m) => (
+          {result.matches.map((m) => {
+            const matchHoles = m.holeResults.map((hr) => hr.hole);
+            const firstHole = matchHoles.length > 0 ? Math.min(...matchHoles) : 0;
+            const lastHole = matchHoles.length > 0 ? Math.max(...matchHoles) : 0;
+            const isScramble = m.scorerType === "pair";
+            return (
             <div key={m.matchIndex} className="flex items-center justify-between px-3 py-2">
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-gray-700">
-                  {m.section === 3 ? "Scramble" : `Match ${m.matchIndex + 1}`}: {m.label}
+                  {isScramble ? "Scramble" : `Match ${m.matchIndex + 1}`}: {m.label}
                 </p>
-                <p className="text-[10px] text-gray-400">Section {m.section} (Holes {(m.section - 1) * 6 + 1}-{m.section * 6})</p>
+                <p className="text-[10px] text-gray-400">Section {m.section} (Holes {firstHole}-{lastHole})</p>
               </div>
               <div className="text-right">
                 <p className="text-xs font-bold" style={{
@@ -976,7 +1024,8 @@ function FoursomeScoreEntry({
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
           <div className="flex items-center justify-between px-3 py-2 bg-gray-50">
             <p className="text-xs font-bold text-gray-700">Group Total</p>
             <p className="text-sm font-bold text-gray-900">
@@ -990,11 +1039,30 @@ function FoursomeScoreEntry({
     );
   };
 
+  // No schedule (group misconfigured) — fall back to a hint instead of crashing.
+  if (!schedule) {
+    return (
+      <div className="text-center py-8 text-gray-400 text-sm">
+        Cannot score this group — unsupported team-size combination.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
-      {renderSectionGrid(1, "Section 1 — Holes 1-6 (Individual)", individualPlayers, "player")}
-      {renderSectionGrid(2, "Section 2 — Holes 7-12 (Individual)", individualPlayers, "player")}
-      {renderSectionGrid(3, "Section 3 — Holes 13-18 (Scramble)", scramblePairs, "pair")}
+      {schedule.sections.map((sec) => {
+        const firstHole = sec.holes[0];
+        const lastHole = sec.holes[sec.holes.length - 1];
+        const isScramble = sec.format === "scramble";
+        const label = `Section ${sec.section} — Holes ${firstHole}-${lastHole} (${isScramble ? "Scramble" : "Individual"})`;
+        return renderSectionGrid(
+          sec.section,
+          label,
+          isScramble ? scramblePairs : individualPlayers,
+          isScramble ? "pair" : "player",
+          sec.holes,
+        );
+      })}
       {renderMatchSummary()}
     </div>
   );
@@ -1031,15 +1099,11 @@ function ResultsTab({
   const groups: KgbGroupData[] = foursomes.map((f) => {
     const pair1 = pairs.find((p) => p.id === f.pair_team1_id);
     const pair2 = pairs.find((p) => p.id === f.pair_team2_id);
-    const p1a = pair1?.player_a?.display_name || "?";
-    const p1b = pair1?.player_b?.display_name || "";
-    const p2a = pair2?.player_a?.display_name || "?";
-    const p2b = pair2?.player_b?.display_name || "";
     return {
       id: f.id,
       sort_order: f.sort_order || 0,
-      team1PairLabel: p1b ? `${p1a} & ${p1b}` : p1a,
-      team2PairLabel: p2b ? `${p2a} & ${p2b}` : p2a,
+      team1PairLabel: pairLabel([pair1?.player_a, pair1?.player_b, pair1?.player_c]),
+      team2PairLabel: pairLabel([pair2?.player_a, pair2?.player_b, pair2?.player_c]),
       results: foursomeResults.find((r) => r.foursomeId === f.id)!,
     };
   }).filter((g) => g.results);

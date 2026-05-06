@@ -59,7 +59,7 @@ export async function GET(request: Request) {
     const { data: pairs } = await adminClient
       .from("ryder_cup_pairs")
       .select(
-        "id, team_id, player_a_id, player_b_id, sort_order, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name, full_name, avatar_url), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name, full_name, avatar_url)"
+        "id, team_id, player_a_id, player_b_id, player_c_id, sort_order, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name, full_name, avatar_url), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name, full_name, avatar_url), player_c:users!ryder_cup_pairs_player_c_id_fkey(id, display_name, full_name, avatar_url)"
       )
       .in("team_id", teamIds)
       .order("sort_order");
@@ -68,12 +68,14 @@ export async function GET(request: Request) {
     const normalizedPairs = (pairs || []).map((p) => {
       const playerA = Array.isArray(p.player_a) ? p.player_a[0] : p.player_a;
       const playerB = Array.isArray(p.player_b) ? p.player_b[0] : p.player_b;
+      const playerC = Array.isArray(p.player_c) ? p.player_c[0] : p.player_c;
       return {
         id: p.id,
         team_id: p.team_id,
         sort_order: p.sort_order,
         player_a: playerA ? { id: playerA.id, display_name: playerA.display_name, full_name: playerA.full_name, avatar_url: playerA.avatar_url } : null,
         player_b: playerB ? { id: playerB.id, display_name: playerB.display_name, full_name: playerB.full_name, avatar_url: playerB.avatar_url } : null,
+        player_c: playerC ? { id: playerC.id, display_name: playerC.display_name, full_name: playerC.full_name, avatar_url: playerC.avatar_url } : null,
       };
     });
 
@@ -94,6 +96,7 @@ export async function GET(request: Request) {
     for (const pair of normalizedPairs) {
       if (pair.player_a) assignedIds.add(pair.player_a.id);
       if (pair.player_b) assignedIds.add(pair.player_b.id);
+      if (pair.player_c) assignedIds.add(pair.player_c.id);
     }
 
     const unassigned = await getUnassigned(adminClient, contestId, Array.from(assignedIds));

@@ -20,7 +20,13 @@ interface Pair {
   sort_order: number;
   player_a: PlayerInfo | null;
   player_b: PlayerInfo | null;
+  player_c: PlayerInfo | null;
 }
+
+type PairSlotKey = "player_a_id" | "player_b_id" | "player_c_id";
+
+const slotField = (slot: PairSlotKey): "player_a" | "player_b" | "player_c" =>
+  (slot === "player_a_id" ? "player_a" : slot === "player_b_id" ? "player_b" : "player_c");
 
 interface Team {
   id: string;
@@ -135,7 +141,7 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
 
   const assignPlayer = async (
     pairId: string,
-    slot: "player_a_id" | "player_b_id",
+    slot: PairSlotKey,
     userId: string | null
   ) => {
     setSaving(`assign-${pairId}-${slot}`);
@@ -156,7 +162,7 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
   const deletePair = (pairId: string) => {
     // Find the pair to check if it has players that need to be returned to pool
     const pair = teams.flatMap((t) => t.pairs).find((p) => p.id === pairId);
-    const hasPlayers = pair && (pair.player_a || pair.player_b);
+    const hasPlayers = pair && (pair.player_a || pair.player_b || pair.player_c);
 
     setConfirmModal({
       title: "Delete Pair",
@@ -172,6 +178,7 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
           for (const [player, slot] of [
             [pair.player_a, "player_a_id"] as const,
             [pair.player_b, "player_b_id"] as const,
+            [pair.player_c, "player_c_id"] as const,
           ]) {
             if (!player) continue;
             // Clear slot first
@@ -231,7 +238,7 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
     const userIds = Array.from(drawerSelections);
 
     // Track available slots locally so we don't rely on stale React state
-    type SlotInfo = { pairId: string; slot: "player_a_id" | "player_b_id" };
+    type SlotInfo = { pairId: string; slot: PairSlotKey };
     const openSlots: SlotInfo[] = [];
 
     const currentTeam = teams.find((t) => t.id === drawerTeam.id);
@@ -327,14 +334,14 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
 
   const [openSlot, setOpenSlot] = useState<{
     pairId: string;
-    slot: "player_a_id" | "player_b_id";
+    slot: PairSlotKey;
     teamId: string;
   } | null>(null);
 
   const placePlayerIntoPair = async (
     poolPairId: string,
     targetPairId: string,
-    slot: "player_a_id" | "player_b_id",
+    slot: PairSlotKey,
     userId: string
   ) => {
     setErrorMsg(null);
@@ -353,7 +360,7 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
             .filter((p) => p.id !== poolPairId)
             .map((p) =>
               p.id === targetPairId
-                ? { ...p, [slot === "player_a_id" ? "player_a" : "player_b"]: playerInfo }
+                ? { ...p, [slotField(slot)]: playerInfo }
                 : p
             ),
         }))
@@ -382,7 +389,7 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
 
   const removePlayerFromPair = async (
     pairId: string,
-    slot: "player_a_id" | "player_b_id",
+    slot: PairSlotKey,
     userId: string,
     teamId: string
   ) => {
@@ -390,7 +397,7 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
 
     // Find player info for optimistic update
     const pair = teams.flatMap((t) => t.pairs).find((p) => p.id === pairId);
-    const playerInfo = slot === "player_a_id" ? pair?.player_a : pair?.player_b;
+    const playerInfo = pair?.[slotField(slot)] ?? null;
 
     // Optimistic UI: clear slot, add a temporary pool pair
     if (playerInfo) {
@@ -403,10 +410,10 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
             pairs: [
               ...t.pairs.map((p) =>
                 p.id === pairId
-                  ? { ...p, [slot === "player_a_id" ? "player_a" : "player_b"]: null }
+                  ? { ...p, [slotField(slot)]: null }
                   : p
               ),
-              { id: tempPoolId, team_id: teamId, sort_order: 0, player_a: playerInfo, player_b: null },
+              { id: tempPoolId, team_id: teamId, sort_order: 0, player_a: playerInfo, player_b: null, player_c: null },
             ],
           };
         })
@@ -460,17 +467,19 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
     for (const pair of team.pairs) {
       if (pair.player_a) players.push(pair.player_a);
       if (pair.player_b) players.push(pair.player_b);
+      if (pair.player_c) players.push(pair.player_c);
     }
     return players;
   }
 
   // All players assigned to any pair across both teams (for computing available lists)
-  function getAllAssignedPlayers(): Map<string, { pairId: string; slot: "a" | "b" }> {
-    const map = new Map<string, { pairId: string; slot: "a" | "b" }>();
+  function getAllAssignedPlayers(): Map<string, { pairId: string; slot: "a" | "b" | "c" }> {
+    const map = new Map<string, { pairId: string; slot: "a" | "b" | "c" }>();
     for (const team of teams) {
       for (const pair of team.pairs) {
         if (pair.player_a) map.set(pair.player_a.id, { pairId: pair.id, slot: "a" });
         if (pair.player_b) map.set(pair.player_b.id, { pairId: pair.id, slot: "b" });
+        if (pair.player_c) map.set(pair.player_c.id, { pairId: pair.id, slot: "c" });
       }
     }
     return map;
@@ -486,6 +495,7 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
       for (const [player, slotKey] of [
         [pair.player_a, "a"] as const,
         [pair.player_b, "b"] as const,
+        [pair.player_c, "c"] as const,
       ]) {
         if (!player) continue;
         if (player.id === currentPlayerId) continue; // skip current occupant of this slot
@@ -719,6 +729,10 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
                                   assignPlayer(pair.id, "player_b_id", null);
                                   return;
                                 }
+                                if (pair.player_c?.id === p.id) {
+                                  assignPlayer(pair.id, "player_c_id", null);
+                                  return;
+                                }
                               }
                             }}
                             className="text-gray-300 hover:text-red-500"
@@ -793,6 +807,7 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
                     {realPairs.map((pair, idx) => {
                       const isSlotAOpen = openSlot?.pairId === pair.id && openSlot?.slot === "player_a_id";
                       const isSlotBOpen = openSlot?.pairId === pair.id && openSlot?.slot === "player_b_id";
+                      const isSlotCOpen = openSlot?.pairId === pair.id && openSlot?.slot === "player_c_id";
 
                       return (
                         <div
@@ -844,13 +859,35 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
                             onPickPlayer={(poolPair) => placePlayerIntoPair(poolPair.id, pair.id, "player_b_id", poolPair.player_a!.id)}
                             onRemove={() => removePlayerFromPair(pair.id, "player_b_id", pair.player_b!.id, team.id)}
                           />
+
+                          {/* Slot C — optional 3rd player for uneven teams (1v2 / 2v3 / 3v3) */}
+                          {(pair.player_c || pair.player_a || pair.player_b) ? (
+                            <PairSlot
+                              label="C"
+                              player={pair.player_c}
+                              pairId={pair.id}
+                              slot="player_c_id"
+                              teamId={team.id}
+                              isOpen={isSlotCOpen}
+                              availablePlayers={poolPairs}
+                              saving={saving}
+                              optional
+                              onTapEmpty={() => setOpenSlot({ pairId: pair.id, slot: "player_c_id", teamId: team.id })}
+                              onCancel={() => setOpenSlot(null)}
+                              onPickPlayer={(poolPair) => placePlayerIntoPair(poolPair.id, pair.id, "player_c_id", poolPair.player_a!.id)}
+                              onRemove={() => removePlayerFromPair(pair.id, "player_c_id", pair.player_c!.id, team.id)}
+                            />
+                          ) : null}
                         </div>
                       );
                     })}
 
                     {/* New Pair button — only if unplaced players outnumber empty slots */}
                     {(() => {
-                      const emptySlots = realPairs.reduce((n, p) => n + (p.player_a ? 0 : 1) + (p.player_b ? 0 : 1), 0);
+                      const emptySlots = realPairs.reduce(
+                        (n, p) => n + (p.player_a ? 0 : 1) + (p.player_b ? 0 : 1) + (p.player_c ? 0 : 1),
+                        0,
+                      );
                       return poolPairs.length > emptySlots;
                     })() && (
                       <button
@@ -955,6 +992,7 @@ function PairSlot({
   isOpen,
   availablePlayers,
   saving,
+  optional,
   onTapEmpty,
   onCancel,
   onPickPlayer,
@@ -963,11 +1001,12 @@ function PairSlot({
   label: string;
   player: PlayerInfo | null;
   pairId: string;
-  slot: "player_a_id" | "player_b_id";
+  slot: PairSlotKey;
   teamId: string;
   isOpen: boolean;
   availablePlayers: Pair[];
   saving: string | null;
+  optional?: boolean;
   onTapEmpty: () => void;
   onCancel: () => void;
   onPickPlayer: (poolPair: Pair) => void;
@@ -1042,13 +1081,13 @@ function PairSlot({
 
   return (
     <div className="flex items-center gap-2 py-1">
-      <span className="text-[10px] font-bold text-gray-400 w-3">{label}</span>
+      <span className={`text-[10px] font-bold w-3 ${optional ? "text-gray-300" : "text-gray-400"}`}>{label}</span>
       <button
         onClick={onTapEmpty}
         disabled={saving !== null}
-        className="text-xs text-gray-400 hover:text-green-700 italic"
+        className={`text-xs italic hover:text-green-700 ${optional ? "text-gray-300" : "text-gray-400"}`}
       >
-        Tap to assign
+        {optional ? "+ Add 3rd player" : "Tap to assign"}
       </button>
     </div>
   );

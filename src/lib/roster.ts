@@ -62,6 +62,11 @@ export async function cascadeRemoveFromRoster(tripId: string, userId: string) {
         .update({ player_b_id: null })
         .in("team_id", ryderTeamIds)
         .eq("player_b_id", userId);
+      await adminClient
+        .from("ryder_cup_pairs")
+        .update({ player_c_id: null })
+        .in("team_id", ryderTeamIds)
+        .eq("player_c_id", userId);
     }
 
     // Remove from contest participants

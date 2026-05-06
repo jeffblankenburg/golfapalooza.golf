@@ -57,7 +57,7 @@ export default async function KgbCupScoringPage() {
     ? await adminClient
         .from("ryder_cup_pairs")
         .select(
-          "id, team_id, player_a_id, player_b_id, sort_order, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name, avatar_url), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name, avatar_url)"
+          "id, team_id, player_a_id, player_b_id, player_c_id, sort_order, player_a:users!ryder_cup_pairs_player_a_id_fkey(id, display_name, avatar_url), player_b:users!ryder_cup_pairs_player_b_id_fkey(id, display_name, avatar_url), player_c:users!ryder_cup_pairs_player_c_id_fkey(id, display_name, avatar_url)"
         )
         .in("team_id", teamIds)
         .order("sort_order")
@@ -65,7 +65,7 @@ export default async function KgbCupScoringPage() {
 
   // Find user's pair
   const myPair = (allPairs || []).find(
-    (p) => p.player_a_id === effectiveUserId || p.player_b_id === effectiveUserId
+    (p) => p.player_a_id === effectiveUserId || p.player_b_id === effectiveUserId || p.player_c_id === effectiveUserId
   );
 
   if (!myPair) redirect("/kgb-cup");
@@ -135,17 +135,21 @@ export default async function KgbCupScoringPage() {
   const players: PlayerInfo[] = [];
   const p1a = normPlayer(pair1!.player_a as never, pair1!.team_id);
   const p1b = normPlayer(pair1!.player_b as never, pair1!.team_id);
+  const p1c = normPlayer(pair1!.player_c as never, pair1!.team_id);
   const p2a = normPlayer(pair2!.player_a as never, pair2!.team_id);
   const p2b = normPlayer(pair2!.player_b as never, pair2!.team_id);
+  const p2c = normPlayer(pair2!.player_c as never, pair2!.team_id);
   if (p1a) players.push(p1a);
   if (p1b) players.push(p1b);
+  if (p1c) players.push(p1c);
   if (p2a) players.push(p2a);
   if (p2b) players.push(p2b);
+  if (p2c) players.push(p2c);
 
   // Pairs for scramble section
   const pairInfos = [
-    { id: pair1!.id, teamId: pair1!.team_id, players: [p1a, p1b].filter(Boolean) as PlayerInfo[] },
-    { id: pair2!.id, teamId: pair2!.team_id, players: [p2a, p2b].filter(Boolean) as PlayerInfo[] },
+    { id: pair1!.id, teamId: pair1!.team_id, players: [p1a, p1b, p1c].filter(Boolean) as PlayerInfo[] },
+    { id: pair2!.id, teamId: pair2!.team_id, players: [p2a, p2b, p2c].filter(Boolean) as PlayerInfo[] },
   ];
 
   // Fetch tee time for starting hole
@@ -310,7 +314,6 @@ export default async function KgbCupScoringPage() {
     <KgbCupLiveScorer
       foursomeId={myFoursome.id}
       contestId={contest.id}
-      players={players}
       pairs={pairInfos}
       startingHole={startingHole}
       holes={sortedHoles}

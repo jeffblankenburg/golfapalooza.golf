@@ -19,7 +19,6 @@ interface ProfileData {
   occupation: string | null;
   city: string | null;
   state: string | null;
-  show_on_map: boolean;
   playing_since: number | null;
   swings: string | null;
   typical_shot: string | null;
@@ -75,7 +74,6 @@ export function ProfileEditor({
     occupation: profile.occupation || "",
     city: profile.city || "",
     state: profile.state || "",
-    show_on_map: profile.show_on_map !== false,
     playing_since: profile.playing_since?.toString() || "",
     swings: profile.swings || "",
     typical_shot: profile.typical_shot || "",
@@ -85,11 +83,6 @@ export function ProfileEditor({
   });
 
   const updateField = (field: string, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    setSaveStatus("idle");
-  };
-
-  const updateBool = (field: string, value: boolean) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setSaveStatus("idle");
   };
@@ -154,7 +147,6 @@ export function ProfileEditor({
         occupation: form.occupation.trim() || null,
         city: nextCity,
         state: nextState,
-        show_on_map: form.show_on_map,
         playing_since: form.playing_since
           ? parseInt(form.playing_since, 10)
           : null,
@@ -397,21 +389,6 @@ export function ProfileEditor({
             ))}
           </select>
         </Field>
-
-        <label className="flex items-start gap-3 p-3 rounded-xl border border-gray-200 active:bg-gray-50 transition-colors cursor-pointer">
-          <input
-            type="checkbox"
-            checked={form.show_on_map}
-            onChange={(e) => updateBool("show_on_map", e.target.checked)}
-            className="mt-0.5 w-5 h-5 accent-green-600"
-          />
-          <span className="flex-1 text-sm">
-            <span className="block font-medium text-gray-900">Show me on the Loozer map</span>
-            <span className="block text-gray-500 text-xs mt-0.5">
-              Other Loozers can see your city on the /loozers map. Only city-level — no street address.
-            </span>
-          </span>
-        </label>
       </div>
 
       {/* Golf Info */}

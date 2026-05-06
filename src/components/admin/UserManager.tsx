@@ -24,7 +24,6 @@ interface User {
   birthday: string | null;
   city: string | null;
   state: string | null;
-  show_on_map: boolean;
   created_at: string;
 }
 
@@ -81,7 +80,6 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
     birthday: "",
     city: "",
     state: "",
-    showOnMap: true,
   });
   const [editIsAdmin, setEditIsAdmin] = useState(false);
   const [editPermissions, setEditPermissions] = useState<
@@ -176,7 +174,7 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
 
   const openAdd = () => {
     setEditingUser(null);
-    setFormData({ phone: "", displayName: "", fullName: "", handicapIndex: "", eightBagAverage: "", avgScrambleScore: "", birthday: "", city: "", state: "", showOnMap: true });
+    setFormData({ phone: "", displayName: "", fullName: "", handicapIndex: "", eightBagAverage: "", avgScrambleScore: "", birthday: "", city: "", state: "" });
     setEditIsAdmin(false);
     setEditPermissions({});
     setEditIsFounder(false);
@@ -199,7 +197,6 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
       birthday: user.birthday || "",
       city: user.city || "",
       state: user.state || "",
-      showOnMap: user.show_on_map !== false,
     });
     setEditIsAdmin(user.is_admin);
     setEditPermissions(user.permissions || {});
@@ -581,17 +578,6 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                         </select>
                       </div>
                     </div>
-                    <label className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.showOnMap}
-                        onChange={(e) =>
-                          setFormData({ ...formData, showOnMap: e.target.checked })
-                        }
-                        className="w-4 h-4 accent-green-600"
-                      />
-                      <span className="text-sm text-gray-700">Show on Loozer map</span>
-                    </label>
                     <div>
                       <label className="block text-sm font-medium text-gray-600 mb-1">
                         Handicap Index (optional)

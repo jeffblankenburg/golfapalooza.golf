@@ -61,8 +61,6 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const markersRef = useRef<any[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const userMarkerRef = useRef<any>(null);
 
   const [loozers, setLoozers] = useState<LoozerLocation[]>([]);
@@ -122,66 +120,152 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
         mapRef.current.remove();
         mapRef.current = null;
       }
-      markersRef.current = [];
       userMarkerRef.current = null;
       setMapReady(false);
     };
   }, []);
 
-  // Render markers when groups or map change.
+  // Render markers — single Loozers as avatars, multi-Loozer cities as a
+  // numbered cluster circle that blossoms into individual avatars (positions
+  // recomputed in pixel space on every zoom tick) once you cross the
+  // BLOSSOM_ZOOM threshold.
   useEffect(() => {
     if (!mapReady || !mapRef.current || groups.length === 0) return;
     let cancelled = false;
     const map = mapRef.current;
 
-    async function render() {
-      const mapboxgl = (await import("mapbox-gl")).default;
-      if (cancelled) return;
+    const BLOSSOM_ZOOM = 9;
 
-      // Clear existing
+    type Kind = "single" | "cluster" | "leaves";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    type GroupState = { kind: Kind; markers: any[] };
+    const state = new Map<number, GroupState>();
+
+    function fanRadiusPx(n: number) {
+      // Big enough that 40px avatars don't overlap on the circle. At n=12 ≈ 84px.
+      return Math.max(36, 7 * n);
+    }
+
+    function fanLngLats(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      markersRef.current.forEach((m: any) => m.remove());
-      markersRef.current = [];
+      mapboxgl: any,
+      center: [number, number],
+      n: number
+    ): [number, number][] {
+      const radius = fanRadiusPx(n);
+      const cp = map.project(center);
+      const out: [number, number][] = [];
+      for (let i = 0; i < n; i++) {
+        const angle = (2 * Math.PI * i) / n - Math.PI / 2; // start at top
+        const lngLat = map.unproject([cp.x + radius * Math.cos(angle), cp.y + radius * Math.sin(angle)]);
+        out.push([lngLat.lng, lngLat.lat]);
+      }
+      return out;
+    }
 
-      for (const group of groups) {
-        const first = group[0];
+    function makeAvatarEl(l: LoozerLocation, group: LoozerLocation[]): HTMLButtonElement {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className =
+        "w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-md bg-green-700 text-white flex items-center justify-center text-xs font-bold cursor-pointer";
+      if (l.avatar_url) {
+        const img = document.createElement("img");
+        img.src = l.avatar_url;
+        img.alt = l.display_name;
+        img.className = "w-full h-full object-cover";
+        el.appendChild(img);
+      } else {
+        el.textContent = getInitials(l.display_name);
+      }
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setActiveGroup(group);
+      });
+      return el;
+    }
 
-        const el = document.createElement("button");
-        el.type = "button";
-        el.className =
-          "relative w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-md bg-green-700 text-white flex items-center justify-center text-xs font-bold cursor-pointer";
-        if (first.avatar_url) {
-          const img = document.createElement("img");
-          img.src = first.avatar_url;
-          img.alt = first.display_name;
-          img.className = "w-full h-full object-cover";
-          el.appendChild(img);
-        } else {
-          el.textContent = getInitials(first.display_name);
-        }
-        if (group.length > 1) {
-          const badge = document.createElement("span");
-          badge.className =
-            "absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-green-600 text-white text-[10px] font-bold flex items-center justify-center border border-white";
-          badge.textContent = String(group.length);
-          el.appendChild(badge);
-        }
-        el.addEventListener("click", (e) => {
-          e.stopPropagation();
-          setActiveGroup(group);
-          map.flyTo({ center: [first.longitude, first.latitude], zoom: Math.max(map.getZoom(), 8) });
-        });
+    function makeClusterEl(group: LoozerLocation[]): HTMLButtonElement {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className =
+        "w-12 h-12 rounded-full bg-green-700 text-white border-2 border-white shadow-md flex items-center justify-center text-sm font-bold cursor-pointer hover:bg-green-600";
+      el.textContent = String(group.length);
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const center: [number, number] = [group[0].longitude, group[0].latitude];
+        map.flyTo({ center, zoom: Math.max(map.getZoom(), BLOSSOM_ZOOM + 0.5) });
+      });
+      return el;
+    }
 
-        const marker = new mapboxgl.Marker({ element: el })
-          .setLngLat([first.longitude, first.latitude])
-          .addTo(map);
-        markersRef.current.push(marker);
+    function clear(idx: number) {
+      const s = state.get(idx);
+      if (s) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        s.markers.forEach((m: any) => m.remove());
+        state.delete(idx);
       }
     }
 
-    render();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    function place(mapboxgl: any, idx: number) {
+      const group = groups[idx];
+      const center: [number, number] = [group[0].longitude, group[0].latitude];
+      const desired: Kind =
+        group.length === 1 ? "single" : map.getZoom() >= BLOSSOM_ZOOM ? "leaves" : "cluster";
+
+      const existing = state.get(idx);
+      if (existing && existing.kind !== desired) clear(idx);
+
+      let s = state.get(idx);
+      if (!s) {
+        s = { kind: desired, markers: [] };
+        state.set(idx, s);
+        if (desired === "single") {
+          const el = makeAvatarEl(group[0], group);
+          s.markers.push(new mapboxgl.Marker({ element: el }).setLngLat(center).addTo(map));
+        } else if (desired === "cluster") {
+          const el = makeClusterEl(group);
+          s.markers.push(new mapboxgl.Marker({ element: el }).setLngLat(center).addTo(map));
+        } else {
+          const positions = fanLngLats(mapboxgl, center, group.length);
+          group.forEach((l, i) => {
+            const el = makeAvatarEl(l, group);
+            s!.markers.push(new mapboxgl.Marker({ element: el }).setLngLat(positions[i]).addTo(map));
+          });
+        }
+      } else if (s.kind === "leaves") {
+        // Pixel-based fan radius — recompute lat/lng every zoom tick so the
+        // visual spread stays constant.
+        const positions = fanLngLats(mapboxgl, center, group.length);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        s.markers.forEach((m: any, i: number) => m.setLngLat(positions[i]));
+      }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let mapboxglRef: any = null;
+    async function init() {
+      const mapboxgl = (await import("mapbox-gl")).default;
+      if (cancelled) return;
+      mapboxglRef = mapboxgl;
+      groups.forEach((_, idx) => place(mapboxgl, idx));
+    }
+
+    function onZoom() {
+      if (!mapboxglRef) return;
+      groups.forEach((_, idx) => place(mapboxglRef, idx));
+    }
+
+    init();
+    map.on("zoom", onZoom);
+
     return () => {
       cancelled = true;
+      map.off("zoom", onZoom);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      state.forEach((s) => s.markers.forEach((m: any) => m.remove()));
+      state.clear();
     };
   }, [groups, mapReady]);
 

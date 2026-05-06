@@ -19,7 +19,7 @@ export default async function ProfilePage() {
   const { data: profile } = await queryClient
     .from("users")
     .select(
-      "id, display_name, full_name, email, phone, avatar_url, birthday, occupation, city, state, show_on_map, playing_since, swings, typical_shot, shirt_size, fun_fact, best_shot, eight_bag_average, avg_scramble_score, player_handicaps(handicap_index)"
+      "id, display_name, full_name, email, phone, avatar_url, birthday, occupation, city, state, playing_since, swings, typical_shot, shirt_size, fun_fact, best_shot, eight_bag_average, avg_scramble_score, player_handicaps(handicap_index)"
     )
     .eq("id", effectiveUserId)
     .single();

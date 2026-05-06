@@ -220,7 +220,7 @@ export async function PUT(request: Request) {
   const isFullAdmin = !!(await checkIsAdmin());
 
   try {
-    const { userId, displayName, fullName, phone, isAdmin, permissions, handicapIndex, eightBagAverage, avgScrambleScore, birthday, city, state, showOnMap, sponsorId, isFounder } = await request.json();
+    const { userId, displayName, fullName, phone, isAdmin, permissions, handicapIndex, eightBagAverage, avgScrambleScore, birthday, city, state, sponsorId, isFounder } = await request.json();
 
     if (!userId) {
       return NextResponse.json(
@@ -316,7 +316,6 @@ export async function PUT(request: Request) {
     if (birthday !== undefined) updates.birthday = birthday === null || birthday === "" ? null : birthday;
     if (city !== undefined) updates.city = city === null || city === "" ? null : String(city).trim();
     if (state !== undefined) updates.state = state === null || state === "" ? null : state;
-    if (showOnMap !== undefined) updates.show_on_map = !!showOnMap;
 
     // Re-geocode if city or state actually changed. Failures are non-fatal —
     // we just blank coords (excluding from the map) and let the next save retry.

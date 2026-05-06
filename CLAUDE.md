@@ -149,6 +149,8 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 | PUT | `/api/admin/accolades/categories/{category}` | Update one category's display fields. Body: `{title?, short_label?, icon?, description?, sort_order?}`. |
 | POST | `/api/admin/accolades/categories/{category}/badge` | Upload a badge image (multipart, `file`). Replaces the existing badge; sets `icon_url`. |
 | DELETE | `/api/admin/accolades/categories/{category}/badge` | Remove the badge image and revert to the emoji icon. |
+| GET | `/api/admin/analytics-overview?days={7\|14\|30}` | Admin-friendly analytics for the selected window: per-day breakdown (users/page-views/logins/chat/scores/uploads/notifications/errors), window totals for each metric, Loozers who have not installed the PWA, and Loozers inactive for that same window. Single `days` param drives every section of the page. Gated by `checkAnyPermissionAccess`. Powers `/admin/analytics`. |
+| GET | `/api/admin/analytics-overview/day?date=YYYY-MM-DD` | Per-day breakdown for the analytics drill-down: full event counts + active Loozers (with their per-event-type counts) + top pages. Same auth gate. |
 
 ## Database Schema
 
@@ -189,6 +191,10 @@ Located in `supabase/migrations/`:
 - `00120_accolade_categories.sql` - `accolade_categories` table for admin-editable award metadata. Replaces the CHECK constraint on `accolades.category` with a FK so new categories can be added without migrations.
 - `00121_accolade_badge_images.sql` - Optional badge images for awards. `accolade_categories.icon_url` + `accolade-badges` storage bucket (public read, admin-only write).
 - `00124_user_geocode.sql` - `users.latitude`/`longitude`/`geocoded_at` (city-level coords cached from Mapbox) + `users.show_on_map` (default `true`) for the `/loozers` Map tab (issue #120). Geocode-on-write hooks live in `ProfileEditor.handleSave` and `/api/admin/users` PUT — both call `geocodeAddress({city, state})` from `src/lib/geocode.ts` whenever city/state changes. Backfill via `node scripts/backfill-loozer-geocode.mjs`.
+- `00126_analytics_overview.sql` - `analytics_overview_v1(inactive_days int)` SQL function powering `/admin/analytics` (daily totals, no-PWA users, inactive users). Excludes `is_system` and `is_financial_only` from user lists. PWA detection uses `metadata->>'pwa' = 'true'` from `activity_log`.
+- `00127_analytics_overview_metrics.sql` - Expands `analytics_overview_v1` with per-day breakdowns for logins/chat/scores/uploads/notifications/errors and 30-day cumulative totals; adds `analytics_day_detail(target_day date)` for the tap-into-day drawer (per-user event counts and top pages).
+- `00128_analytics_overview_window.sql` - Replaces `analytics_overview_v1` signature with a single `window_days` param (DROP + recreate). All totals, the daily array, and the inactive-user cutoff are now scoped to that window so the page can drive everything from a single 7/14/30 toggle.
+- `00129_analytics_day_detail_uploads.sql` - Updates both analytics functions to surface `song_plays` (sourced from the `song_plays` table, not `activity_log`) in window totals, daily breakdown, and per-user day detail. Adds `gallery_uploads` to per-user day detail.
 
 **IMPORTANT: Always create NEW migration files.** Never modify existing migrations that may have already been run. Use sequential numbering (00004, 00005, etc.) for new migrations. Each migration should be atomic and handle its own rollback safety (use `DROP ... IF EXISTS` before `CREATE`).
 

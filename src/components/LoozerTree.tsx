@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -13,6 +13,7 @@ import {
   type Node,
   type Edge,
   type NodeProps,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -25,12 +26,22 @@ interface Loozer {
   is_founder: boolean;
 }
 
+type Orientation = "horizontal" | "vertical";
+
 interface LoozerTreeProps {
   loozers: Loozer[];
   currentUserId?: string | null;
   focusUserId?: string | null;
   basePath?: string;
   showRealNames?: boolean;
+  heightStyle?: string;
+  orientation?: Orientation;
+  /**
+   * When true, fit the whole graph in view on initial load (instead of centering
+   * on focusUserId/currentUserId at zoom=1). Useful for subtree views where you
+   * want every descendant visible without panning.
+   */
+  fitOnLoad?: boolean;
 }
 
 const NODE_WIDTH = 180;
@@ -38,7 +49,10 @@ const NODE_HEIGHT = 56;
 const COLUMN_GAP = 60;
 const ROW_GAP = 12;
 const COLUMN_STRIDE = NODE_WIDTH + COLUMN_GAP;
-const ROW_STRIDE = NODE_HEIGHT + ROW_GAP;
+// Vertical layout: depth → y, siblings stacked across x. Siblings need a wider
+// gap than horizontal-mode rows because each node is 180px wide.
+const VERT_ROW_GAP = 60;
+const VERT_COL_GAP = 24;
 
 function getInitial(name: string): string {
   return (name?.[0] || "?").toUpperCase();
@@ -52,11 +66,14 @@ interface LoozerNodeData {
   showRealNames: boolean;
   hasParent: boolean;
   hasChildren: boolean;
+  orientation: Orientation;
   [key: string]: unknown;
 }
 
 function LoozerNode({ data }: NodeProps<Node<LoozerNodeData>>) {
-  const { loozer, basePath, isCurrentUser, isFocused, showRealNames, hasParent, hasChildren } = data;
+  const { loozer, basePath, isCurrentUser, isFocused, showRealNames, hasParent, hasChildren, orientation } = data;
+  const targetPos = orientation === "vertical" ? Position.Top : Position.Left;
+  const sourcePos = orientation === "vertical" ? Position.Bottom : Position.Right;
   const ringClass = isFocused
     ? "border-amber-500 ring-2 ring-amber-300"
     : isCurrentUser
@@ -66,21 +83,28 @@ function LoozerNode({ data }: NodeProps<Node<LoozerNodeData>>) {
     showRealNames && loozer.full_name && loozer.full_name.trim().length > 0
       ? loozer.full_name
       : loozer.display_name;
+  const href = `${basePath}/${loozer.id}`;
+  // Navigation is driven by ReactFlow's onNodeClick at the <ReactFlow> level —
+  // that's the only path that fires reliably across mouse, touch, and pointer
+  // capture. We keep <a href> on the inner element purely for accessibility
+  // (screen readers, right-click → "Open in new tab") and call preventDefault
+  // in case the synthetic click does fire so we don't double-navigate.
   return (
     <>
       {hasParent && (
         <Handle
           type="target"
-          position={Position.Left}
+          position={targetPos}
           style={{ background: "transparent", border: "none", width: 1, height: 1 }}
           isConnectable={false}
         />
       )}
-      <Link
-        href={`${basePath}/${loozer.id}`}
+      <a
+        href={href}
         data-loozer-id={loozer.id}
-        className={`flex items-center gap-2 px-2 py-1.5 bg-white border rounded-xl shadow-sm active:bg-gray-50 transition-colors ${ringClass}`}
-        style={{ width: NODE_WIDTH, height: NODE_HEIGHT }}
+        onClick={(e) => e.preventDefault()}
+        className={`nopan nodrag flex items-center gap-2 px-2 py-1.5 bg-white border rounded-xl shadow-sm active:bg-gray-50 transition-colors cursor-pointer ${ringClass}`}
+        style={{ width: NODE_WIDTH, height: NODE_HEIGHT, touchAction: "manipulation" }}
       >
         <div className="w-9 h-9 rounded-full overflow-hidden bg-green-700 text-white flex items-center justify-center flex-shrink-0">
           {loozer.avatar_url ? (
@@ -96,11 +120,11 @@ function LoozerNode({ data }: NodeProps<Node<LoozerNodeData>>) {
         {loozer.is_founder && (
           <span className="text-amber-500 text-sm leading-none flex-shrink-0" aria-label="Founder">★</span>
         )}
-      </Link>
+      </a>
       {hasChildren && (
         <Handle
           type="source"
-          position={Position.Right}
+          position={sourcePos}
           style={{ background: "transparent", border: "none", width: 1, height: 1 }}
           isConnectable={false}
         />
@@ -192,20 +216,67 @@ function layoutSubtree(
   };
 }
 
+/**
+ * Vertical-tree layout. Depth maps to y; siblings stack horizontally.
+ * Returns the [leftX, rightX] horizontal range occupied by this subtree.
+ */
+function layoutSubtreeVertical(
+  node: Loozer,
+  depth: number,
+  leftX: number,
+  childrenByParent: Map<string, Loozer[]>,
+  positions: Map<string, { x: number; y: number }>
+): { leftX: number; rightX: number } {
+  const y = depth * (NODE_HEIGHT + VERT_ROW_GAP);
+  const kids = childrenByParent.get(node.id) || [];
+
+  if (kids.length === 0) {
+    positions.set(node.id, { x: leftX, y });
+    return { leftX, rightX: leftX + NODE_WIDTH };
+  }
+
+  let cursorX = leftX;
+  const kidRanges: { leftX: number; rightX: number }[] = [];
+  for (const kid of kids) {
+    const range = layoutSubtreeVertical(kid, depth + 1, cursorX, childrenByParent, positions);
+    kidRanges.push(range);
+    cursorX = range.rightX + VERT_COL_GAP;
+  }
+  // Center this node horizontally against its children's combined range.
+  const firstKidCenter = (kidRanges[0].leftX + kidRanges[0].rightX) / 2;
+  const lastKidCenter =
+    (kidRanges[kidRanges.length - 1].leftX + kidRanges[kidRanges.length - 1].rightX) / 2;
+  const myX = (firstKidCenter + lastKidCenter) / 2 - NODE_WIDTH / 2;
+  positions.set(node.id, { x: myX, y });
+  return {
+    leftX: Math.min(myX, kidRanges[0].leftX),
+    rightX: Math.max(myX + NODE_WIDTH, kidRanges[kidRanges.length - 1].rightX),
+  };
+}
+
 function buildGraph(
   loozers: Loozer[],
   currentUserId: string | null | undefined,
   focusUserId: string | null | undefined,
   basePath: string,
-  showRealNames: boolean
+  showRealNames: boolean,
+  orientation: Orientation
 ): { nodes: Node<LoozerNodeData>[]; edges: Edge[] } {
   const { roots, childrenByParent, hasParent } = partition(loozers);
 
   const positions = new Map<string, { x: number; y: number }>();
-  let cursorY = 0;
-  for (const root of roots) {
-    const range = layoutSubtree(root, 0, cursorY, childrenByParent, positions);
-    cursorY = range.bottomY + ROW_GAP * 2; // a little extra breathing room between separate trees
+  if (orientation === "vertical") {
+    let cursorX = 0;
+    for (const root of roots) {
+      const range = layoutSubtreeVertical(root, 0, cursorX, childrenByParent, positions);
+      cursorX = range.rightX + VERT_COL_GAP * 2;
+    }
+  } else {
+    let cursorY = 0;
+    for (const root of roots) {
+      const range = layoutSubtree(root, 0, cursorY, childrenByParent, positions);
+      cursorY = range.bottomY + ROW_GAP * 2; // a little extra breathing room between separate trees
+    }
   }
 
   const byId = new Map<string, Loozer>();
@@ -227,6 +298,7 @@ function buildGraph(
         showRealNames,
         hasParent: hasParent.has(id),
         hasChildren: (childrenByParent.get(id)?.length || 0) > 0,
+        orientation,
       },
       // Disable drag — this is a read-only tree.
       draggable: false,
@@ -258,60 +330,111 @@ function LoozerTreeInner({
   focusUserId,
   basePath = "/loozers",
   showRealNames = false,
+  orientation = "horizontal",
+  fitOnLoad = false,
 }: LoozerTreeProps) {
-  const { setCenter, fitView } = useReactFlow();
-  const hasInitialized = useRef(false);
+  const { setCenter } = useReactFlow();
+  const router = useRouter();
+  const mountedRef = useRef(false);
 
   const { nodes, edges } = useMemo(
-    () => buildGraph(loozers, currentUserId, focusUserId, basePath, showRealNames),
-    [loozers, currentUserId, focusUserId, basePath, showRealNames]
+    () => buildGraph(loozers, currentUserId, focusUserId, basePath, showRealNames, orientation),
+    [loozers, currentUserId, focusUserId, basePath, showRealNames, orientation]
   );
 
-  // Initial viewport: pan to the focus user (if ?focus= was passed), otherwise
-  // pan to the current user, otherwise fit the whole tree. Runs once.
-  useEffect(() => {
-    if (hasInitialized.current) return;
-    if (nodes.length === 0) return;
+  // ReactFlow's onNodeClick is the only event that fires reliably on both
+  // mouse and touch — the pane's pointerdown preventDefault can suppress
+  // synthetic click events on the inner anchor, and setPointerCapture during
+  // drag can redirect pointerup away from it. Driving navigation from here
+  // sidesteps all of that.
+  const handleNodeClick = useCallback(
+    (_e: React.MouseEvent, node: Node<LoozerNodeData>) => {
+      router.push(`${node.data.basePath}/${node.data.loozer.id}`);
+    },
+    [router]
+  );
 
-    const targetId = focusUserId || currentUserId;
-    if (targetId) {
-      const node = nodes.find((n) => n.id === targetId);
-      if (node) {
-        const id = requestAnimationFrame(() => {
-          setCenter(
+  // onInit fires once, after the React Flow viewport is fully initialized and
+  // the container has been measured. This is the safe place to call fitBounds /
+  // fitView without racing against the library's own layout pass. The deps
+  // could in principle make this recreate, but ReactFlow only invokes onInit
+  // once at init time, so a later identity change has no effect.
+  const handleInit = useCallback(
+    (rf: ReactFlowInstance<Node<LoozerNodeData>, Edge>) => {
+      if (fitOnLoad) {
+        rf.fitView({ padding: 0.15, duration: 0 });
+        mountedRef.current = true;
+        return;
+      }
+
+      if (focusUserId) {
+        const node = rf.getNode(focusUserId);
+        if (node) {
+          rf.setCenter(
             node.position.x + NODE_WIDTH / 2,
             node.position.y + NODE_HEIGHT / 2,
             { zoom: 1, duration: 0 }
           );
-        });
-        hasInitialized.current = true;
-        return () => cancelAnimationFrame(id);
+          mountedRef.current = true;
+          return;
+        }
       }
-    }
 
-    // No target — fit the whole tree.
-    const id = requestAnimationFrame(() => {
-      fitView({ padding: 0.1, duration: 0 });
-    });
-    hasInitialized.current = true;
-    return () => cancelAnimationFrame(id);
-  }, [nodes, focusUserId, currentUserId, setCenter, fitView]);
+      if (currentUserId) {
+        const userNode = rf.getNode(currentUserId);
+        const userLoozer = loozers.find((l) => l.id === currentUserId);
+        if (userNode && userLoozer) {
+          const familyIds = new Set<string>([currentUserId]);
+          if (userLoozer.sponsor_id) familyIds.add(userLoozer.sponsor_id);
+          for (const l of loozers) {
+            if (l.sponsor_id === currentUserId) familyIds.add(l.id);
+          }
+          const familyNodes = rf.getNodes().filter((n) => familyIds.has(n.id));
+          // Build a bounding box symmetric around the user so the user stays
+          // visually centered regardless of how the sponsor / sponsees fall.
+          const userCx = userNode.position.x + NODE_WIDTH / 2;
+          const userCy = userNode.position.y + NODE_HEIGHT / 2;
+          let halfW = NODE_WIDTH / 2;
+          let halfH = NODE_HEIGHT / 2;
+          for (const n of familyNodes) {
+            halfW = Math.max(
+              halfW,
+              Math.abs(n.position.x - userCx),
+              Math.abs(n.position.x + NODE_WIDTH - userCx)
+            );
+            halfH = Math.max(
+              halfH,
+              Math.abs(n.position.y - userCy),
+              Math.abs(n.position.y + NODE_HEIGHT - userCy)
+            );
+          }
+          rf.fitBounds(
+            { x: userCx - halfW, y: userCy - halfH, width: halfW * 2, height: halfH * 2 },
+            { padding: 0.15, duration: 0 }
+          );
+          mountedRef.current = true;
+          return;
+        }
+      }
 
-  // After mount, if ?focus=<id> changes (e.g. via client-side navigation),
-  // smoothly pan to the new target.
+      rf.fitView({ padding: 0.1, duration: 0 });
+      mountedRef.current = true;
+    },
+    [loozers, currentUserId, focusUserId, fitOnLoad]
+  );
+
+  // After mount, if focusUserId changes (e.g. ?focus= via client-side
+  // navigation), smoothly pan to the new target.
   useEffect(() => {
-    if (!hasInitialized.current) return;
+    if (!mountedRef.current) return;
     if (!focusUserId) return;
     const node = nodes.find((n) => n.id === focusUserId);
     if (!node) return;
-    const id = requestAnimationFrame(() => {
-      setCenter(
-        node.position.x + NODE_WIDTH / 2,
-        node.position.y + NODE_HEIGHT / 2,
-        { zoom: 1, duration: 400 }
-      );
-    });
-    return () => cancelAnimationFrame(id);
+    setCenter(
+      node.position.x + NODE_WIDTH / 2,
+      node.position.y + NODE_HEIGHT / 2,
+      { zoom: 1, duration: 400 }
+    );
   }, [focusUserId, nodes, setCenter]);
 
   if (loozers.length === 0) {
@@ -325,7 +448,6 @@ function LoozerTreeInner({
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
-      fitView
       minZoom={0.2}
       maxZoom={1.5}
       panOnDrag
@@ -336,6 +458,8 @@ function LoozerTreeInner({
       nodesDraggable={false}
       nodesConnectable={false}
       elementsSelectable={false}
+      onNodeClick={handleNodeClick}
+      onInit={handleInit}
       proOptions={{ hideAttribution: true }}
     >
       <Background gap={24} size={1} color="#e5e7eb" />
@@ -345,10 +469,11 @@ function LoozerTreeInner({
 }
 
 export function LoozerTree(props: LoozerTreeProps) {
+  const { heightStyle = "calc(100dvh - 280px)" } = props;
   return (
     <div
       className="w-full bg-gray-50 border border-gray-200 rounded-xl overflow-hidden"
-      style={{ height: "calc(100dvh - 280px)" }}
+      style={{ height: heightStyle }}
     >
       <ReactFlowProvider>
         <LoozerTreeInner {...props} />

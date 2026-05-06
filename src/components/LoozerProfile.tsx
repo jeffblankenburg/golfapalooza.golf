@@ -9,7 +9,17 @@ import rehypeRaw from "rehype-raw";
 import { useMusicPlayerOptional, Song } from "@/contexts/MusicPlayerContext";
 import { FakeAdCarousel } from "@/components/FakeAdCarousel";
 import { AccoladesList, type AccoladeData } from "@/components/profile/AccoladesList";
+import { LoozerTree } from "@/components/LoozerTree";
 import { BTN_PRIMARY } from "@/lib/ui/buttons";
+
+interface DescendantLoozer {
+  id: string;
+  display_name: string;
+  full_name?: string | null;
+  avatar_url: string | null;
+  sponsor_id: string | null;
+  is_founder: boolean;
+}
 
 interface ProfileData {
   id: string;
@@ -108,6 +118,11 @@ export function LoozerProfile({
   // Accordion state — bio open by default, others closed
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(["bio", "accolades"]));
 
+  // Family tree — lazy-loaded the first time the accordion is opened.
+  const [descendants, setDescendants] = useState<DescendantLoozer[] | null>(null);
+  const [descendantsLoading, setDescendantsLoading] = useState(false);
+  const familyRequestedRef = useRef(false);
+
   useEffect(() => {
     if (initialData) return; // already have data
     fetch(`/api/loozers/${userId}`)
@@ -140,6 +155,20 @@ export function LoozerProfile({
       return next;
     });
   };
+
+  useEffect(() => {
+    if (!openSections.has("family")) return;
+    if (familyRequestedRef.current) return;
+    familyRequestedRef.current = true;
+    setDescendantsLoading(true);
+    fetch(`/api/loozers/${userId}/descendants`)
+      .then((res) => res.json())
+      .then((d) => {
+        setDescendants(Array.isArray(d.loozers) ? d.loozers : []);
+      })
+      .catch(() => setDescendants([]))
+      .finally(() => setDescendantsLoading(false));
+  }, [openSections, userId]);
 
   if (loading) {
     return (
@@ -522,6 +551,35 @@ export function LoozerProfile({
               </div>
             )}
           </div>
+        </Accordion>
+      )}
+
+      {/* Family Tree — this Loozer + everyone they sponsored, recursively. Auth-only. */}
+      {!spectator && (
+        <Accordion
+          title="Family Tree"
+          count={descendants ? Math.max(descendants.length - 1, 0) : undefined}
+          isOpen={openSections.has("family")}
+          onToggle={() => toggleSection("family")}
+        >
+          {descendantsLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : descendants && descendants.length > 1 ? (
+            <LoozerTree
+              loozers={descendants}
+              focusUserId={userId}
+              basePath="/loozers"
+              heightStyle="500px"
+              orientation="vertical"
+              fitOnLoad
+            />
+          ) : descendants ? (
+            <p className="text-sm text-gray-400 italic">
+              {profile.display_name} hasn&apos;t sponsored any Loozers yet.
+            </p>
+          ) : null}
         </Accordion>
       )}
     </div>

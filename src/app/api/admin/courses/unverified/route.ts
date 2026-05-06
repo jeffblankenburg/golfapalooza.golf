@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { checkIsAdmin } from "@/lib/permissions-server";
+import { checkPermissionAccess } from "@/lib/permissions-server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -11,7 +11,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
  *     tags: [Admin]
  */
 export async function GET() {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_facilities");
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const supabase = createAdminClient();

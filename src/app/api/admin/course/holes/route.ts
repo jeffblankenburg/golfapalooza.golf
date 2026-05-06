@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { checkIsAdmin } from "@/lib/permissions-server";
+import { checkPermissionAccess } from "@/lib/permissions-server";
 
 // PUT - Batch update hole data (par, handicap, yards, hole_name).
 //
@@ -8,7 +8,7 @@ import { checkIsAdmin } from "@/lib/permissions-server";
 // hole_name is a property of the hole itself, so it's mirrored to every tee
 // row sharing the same (course_id, hole_number).
 export async function PUT(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_facilities");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

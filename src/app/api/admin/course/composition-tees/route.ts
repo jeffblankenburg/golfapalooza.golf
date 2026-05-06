@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { checkIsAdmin } from "@/lib/permissions-server";
+import { checkPermissionAccess } from "@/lib/permissions-server";
 
 // GET - Get composition mappings for a tee
 export async function GET(request: NextRequest) {
-  const isAdmin = await checkIsAdmin();
+  const isAdmin = await checkPermissionAccess("manage_facilities");
   if (!isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
 
 // POST - Save composition mappings (upsert all 18 holes)
 export async function POST(request: NextRequest) {
-  const isAdmin = await checkIsAdmin();
+  const isAdmin = await checkPermissionAccess("manage_facilities");
   if (!isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
 
 // DELETE - Remove all composition mappings for a tee (makes it a regular tee again)
 export async function DELETE(request: NextRequest) {
-  const isAdmin = await checkIsAdmin();
+  const isAdmin = await checkPermissionAccess("manage_facilities");
   if (!isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

@@ -39,8 +39,28 @@ interface OverviewData {
     song_plays: number;
     eligible_users: number;
   };
+  users_breakdown: LoozerStatsRow[];
   no_pwa: UserRow[];
   inactive: UserRow[];
+}
+
+interface LoozerStatsRow {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+  events: number;
+  page_views: number;
+  chat_messages: number;
+  gallery_uploads: number;
+  song_plays: number;
+  last_seen: string | null;
+}
+
+type SortKey = "page_views" | "chat_messages" | "gallery_uploads" | "song_plays";
+type SortDir = "asc" | "desc";
+interface SortState {
+  key: SortKey;
+  dir: SortDir;
 }
 
 interface DayDetailUser {
@@ -73,8 +93,21 @@ interface DayDetail {
   top_pages: { page_path: string; views: number }[];
 }
 
-const WINDOW_OPTIONS = [7, 14, 30] as const;
-type WindowDays = (typeof WINDOW_OPTIONS)[number];
+const ALL_TIME_DAYS = 99999;
+const WINDOW_OPTIONS: { value: WindowSetting; label: string }[] = [
+  { value: 7, label: "7 days" },
+  { value: 14, label: "14 days" },
+  { value: 30, label: "30 days" },
+  { value: "all", label: "All Time" },
+];
+type WindowSetting = 7 | 14 | 30 | "all";
+type WindowDays = 7 | 14 | 30;
+function settingToDays(s: WindowSetting): number {
+  return s === "all" ? ALL_TIME_DAYS : s;
+}
+function settingLabel(s: WindowSetting): string {
+  return s === "all" ? "all time" : `last ${s} days`;
+}
 
 type MetricKey =
   | "users"
@@ -106,15 +139,19 @@ export default function AnalyticsOverviewPage() {
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
-  const [windowDays, setWindowDays] = useState<WindowDays>(7);
+  const [windowSetting, setWindowSetting] = useState<WindowSetting>(7);
   const [chartMetric, setChartMetric] = useState<MetricKey>("users");
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
   const [dayLoading, setDayLoading] = useState(false);
+  const [windowSort, setWindowSort] = useState<SortState>({ key: "page_views", dir: "desc" });
+  const [daySort, setDaySort] = useState<SortState>({ key: "page_views", dir: "desc" });
+  const [pwaOpen, setPwaOpen] = useState(false);
+  const [inactiveOpen, setInactiveOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/admin/analytics-overview?days=${windowDays}`);
+    const res = await fetch(`/api/admin/analytics-overview?days=${settingToDays(windowSetting)}`);
     if (res.status === 401 || res.status === 403) {
       setForbidden(true);
       setLoading(false);
@@ -123,7 +160,7 @@ export default function AnalyticsOverviewPage() {
     const json = await res.json();
     setData(json);
     setLoading(false);
-  }, [windowDays]);
+  }, [windowSetting]);
 
   useEffect(() => {
     fetchData();
@@ -157,7 +194,7 @@ export default function AnalyticsOverviewPage() {
         </button>
       </div>
 
-      <WindowSelector windowDays={windowDays} onChange={setWindowDays} />
+      <WindowSelector value={windowSetting} onChange={setWindowSetting} />
 
       {loading && !data ? (
         <div className="flex justify-center py-16">
@@ -177,7 +214,7 @@ export default function AnalyticsOverviewPage() {
 
           <section className="space-y-3">
             <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Last {windowDays} days totals
+              {windowSetting === "all" ? "All time totals" : `Last ${windowSetting} days totals`}
             </h2>
             <div className="grid grid-cols-3 gap-2">
               <MiniStat label="Active Users" value={data.totals.users} color="text-green-600" />
@@ -200,15 +237,70 @@ export default function AnalyticsOverviewPage() {
 
           <DailyChart
             daily={data.daily}
-            windowDays={windowDays}
+            windowSetting={windowSetting}
             metric={chartMetric}
             onMetricChange={setChartMetric}
             onBarTap={openDay}
           />
 
-          <PwaSection rows={data.no_pwa} eligibleTotal={data.totals.eligible_users} />
+          {(() => {
+            const breakdown = data.users_breakdown ?? [];
+            return (
+              <section className="bg-white rounded-2xl border border-gray-200 p-4">
+                <div className="flex items-baseline justify-between mb-3">
+                  <h2 className="text-sm font-semibold text-gray-900">
+                    Active Loozers ({settingLabel(windowSetting)})
+                  </h2>
+                  <span className="text-xs text-gray-500">{breakdown.length}</span>
+                </div>
+                <LoozerStatsTable
+                  rows={breakdown}
+                  sort={windowSort}
+                  onSortChange={setWindowSort}
+                  emptyText="No activity in this window."
+                />
+              </section>
+            );
+          })()}
 
-          <InactiveSection rows={data.inactive} days={windowDays} loading={loading} />
+          <CollapsibleSection
+            title="Haven't installed the app"
+            summary={`${data.totals.eligible_users - data.no_pwa.length}/${data.totals.eligible_users} installed · ${data.no_pwa.length} not yet`}
+            open={pwaOpen}
+            onToggle={() => setPwaOpen((v) => !v)}
+          >
+            <p className="text-xs text-gray-500 mb-3">
+              Loozers who&apos;ve only opened the site in a browser tab. They&apos;re missing push notifications and the home-screen icon.
+            </p>
+            <UserList rows={data.no_pwa} emptyText="Everyone has installed the app." showLastActive />
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            title="Inactive Loozers"
+            summary={
+              windowSetting === "all"
+                ? `${data.inactive.length} have never visited`
+                : `${data.inactive.length} haven't visited in ${windowSetting} days`
+            }
+            open={inactiveOpen}
+            onToggle={() => setInactiveOpen((v) => !v)}
+          >
+            {loading ? (
+              <div className="flex justify-center py-6">
+                <div className="w-5 h-5 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : (
+              <UserList
+                rows={data.inactive}
+                emptyText={
+                  windowSetting === "all"
+                    ? "Every Loozer has visited at least once."
+                    : `No Loozers inactive for ${windowSetting}+ days.`
+                }
+                showLastActive
+              />
+            )}
+          </CollapsibleSection>
         </>
       ) : null}
 
@@ -253,43 +345,12 @@ export default function AnalyticsOverviewPage() {
                 <h3 className="text-sm font-semibold text-gray-900 mb-2">
                   Active Loozers ({dayDetail.active_users.length})
                 </h3>
-                {dayDetail.active_users.length === 0 ? (
-                  <p className="text-sm text-gray-400 py-3 text-center">No activity recorded.</p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {dayDetail.active_users.map((u) => (
-                      <div
-                        key={u.id}
-                        className="flex items-center gap-3 px-2 py-1.5 rounded-xl bg-gray-50"
-                      >
-                        {u.avatar_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={u.avatar_url}
-                            alt=""
-                            className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                            <span className="text-xs font-semibold text-gray-500">
-                              {u.display_name?.[0]?.toUpperCase() || "?"}
-                            </span>
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{u.display_name}</p>
-                          <p className="text-[11px] text-gray-500 truncate">
-                            {u.page_views} page views
-                            {u.chat_messages > 0 ? ` · ${u.chat_messages} messages` : ""}
-                            {u.gallery_uploads > 0 ? ` · ${u.gallery_uploads} photo uploads` : ""}
-                            {u.song_plays > 0 ? ` · ${u.song_plays} song plays` : ""}
-                          </p>
-                        </div>
-                        <span className="text-xs text-gray-500 shrink-0">{u.events}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <LoozerStatsTable
+                  rows={dayDetail.active_users}
+                  sort={daySort}
+                  onSortChange={setDaySort}
+                  emptyText="No activity recorded."
+                />
               </div>
 
               {dayDetail.top_pages.length > 0 && (
@@ -325,25 +386,25 @@ export default function AnalyticsOverviewPage() {
 }
 
 function WindowSelector({
-  windowDays,
+  value,
   onChange,
 }: {
-  windowDays: WindowDays;
-  onChange: (n: WindowDays) => void;
+  value: WindowSetting;
+  onChange: (v: WindowSetting) => void;
 }) {
   return (
     <div className="flex gap-2">
-      {WINDOW_OPTIONS.map((d) => (
+      {WINDOW_OPTIONS.map((opt) => (
         <button
-          key={d}
-          onClick={() => onChange(d)}
-          className={`flex-1 px-3 py-2 text-sm font-semibold rounded-xl transition-colors ${
-            windowDays === d
+          key={String(opt.value)}
+          onClick={() => onChange(opt.value)}
+          className={`flex-1 px-2 py-2 text-sm font-semibold rounded-xl transition-colors ${
+            value === opt.value
               ? "bg-green-600 text-white"
               : "bg-white text-gray-600 border border-gray-200"
           }`}
         >
-          {d} days
+          {opt.label}
         </button>
       ))}
     </div>
@@ -378,25 +439,185 @@ function MiniStat({ label, value, color }: { label: string; value: number; color
   );
 }
 
+function StatCell({ value, color }: { value: number; color: string }) {
+  return (
+    <span
+      className={`w-12 shrink-0 text-center text-sm font-semibold tabular-nums ${
+        value > 0 ? color : "text-gray-300"
+      }`}
+    >
+      {value}
+    </span>
+  );
+}
+
+const SORT_COLUMNS: { key: SortKey; label: string; color: string }[] = [
+  { key: "page_views", label: "Pages", color: "text-indigo-600" },
+  { key: "chat_messages", label: "Msgs", color: "text-fuchsia-600" },
+  { key: "gallery_uploads", label: "Photos", color: "text-pink-600" },
+  { key: "song_plays", label: "Songs", color: "text-amber-600" },
+];
+
+function LoozerStatsTable({
+  rows,
+  sort,
+  onSortChange,
+  emptyText,
+}: {
+  rows: { id: string; display_name: string; avatar_url: string | null; page_views: number; chat_messages: number; gallery_uploads: number; song_plays: number }[];
+  sort: SortState;
+  onSortChange: (s: SortState) => void;
+  emptyText: string;
+}) {
+  if (rows.length === 0) {
+    return <p className="text-sm text-gray-400 py-3 text-center">{emptyText}</p>;
+  }
+
+  const sorted = [...rows].sort((a, b) => {
+    const av = a[sort.key];
+    const bv = b[sort.key];
+    if (av === bv) return a.display_name.localeCompare(b.display_name);
+    return sort.dir === "desc" ? bv - av : av - bv;
+  });
+
+  const handleSort = (key: SortKey) => {
+    if (sort.key === key) {
+      onSortChange({ key, dir: sort.dir === "desc" ? "asc" : "desc" });
+    } else {
+      onSortChange({ key, dir: "desc" });
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 px-2 pb-1.5 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+        <div className="w-8 shrink-0" />
+        <div className="flex-1" />
+        {SORT_COLUMNS.map((c) => {
+          const active = sort.key === c.key;
+          return (
+            <button
+              key={c.key}
+              onClick={() => handleSort(c.key)}
+              className={`w-12 shrink-0 text-center flex items-center justify-center gap-0.5 ${
+                active ? "text-gray-900" : "text-gray-500"
+              }`}
+            >
+              <span>{c.label}</span>
+              {active && (
+                <span className="text-[8px]">{sort.dir === "desc" ? "▼" : "▲"}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      <div className="space-y-1.5">
+        {sorted.map((u) => (
+          <div
+            key={u.id}
+            className="flex items-center gap-2 px-2 py-1.5 rounded-xl bg-gray-50"
+          >
+            {u.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={u.avatar_url}
+                alt=""
+                className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                <span className="text-xs font-semibold text-gray-500">
+                  {u.display_name?.[0]?.toUpperCase() || "?"}
+                </span>
+              </div>
+            )}
+            <p className="flex-1 min-w-0 text-sm font-medium text-gray-900 truncate">
+              {u.display_name}
+            </p>
+            <StatCell value={u.page_views} color="text-indigo-600" />
+            <StatCell value={u.chat_messages} color="text-fuchsia-600" />
+            <StatCell value={u.gallery_uploads} color="text-pink-600" />
+            <StatCell value={u.song_plays} color="text-amber-600" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CollapsibleSection({
+  title,
+  summary,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  summary: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center gap-3 p-4 text-left active:bg-gray-50"
+      >
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-900">{title}</p>
+          <p className="text-xs text-gray-500 truncate">{summary}</p>
+        </div>
+        <svg
+          className={`w-5 h-5 text-gray-400 shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+      {open && <div className="px-4 pb-4 -mt-1">{children}</div>}
+    </section>
+  );
+}
+
 function DailyChart({
   daily,
-  windowDays,
+  windowSetting,
   metric,
   onMetricChange,
   onBarTap,
 }: {
   daily: DailyRow[];
-  windowDays: WindowDays;
+  windowSetting: WindowSetting;
   metric: MetricKey;
   onMetricChange: (m: MetricKey) => void;
   onBarTap: (day: string) => void;
 }) {
-  // Build a contiguous N-day window so missing days render as zero.
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const lookup = new Map(daily.map((d) => [d.day, d]));
   const days: DailyRow[] = [];
-  for (let i = windowDays - 1; i >= 0; i--) {
+
+  // For fixed windows render N contiguous days. For "all time", render from the
+  // earliest day with activity through today so missing days appear as zero.
+  let startOffset: number;
+  if (windowSetting === "all") {
+    if (daily.length === 0) {
+      startOffset = 0;
+    } else {
+      const earliest = daily
+        .map((d) => new Date(d.day + "T00:00:00").getTime())
+        .reduce((a, b) => Math.min(a, b));
+      const ms = today.getTime() - earliest;
+      startOffset = Math.max(0, Math.floor(ms / 86400000));
+    }
+  } else {
+    startOffset = windowSetting - 1;
+  }
+
+  for (let i = startOffset; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(today.getDate() - i);
     const key = d.toISOString().slice(0, 10);
@@ -419,11 +640,13 @@ function DailyChart({
 
   const def = METRIC_DEFS.find((m) => m.key === metric)!;
   const max = Math.max(1, ...days.map((d) => d[metric]));
+  const headerLabel =
+    windowSetting === "all" ? "All time" : `Last ${windowSetting} days`;
 
   return (
     <section className="bg-white rounded-2xl border border-gray-200 p-4 space-y-4">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold text-gray-900">Last {windowDays} days</h2>
+        <h2 className="text-sm font-semibold text-gray-900">{headerLabel}</h2>
         <span className="text-xs text-gray-400">peak {max}</span>
       </div>
 
@@ -472,53 +695,6 @@ function DailyChart({
           <span className="text-[10px] text-gray-400">{formatShortDate(days[days.length - 1].day)}</span>
         </div>
       </div>
-    </section>
-  );
-}
-
-function PwaSection({ rows, eligibleTotal }: { rows: UserRow[]; eligibleTotal: number }) {
-  const installed = eligibleTotal - rows.length;
-  return (
-    <section className="bg-white rounded-2xl border border-gray-200 p-4">
-      <div className="flex items-baseline justify-between mb-1">
-        <h2 className="text-sm font-semibold text-gray-900">Haven&apos;t installed the app</h2>
-        <span className="text-xs text-gray-500">
-          {installed}/{eligibleTotal} installed
-        </span>
-      </div>
-      <p className="text-xs text-gray-500 mb-3">
-        Loozers who&apos;ve only opened the site in a browser tab. They&apos;re missing push notifications and the home-screen icon.
-      </p>
-      <UserList rows={rows} emptyText="Everyone has installed the app." showLastActive />
-    </section>
-  );
-}
-
-function InactiveSection({
-  rows,
-  days,
-  loading,
-}: {
-  rows: UserRow[];
-  days: number;
-  loading: boolean;
-}) {
-  return (
-    <section className="bg-white rounded-2xl border border-gray-200 p-4">
-      <div className="flex items-baseline justify-between mb-1">
-        <h2 className="text-sm font-semibold text-gray-900">Inactive Loozers</h2>
-        <span className="text-xs text-gray-500">{rows.length}</span>
-      </div>
-      <p className="text-xs text-gray-500 mb-3">
-        Haven&apos;t opened any page in the last {days} days.
-      </p>
-      {loading ? (
-        <div className="flex justify-center py-6">
-          <div className="w-5 h-5 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : (
-        <UserList rows={rows} emptyText={`No Loozers inactive for ${days}+ days.`} showLastActive />
-      )}
     </section>
   );
 }
@@ -583,6 +759,14 @@ function formatLongDate(iso: string) {
     month: "short",
     day: "numeric",
     year: "numeric",
+  });
+}
+
+function formatTimeOnly(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
   });
 }
 

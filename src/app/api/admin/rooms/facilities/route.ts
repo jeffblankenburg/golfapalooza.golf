@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { checkIsAdmin } from "@/lib/permissions-server";
+import { checkPermissionAccess } from "@/lib/permissions-server";
 
 /**
  * @swagger
@@ -21,7 +21,7 @@ import { checkIsAdmin } from "@/lib/permissions-server";
  *         description: Unauthorized
  */
 export async function GET(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_facilities");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -66,7 +66,7 @@ export async function GET(request: Request) {
  *         description: Unauthorized
  */
 export async function POST(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_facilities");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
  *         description: Unauthorized
  */
 export async function PUT(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_facilities");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -191,7 +191,7 @@ export async function PUT(request: Request) {
  *         description: Unauthorized
  */
 export async function PATCH(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_facilities");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -250,7 +250,7 @@ export async function PATCH(request: Request) {
  *         description: Unauthorized
  */
 export async function DELETE(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_facilities");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

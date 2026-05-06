@@ -30,7 +30,8 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const raw = parseInt(searchParams.get("days") || searchParams.get("inactive_days") || "7", 10);
-  const windowDays = [7, 14, 30].includes(raw) ? raw : 7;
+  // Allow the standard windows (7/14/30) plus the 99999 "all time" sentinel.
+  const windowDays = Number.isFinite(raw) && raw >= 1 && raw <= 99999 ? raw : 7;
 
   const adminClient = createAdminClient();
   const { data, error } = await adminClient

@@ -195,6 +195,7 @@ Located in `supabase/migrations/`:
 - `00127_analytics_overview_metrics.sql` - Expands `analytics_overview_v1` with per-day breakdowns for logins/chat/scores/uploads/notifications/errors and 30-day cumulative totals; adds `analytics_day_detail(target_day date)` for the tap-into-day drawer (per-user event counts and top pages).
 - `00128_analytics_overview_window.sql` - Replaces `analytics_overview_v1` signature with a single `window_days` param (DROP + recreate). All totals, the daily array, and the inactive-user cutoff are now scoped to that window so the page can drive everything from a single 7/14/30 toggle.
 - `00129_analytics_day_detail_uploads.sql` - Updates both analytics functions to surface `song_plays` (sourced from the `song_plays` table, not `activity_log`) in window totals, daily breakdown, and per-user day detail. Adds `gallery_uploads` to per-user day detail.
+- `00130_analytics_users_breakdown.sql` - Adds `users_breakdown[]` to `analytics_overview_v1` — per-Loozer page-views/messages/photo-uploads/song-plays for the selected window. Powers the sortable Active Loozers table on `/admin/analytics`.
 
 **IMPORTANT: Always create NEW migration files.** Never modify existing migrations that may have already been run. Use sequential numbering (00004, 00005, etc.) for new migrations. Each migration should be atomic and handle its own rollback safety (use `DROP ... IF EXISTS` before `CREATE`).
 

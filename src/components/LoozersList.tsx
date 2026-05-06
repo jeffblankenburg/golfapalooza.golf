@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { LoozerTree } from "@/components/LoozerTree";
+import { LoozerMap } from "@/components/LoozerMap";
+import { readGeoCache, writeGeoCache, GEO_CACHE_TTL_MS } from "@/lib/geo-cache";
 
 interface Loozer {
   id: string;
@@ -16,8 +18,15 @@ interface Loozer {
   is_attending?: boolean;
 }
 
-type ViewMode = "grid" | "tree";
-type Scope = "all" | "attending" | "not-attending";
+type ViewMode = "grid" | "tree" | "map";
+type Scope = "attending" | "not-attending" | "all";
+
+const SCOPE_CYCLE: Scope[] = ["attending", "not-attending", "all"];
+const SCOPE_LABEL: Record<Scope, string> = {
+  attending: "Attending",
+  "not-attending": "Not Attending",
+  all: "All",
+};
 
 const VIEW_STORAGE_KEY = "loozers-view-mode";
 const SCOPE_STORAGE_KEY = "loozers-scope";
@@ -31,8 +40,29 @@ function getInitials(name: string): string {
   return (name[0] || "?").toUpperCase();
 }
 
+function TabChip({
+  onClick,
+  children,
+  pressed,
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+  pressed?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={pressed}
+      className="px-3 py-1.5 rounded-full text-xs font-semibold border border-gray-200 bg-white text-gray-900 shadow-sm active:bg-gray-100 transition-colors"
+    >
+      {children}
+    </button>
+  );
+}
+
 /**
- * Loozers list with Grid | Tree toggle.
+ * Loozers list with Grid | Tree | Map tabs.
  * - When `loozers` is provided, renders immediately (server-fetched).
  * - When `loozers` is omitted, fetches from `/api/loozers` client-side.
  * - `basePath` controls link prefix (default: "/loozers").
@@ -65,7 +95,7 @@ export function LoozersList({
     }
     try {
       const stored = window.localStorage.getItem(VIEW_STORAGE_KEY);
-      if (stored === "tree" || stored === "grid") setView(stored);
+      if (stored === "tree" || stored === "grid" || stored === "map") setView(stored);
     } catch {
       // ignore
     }
@@ -98,7 +128,9 @@ export function LoozersList({
     }
   };
 
-  const setScopePersisted = (next: Scope) => {
+  const cycleScope = () => {
+    const idx = SCOPE_CYCLE.indexOf(scope);
+    const next = SCOPE_CYCLE[(idx + 1) % SCOPE_CYCLE.length];
     setScope(next);
     try {
       localStorage.setItem(SCOPE_STORAGE_KEY, next);
@@ -107,13 +139,51 @@ export function LoozersList({
     }
   };
 
-  const setShowRealNamesPersisted = (next: boolean) => {
+  const toggleRealNames = () => {
+    const next = !showRealNames;
     setShowRealNames(next);
     try {
       localStorage.setItem(REAL_NAMES_STORAGE_KEY, next ? "true" : "false");
     } catch {
       // ignore
     }
+  };
+
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [locateError, setLocateError] = useState<string | null>(null);
+  const [flyToUserNonce, setFlyToUserNonce] = useState(0);
+
+  useEffect(() => {
+    const cached = readGeoCache();
+    if (cached) setUserLocation({ lat: cached.lat, lng: cached.lng });
+  }, []);
+
+  const locateMe = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocateError("Geolocation isn't available on this device.");
+      return;
+    }
+    setLocateError(null);
+    if (userLocation) {
+      setFlyToUserNonce((n) => n + 1);
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        writeGeoCache(latitude, longitude);
+        setUserLocation({ lat: latitude, lng: longitude });
+        setFlyToUserNonce((n) => n + 1);
+        setLocating(false);
+      },
+      (err) => {
+        setLocating(false);
+        setLocateError(err.code === err.PERMISSION_DENIED ? "Location permission denied." : "Couldn't get your location.");
+      },
+      { enableHighAccuracy: false, maximumAge: GEO_CACHE_TTL_MS, timeout: 8000 }
+    );
   };
 
   useEffect(() => {
@@ -144,7 +214,6 @@ export function LoozersList({
     );
   }
 
-  // Grid view: exclude financial-only loozers; optionally filter to the active trip's roster.
   const gridLoozers = loozers
     .filter((l) => l.is_financial_only !== true)
     .filter((l) => {
@@ -155,9 +224,9 @@ export function LoozersList({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4">
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-          {(["grid", "tree"] as const).map((m) => (
+          {(["grid", "tree", "map"] as const).map((m) => (
             <button
               key={m}
               type="button"
@@ -166,40 +235,29 @@ export function LoozersList({
                 view === m ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
               }`}
             >
-              {m === "grid" ? "Grid" : "Tree"}
+              {m === "grid" ? "Grid" : m === "tree" ? "Tree" : "Map"}
             </button>
           ))}
         </div>
-        {view === "tree" && !spectator && (
-          <button
-            type="button"
-            onClick={() => setShowRealNamesPersisted(!showRealNames)}
-            className={`ml-auto px-3 py-1 rounded-md text-xs font-semibold transition-colors border ${
-              showRealNames
-                ? "bg-green-600 text-white border-green-600"
-                : "bg-white text-gray-700 border-gray-300"
-            }`}
-          >
-            Real Names
-          </button>
-        )}
-        {view === "grid" && (
-          <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-            {(["attending", "not-attending", "all"] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setScopePersisted(s)}
-                className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
-                  scope === s ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-                }`}
-              >
-                {s === "attending" ? "Attending" : s === "not-attending" ? "Not Attending" : "All"}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="ml-auto">
+          {view === "grid" && (
+            <TabChip onClick={cycleScope}>{SCOPE_LABEL[scope]}</TabChip>
+          )}
+          {view === "tree" && !spectator && (
+            <TabChip onClick={toggleRealNames} pressed={showRealNames}>
+              Real Names: {showRealNames ? "On" : "Off"}
+            </TabChip>
+          )}
+          {view === "map" && (
+            <TabChip onClick={locateMe}>
+              {locating ? "Locating…" : "📍 Find me"}
+            </TabChip>
+          )}
+        </div>
       </div>
+      {view === "map" && locateError && (
+        <p className="text-xs text-red-600 mb-2">{locateError}</p>
+      )}
 
       {view === "grid" ? (
         gridLoozers.length === 0 ? (
@@ -238,7 +296,7 @@ export function LoozersList({
             ))}
           </div>
         )
-      ) : (
+      ) : view === "tree" ? (
         <LoozerTree
           loozers={loozers.map((l) => ({
             id: l.id,
@@ -252,6 +310,13 @@ export function LoozersList({
           focusUserId={focusUserId}
           basePath={basePath}
           showRealNames={!spectator && showRealNames}
+        />
+      ) : (
+        <LoozerMap
+          basePath={basePath}
+          userLocation={userLocation}
+          flyToUserNonce={flyToUserNonce}
+          currentUserId={currentUserId}
         />
       )}
     </div>

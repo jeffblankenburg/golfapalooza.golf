@@ -22,8 +22,19 @@ interface User {
   eight_bag_average: number | null;
   avg_scramble_score: number | null;
   birthday: string | null;
+  city: string | null;
+  state: string | null;
+  show_on_map: boolean;
   created_at: string;
 }
+
+const US_STATES = [
+  "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA",
+  "HI","ID","IL","IN","IA","KS","KY","LA","ME","MD",
+  "MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ",
+  "NM","NY","NC","ND","OH","OK","OR","PA","RI","SC",
+  "SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC",
+];
 
 function computeDescendants(rootId: string, users: User[]): Set<string> {
   const childrenByParent = new Map<string, string[]>();
@@ -68,6 +79,9 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
     eightBagAverage: "",
     avgScrambleScore: "",
     birthday: "",
+    city: "",
+    state: "",
+    showOnMap: true,
   });
   const [editIsAdmin, setEditIsAdmin] = useState(false);
   const [editPermissions, setEditPermissions] = useState<
@@ -162,7 +176,7 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
 
   const openAdd = () => {
     setEditingUser(null);
-    setFormData({ phone: "", displayName: "", fullName: "", handicapIndex: "", eightBagAverage: "", avgScrambleScore: "", birthday: "" });
+    setFormData({ phone: "", displayName: "", fullName: "", handicapIndex: "", eightBagAverage: "", avgScrambleScore: "", birthday: "", city: "", state: "", showOnMap: true });
     setEditIsAdmin(false);
     setEditPermissions({});
     setEditIsFounder(false);
@@ -183,6 +197,9 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
       eightBagAverage: user.eight_bag_average !== null ? String(user.eight_bag_average) : "",
       avgScrambleScore: user.avg_scramble_score !== null ? String(user.avg_scramble_score) : "",
       birthday: user.birthday || "",
+      city: user.city || "",
+      state: user.state || "",
+      showOnMap: user.show_on_map !== false,
     });
     setEditIsAdmin(user.is_admin);
     setEditPermissions(user.permissions || {});
@@ -527,6 +544,54 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                         className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
                       />
                     </div>
+                    <div className="grid grid-cols-[1fr_auto] gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">
+                          City (optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.city}
+                          onChange={(e) =>
+                            setFormData({ ...formData, city: e.target.value })
+                          }
+                          maxLength={100}
+                          placeholder="e.g. Columbus"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">
+                          State
+                        </label>
+                        <select
+                          value={formData.state}
+                          onChange={(e) =>
+                            setFormData({ ...formData, state: e.target.value })
+                          }
+                          style={{ backgroundColor: "transparent" }}
+                          className="w-24 px-3 py-3 border border-gray-300 rounded-xl text-[16px]"
+                        >
+                          <option value="">—</option>
+                          {US_STATES.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.showOnMap}
+                        onChange={(e) =>
+                          setFormData({ ...formData, showOnMap: e.target.checked })
+                        }
+                        className="w-4 h-4 accent-green-600"
+                      />
+                      <span className="text-sm text-gray-700">Show on Loozer map</span>
+                    </label>
                     <div>
                       <label className="block text-sm font-medium text-gray-600 mb-1">
                         Handicap Index (optional)

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkIsAdmin, checkAnyPermissionAccess, checkPermissionAccess } from "@/lib/permissions-server";
+import { geocodeAddress } from "@/lib/geocode";
 
 /**
  * @swagger
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { phone, displayName, fullName, handicapIndex, eightBagAverage, avgScrambleScore, birthday } = await request.json();
+    const { phone, displayName, fullName, handicapIndex, eightBagAverage, avgScrambleScore, birthday, city, state } = await request.json();
 
     if (!displayName) {
       return NextResponse.json(
@@ -97,6 +98,8 @@ export async function POST(request: Request) {
         eight_bag_average: eightBagAverage ? parseFloat(eightBagAverage) : null,
         avg_scramble_score: avgScrambleScore ? parseFloat(avgScrambleScore) : null,
         birthday: birthday || null,
+        city: city?.trim() || null,
+        state: state || null,
       });
 
       if (profileError) {
@@ -150,6 +153,8 @@ export async function POST(request: Request) {
       eight_bag_average: eightBagAverage ? parseFloat(eightBagAverage) : null,
       avg_scramble_score: avgScrambleScore ? parseFloat(avgScrambleScore) : null,
       birthday: birthday || null,
+      city: city?.trim() || null,
+      state: state || null,
     });
 
     if (profileError) {
@@ -215,7 +220,7 @@ export async function PUT(request: Request) {
   const isFullAdmin = !!(await checkIsAdmin());
 
   try {
-    const { userId, displayName, fullName, phone, isAdmin, permissions, handicapIndex, eightBagAverage, avgScrambleScore, birthday, sponsorId, isFounder } = await request.json();
+    const { userId, displayName, fullName, phone, isAdmin, permissions, handicapIndex, eightBagAverage, avgScrambleScore, birthday, city, state, showOnMap, sponsorId, isFounder } = await request.json();
 
     if (!userId) {
       return NextResponse.json(
@@ -228,7 +233,7 @@ export async function PUT(request: Request) {
 
     const { data: currentUser } = await adminClient
       .from("users")
-      .select("phone, is_financial_only")
+      .select("phone, is_financial_only, city, state")
       .eq("id", userId)
       .single();
 
@@ -309,6 +314,28 @@ export async function PUT(request: Request) {
     if (eightBagAverage !== undefined) updates.eight_bag_average = eightBagAverage === null || eightBagAverage === "" ? null : parseFloat(eightBagAverage);
     if (avgScrambleScore !== undefined) updates.avg_scramble_score = avgScrambleScore === null || avgScrambleScore === "" ? null : parseFloat(avgScrambleScore);
     if (birthday !== undefined) updates.birthday = birthday === null || birthday === "" ? null : birthday;
+    if (city !== undefined) updates.city = city === null || city === "" ? null : String(city).trim();
+    if (state !== undefined) updates.state = state === null || state === "" ? null : state;
+    if (showOnMap !== undefined) updates.show_on_map = !!showOnMap;
+
+    // Re-geocode if city or state actually changed. Failures are non-fatal —
+    // we just blank coords (excluding from the map) and let the next save retry.
+    const nextCity = (updates.city as string | null | undefined) ?? currentUser?.city ?? null;
+    const nextState = (updates.state as string | null | undefined) ?? currentUser?.state ?? null;
+    const cityChanged = updates.city !== undefined && updates.city !== currentUser?.city;
+    const stateChanged = updates.state !== undefined && updates.state !== currentUser?.state;
+    if (cityChanged || stateChanged) {
+      if (nextCity && nextState) {
+        const coords = await geocodeAddress({ city: nextCity, state: nextState });
+        updates.latitude = coords ? coords[0] : null;
+        updates.longitude = coords ? coords[1] : null;
+        updates.geocoded_at = coords ? new Date().toISOString() : null;
+      } else {
+        updates.latitude = null;
+        updates.longitude = null;
+        updates.geocoded_at = null;
+      }
+    }
 
     // Sponsorship: founder and sponsor are mutually exclusive — setting one clears the other
     if (isFounder === true) {

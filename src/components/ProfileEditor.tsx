@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatPhoneDisplay } from "@/lib/utils/phone";
 import { AvatarCropModal } from "@/components/AvatarCropModal";
 import { AccoladesList, type AccoladeData } from "@/components/profile/AccoladesList";
+import { geocodeAddress } from "@/lib/geocode";
 
 interface ProfileData {
   id: string;
@@ -18,6 +19,7 @@ interface ProfileData {
   occupation: string | null;
   city: string | null;
   state: string | null;
+  show_on_map: boolean;
   playing_since: number | null;
   swings: string | null;
   typical_shot: string | null;
@@ -73,6 +75,7 @@ export function ProfileEditor({
     occupation: profile.occupation || "",
     city: profile.city || "",
     state: profile.state || "",
+    show_on_map: profile.show_on_map !== false,
     playing_since: profile.playing_since?.toString() || "",
     swings: profile.swings || "",
     typical_shot: profile.typical_shot || "",
@@ -82,6 +85,11 @@ export function ProfileEditor({
   });
 
   const updateField = (field: string, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setSaveStatus("idle");
+  };
+
+  const updateBool = (field: string, value: boolean) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setSaveStatus("idle");
   };
@@ -133,25 +141,46 @@ export function ProfileEditor({
     setError("");
     try {
       const supabase = createClient();
+      const nextCity = form.city.trim() || null;
+      const nextState = form.state || null;
+      const cityChanged = nextCity !== (profile.city || null);
+      const stateChanged = nextState !== (profile.state || null);
+
+      const updates: Record<string, unknown> = {
+        display_name: form.display_name.trim(),
+        full_name: form.full_name.trim() || null,
+        email: form.email.trim() || null,
+        birthday: form.birthday || null,
+        occupation: form.occupation.trim() || null,
+        city: nextCity,
+        state: nextState,
+        show_on_map: form.show_on_map,
+        playing_since: form.playing_since
+          ? parseInt(form.playing_since, 10)
+          : null,
+        swings: form.swings || null,
+        typical_shot: form.typical_shot || null,
+        shirt_size: form.shirt_size || null,
+        fun_fact: form.fun_fact.trim() || null,
+        best_shot: form.best_shot.trim() || null,
+      };
+
+      if (cityChanged || stateChanged) {
+        if (nextCity && nextState) {
+          const coords = await geocodeAddress({ city: nextCity, state: nextState });
+          updates.latitude = coords ? coords[0] : null;
+          updates.longitude = coords ? coords[1] : null;
+          updates.geocoded_at = coords ? new Date().toISOString() : null;
+        } else {
+          updates.latitude = null;
+          updates.longitude = null;
+          updates.geocoded_at = null;
+        }
+      }
+
       const { error: saveError } = await supabase
         .from("users")
-        .update({
-          display_name: form.display_name.trim(),
-          full_name: form.full_name.trim() || null,
-          email: form.email.trim() || null,
-          birthday: form.birthday || null,
-          occupation: form.occupation.trim() || null,
-          city: form.city.trim() || null,
-          state: form.state || null,
-          playing_since: form.playing_since
-            ? parseInt(form.playing_since, 10)
-            : null,
-          swings: form.swings || null,
-          typical_shot: form.typical_shot || null,
-          shirt_size: form.shirt_size || null,
-          fun_fact: form.fun_fact.trim() || null,
-          best_shot: form.best_shot.trim() || null,
-        })
+        .update(updates)
         .eq("id", profile.id);
 
       if (saveError) {
@@ -368,6 +397,21 @@ export function ProfileEditor({
             ))}
           </select>
         </Field>
+
+        <label className="flex items-start gap-3 p-3 rounded-xl border border-gray-200 active:bg-gray-50 transition-colors cursor-pointer">
+          <input
+            type="checkbox"
+            checked={form.show_on_map}
+            onChange={(e) => updateBool("show_on_map", e.target.checked)}
+            className="mt-0.5 w-5 h-5 accent-green-600"
+          />
+          <span className="flex-1 text-sm">
+            <span className="block font-medium text-gray-900">Show me on the Loozer map</span>
+            <span className="block text-gray-500 text-xs mt-0.5">
+              Other Loozers can see your city on the /loozers map. Only city-level — no street address.
+            </span>
+          </span>
+        </label>
       </div>
 
       {/* Golf Info */}

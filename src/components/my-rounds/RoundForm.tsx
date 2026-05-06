@@ -9,6 +9,7 @@ import { calculateDifferential } from "@/lib/golf/calculator";
 import { getTeeDotStyle } from "@/lib/utils/tee-colors";
 import { formatCourseName } from "@/lib/utils/course-display";
 import { BTN_BACK, BTN_PRIMARY } from "@/lib/ui/buttons";
+import { readGeoCache, writeGeoCache, GEO_CACHE_TTL_MS } from "@/lib/geo-cache";
 
 interface CourseSummary {
   id: string;
@@ -20,33 +21,6 @@ interface CourseSummary {
 }
 
 const NEARBY_RADIUS_MI = 25;
-const GEO_CACHE_KEY = "gp_geo_v1";
-const GEO_CACHE_TTL_MS = 15 * 60 * 1000;
-
-interface GeoCache { lat: number; lng: number; capturedAt: number; }
-
-function readGeoCache(): GeoCache | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.sessionStorage.getItem(GEO_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as GeoCache;
-    if (Date.now() - parsed.capturedAt > GEO_CACHE_TTL_MS) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function writeGeoCache(lat: number, lng: number) {
-  if (typeof window === "undefined") return;
-  try {
-    window.sessionStorage.setItem(
-      GEO_CACHE_KEY,
-      JSON.stringify({ lat, lng, capturedAt: Date.now() } satisfies GeoCache)
-    );
-  } catch {}
-}
 
 function formatDistance(mi: number): string {
   if (mi < 10) return `${(Math.round(mi * 10) / 10).toFixed(1)} mi`;

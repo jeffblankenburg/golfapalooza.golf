@@ -89,6 +89,12 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 |--------|----------|-------------|
 | GET | `/api/birthdays/today` | List Loozers whose birthday falls on today (in the active trip's timezone). Returns `{id, display_name, avatar_url, age}[]`. |
 
+#### Loozers (`/api/loozers`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/loozers/locations` | Loozers with cached lat/lng (`show_on_map=true`, non-financial-only, non-system) for the `/loozers` Map tab. Returns `{id, display_name, avatar_url, city, state, latitude, longitude}[]`. |
+
 #### Polls (`/api/polls`)
 
 | Method | Endpoint | Description |
@@ -148,7 +154,7 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 
 ### Tables
 
-- `users` - User profiles (display_name, phone, full_name, `is_founder`, `sponsor_id` self-FK for the Loozer family tree, `workbook_name` join key from the historical Golfapalooza workbook for issue #114 — unique when set)
+- `users` - User profiles (display_name, phone, full_name, `is_founder`, `sponsor_id` self-FK for the Loozer family tree, `workbook_name` join key from the historical Golfapalooza workbook for issue #114 — unique when set, `city`/`state`/`latitude`/`longitude`/`geocoded_at`/`show_on_map` for the `/loozers` Map tab — issue #120)
 - `courses` - Cached golf courses; `source` ∈ ('manual','gcapi','ai'), `verified` flag, `lookup_key` for cross-user dedup
 - `course_tees` - Tee boxes with ratings (course_rating, slope_rating); `confidence` jsonb for AI-extracted ratings
 - `course_holes` - Hole details (par, handicap_index, yards)
@@ -182,6 +188,7 @@ Located in `supabase/migrations/`:
 - `00119_history_accolades.sql` - Phase 1a of historical import (issue #114): `users.workbook_name` join key, `accolades.category` enum + check constraint, `accolades.partner_user_id` for doubles cornhole, partial unique index for importer idempotency.
 - `00120_accolade_categories.sql` - `accolade_categories` table for admin-editable award metadata. Replaces the CHECK constraint on `accolades.category` with a FK so new categories can be added without migrations.
 - `00121_accolade_badge_images.sql` - Optional badge images for awards. `accolade_categories.icon_url` + `accolade-badges` storage bucket (public read, admin-only write).
+- `00124_user_geocode.sql` - `users.latitude`/`longitude`/`geocoded_at` (city-level coords cached from Mapbox) + `users.show_on_map` (default `true`) for the `/loozers` Map tab (issue #120). Geocode-on-write hooks live in `ProfileEditor.handleSave` and `/api/admin/users` PUT — both call `geocodeAddress({city, state})` from `src/lib/geocode.ts` whenever city/state changes. Backfill via `node scripts/backfill-loozer-geocode.mjs`.
 
 **IMPORTANT: Always create NEW migration files.** Never modify existing migrations that may have already been run. Use sequential numbering (00004, 00005, etc.) for new migrations. Each migration should be atomic and handle its own rollback safety (use `DROP ... IF EXISTS` before `CREATE`).
 

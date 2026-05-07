@@ -119,6 +119,9 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 | GET | `/api/admin/users` | List all users (includes current_user) |
 | POST | `/api/admin/users` | Create a new user |
 | DELETE | `/api/admin/users?id={userId}` | Delete a user |
+| GET | `/api/admin/users/{userId}/scorecards` | Per-user list of completed scorecards with the user's hole-by-hole scores. Powers the Scorecards tab on `/admin/users/{userId}`. |
+| GET | `/api/admin/users/{userId}/songs` | Per-song aggregate of song plays by this user (`play_count` + `last_played`). Powers the Songs tab. |
+| GET | `/api/admin/users/{userId}/stats` | Derived per-user stats: scoring breakdown (eagles/birdies/pars/bogeys/doubles+ counts and percentages, best gross, best differential), accolades by category, and engagement (page views/chat/uploads/score saves/song plays in the last 30 days + `last_active`). Powers the Stats tab. |
 | GET | `/api/admin/nominations` | List all rookie nominations |
 | PATCH | `/api/admin/nominations` | Approve or reject a nomination |
 | DELETE | `/api/admin/nominations?id={nominationId}` | Delete a rejected nomination (only when `status='rejected'`) |

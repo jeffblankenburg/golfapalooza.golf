@@ -263,17 +263,23 @@ export default function AnalyticsOverviewPage() {
             );
           })()}
 
-          <CollapsibleSection
-            title="Haven't installed the app"
-            summary={`${data.totals.eligible_users - data.no_pwa.length}/${data.totals.eligible_users} installed · ${data.no_pwa.length} not yet`}
-            open={pwaOpen}
-            onToggle={() => setPwaOpen((v) => !v)}
-          >
-            <p className="text-xs text-gray-500 mb-3">
-              Loozers who&apos;ve only opened the site in a browser tab. They&apos;re missing push notifications and the home-screen icon.
-            </p>
-            <UserList rows={data.no_pwa} emptyText="Everyone has installed the app." showLastActive />
-          </CollapsibleSection>
+          {(() => {
+            const inactiveIds = new Set(data.inactive.map((u) => u.id));
+            const visibleNoPwa = data.no_pwa.filter((u) => !inactiveIds.has(u.id));
+            return (
+              <CollapsibleSection
+                title="Haven't installed the app"
+                summary={`${data.totals.eligible_users - data.no_pwa.length}/${data.totals.eligible_users} installed · ${visibleNoPwa.length} to remind`}
+                open={pwaOpen}
+                onToggle={() => setPwaOpen((v) => !v)}
+              >
+                <p className="text-xs text-gray-500 mb-3">
+                  Active Loozers who&apos;ve only opened the site in a browser tab. They&apos;re missing push notifications and the home-screen icon. (Inactive Loozers are listed separately below.)
+                </p>
+                <UserList rows={visibleNoPwa} emptyText="Everyone active has installed the app." />
+              </CollapsibleSection>
+            );
+          })()}
 
           <CollapsibleSection
             title="Inactive Loozers"

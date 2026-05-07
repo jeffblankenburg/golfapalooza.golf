@@ -114,10 +114,11 @@ export async function POST(request: Request) {
 
     // Upsert event_participants row (always keep for RSVP tracking)
     const adminClient = createAdminClient();
+    const nowIso = new Date().toISOString();
     if (existing) {
       const { error } = await adminClient
         .from("event_participants")
-        .update({ likelihood, on_roster: attending })
+        .update({ likelihood, on_roster: attending, likelihood_set_at: nowIso })
         .eq("trip_id", trip.id)
         .eq("user_id", effectiveUserId);
 
@@ -127,7 +128,7 @@ export async function POST(request: Request) {
     } else {
       const { error: insertError } = await adminClient
         .from("event_participants")
-        .insert({ trip_id: trip.id, user_id: effectiveUserId, likelihood, on_roster: attending });
+        .insert({ trip_id: trip.id, user_id: effectiveUserId, likelihood, on_roster: attending, likelihood_set_at: nowIso });
 
       if (insertError) {
         return NextResponse.json({ error: insertError.message }, { status: 500 });

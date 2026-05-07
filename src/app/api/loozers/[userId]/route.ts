@@ -49,6 +49,7 @@ export async function GET(
     { data: bioData },
     { data: song },
     { data: teamMemberships },
+    { count: eventsAttendedCount },
   ] = await Promise.all([
     queryClient
       .from("users")
@@ -104,6 +105,10 @@ export async function GET(
       .not("round_players.final_gross_score", "is", null)
       .order("round_date", { ascending: false })
       .limit(10),
+    adminClient
+      .from("event_attendance")
+      .select("trip_id", { count: "exact", head: true })
+      .eq("user_id", userId),
   ]);
 
   if (profileError || !profile) {
@@ -163,5 +168,6 @@ export async function GET(
     scorecards,
     isFounder: profile.is_founder === true,
     sponsor,
+    eventsAttended: eventsAttendedCount ?? 0,
   });
 }

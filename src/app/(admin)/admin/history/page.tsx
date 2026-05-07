@@ -12,6 +12,11 @@ const sections = [
     description: "Write parsed awards to the accolades table",
   },
   {
+    href: "/admin/history/import-attendance",
+    label: "Import attendance",
+    description: "Write per-Loozer trip attendance from the Attendance sheet",
+  },
+  {
     href: "/admin/history/verify",
     label: "Verify",
     description: "Cross-check imports against the workbook Summary sheet",

@@ -10,6 +10,7 @@ import { useMusicPlayerOptional, Song } from "@/contexts/MusicPlayerContext";
 import { FakeAdCarousel } from "@/components/FakeAdCarousel";
 import { AccoladesList, type AccoladeData } from "@/components/profile/AccoladesList";
 import { LoozerTree } from "@/components/LoozerTree";
+import { AvatarLightbox } from "@/components/AvatarLightbox";
 import { BTN_PRIMARY } from "@/lib/ui/buttons";
 
 interface DescendantLoozer {
@@ -82,6 +83,7 @@ interface LoozerProfileData {
   scorecards: ScorecardSummary[];
   isFounder?: boolean;
   sponsor?: SponsorRef | null;
+  eventsAttended?: number;
 }
 
 function getInitials(name: string): string {
@@ -123,6 +125,8 @@ export function LoozerProfile({
   const [descendantsLoading, setDescendantsLoading] = useState(false);
   const familyRequestedRef = useRef(false);
 
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
   useEffect(() => {
     if (initialData) return; // already have data
     fetch(`/api/loozers/${userId}`)
@@ -141,6 +145,7 @@ export function LoozerProfile({
           scorecards: d.scorecards || [],
           isFounder: d.isFounder === true,
           sponsor: d.sponsor ?? null,
+          eventsAttended: d.eventsAttended ?? 0,
         });
         setLoading(false);
       })
@@ -186,7 +191,7 @@ export function LoozerProfile({
     );
   }
 
-  const { profile, accolades, taggedPhotos, taggedPhotosCount, handicapIndex, eightBagAverage, avgScrambleScore, bio, song, scorecards, isFounder, sponsor } = profileData;
+  const { profile, accolades, taggedPhotos, taggedPhotosCount, handicapIndex, eightBagAverage, avgScrambleScore, bio, song, scorecards, isFounder, sponsor, eventsAttended } = profileData;
 
   const openChat = async () => {
     if (spectator) return;
@@ -233,18 +238,46 @@ export function LoozerProfile({
       {/* ── Compact Header ── */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         <div className="flex items-center gap-4">
-          {/* Avatar */}
-          <div className="w-16 h-16 rounded-full overflow-hidden bg-green-700 text-white flex items-center justify-center flex-shrink-0">
+          {/* Avatar + sponsor */}
+          <div className="flex flex-col items-center gap-1.5 flex-shrink-0 max-w-[80px]">
             {profile.avatar_url ? (
-              <img
-                src={profile.avatar_url}
-                alt={profile.display_name}
-                className="w-full h-full object-cover"
-              />
+              <button
+                type="button"
+                onClick={() => setLightboxOpen(true)}
+                aria-label={`View ${profile.display_name}'s photo`}
+                className="w-16 h-16 rounded-full overflow-hidden bg-green-700 text-white flex items-center justify-center active:opacity-80 transition-opacity"
+              >
+                <img
+                  src={profile.avatar_url}
+                  alt={profile.display_name}
+                  className="w-full h-full object-cover"
+                />
+              </button>
             ) : (
-              <span className="text-2xl font-bold">
-                {getInitials(profile.display_name)}
-              </span>
+              <div className="w-16 h-16 rounded-full overflow-hidden bg-green-700 text-white flex items-center justify-center">
+                <span className="text-2xl font-bold">
+                  {getInitials(profile.display_name)}
+                </span>
+              </div>
+            )}
+            {!isFounder && sponsor && (
+              <Link
+                href={`${spectator ? "/spectator/loozers" : "/loozers"}?focus=${sponsor.id}`}
+                className="flex flex-col items-center gap-0.5 text-green-700 active:opacity-80"
+                title={`Sponsored by ${sponsor.display_name}`}
+              >
+                {sponsor.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={sponsor.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
+                ) : (
+                  <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-500">
+                    {sponsor.display_name?.[0]?.toUpperCase() || "?"}
+                  </span>
+                )}
+                <span className="text-[10px] font-medium leading-tight text-center truncate max-w-full">
+                  {sponsor.display_name}
+                </span>
+              </Link>
             )}
           </div>
 
@@ -256,36 +289,25 @@ export function LoozerProfile({
             {!spectator && profile.full_name && profile.full_name !== profile.display_name && (
               <p className="text-sm text-gray-500 truncate">{profile.full_name}</p>
             )}
-            {handicapIndex != null && (
-              <span className="inline-flex items-center gap-1 mt-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2 py-0.5">
-                Handicap: {handicapIndex}
-              </span>
-            )}
-            {isFounder ? (
+            <div className="flex flex-wrap items-center gap-1 mt-1">
+              {handicapIndex != null && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2 py-0.5">
+                  Handicap: {handicapIndex}
+                </span>
+              )}
+              {eventsAttended != null && eventsAttended > 0 && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg px-2 py-0.5">
+                  Attended: {eventsAttended}
+                </span>
+              )}
+            </div>
+            {isFounder && (
               <div className="mt-1">
                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-0.5">
                   ★ Founding Father
                 </span>
               </div>
-            ) : sponsor ? (
-              <div className="mt-1 text-xs text-gray-500 flex items-center gap-1.5">
-                <span>Sponsor:</span>
-                <Link
-                  href={`${spectator ? "/spectator/loozers" : "/loozers"}?focus=${sponsor.id}`}
-                  className="inline-flex items-center gap-1 text-green-700 font-medium"
-                >
-                  {sponsor.avatar_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={sponsor.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
-                  ) : (
-                    <span className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center text-[8px] font-bold text-gray-500">
-                      {sponsor.display_name?.[0]?.toUpperCase() || "?"}
-                    </span>
-                  )}
-                  {sponsor.display_name}
-                </Link>
-              </div>
-            ) : null}
+            )}
           </div>
 
           {/* Comms grid — authenticated only */}
@@ -581,6 +603,14 @@ export function LoozerProfile({
             </p>
           ) : null}
         </Accordion>
+      )}
+
+      {lightboxOpen && profile.avatar_url && (
+        <AvatarLightbox
+          src={profile.avatar_url}
+          alt={profile.display_name}
+          onClose={() => setLightboxOpen(false)}
+        />
       )}
     </div>
   );

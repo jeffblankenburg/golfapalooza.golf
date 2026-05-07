@@ -42,10 +42,16 @@ export interface ParsedAward {
   partnerWorkbookName?: string; // doubles cornhole only
 }
 
+export interface ParsedAttendance {
+  workbookName: string;
+  year: number;
+}
+
 export interface ParsedWorkbook {
   trips: ParsedTrip[];
   loozers: ParsedLoozer[];
   awards: ParsedAward[];
+  attendance: ParsedAttendance[];
   warnings: string[]; // non-fatal data quirks (typos, blanks, etc.)
 }
 
@@ -268,6 +274,58 @@ function harvestLoozers(wb: XLSX.WorkBook, awards: ParsedAward[]): {
   };
 }
 
+// === Attendance parsing ======================================================
+//
+// Layout: row 0 is per-year totals (skip), row 1 is the header row. Cols 0..3
+// are First/Last/Loozer/Years; cols 4..N are year columns (1997..). Any
+// non-empty cell (canonically "Y", but treat any truthy string as attended)
+// marks attendance.
+function parseAttendance(sheet: XLSX.WorkSheet): {
+  attendance: ParsedAttendance[];
+  warnings: string[];
+} {
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    raw: false,
+    defval: null,
+  });
+  const warnings: string[] = [];
+  const attendance: ParsedAttendance[] = [];
+
+  if (rows.length < 2) {
+    warnings.push("Attendance sheet has no header row");
+    return { attendance, warnings };
+  }
+
+  const header = rows[1] as Array<string | null>;
+  // Year columns start at index 4. Parse each header cell as a year.
+  const yearByCol = new Map<number, number>();
+  for (let c = 4; c < header.length; c++) {
+    const cell = header[c];
+    if (cell == null || cell === "") continue;
+    const y = parseInt(String(cell).trim(), 10);
+    if (Number.isFinite(y) && y >= 1900 && y <= 2100) {
+      yearByCol.set(c, y);
+    }
+  }
+
+  for (let i = 2; i < rows.length; i++) {
+    const r = rows[i] as Array<string | null>;
+    if (!r) continue;
+    const wbn = fixName(r[2] ?? null);
+    if (!wbn) continue;
+    for (const [col, year] of yearByCol) {
+      const cell = r[col];
+      if (cell == null) continue;
+      const s = String(cell).trim();
+      if (!s) continue;
+      attendance.push({ workbookName: wbn, year });
+    }
+  }
+
+  return { attendance, warnings };
+}
+
 // === Top-level entry point ===================================================
 
 export function parseWorkbook(buffer: Buffer | ArrayBuffer): ParsedWorkbook {
@@ -280,10 +338,22 @@ export function parseWorkbook(buffer: Buffer | ArrayBuffer): ParsedWorkbook {
   const { trips, awards, warnings: awardsWarnings } = parseAwards(awardsSheet);
   const { loozers, warnings: loozerWarnings } = harvestLoozers(wb, awards);
 
+  const attendanceSheet = wb.Sheets["Attendance"];
+  let attendance: ParsedAttendance[] = [];
+  let attendanceWarnings: string[] = [];
+  if (attendanceSheet) {
+    const out = parseAttendance(attendanceSheet);
+    attendance = out.attendance;
+    attendanceWarnings = out.warnings;
+  } else {
+    attendanceWarnings.push("Attendance sheet not found; no attendance data parsed");
+  }
+
   return {
     trips,
     loozers,
     awards,
-    warnings: [...awardsWarnings, ...loozerWarnings],
+    attendance,
+    warnings: [...awardsWarnings, ...loozerWarnings, ...attendanceWarnings],
   };
 }

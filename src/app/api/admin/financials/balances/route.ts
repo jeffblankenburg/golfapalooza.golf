@@ -20,6 +20,7 @@ export async function GET() {
       usersResult,
       contestParticipantsResult,
       eventParticipantsResult,
+      activeTripResult,
     ] = await Promise.all([
       adminClient
         .from("financial_contests")
@@ -42,7 +43,12 @@ export async function GET() {
         .select("financial_contest_id, user_id"),
       adminClient
         .from("event_participants")
-        .select("trip_id, user_id"),
+        .select("trip_id, user_id, likelihood"),
+      adminClient
+        .from("trip_settings")
+        .select("id, trip_name, trip_year")
+        .eq("status", "active")
+        .maybeSingle(),
     ]);
 
     if (contestsResult.error) {
@@ -73,11 +79,16 @@ export async function GET() {
     }
 
     const eventParticipants: Record<string, string[]> = {};
+    const activeTrip = activeTripResult.data || null;
+    const activeAttending: string[] = [];
     for (const ep of eventParticipantsResult.data || []) {
       if (!eventParticipants[ep.trip_id]) {
         eventParticipants[ep.trip_id] = [];
       }
       eventParticipants[ep.trip_id].push(ep.user_id);
+      if (activeTrip && ep.trip_id === activeTrip.id && ep.likelihood === 99) {
+        activeAttending.push(ep.user_id);
+      }
     }
 
     // Aggregate per-user totals, per-contest balances, and per-trip balances
@@ -155,6 +166,8 @@ export async function GET() {
       contest_participants: contestParticipants,
       event_participants: eventParticipants,
       uncategorized,
+      active_trip: activeTrip,
+      active_trip_attending: activeAttending,
     });
   } catch (error) {
     console.error("Balances error:", error);

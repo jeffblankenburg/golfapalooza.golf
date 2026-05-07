@@ -16,6 +16,7 @@ interface Loozer {
   is_founder?: boolean;
   is_financial_only?: boolean;
   is_attending?: boolean;
+  events_attended?: number;
 }
 
 type ViewMode = "grid" | "tree" | "map";
@@ -274,18 +275,29 @@ export function LoozersList({
               <Link
                 key={loozer.id}
                 href={`${basePath}/${loozer.id}`}
-                className="flex flex-col items-center p-3 bg-white rounded-xl border border-gray-200 shadow-sm active:scale-95 transition-transform"
+                className="relative flex flex-col items-center p-3 bg-white rounded-xl border border-gray-200 shadow-sm active:scale-95 transition-transform"
               >
-                <div className="w-16 h-16 rounded-full overflow-hidden bg-green-700 text-white flex items-center justify-center mb-2">
-                  {loozer.avatar_url ? (
-                    <img
-                      src={loozer.avatar_url}
-                      alt={loozer.display_name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-xl font-bold">
-                      {getInitials(loozer.display_name)}
+                <div className="relative mb-2">
+                  <div className="w-16 h-16 rounded-full overflow-hidden bg-green-700 text-white flex items-center justify-center">
+                    {loozer.avatar_url ? (
+                      <img
+                        src={loozer.avatar_url}
+                        alt={loozer.display_name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-xl font-bold">
+                        {getInitials(loozer.display_name)}
+                      </span>
+                    )}
+                  </div>
+                  {loozer.events_attended != null && loozer.events_attended > 0 && (
+                    <span
+                      title={`${loozer.events_attended} event${loozer.events_attended === 1 ? "" : "s"} attended`}
+                      aria-label={`${loozer.events_attended} event${loozer.events_attended === 1 ? "" : "s"} attended`}
+                      className="absolute -bottom-0.5 -right-0.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-bold text-white bg-green-600 rounded-full border-2 border-white"
+                    >
+                      {loozer.events_attended}
                     </span>
                   )}
                 </div>
@@ -305,6 +317,7 @@ export function LoozersList({
             avatar_url: l.avatar_url,
             sponsor_id: l.sponsor_id ?? null,
             is_founder: l.is_founder === true,
+            events_attended: l.events_attended ?? 0,
           }))}
           currentUserId={currentUserId}
           focusUserId={focusUserId}

@@ -84,7 +84,7 @@ export default async function HomePage() {
     // RSVP
     queryClient.from("event_participants").select("likelihood").eq("trip_id", trip.id).eq("user_id", effectiveUserId).maybeSingle(),
     // All participants
-    queryClient.from("event_participants").select("user_id, likelihood, user:users(display_name, avatar_url)").eq("trip_id", trip.id).not("likelihood", "is", null),
+    queryClient.from("event_participants").select("user_id, likelihood, likelihood_set_at, user:users(display_name, avatar_url)").eq("trip_id", trip.id).not("likelihood", "is", null),
     // Tee time players
     queryClient.from("tee_time_players").select("tee_time_id, tee_time:tee_times(id, trip_id, day_number, tee_time, starting_hole)").eq("user_id", effectiveUserId),
     // Scramble memberships
@@ -144,6 +144,7 @@ export default async function HomePage() {
     return {
       userId: p.user_id as string,
       likelihood: p.likelihood as number,
+      likelihoodSetAt: (p.likelihood_set_at as string | null) ?? null,
       displayName: typed?.display_name || "Unknown",
       avatarUrl: typed?.avatar_url || null,
     };

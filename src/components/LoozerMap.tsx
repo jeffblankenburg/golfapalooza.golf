@@ -91,6 +91,7 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
   useEffect(() => {
     if (!containerRef.current) return;
     let cancelled = false;
+    let resizeObserver: ResizeObserver | null = null;
 
     async function init() {
       const mapboxgl = (await import("mapbox-gl")).default;
@@ -111,11 +112,24 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
       map.once("load", () => {
         if (!cancelled) setMapReady(true);
       });
+
+      // Container size can change on iOS as the address bar slides in/out;
+      // mapbox needs to be told so the canvas stays in sync.
+      if (typeof ResizeObserver !== "undefined" && containerRef.current) {
+        resizeObserver = new ResizeObserver(() => {
+          if (mapRef.current) mapRef.current.resize();
+        });
+        resizeObserver.observe(containerRef.current);
+      }
     }
 
     init();
     return () => {
       cancelled = true;
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+        resizeObserver = null;
+      }
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -270,16 +284,27 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
   }, [groups, mapReady]);
 
   // One-shot initial center: GPS → current user's home → Terra Alta. Runs once
-  // per mount when the map is ready and loozers have loaded.
+  // per mount when the map is ready and loozers have loaded. We deliberately
+  // omit userLocation/currentUserId/loozers from deps — those are read via refs
+  // so subsequent changes don't fight the user's pan/zoom.
   const didInitialCenterRef = useRef(false);
+  const userLocationRef = useRef(userLocation);
+  const currentUserIdRef = useRef(currentUserId);
+  const loozersRef = useRef(loozers);
+  useEffect(() => { userLocationRef.current = userLocation; }, [userLocation]);
+  useEffect(() => { currentUserIdRef.current = currentUserId; }, [currentUserId]);
+  useEffect(() => { loozersRef.current = loozers; }, [loozers]);
   useEffect(() => {
     if (!mapReady || !mapRef.current || didInitialCenterRef.current) return;
     if (loading) return;
     const map = mapRef.current;
-    if (userLocation) {
-      map.jumpTo({ center: [userLocation.lng, userLocation.lat], zoom: 8 });
-    } else if (currentUserId) {
-      const me = loozers.find((l) => l.id === currentUserId);
+    const ul = userLocationRef.current;
+    const uid = currentUserIdRef.current;
+    const ll = loozersRef.current;
+    if (ul) {
+      map.jumpTo({ center: [ul.lng, ul.lat], zoom: 8 });
+    } else if (uid) {
+      const me = ll.find((l) => l.id === uid);
       if (me) {
         map.jumpTo({ center: [me.longitude, me.latitude], zoom: 7 });
       } else {
@@ -289,7 +314,7 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
       map.jumpTo({ center: [TERRA_ALTA[1], TERRA_ALTA[0]], zoom: 6 });
     }
     didInitialCenterRef.current = true;
-  }, [mapReady, loading, userLocation, currentUserId, loozers]);
+  }, [mapReady, loading]);
 
   // User pin + fly-to when nonce changes.
   useEffect(() => {
@@ -340,7 +365,7 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
       <div
         ref={containerRef}
         className="w-full bg-gray-100 border border-gray-200 rounded-xl overflow-hidden"
-        style={{ height: "calc(100dvh - 280px)" }}
+        style={{ height: "calc(100svh - 280px)" }}
       />
 
       {loading && (

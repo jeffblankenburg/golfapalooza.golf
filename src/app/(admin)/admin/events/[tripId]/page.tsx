@@ -464,6 +464,7 @@ export default function EventDetailPage() {
           <AccoladesManager tripId={tripId} />
         </CollapsibleSection>
       )}
+
     </div>
   );
 }

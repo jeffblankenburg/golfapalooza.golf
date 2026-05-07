@@ -70,7 +70,7 @@ interface SponsorRef {
   avatar_url: string | null;
 }
 
-interface LoozerProfileData {
+export interface LoozerProfileData {
   profile: ProfileData;
   accolades: AccoladeData[];
   taggedPhotos: TaggedPhoto[];

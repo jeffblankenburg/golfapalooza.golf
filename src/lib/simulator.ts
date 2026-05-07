@@ -1,9 +1,12 @@
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const SIM_USER_COOKIE = "sim-user-id";
 
-export async function getSimDate(): Promise<string | null> {
+// Wrapped in React's request-scoped cache so the home-page's many callers
+// (≥5 on the active page) share a single Supabase round-trip per request.
+export const getSimDate = cache(async (): Promise<string | null> => {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("trip_settings")
@@ -11,7 +14,7 @@ export async function getSimDate(): Promise<string | null> {
     .eq("status", "active")
     .single();
   return data?.sim_date || null;
-}
+});
 
 export async function getEffectiveDate(): Promise<Date> {
   const simDate = await getSimDate();
@@ -29,10 +32,10 @@ export async function getEffectiveDate(): Promise<Date> {
   return new Date();
 }
 
-export async function getSimUserId(): Promise<string | null> {
+export const getSimUserId = cache(async (): Promise<string | null> => {
   const cookieStore = await cookies();
   return cookieStore.get(SIM_USER_COOKIE)?.value || null;
-}
+});
 
 export async function getEffectiveUserId(realUserId: string): Promise<string> {
   const simUserId = await getSimUserId();

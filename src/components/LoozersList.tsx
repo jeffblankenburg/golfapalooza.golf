@@ -1,10 +1,22 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { LoozerTree } from "@/components/LoozerTree";
-import { LoozerMap } from "@/components/LoozerMap";
 import { readGeoCache, writeGeoCache, GEO_CACHE_TTL_MS } from "@/lib/geo-cache";
+
+// Mapbox + the LoozerMap glue together are ~hundreds of KB. Most visits to
+// /loozers stay on the grid or tree tab, so we only ship the map code when
+// the user actually clicks the Map tab.
+const LoozerMap = dynamic(() => import("@/components/LoozerMap").then((m) => m.LoozerMap), {
+  ssr: false,
+  loading: () => (
+    <div className="flex justify-center py-20">
+      <div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+    </div>
+  ),
+});
 
 interface Loozer {
   id: string;

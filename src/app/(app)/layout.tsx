@@ -6,6 +6,7 @@ import { HeaderBar } from "@/components/HeaderBar";
 import { SimulatorBanner } from "@/components/SimulatorBanner";
 import { MusicPlayerProvider } from "@/components/MusicPlayerProvider";
 import { AppShell } from "@/components/AppShell";
+import { RouteProgress } from "@/components/RouteProgress";
 import { getSimDate, getSimUserId, getEffectiveUserId, isSimulating } from "@/lib/simulator";
 import { hasAnyPermission } from "@/lib/permissions";
 
@@ -103,6 +104,7 @@ export default async function AppLayout({
   return (
     <MusicPlayerProvider>
       <AppShell>
+        <RouteProgress />
         {showBanner && (
           <SimulatorBanner
             simDate={simDate}

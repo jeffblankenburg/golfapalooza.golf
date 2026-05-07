@@ -106,7 +106,7 @@ export async function POST(request: Request) {
     const adminClient = createAdminClient();
     const insertStatus = requestedStatus === "archived" ? "archived" : "active";
 
-    // If creating as active, archive any existing active event first
+    // If creating as active, archive any existing active event first.
     if (insertStatus === "active") {
       await adminClient
         .from("trip_settings")

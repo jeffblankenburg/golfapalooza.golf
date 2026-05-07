@@ -543,7 +543,7 @@ export function HomeContent({
             </button>
           </div>
           {participantsExpanded && (
-            <div className="border-t border-gray-100 px-4 py-3 space-y-4 max-h-96 overflow-y-auto">
+            <div className="border-t border-gray-100 px-4 py-3 space-y-3 max-h-96 overflow-y-auto">
               {likelihoodOptions.map((option) => {
                 const group = participants
                   .filter((p) => p.likelihood === option.value)
@@ -557,31 +557,32 @@ export function HomeContent({
                 if (group.length === 0) return null;
                 return (
                   <div key={option.value}>
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
                       {option.label} ({group.length})
                     </p>
-                    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white divide-y divide-gray-100">
+                    <div className="flex flex-wrap gap-1.5">
                       {group.map((p) => {
-                        const date = p.likelihoodSetAt ? new Date(p.likelihoodSetAt) : null;
+                        const d = p.likelihoodSetAt ? new Date(p.likelihoodSetAt) : null;
+                        const dateLabel = d
+                          ? `${d.getMonth() + 1}/${d.getDate()}`
+                          : null;
                         return (
                           <Link
                             key={p.userId}
                             href={`/loozers/${p.userId}`}
-                            className="flex items-center gap-2.5 px-3 py-2 active:bg-gray-50"
+                            className="inline-flex items-center gap-1.5 pl-0.5 pr-2 py-0.5 bg-gray-100 rounded-full text-sm text-gray-700"
                           >
                             {p.avatarUrl ? (
-                              <img src={p.avatarUrl} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                              <img src={p.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
                             ) : (
-                              <span className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-xs font-bold flex-shrink-0">
+                              <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[9px] font-bold">
                                 {(p.displayName || "?")[0].toUpperCase()}
                               </span>
                             )}
-                            <span className="flex-1 text-sm text-gray-800 truncate">{p.displayName}</span>
-                            <span className="text-[11px] text-gray-400 tabular-nums flex-shrink-0">
-                              {date
-                                ? date.toLocaleDateString(undefined, { month: "short", day: "numeric" })
-                                : "—"}
-                            </span>
+                            <span>{p.displayName}</span>
+                            {dateLabel && (
+                              <span className="text-[10px] text-gray-400 tabular-nums">{dateLabel}</span>
+                            )}
                           </Link>
                         );
                       })}

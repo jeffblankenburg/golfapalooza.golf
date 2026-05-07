@@ -47,7 +47,12 @@ async function runImport({ apply }: { apply: boolean }) {
   const [tripsRes, usersRes, existingRes] = await Promise.all([
     adminClient.from("trip_settings").select("id, trip_year"),
     adminClient.from("users").select("id, workbook_name"),
-    adminClient.from("event_attendance").select("user_id, trip_id"),
+    // Existing rosters across all trips — anything already on_roster=true counts
+    // as "already imported" so re-runs are no-ops.
+    adminClient
+      .from("event_participants")
+      .select("user_id, trip_id")
+      .eq("on_roster", true),
   ]);
 
   const tripByYear = new Map<number, string>();
@@ -104,16 +109,26 @@ async function runImport({ apply }: { apply: boolean }) {
   const errors: Array<{ row: ImportRow; error: string }> = [];
 
   if (apply && toInsert.length > 0) {
+    // Upsert into event_participants with on_roster=true and likelihood=NULL
+    // (workbook attendees didn't RSVP through the app). Existing rows for the
+    // same (trip, user) get on_roster=true without changing their likelihood.
     for (let i = 0; i < toInsert.length; i += 100) {
-      const chunk = toInsert.slice(i, i + 100);
+      const chunk = toInsert.slice(i, i + 100).map((r) => ({
+        user_id: r.user_id,
+        trip_id: r.trip_id,
+        on_roster: true,
+      }));
       const { data, error } = await adminClient
-        .from("event_attendance")
-        .insert(chunk)
+        .from("event_participants")
+        .upsert(chunk, { onConflict: "trip_id,user_id" })
         .select("user_id");
       if (error) {
         for (const row of chunk) {
-          const { error: rowErr } = await adminClient.from("event_attendance").insert(row);
-          if (rowErr) errors.push({ row, error: rowErr.message });
+          const { error: rowErr } = await adminClient
+            .from("event_participants")
+            .upsert(row, { onConflict: "trip_id,user_id" });
+          if (rowErr)
+            errors.push({ row: { user_id: row.user_id, trip_id: row.trip_id }, error: rowErr.message });
           else inserted += 1;
         }
       } else {

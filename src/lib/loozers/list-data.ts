@@ -27,37 +27,31 @@ export async function loadLoozerList(
     .eq("status", "active")
     .maybeSingle();
 
-  const [
-    { data: users },
-    { data: bios },
-    { data: roster },
-    { data: rosterAll },
-    { data: attendance },
-  ] = await Promise.all([
-    adminClient
-      .from("users")
-      .select("id, display_name, full_name, avatar_url, sponsor_id, is_founder, is_financial_only")
-      .eq("is_system", false)
-      .order("display_name"),
-    adminClient
-      .from("loozer_bios")
-      .select("user_id, content")
-      .eq("is_visible", true),
-    activeTrip
-      ? adminClient
-          .from("event_participants")
-          .select("user_id")
-          .eq("trip_id", activeTrip.id)
-          .eq("on_roster", true)
-      : Promise.resolve({ data: [] as { user_id: string }[] }),
-    // Lifetime roster signal across every trip — feeds the events_attended
-    // count alongside the historical workbook table.
-    adminClient
-      .from("event_participants")
-      .select("user_id, trip_id")
-      .eq("on_roster", true),
-    adminClient.from("event_attendance").select("user_id, trip_id"),
-  ]);
+  const [{ data: users }, { data: bios }, { data: roster }, { data: rosterAll }] =
+    await Promise.all([
+      adminClient
+        .from("users")
+        .select("id, display_name, full_name, avatar_url, sponsor_id, is_founder, is_financial_only")
+        .eq("is_system", false)
+        .order("display_name"),
+      adminClient
+        .from("loozer_bios")
+        .select("user_id, content")
+        .eq("is_visible", true),
+      activeTrip
+        ? adminClient
+            .from("event_participants")
+            .select("user_id")
+            .eq("trip_id", activeTrip.id)
+            .eq("on_roster", true)
+        : Promise.resolve({ data: [] as { user_id: string }[] }),
+      // Lifetime roster signal across every trip — single source for the
+      // events_attended count (modern + historical now both live here).
+      adminClient
+        .from("event_participants")
+        .select("user_id, trip_id")
+        .eq("on_roster", true),
+    ]);
 
   const bioUserIds = new Set(
     (bios || [])
@@ -65,15 +59,9 @@ export async function loadLoozerList(
       .map((b) => b.user_id),
   );
   const attendingUserIds = new Set((roster || []).map((r) => r.user_id));
-  // Union (user, trip) pairs from both sources, then count distinct trips per user.
-  const attendedTripsByUser = new Map<string, Set<string>>();
+  const attendanceCounts = new Map<string, number>();
   for (const r of rosterAll || []) {
-    if (!attendedTripsByUser.has(r.user_id)) attendedTripsByUser.set(r.user_id, new Set());
-    attendedTripsByUser.get(r.user_id)!.add(r.trip_id);
-  }
-  for (const r of attendance || []) {
-    if (!attendedTripsByUser.has(r.user_id)) attendedTripsByUser.set(r.user_id, new Set());
-    attendedTripsByUser.get(r.user_id)!.add(r.trip_id);
+    attendanceCounts.set(r.user_id, (attendanceCounts.get(r.user_id) || 0) + 1);
   }
 
   return (users || []).map((u) => ({
@@ -86,6 +74,6 @@ export async function loadLoozerList(
     is_founder: u.is_founder,
     is_financial_only: u.is_financial_only,
     is_attending: attendingUserIds.has(u.id),
-    events_attended: attendedTripsByUser.get(u.id)?.size ?? 0,
+    events_attended: attendanceCounts.get(u.id) ?? 0,
   }));
 }

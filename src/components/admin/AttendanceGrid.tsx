@@ -7,7 +7,6 @@ interface Trip {
   trip_name: string;
   trip_year: number;
   status: string;
-  has_roster: boolean;
 }
 
 interface Loozer {
@@ -26,9 +25,7 @@ const cellKey = (userId: string, tripId: string) => `${userId}|${tripId}`;
 export function AttendanceGrid() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loozers, setLoozers] = useState<Loozer[]>([]);
-  // Two backing stores so the UI can show how each cell got its truth.
-  const [rostered, setRostered] = useState<Set<string>>(new Set());
-  const [historical, setHistorical] = useState<Set<string>>(new Set());
+  const [attended, setAttended] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -47,11 +44,8 @@ export function AttendanceGrid() {
         }
         setTrips(d.trips || []);
         setLoozers(d.loozers || []);
-        setRostered(
+        setAttended(
           new Set((d.roster || []).map((r: Cell) => cellKey(r.user_id, r.trip_id))),
-        );
-        setHistorical(
-          new Set((d.attendance || []).map((r: Cell) => cellKey(r.user_id, r.trip_id))),
         );
         setLoading(false);
       })
@@ -66,24 +60,13 @@ export function AttendanceGrid() {
     };
   }, []);
 
-  const tripById = useMemo(() => new Map(trips.map((t) => [t.id, t])), [trips]);
-
-  const isAttended = (userId: string, tripId: string) => {
-    const k = cellKey(userId, tripId);
-    return rostered.has(k) || historical.has(k);
-  };
-
   const toggle = async (userId: string, tripId: string) => {
     const k = cellKey(userId, tripId);
     if (pending.has(k)) return;
-    const trip = tripById.get(tripId);
-    if (!trip) return;
-    const target: "roster" | "historical" = trip.has_roster ? "roster" : "historical";
-    const next = !isAttended(userId, tripId);
+    const next = !attended.has(k);
 
-    // Optimistic update — change the right backing store.
-    const setForTarget = target === "roster" ? setRostered : setHistorical;
-    setForTarget((prev) => {
+    // Optimistic update
+    setAttended((prev) => {
       const n = new Set(prev);
       if (next) n.add(k);
       else n.delete(k);
@@ -95,11 +78,10 @@ export function AttendanceGrid() {
       const res = await fetch("/api/admin/attendance/cell", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, tripId, attended: next, target }),
+        body: JSON.stringify({ userId, tripId, attended: next }),
       });
       if (!res.ok) {
-        // Revert
-        setForTarget((prev) => {
+        setAttended((prev) => {
           const n = new Set(prev);
           if (next) n.delete(k);
           else n.add(k);
@@ -109,7 +91,7 @@ export function AttendanceGrid() {
         setError(d.error || "Save failed");
       }
     } catch {
-      setForTarget((prev) => {
+      setAttended((prev) => {
         const n = new Set(prev);
         if (next) n.delete(k);
         else n.add(k);
@@ -132,37 +114,22 @@ export function AttendanceGrid() {
   }, [loozers, search]);
 
   const perLoozerTotal = useMemo(() => {
-    const m = new Map<string, Set<string>>();
-    const add = (set: Set<string>) => {
-      for (const k of set) {
-        const [userId, tripId] = k.split("|");
-        if (!m.has(userId)) m.set(userId, new Set());
-        m.get(userId)!.add(tripId);
-      }
-    };
-    add(rostered);
-    add(historical);
-    return new Map([...m.entries()].map(([uid, trips]) => [uid, trips.size]));
-  }, [rostered, historical]);
+    const m = new Map<string, number>();
+    for (const k of attended) {
+      const userId = k.split("|")[0];
+      m.set(userId, (m.get(userId) || 0) + 1);
+    }
+    return m;
+  }, [attended]);
 
   const perTripTotal = useMemo(() => {
-    const m = new Map<string, Set<string>>();
-    const add = (set: Set<string>) => {
-      for (const k of set) {
-        const [userId, tripId] = k.split("|");
-        if (!m.has(tripId)) m.set(tripId, new Set());
-        m.get(tripId)!.add(userId);
-      }
-    };
-    add(rostered);
-    add(historical);
-    return new Map([...m.entries()].map(([tid, users]) => [tid, users.size]));
-  }, [rostered, historical]);
-
-  const totalAttended = useMemo(() => {
-    const all = new Set<string>([...rostered, ...historical]);
-    return all.size;
-  }, [rostered, historical]);
+    const m = new Map<string, number>();
+    for (const k of attended) {
+      const tripId = k.split("|")[1];
+      m.set(tripId, (m.get(tripId) || 0) + 1);
+    }
+    return m;
+  }, [attended]);
 
   if (loading) {
     return (
@@ -184,14 +151,6 @@ export function AttendanceGrid() {
         <div className="bg-red-50 text-red-700 p-2 rounded-lg text-xs">{error}</div>
       )}
 
-      <p className="text-[11px] text-gray-500">
-        Cells for events with a roster (modern) edit{" "}
-        <code className="bg-gray-100 px-1 rounded">event_participants.on_roster</code> and stay
-        live with whatever changes Loozers or admins make in the Roster. Cells for
-        roster-less events (historical / pre-app) edit{" "}
-        <code className="bg-gray-100 px-1 rounded">event_attendance</code>.
-      </p>
-
       <input
         type="text"
         placeholder="Search Loozers…"
@@ -211,12 +170,9 @@ export function AttendanceGrid() {
                 <th
                   key={t.id}
                   className="px-1.5 py-2 text-center font-semibold text-gray-600 whitespace-nowrap min-w-[44px]"
-                  title={`${t.trip_name}${t.has_roster ? " (live roster)" : " (historical)"}`}
+                  title={t.trip_name}
                 >
                   {t.trip_year}
-                  {t.has_roster && (
-                    <div className="text-[9px] font-normal text-green-600">live</div>
-                  )}
                 </th>
               ))}
               <th className="sticky right-0 z-20 bg-gray-50 px-2 py-2 text-center font-semibold text-gray-900 uppercase tracking-wider min-w-[44px] shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)]">
@@ -252,7 +208,7 @@ export function AttendanceGrid() {
                   </td>
                   {trips.map((t) => {
                     const k = cellKey(l.id, t.id);
-                    const checked = isAttended(l.id, t.id);
+                    const checked = attended.has(k);
                     const isPending = pending.has(k);
                     return (
                       <td
@@ -313,7 +269,7 @@ export function AttendanceGrid() {
                 );
               })}
               <td className="sticky right-0 z-10 bg-gray-50 px-2 py-2 text-center text-[10px] text-gray-900 shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)]">
-                {totalAttended}
+                {attended.size}
               </td>
             </tr>
           </tbody>
@@ -322,7 +278,7 @@ export function AttendanceGrid() {
 
       <p className="text-[11px] text-gray-400 text-center">
         {loozers.length} Loozer{loozers.length === 1 ? "" : "s"} · {trips.length} event
-        {trips.length === 1 ? "" : "s"} · {totalAttended} cells marked attended
+        {trips.length === 1 ? "" : "s"} · {attended.size} marked attended · click any cell to toggle
       </p>
     </div>
   );

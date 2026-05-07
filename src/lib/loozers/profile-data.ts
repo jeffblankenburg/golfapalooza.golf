@@ -62,8 +62,7 @@ export async function loadLoozerProfile(
     { data: bioData },
     { data: song },
     { data: teamMemberships },
-    { data: rosteredTrips },
-    { data: attendedHistorical },
+    { count: eventsAttendedCount },
   ] = await Promise.all([
     queryClient
       .from("users")
@@ -118,18 +117,13 @@ export async function loadLoozerProfile(
       .not("round_players.final_gross_score", "is", null)
       .order("round_date", { ascending: false })
       .limit(10),
-    // Events attended is the union of two sources: trips where this user is
-    // currently on_roster (modern, live-updating) and rows in event_attendance
-    // (historical workbook + admin-marked). De-duped by trip_id below.
+    // Single source: every trip the user is rostered for. Historical
+    // workbook rows were unified into event_participants by migration 00133.
     adminClient
       .from("event_participants")
-      .select("trip_id")
+      .select("trip_id", { count: "exact", head: true })
       .eq("user_id", userId)
       .eq("on_roster", true),
-    adminClient
-      .from("event_attendance")
-      .select("trip_id")
-      .eq("user_id", userId),
   ]);
 
   if (profileError || !profile) return null;
@@ -177,15 +171,6 @@ export async function loadLoozerProfile(
   const { sponsor: _sponsorJoined, ...profileOut } = profile as { sponsor?: unknown } & typeof profile;
   void _sponsorJoined;
 
-  // Distinct trip_ids across both sources.
-  const eventsAttendedSet = new Set<string>();
-  for (const r of (rosteredTrips as { trip_id: string }[] | null) || []) {
-    eventsAttendedSet.add(r.trip_id);
-  }
-  for (const r of (attendedHistorical as { trip_id: string }[] | null) || []) {
-    eventsAttendedSet.add(r.trip_id);
-  }
-
   return {
     profile: profileOut as LoozerProfileResponse["profile"],
     accolades: accolades || [],
@@ -199,6 +184,6 @@ export async function loadLoozerProfile(
     scorecards,
     isFounder: profileOut.is_founder === true,
     sponsor,
-    eventsAttended: eventsAttendedSet.size,
+    eventsAttended: eventsAttendedCount ?? 0,
   };
 }

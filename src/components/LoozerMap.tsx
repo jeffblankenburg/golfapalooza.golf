@@ -62,6 +62,14 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
   const mapRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const userMarkerRef = useRef<any>(null);
+  // Set true on the first real user gesture (drag/zoom/rotate with an
+  // originalEvent). Once set, programmatic camera moves are skipped so we
+  // never fight the user. Same pattern used by HoleMapView.
+  const userMapOverrideRef = useRef(false);
+  // True while a pan/zoom is mid-flight. Marker tap handlers consult this
+  // because mobile fires `click` on touchend even after a pan, which made
+  // accidental flyTo()s feel like the map was recentering on its own.
+  const dragInProgressRef = useRef(false);
 
   const [loozers, setLoozers] = useState<LoozerLocation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,7 +118,28 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
       map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-left");
       mapRef.current = map;
       map.once("load", () => {
-        if (!cancelled) setMapReady(true);
+        if (cancelled) return;
+        // Distinguish user gestures from programmatic camera moves: only
+        // user-initiated events have an `originalEvent`. Once any real
+        // gesture happens, we never auto-recenter again for the lifetime
+        // of this map instance.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const onUserGesture = (e: any) => {
+          if (e?.originalEvent) userMapOverrideRef.current = true;
+        };
+        map.on("dragstart", onUserGesture);
+        map.on("zoomstart", onUserGesture);
+        map.on("rotatestart", onUserGesture);
+
+        // Suppress marker taps that fire from a touchend at the end of a
+        // pan/zoom — the user wasn't trying to click anything, they were
+        // navigating. We re-enable on idle so a true tap (no movement)
+        // still works.
+        map.on("dragstart", () => { dragInProgressRef.current = true; });
+        map.on("zoomstart", () => { dragInProgressRef.current = true; });
+        map.on("idle", () => { dragInProgressRef.current = false; });
+
+        setMapReady(true);
       });
 
       // Container size can change on iOS as the address bar slides in/out;
@@ -193,6 +222,8 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
       }
       el.addEventListener("click", (e) => {
         e.stopPropagation();
+        // Mobile fires click on touchend at the end of a pan; ignore those.
+        if (dragInProgressRef.current) return;
         setActiveGroup(group);
       });
       return el;
@@ -206,7 +237,11 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
       el.textContent = String(group.length);
       el.addEventListener("click", (e) => {
         e.stopPropagation();
+        if (dragInProgressRef.current) return;
         const center: [number, number] = [group[0].longitude, group[0].latitude];
+        // User just tapped; an explicit flyTo here is an intentional
+        // user-initiated camera move, so it overrides the
+        // userMapOverrideRef gate.
         map.flyTo({ center, zoom: Math.max(map.getZoom(), BLOSSOM_ZOOM + 0.5) });
       });
       return el;
@@ -297,6 +332,12 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
   useEffect(() => {
     if (!mapReady || !mapRef.current || didInitialCenterRef.current) return;
     if (loading) return;
+    // If the user has already touched the map (rare race — they panned
+    // before the loozers fetch resolved), don't yank the camera away.
+    if (userMapOverrideRef.current) {
+      didInitialCenterRef.current = true;
+      return;
+    }
     const map = mapRef.current;
     const ul = userLocationRef.current;
     const uid = currentUserIdRef.current;

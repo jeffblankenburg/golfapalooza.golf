@@ -24,6 +24,9 @@ export function PullToRefresh() {
       const target = e.target as HTMLElement;
       if (target.closest(".fixed.z-50, .fixed.z-40")) return;
       if (target.closest("[data-drag-item]")) return;
+      // Components that own their own touch gestures (maps, image zoomers,
+      // etc.) opt out by setting data-pull-refresh="off" on a container.
+      if (target.closest('[data-pull-refresh="off"]')) return;
 
       const scrollTop = getScrollTop();
       if (scrollTop <= 1) {

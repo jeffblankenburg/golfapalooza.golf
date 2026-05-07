@@ -75,19 +75,6 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
   const [loading, setLoading] = useState(true);
   const [activeGroup, setActiveGroup] = useState<LoozerLocation[] | null>(null);
   const [mapReady, setMapReady] = useState(false);
-  // Diagnostic: counts page-level reloads while we hunt the "map refreshes"
-  // bug. Persists in sessionStorage so a real reload bumps it.
-  const [mountCount, setMountCount] = useState<number>(1);
-  useEffect(() => {
-    try {
-      const prev = parseInt(sessionStorage.getItem("loozerMapMountCount") || "0", 10);
-      const next = (Number.isFinite(prev) ? prev : 0) + 1;
-      sessionStorage.setItem("loozerMapMountCount", String(next));
-      setMountCount(next);
-    } catch {
-      // ignore — sessionStorage may be unavailable in some embeds
-    }
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -418,6 +405,7 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
     <div className="relative">
       <div
         ref={containerRef}
+        data-pull-refresh="off"
         className="w-full bg-gray-100 border border-gray-200 rounded-xl overflow-hidden overscroll-none"
         style={{ height: "calc(100svh - 280px)", touchAction: "none" }}
       />
@@ -428,15 +416,6 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
         </div>
       )}
 
-      {/* TEMP diagnostic: shows how many times the map has mounted in this
-          session. If you tap "refresh" 3 times this stays at 1; if a real
-          page reload happens, it bumps. Remove once we've nailed the bug. */}
-      <div
-        className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] font-mono pointer-events-none"
-        style={{ zIndex: 30 }}
-      >
-        mounts: {mountCount}
-      </div>
 
       {/* Selected group popover */}
       {activeGroup && (

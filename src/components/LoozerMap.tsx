@@ -405,8 +405,8 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
     <div className="relative">
       <div
         ref={containerRef}
-        className="w-full bg-gray-100 border border-gray-200 rounded-xl overflow-hidden"
-        style={{ height: "calc(100svh - 280px)" }}
+        className="w-full bg-gray-100 border border-gray-200 rounded-xl overflow-hidden overscroll-none"
+        style={{ height: "calc(100svh - 280px)", touchAction: "none" }}
       />
 
       {loading && (

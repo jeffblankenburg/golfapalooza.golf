@@ -99,7 +99,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { contest_id, participant_ids } = await request.json();
+    const { contest_id, participant_ids, bracket_format } = await request.json();
 
     if (!contest_id) {
       return NextResponse.json({ error: "contest_id is required" }, { status: 400 });
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
     // Determine contest type
     const { data: contest, error: contestError } = await adminClient
       .from("contests")
-      .select("id, contest_type")
+      .select("id, contest_type, bracket_format")
       .eq("id", contest_id)
       .single();
 
@@ -118,10 +118,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Contest not found" }, { status: 404 });
     }
 
+    // For doubles, allow caller to set/change format on this generation.
+    // Singles always uses single-elim with bo3 finals — ignore bracket_format.
+    const isSingles = contest.contest_type === "cornhole_singles";
+    const validFormats = [
+      "double-elimination",
+      "single-elim-finals-bo3",
+      "single-elim-all-bo3",
+      "single-elim-semis-bo3",
+    ];
+    let format: string = contest.bracket_format || "double-elimination";
+    if (!isSingles && bracket_format) {
+      if (!validFormats.includes(bracket_format)) {
+        return NextResponse.json({ error: "Invalid bracket_format" }, { status: 400 });
+      }
+      format = bracket_format;
+      if (format !== contest.bracket_format) {
+        await adminClient
+          .from("contests")
+          .update({ bracket_format: format })
+          .eq("id", contest_id);
+      }
+    }
+
     // Get participant count
     let ids: string[] = participant_ids || [];
     if (ids.length === 0) {
-      if (contest.contest_type === "cornhole_singles") {
+      if (isSingles) {
         const { data: participants } = await adminClient
           .from("contest_participants")
           .select("user_id")
@@ -154,11 +177,11 @@ export async function POST(request: Request) {
       .delete()
       .eq("contest_id", contest_id);
 
-    // Generate bracket
-    const isSingles = contest.contest_type === "cornhole_singles";
-    const bracketMatches: BracketMatch[] = isSingles
-      ? generateSingleElimination(ids.length, ids)
-      : generateDoubleElimination(ids.length, ids);
+    // Generate bracket. Singles is always single-elim. Doubles dispatches on format.
+    const useDoubleElim = !isSingles && format === "double-elimination";
+    const bracketMatches: BracketMatch[] = useDoubleElim
+      ? generateDoubleElimination(ids.length, ids)
+      : generateSingleElimination(ids.length, ids);
 
     // Two-pass insert: first insert without linkages, then update with UUIDs
     const insertRows = bracketMatches.map((m) => ({
@@ -232,19 +255,38 @@ export async function POST(request: Request) {
 
     await Promise.all(updates);
 
-    // Singles final is a best-of-3 series
-    if (isSingles) {
+    // Apply best-of-3 series flags based on format.
+    //   - cornhole_singles: final round only (legacy behavior)
+    //   - double-elimination: no series anywhere
+    //   - single-elim-finals-bo3: final round only
+    //   - single-elim-all-bo3: every non-bye match
+    //   - single-elim-semis-bo3: final round + the round before it
+    if (!useDoubleElim) {
       const mainMatches = bracketMatches.filter((m) => m.bracket_type === "main");
-      const finalRound = Math.max(...mainMatches.map((m) => m.round_number));
-      const finalMatch = mainMatches.find((m) => m.round_number === finalRound);
-      const finalId = finalMatch
-        ? keyToId[`main|${finalMatch.round_number}|${finalMatch.match_number}`]
-        : null;
-      if (finalId) {
-        await adminClient
-          .from("cornhole_bracket_matches")
-          .update({ series_best_of: 3 })
-          .eq("id", finalId);
+      if (mainMatches.length > 0) {
+        const finalRound = Math.max(...mainMatches.map((m) => m.round_number));
+
+        const seriesEffectiveFormat = isSingles ? "single-elim-finals-bo3" : format;
+        const seriesIds: string[] = [];
+        for (const m of mainMatches) {
+          if (m.is_bye) continue;
+          const include =
+            seriesEffectiveFormat === "single-elim-all-bo3"
+              ? true
+              : seriesEffectiveFormat === "single-elim-semis-bo3"
+                ? m.round_number >= finalRound - 1
+                : m.round_number === finalRound; // finals-bo3
+          if (!include) continue;
+          const id = keyToId[`main|${m.round_number}|${m.match_number}`];
+          if (id) seriesIds.push(id);
+        }
+
+        if (seriesIds.length > 0) {
+          await adminClient
+            .from("cornhole_bracket_matches")
+            .update({ series_best_of: 3 })
+            .in("id", seriesIds);
+        }
       }
     }
 

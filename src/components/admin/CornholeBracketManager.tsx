@@ -5,6 +5,35 @@ import { BracketView, BracketMatchData } from "@/components/BracketView";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { computeChampionId } from "@/lib/bracket/champion";
 
+type BracketFormat =
+  | "double-elimination"
+  | "single-elim-finals-bo3"
+  | "single-elim-all-bo3"
+  | "single-elim-semis-bo3";
+
+const DOUBLES_FORMAT_OPTIONS: { value: BracketFormat; label: string; description: string }[] = [
+  {
+    value: "double-elimination",
+    label: "Double elimination",
+    description: "Winners + losers brackets, championship match. Single games throughout.",
+  },
+  {
+    value: "single-elim-finals-bo3",
+    label: "Single elim · finals best-of-3",
+    description: "One bracket. Lose once, you're out. Final match is best-of-3.",
+  },
+  {
+    value: "single-elim-all-bo3",
+    label: "Single elim · every match best-of-3",
+    description: "One bracket. Every round is a best-of-3 series.",
+  },
+  {
+    value: "single-elim-semis-bo3",
+    label: "Single elim · semis & finals best-of-3",
+    description: "One bracket. Single games until the semifinals, then best-of-3.",
+  },
+];
+
 export function CornholeBracketManager({
   tripId,
   contestType,
@@ -29,10 +58,11 @@ export function CornholeBracketManager({
     onConfirm: () => void;
   } | null>(null);
   const [locked, setLocked] = useState(false);
+  const [bracketFormat, setBracketFormat] = useState<BracketFormat>("double-elimination");
 
   const isSingles = contestType === "cornhole_singles";
 
-  // Fetch contest ID + lock status
+  // Fetch contest ID + lock status + persisted format
   const fetchContest = useCallback(async () => {
     const res = await fetch(`/api/admin/contests?trip_id=${tripId}`);
     const data = await res.json();
@@ -41,6 +71,9 @@ export function CornholeBracketManager({
     );
     setContestId(c?.id || null);
     setLocked(!!c?.winners_locked_at);
+    if (c?.bracket_format) {
+      setBracketFormat(c.bracket_format as BracketFormat);
+    }
     return c?.id || null;
   }, [tripId, contestType]);
 
@@ -86,7 +119,11 @@ export function CornholeBracketManager({
     const res = await fetch("/api/admin/cornhole/bracket", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contest_id: contestId }),
+      body: JSON.stringify({
+        contest_id: contestId,
+        // Singles ignores this server-side; harmless to send.
+        bracket_format: isSingles ? undefined : bracketFormat,
+      }),
     });
     if (res.ok) {
       await fetchBracket(contestId);
@@ -411,6 +448,51 @@ export function CornholeBracketManager({
         </div>
       )}
 
+      {/* Format picker — doubles only, before generation. Locked once a bracket exists. */}
+      {!isSingles && !locked && matches.length === 0 && (
+        <div className="mb-4 space-y-2">
+          <div className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+            Tournament format
+          </div>
+          <div className="space-y-1.5">
+            {DOUBLES_FORMAT_OPTIONS.map((opt) => (
+              <label
+                key={opt.value}
+                className={`flex items-start gap-2.5 px-3 py-2.5 rounded-lg border cursor-pointer ${
+                  bracketFormat === opt.value
+                    ? "border-green-500 bg-green-50"
+                    : "border-gray-200 bg-white active:bg-gray-50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="bracket-format"
+                  value={opt.value}
+                  checked={bracketFormat === opt.value}
+                  onChange={() => setBracketFormat(opt.value)}
+                  className="mt-0.5 accent-green-600"
+                />
+                <span className="flex-1">
+                  <span className="block text-sm font-medium text-gray-900">{opt.label}</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">{opt.description}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Format readout once a bracket is generated (doubles only) */}
+      {!isSingles && matches.length > 0 && (
+        <div className="mb-3 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600">
+          Format:{" "}
+          <span className="font-semibold text-gray-800">
+            {DOUBLES_FORMAT_OPTIONS.find((o) => o.value === bracketFormat)?.label || bracketFormat}
+          </span>
+          {!locked && <span className="text-gray-400"> · reset bracket to change</span>}
+        </div>
+      )}
+
       {/* Action buttons (hidden when locked) */}
       {!locked && (
         <div className="flex gap-2 mb-4">
@@ -449,43 +531,6 @@ export function CornholeBracketManager({
           {!isSingles && " Set up teams in the Cornhole Doubles section first."}
         </p>
       )}
-
-      {/* Series-in-progress banner (Cornhole Singles final is best-of-3) */}
-      {!locked &&
-        matches
-          .filter(
-            (m) =>
-              m.series_best_of &&
-              !m.winner_participant_id &&
-              ((m.slot1_wins ?? 0) > 0 || (m.slot2_wins ?? 0) > 0)
-          )
-          .map((m) => {
-            const s1Name = m.slot1_participant_id
-              ? nameMap[m.slot1_participant_id]?.display_name || "—"
-              : "—";
-            const s2Name = m.slot2_participant_id
-              ? nameMap[m.slot2_participant_id]?.display_name || "—"
-              : "—";
-            return (
-              <div
-                key={m.id}
-                className="flex items-center justify-between gap-2 px-3 py-2 mb-3 bg-amber-50 border border-amber-200 rounded-lg"
-              >
-                <span className="text-xs text-amber-800 truncate">
-                  Finals series:{" "}
-                  <span className="font-semibold">
-                    {s1Name} {m.slot1_wins ?? 0}–{m.slot2_wins ?? 0} {s2Name}
-                  </span>
-                </span>
-                <button
-                  onClick={() => handleSeriesReset(m.id)}
-                  className="text-xs font-semibold text-amber-700 bg-amber-100 px-3 py-1.5 rounded-lg active:bg-amber-200 flex-shrink-0"
-                >
-                  Reset
-                </button>
-              </div>
-            );
-          })}
 
       {/* Bracket */}
       <BracketView

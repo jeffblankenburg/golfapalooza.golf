@@ -271,6 +271,10 @@ function BracketSection({
                       !match.slot2_participant_id
                     )
                       return null;
+                    const seriesInProgress =
+                      !!match.series_best_of &&
+                      !match.winner_participant_id &&
+                      ((match.slot1_wins ?? 0) > 0 || (match.slot2_wins ?? 0) > 0);
                     return (
                       <div
                         key={match.id}
@@ -286,9 +290,17 @@ function BracketSection({
                           match={match}
                           getName={getName}
                           onSlotClick={onSlotClick}
-                          onSeriesReset={onSeriesReset}
                           championId={championId}
                         />
+                        {onSeriesReset && seriesInProgress && (
+                          <button
+                            onClick={() => onSeriesReset(match.id)}
+                            style={{ position: "absolute", top: MATCH_H + 2, left: 0, right: 0 }}
+                            className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-md py-0.5 active:bg-amber-100"
+                          >
+                            Reset series
+                          </button>
+                        )}
                       </div>
                     );
                   })}
@@ -453,13 +465,11 @@ function MatchCard({
   match,
   getName,
   onSlotClick,
-  onSeriesReset,
   championId,
 }: {
   match: BracketMatchData;
   getName: (id: string | null) => string | null;
   onSlotClick?: (matchId: string, participantId: string) => void;
-  onSeriesReset?: (matchId: string) => void;
   championId: string | null;
 }) {
   const slot1Name = getName(match.slot1_participant_id);
@@ -474,8 +484,6 @@ function MatchCard({
   const isSeries = !!match.series_best_of;
   const slot1Wins = match.slot1_wins ?? 0;
   const slot2Wins = match.slot2_wins ?? 0;
-
-  void onSeriesReset; // reset affordance is rendered outside the bracket graphic
 
   return (
     <div

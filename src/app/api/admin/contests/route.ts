@@ -56,6 +56,7 @@ export async function GET(request: Request) {
     verified_at: c.verified_at,
     winners_locked_at: c.winners_locked_at,
     tee_sheet_published_at: c.tee_sheet_published_at ?? null,
+    bracket_format: c.bracket_format ?? "double-elimination",
     participant_count:
       Array.isArray(c.contest_participants) && c.contest_participants.length > 0
         ? (c.contest_participants[0] as { count: number }).count

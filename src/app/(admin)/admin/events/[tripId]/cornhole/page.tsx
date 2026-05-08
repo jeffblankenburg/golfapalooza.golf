@@ -163,7 +163,7 @@ export default function CornholeAdminPage() {
       <CollapsibleSection
         key={`singles-${singlesLocked}`}
         title="Singles Bracket"
-        summary={singlesResult || (singlesLocked ? "Locked" : "Single elimination")}
+        summary={singlesResult || (singlesLocked ? "Locked" : "")}
         icon={
           singlesLocked ? (
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -183,7 +183,7 @@ export default function CornholeAdminPage() {
       <CollapsibleSection
         key={`doubles-${doublesLocked}`}
         title="Doubles Bracket"
-        summary={doublesResult || (doublesLocked ? "Locked" : "Double elimination")}
+        summary={doublesResult || (doublesLocked ? "Locked" : "")}
         icon={
           doublesLocked ? (
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

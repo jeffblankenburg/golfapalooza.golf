@@ -67,7 +67,7 @@ export async function loadLoozerProfile(
     queryClient
       .from("users")
       .select(
-        "id, display_name, full_name, avatar_url, phone, city, state, playing_since, swings, typical_shot, fun_fact, best_shot, occupation, eight_bag_average, avg_scramble_score, is_founder, sponsor_id, sponsor:users!users_sponsor_id_fkey(id, display_name, avatar_url)",
+        "id, display_name, full_name, avatar_url, phone, city, state, playing_since, swings, typical_shot, fun_fact, best_shot, occupation, eight_bag_average, avg_scramble_score, is_founder, sponsor_id",
       )
       .eq("id", userId)
       .single(),
@@ -128,12 +128,18 @@ export async function loadLoozerProfile(
 
   if (profileError || !profile) return null;
 
-  const sponsorJoined = (profile as { sponsor?: unknown }).sponsor;
-  const sponsorRow = Array.isArray(sponsorJoined) ? sponsorJoined[0] : sponsorJoined;
-  const sponsor =
-    sponsorRow && typeof sponsorRow === "object"
-      ? (sponsorRow as { id: string; display_name: string; avatar_url: string | null })
-      : null;
+  const sponsorId = (profile as { sponsor_id: string | null }).sponsor_id;
+  let sponsor: { id: string; display_name: string; avatar_url: string | null } | null = null;
+  if (sponsorId) {
+    const { data: sponsorRow } = await queryClient
+      .from("users")
+      .select("id, display_name, avatar_url")
+      .eq("id", sponsorId)
+      .maybeSingle();
+    if (sponsorRow) {
+      sponsor = sponsorRow as { id: string; display_name: string; avatar_url: string | null };
+    }
+  }
 
   const bioNote = bioData && bioData.content ? { content: bioData.content as string } : null;
 
@@ -168,8 +174,7 @@ export async function loadLoozerProfile(
     })
     .filter((x): x is NonNullable<typeof x> => x != null);
 
-  const { sponsor: _sponsorJoined, ...profileOut } = profile as { sponsor?: unknown } & typeof profile;
-  void _sponsorJoined;
+  const profileOut = profile;
 
   return {
     profile: profileOut as LoozerProfileResponse["profile"],

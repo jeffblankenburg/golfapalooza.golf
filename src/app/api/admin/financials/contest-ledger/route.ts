@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkPermissionAccess } from "@/lib/permissions-server";
+import { applyComputedTransactionAmounts } from "@/lib/cost-items/transaction-amounts";
 
 // GET - Transactions for a specific user + financial contest, trip, or uncategorized
 export async function GET(request: Request) {
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
     let query = adminClient
       .from("financial_transactions")
       .select(
-        "id, type, source, description, amount, method, notes, created_at, created_by, creator:users!financial_transactions_created_by_fkey(display_name)"
+        "id, user_id, option_id, type, source, description, amount, method, notes, created_at, created_by, creator:users!financial_transactions_created_by_fkey(display_name)"
       )
       .eq("user_id", userId);
 
@@ -46,8 +47,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Recompute amounts on option-driven transactions from current cost_items.
+    const recomputed = await applyComputedTransactionAmounts(adminClient, transactions || []);
+
     // Fetch history for these transactions
-    const txnIds = (transactions || []).map((t) => t.id);
+    const txnIds = recomputed.map((t) => t.id);
     let lastEditorMap = new Map<string, { name: string; has_history: boolean }>();
 
     if (txnIds.length > 0) {
@@ -68,8 +72,8 @@ export async function GET(request: Request) {
       }
     }
 
-    const formatted = (transactions || []).map((t) => {
-      const editor = lastEditorMap.get(t.id);
+    const formatted = recomputed.map((t) => {
+      const editor = lastEditorMap.get(t.id as string);
       const creatorName = (t.creator as unknown as { display_name: string } | null)?.display_name ?? null;
 
       return {

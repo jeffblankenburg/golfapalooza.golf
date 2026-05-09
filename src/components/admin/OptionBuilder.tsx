@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import { CostItemLinksModal } from "@/components/admin/CostItemLinksModal";
 import { OPTION_ICONS, ICON_CATEGORIES, OptionIcon } from "@/lib/option-icons";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
@@ -217,6 +218,9 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
     message: string;
     onConfirm: () => void;
   } | null>(null);
+
+  // Cost-item links modal (per-option)
+  const [linksModalOption, setLinksModalOption] = useState<Option | null>(null);
 
   // ── Data Fetching ──
 
@@ -696,15 +700,12 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
           </div>
 
           {optionType === "checkbox" && (
-            <div className="w-32">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Cost ($)</label>
-              <input
-                type="number"
-                placeholder="0"
-                value={optionCost}
-                onChange={(e) => setOptionCost(e.target.value === "" ? "" : Number(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
-              />
+            <div className="flex-1 min-w-0 text-xs text-gray-500 italic">
+              Cost is computed from linked cost items —{" "}
+              <a href="/admin/financials/cost-items" className="text-green-700 underline">
+                manage on Cost Items
+              </a>
+              .
             </div>
           )}
         </div>
@@ -921,6 +922,7 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
               getOptionCostSummary={getOptionCostSummary}
               getOptionChoiceSummary={getOptionChoiceSummary}
               allOptions={options}
+              onOpenLinks={(o) => setLinksModalOption(o)}
             />
           ))}
         </SortableContext>
@@ -991,6 +993,15 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
         onConfirm={() => confirmModal?.onConfirm()}
         onCancel={() => setConfirmModal(null)}
       />
+
+      {linksModalOption && (
+        <CostItemLinksModal
+          option={linksModalOption}
+          tripId={tripId}
+          onClose={() => setLinksModalOption(null)}
+          onSaved={fetchData}
+        />
+      )}
     </div>
   );
 }
@@ -1028,6 +1039,7 @@ interface SortableGroupCardProps {
   getOptionCostSummary: (o: Option) => string | null;
   getOptionChoiceSummary: (o: Option) => string | null;
   allOptions: Option[];
+  onOpenLinks?: (o: Option) => void;
 }
 
 function SortableGroupCard({
@@ -1059,6 +1071,7 @@ function SortableGroupCard({
   getOptionCostSummary,
   getOptionChoiceSummary,
   allOptions,
+  onOpenLinks,
 }: SortableGroupCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.id });
   const style = {
@@ -1216,6 +1229,7 @@ function SortableGroupCard({
                     deleteOption={deleteOption}
                     getOptionCostSummary={getOptionCostSummary}
                     getOptionChoiceSummary={getOptionChoiceSummary}
+                    onOpenLinks={onOpenLinks ? () => onOpenLinks(option) : undefined}
                   />
                 );
               })}
@@ -1322,11 +1336,13 @@ function SortableOptionRow({
   deleteOption,
   getOptionCostSummary,
   getOptionChoiceSummary,
+  onOpenLinks,
 }: {
   option: Option;
   allOptions: Option[];
   startEditOption: (o: Option) => void;
   deleteOption: (o: Option) => void;
+  onOpenLinks?: () => void;
   getOptionCostSummary: (o: Option) => string | null;
   getOptionChoiceSummary: (o: Option) => string | null;
 }) {
@@ -1390,6 +1406,18 @@ function SortableOptionRow({
         </span>
       )}
 
+      {onOpenLinks && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onOpenLinks(); }}
+          title="Link cost items"
+          className="p-1 text-gray-300 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors flex-shrink-0"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+          </svg>
+        </button>
+      )}
+
       <button
         onClick={(e) => { e.stopPropagation(); deleteOption(option); }}
         className="p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
@@ -1433,15 +1461,8 @@ function SortableChoiceRow({
         className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
       />
       {showCost && (
-        <div className="w-24 relative flex-shrink-0">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
-          <input
-            type="number"
-            placeholder="0"
-            value={choice.cost ?? ""}
-            onChange={(e) => updateChoice(index, "cost", e.target.value)}
-            className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
-          />
+        <div className="w-24 px-3 py-2 text-sm text-right tabular-nums text-gray-500 flex-shrink-0">
+          {choice.cost ? `$${choice.cost}` : "—"}
         </div>
       )}
       <button

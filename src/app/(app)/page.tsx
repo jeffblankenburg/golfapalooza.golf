@@ -592,7 +592,7 @@ export default async function HomePage() {
 
   // Compute which quick link categories are visible
   const hiddenQuickLinks: string[] = [];
-  if (!isFeatureVisible("scorecards", visCtx, effectiveDate)) hiddenQuickLinks.push("/scorecards");
+  if (!isFeatureVisible("scorecards", visCtx, effectiveDate)) hiddenQuickLinks.push("/scrambles");
   if (!isFeatureVisible("skins", visCtx, effectiveDate)) hiddenQuickLinks.push("/skins");
   if (!isFeatureVisible("hundred_feet", visCtx, effectiveDate)) hiddenQuickLinks.push("/hundred-feet");
   if (!isFeatureVisible("daily_games", visCtx, effectiveDate)) hiddenQuickLinks.push("/daily-games");
@@ -611,7 +611,7 @@ export default async function HomePage() {
       myStartingHole={teeTimesVisible ? myStartingHole : null}
       myTeammates={teeTimesVisible ? myTeammates : []}
       teeTimeDay={teeTimesVisible ? teeTimeDay : null}
-      teeTimeLinkHref={bestMatch?.source === "player" ? "/kgb-cup" : bestMatch ? `/scorecards?day=${bestMatch.dayNumber}` : "/scorecards"}
+      teeTimeLinkHref={bestMatch?.source === "player" ? "/kgb-cup" : bestMatch ? `/scrambles?day=${bestMatch.dayNumber}` : "/scrambles"}
       simulatedDate={simDate}
       initialBirthdays={birthdaysResult}
       participants={participants}

@@ -15,6 +15,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { calcSkins } from "@/lib/skins";
 import type { PayoutSheetEvent } from "./compute";
+import { computePayoutSplits } from "./splits";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Client = SupabaseClient<any, "public", any>;
@@ -107,7 +108,7 @@ function dayFromLabel(label: string): number | null {
 interface BulkData {
   participantCounts: Map<string, number>; // event.id → count
   // Scramble: contest_id → teams (with members + gross_score)
-  scrambleTeams: Map<string, Array<{ id: string; gross_score: number | null; members: Array<{ user_id: string }> }>>;
+  scrambleTeams: Map<string, Array<{ id: string; gross_score: number | null; team_handicap: number; members: Array<{ user_id: string }> }>>;
   // Scramble: contest_id → hole scores keyed by team_id → hole_number → strokes
   scrambleHoleScores: Map<string, Record<string, Record<number, number>>>;
   // Scramble: contest_id → holes used (with handicap_index)
@@ -284,17 +285,20 @@ function cellsForScrambleTeam(
   if (!teams || teams.length === 0) return [];
   if (!teams.every((t) => t.gross_score !== null)) return [];
 
-  const sorted = [...teams].sort(
-    (a, b) => (Number(a.gross_score) || 0) - (Number(b.gross_score) || 0),
-  );
-  const SECOND = 80;
-  const FIRST = Math.max(0, total - SECOND);
+  // Sort by NET score (gross − team_handicap) — lowest net wins.
+  // Matches the leaderboard ordering on /scrambles.
+  const sorted = [...teams].sort((a, b) => {
+    const aNet = (Number(a.gross_score) || 0) - (Number(a.team_handicap) || 0);
+    const bNet = (Number(b.gross_score) || 0) - (Number(b.team_handicap) || 0);
+    return aNet - bNet;
+  });
+
+  // Per-place team amounts come from the row's admin-configured payout_splits.
+  const placeAmounts = computePayoutSplits(total, row.payout_splits);
 
   const cells: GridCell[] = [];
-  for (const [team, amount] of [
-    [sorted[0], FIRST] as const,
-    [sorted[1], SECOND] as const,
-  ]) {
+  for (const [place, amount] of placeAmounts) {
+    const team = sorted[place - 1];
     if (!team || amount <= 0) continue;
     const members = team.members || [];
     if (members.length === 0) continue;
@@ -424,7 +428,7 @@ export async function loadPayoutGrid(client: Client, tripId: string): Promise<Gr
       .eq("on_roster", true),
     client
       .from("payout_sheet_events")
-      .select("*")
+      .select("*, cost_item:cost_items(cost)")
       .eq("trip_id", tripId)
       .eq("is_payout", true)
       .order("sort_order"),
@@ -443,7 +447,17 @@ export async function loadPayoutGrid(client: Client, tripId: string): Promise<Gr
     return { loozers, events: [], cells: [] };
   }
 
-  const eventList = events as PayoutSheetEvent[];
+  // Overlay each row's amount_per_participant with the linked cost_item.cost
+  // when set. Mirrors the same fallback logic loadPayoutSheet uses, so all
+  // downstream pot math derives from cost_items.
+  const eventList: PayoutSheetEvent[] = (events as Array<PayoutSheetEvent & { cost_item?: { cost: number | string } | Array<{ cost: number | string }> | null }>).map((e) => {
+    const joined = e.cost_item;
+    const item = Array.isArray(joined) ? joined[0] : joined;
+    if (item && item.cost != null) {
+      return { ...e, amount_per_participant: Number(item.cost) };
+    }
+    return e;
+  });
 
   // Identify resource ids needed for bulk fetches.
   const scrambleContestIds = new Set<string>();
@@ -472,7 +486,7 @@ export async function loadPayoutGrid(client: Client, tripId: string): Promise<Gr
     scrambleContestIds.size > 0
       ? client
           .from("scramble_teams")
-          .select(`id, contest_id, gross_score, members:scramble_team_members(user_id)`)
+          .select(`id, contest_id, gross_score, team_handicap, members:scramble_team_members(user_id)`)
           .in("contest_id", [...scrambleContestIds])
       : Promise.resolve({ data: [] }),
     scrambleContestIds.size > 0
@@ -527,13 +541,13 @@ export async function loadPayoutGrid(client: Client, tripId: string): Promise<Gr
   ]);
 
   // Build BulkData maps.
-  const scrambleTeams = new Map<string, Array<{ id: string; gross_score: number | null; members: Array<{ user_id: string }> }>>();
+  const scrambleTeams = new Map<string, Array<{ id: string; gross_score: number | null; team_handicap: number; members: Array<{ user_id: string }> }>>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const teamRows = (scrambleTeamsRes as any).data || [];
   for (const t of teamRows) {
     const arr = scrambleTeams.get(t.contest_id) || [];
     const members = ((t.members as Array<{ user_id: string }>) || []).filter(Boolean);
-    arr.push({ id: t.id, gross_score: t.gross_score, members });
+    arr.push({ id: t.id, gross_score: t.gross_score, team_handicap: Number(t.team_handicap) || 0, members });
     scrambleTeams.set(t.contest_id, arr);
   }
 

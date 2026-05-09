@@ -178,12 +178,20 @@ function formatNetRelPar(net: number, par: number): string {
   return diff > 0 ? `+${diff}` : `${diff}`;
 }
 
+interface ScramblePayout {
+  pot: number;
+  first: number;
+  second: number;
+}
+
 export function ScorecardsContent({
   contests,
   startDate,
+  dayScramblePayouts = {},
 }: {
   contests: Contest[];
   startDate: string;
+  dayScramblePayouts?: Record<number, ScramblePayout>;
 }) {
   const searchParams = useSearchParams();
   const dayParam = searchParams.get("day");
@@ -214,7 +222,7 @@ export function ScorecardsContent({
     }
 
     setLoading(true);
-    const res = await fetch(`/api/scorecards?contest_id=${selectedContest.id}`);
+    const res = await fetch(`/api/scrambles?contest_id=${selectedContest.id}`);
     const json = await res.json();
 
     // Offset team handicaps so the lowest team plays at 0
@@ -329,6 +337,15 @@ export function ScorecardsContent({
           </button>
         ))}
       </div>
+
+      {/* Scramble Team payouts for the selected day (derived from
+          cost_items via the new payout-events data layer) */}
+      {dayScramblePayouts[selectedDay] && (
+        <ScramblePayoutPanel
+          dayLabel={getDayLabel(startDate, selectedDay)}
+          payout={dayScramblePayouts[selectedDay]}
+        />
+      )}
 
       {loading && (
         <div className="flex justify-center py-12">
@@ -632,6 +649,48 @@ export function ScorecardsContent({
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+const fmtMoney = (n: number) =>
+  n.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: n % 1 === 0 ? 0 : 2,
+  });
+
+function ScramblePayoutPanel({
+  dayLabel,
+  payout,
+}: {
+  dayLabel: string;
+  payout: ScramblePayout;
+}) {
+  return (
+    <div className="bg-lime-50 border border-lime-200 rounded-2xl p-3">
+      <div className="flex items-baseline justify-between mb-2">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-lime-800">
+          {dayLabel} scramble payouts
+        </h2>
+        <span className="text-[10px] text-lime-700 tabular-nums">
+          {fmtMoney(payout.pot)} pot
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="bg-white rounded-lg border border-lime-100 px-3 py-2 flex items-baseline justify-between">
+          <span className="text-xs font-semibold text-gray-700">1st place</span>
+          <span className="text-base font-bold text-gray-900 tabular-nums">
+            {fmtMoney(payout.first)}
+          </span>
+        </div>
+        <div className="bg-white rounded-lg border border-lime-100 px-3 py-2 flex items-baseline justify-between">
+          <span className="text-xs font-semibold text-gray-700">2nd place</span>
+          <span className="text-base font-bold text-gray-900 tabular-nums">
+            {fmtMoney(payout.second)}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

@@ -7,6 +7,71 @@ trip's active window opens (~120 days from filing). Until then, the bridge
 layer (`payout_sheet_events.winner_source`) keeps the current surface
 working.
 
+## Depends on #125 (do this first)
+
+#125 (`cost_items`) is the predecessor. Once cost items are the universal
+source of truth for dollars, the contest model collapses to two simple
+responsibilities:
+
+> **A contest points at a cost item as its buy-in, and defines how the
+> winnings are divided. That's it.**
+
+Every other concept that's currently fragmented across the codebase —
+pot total, payout amount, paid status, denomination calculation —
+derives from those two facts plus the people who participated.
+
+What that means for this plan:
+
+- **`contests.buy_in` column is no longer needed** — buy-in derives from
+  cost items targeting the contest (`cost_items.payout_target_contest_id =
+  contest.id`). The "buy-in cost item" is the contest's pot per attendee.
+- **`pot_source` / `fixed_pot` columns on `contests` are no longer needed**
+  — every pot has the same shape (cost item × eligible attendee count).
+- **`contest_payout_structure` only describes the SPLIT** of an existing
+  pot (e.g. "1st = pot − $80, 2nd = $80" or "60/30/10"), never the dollar
+  amount of the pot itself.
+- **The Skins child-contest pattern (`parent_contest_id`) gets cleaner** —
+  its pot is one cost item targeting the Skins contest.
+
+So the work below assumes #125 has shipped first.
+
+## What a contest IS, after this lands
+
+```sql
+contests
+  id, trip_id
+  name, contest_type
+  parent_contest_id            -- only for child contests like Skins
+
+  -- The two responsibilities:
+  -- 1. Buy-in: a single FK to the cost item that funds this contest's pot.
+  --    Pot total = buy_in_cost_item.cost × eligible attendee count.
+  --    NULL only for special cases like Calcutta where the pot is bid-driven.
+  buy_in_cost_item_id UUID REFERENCES cost_items(id) ON DELETE SET NULL,
+
+  -- 2. Winnings split: rows in `contest_payout_structure` describe how
+  --    the pot divides among placements. No dollars stored here.
+
+contest_payout_structure
+  id, contest_id, place
+  label                  -- "1st place" / "2nd place" / "Long shot bonus"
+  percentage NUMERIC(5,2)         -- e.g. Calcutta 1st = 20% of pot
+  flat_amount NUMERIC(10,2)       -- e.g. scramble 2nd = flat $80
+  remainder BOOLEAN               -- true on the row that absorbs whatever's left
+                                  -- (e.g. scramble 1st = "remainder" after $80
+                                  -- to 2nd)
+```
+
+That's the entire contest model. Two tables, one FK to the cost catalog,
+no per-contest-type magic columns, no hidden conventions. Adding a new
+contest is:
+
+1. Insert a `cost_items` row (the buy-in)
+2. Insert a `contests` row pointing at it via `buy_in_cost_item_id`
+3. Insert `contest_payout_structure` rows describing the split
+
+Done — no code change required.
+
 ## Hard constraints (non-negotiable)
 
 1. **Zero downtime.** The site stays fully functional throughout every
@@ -74,20 +139,19 @@ doesn't match what users actually win:
   `trip_options`, not contests, even though Boland and KGB Cup involve
   buy-ins and KGB Cup awards a winner.
 
-## Target model
+## Target model (assumes #125 shipped)
 
 ```
 trip_settings                                                — events (unchanged)
 event_participants                                           — users in events (unchanged)
+trip_fee_components                                          — from #125; the spine for $$
 
 contests
   id, trip_id, parent_contest_id (nullable, self-FK)
   name, contest_type, day_number (nullable)
-  buy_in NUMERIC(10,2) NOT NULL DEFAULT 0
-  pot_source ENUM('entry_fees', 'auction', 'fixed', 'pass_through')
-  fixed_pot NUMERIC(10,2) (used when pot_source='fixed')
   parent_contest_id lets Skins point at its scramble — single row, child of the
   scramble; same participants without re-storing them.
+  -- buy_in / pot_source / fixed_pot all dropped in favor of line-item lookup
 
 contest_participants                                          — used uniformly
   contest_id, user_id, joined_at, ...
@@ -95,10 +159,11 @@ contest_participants                                          — used uniformly
 
 contest_payout_structure                                      — one source of truth
   contest_id, place SMALLINT, label TEXT
-  amount NUMERIC(10,2) (when pot_source='fixed') OR
-  percentage NUMERIC(5,2) (when pot_source IN ('entry_fees','auction'))
-  flat_amount NUMERIC(10,2) (when pot_source='entry_fees' and the place is a
-    flat dollar slice — covers "scramble 2nd place flat $80, 1st = remainder")
+  -- pot total derives from trip_fee_components.payout_target_contest_id
+  -- this table only describes how to SPLIT that pot:
+  percentage NUMERIC(5,2) (e.g. Calcutta 1st = 20%)
+  flat_amount NUMERIC(10,2) (e.g. scramble 2nd = flat $80, 1st = remainder)
+  remainder BOOLEAN (true on the row that absorbs whatever's left)
   Replaces calcutta_prizes, pickem_settings.payout_json, and the cash-sheet
   conventions in payout_sheet_events.
 
@@ -144,12 +209,13 @@ verification step plus a rollback path.
 
 ### Phase A — schema foundation (purely additive)
 
+**Pre-condition:** #125 has shipped — `trip_fee_components` exists and is
+the source of truth for pot totals.
+
 **What ships:** New tables + new nullable columns. No code reads or writes them yet.
 
-1. New table: `contest_payout_structure`.
-2. New columns on `contests`: `buy_in NUMERIC(10,2) DEFAULT 0`,
-   `pot_source TEXT`, `parent_contest_id UUID`, `fixed_pot NUMERIC(10,2)`.
-   All nullable / defaulted — existing rows unaffected.
+1. New table: `contest_payout_structure` (split percentages / flat amounts only — pot total comes from line items).
+2. New column on `contests`: `parent_contest_id UUID` (nullable, self-FK).
 3. New columns on existing `contest_winners`: `paid BOOLEAN DEFAULT false`,
    `paid_at TIMESTAMPTZ`, `paid_by UUID`. Used later; default-safe.
 
@@ -164,16 +230,19 @@ tests pass with no behavior change.
 ### Phase B — generate missing contest rows (additive backfill)
 
 **What ships:** New rows in `contests` for the granularity gaps, plus
-`contest_payout_structure` rows describing how each pays out. No reads or
-writes change yet.
+`contest_payout_structure` rows describing how each splits its pot. No
+reads or writes change yet.
 
 1. Insert `contests` rows for: Skins-per-scramble (with `parent_contest_id`),
    CTP Front × 3, CTP Back × 3, Long Drive × 3, Long Putt × 3.
 2. Populate `contest_payout_structure` for every payout-bearing contest
-   (existing + new) using current admin conventions.
-3. Backfill `buy_in` on existing contest rows from `pickem_settings.entry_fee`,
-   `trip_options.cost`, and the $10 scramble convention.
-4. Set `parent_contest_id` on new Skins rows; existing scramble rows are unchanged.
+   (existing + new) — only the SPLIT (percentages or flat amounts);
+   pot totals come from #125 line items.
+3. Update existing `trip_fee_components` rows from #125 to point at the new
+   contest rows (e.g. "Thursday Skins pot" line item now targets the new
+   Thursday Skins contest, not the scramble).
+4. Set `parent_contest_id` on new Skins rows; existing scramble rows are
+   unchanged.
 
 **Old paths still work:** No leaderboard, admin tool, or aggregator queries
 the new rows yet.
@@ -288,16 +357,18 @@ regressions, and only between trips.
 
 ## Per-contest-type migration table
 
-| Contest | Generate `contests` rows? | Backfill payout structure | Migrate winners from |
+(Pot totals come from #125 line items in every case — column omitted.)
+
+| Contest | Generate `contests` rows? | Backfill payout SPLIT structure | Migrate winners from |
 |---|---|---|---|
 | Calcutta auction | already exists | from `calcutta_prizes.percentage` | `contest_winners` (rename current) |
-| Scramble Team | already exists | flat 2nd-place $80, 1st pot − 80 | derive from `scramble_teams.gross_score` |
+| Scramble Team | already exists | flat 2nd-place $80, 1st = remainder | derive from `scramble_teams.gross_score` |
 | Scramble Skins | **new** (parent = scramble) | percentage-by-skins-share | `calcSkins` materialization on lock |
 | Pickem | already exists | from `pickem_settings.payout_json` | derived rankings materialization on lock |
-| CTP Front × 3 days | **new** | half daily pot each, fall-through rule for unwon side | from `daily_contest_winners` (ctp_front per day) |
+| CTP Front × 3 days | **new** | full pot to single winner (with fall-through rule for unwon sibling) | from `daily_contest_winners` (ctp_front per day) |
 | CTP Back × 3 days | **new** | same | from `daily_contest_winners` (ctp_back per day) |
-| Long Drive × 3 days | **new** | full daily pot to single winner | from `daily_contest_winners` |
-| Long Putt × 3 days | **new** | full daily pot to single winner | from `daily_contest_winners` |
+| Long Drive × 3 days | **new** | full pot to single winner | from `daily_contest_winners` |
+| Long Putt × 3 days | **new** | full pot to single winner | from `daily_contest_winners` |
 | 100 Feet | already exists | full pot to lowest cumulative | derive from `hundred_feet_scores` |
 | KGB Cup | already exists | none (pass-through) | n/a |
 | Cornhole singles/doubles | already exists | none today (no payout) | n/a (or future) |
@@ -343,11 +414,12 @@ regressions, and only between trips.
 
 ## Acceptance Criteria
 
-- [ ] Every contest row has a non-null `buy_in` (even if 0)
-- [ ] Every payout-bearing contest has at least one row in `contest_payout_structure`
+- [ ] #125 has shipped (line-item spine in place)
+- [ ] Every payout-bearing contest has at least one fee component targeting it (#125) and at least one row in `contest_payout_structure` describing the split
+- [ ] Every contest's pot total is derivable as a SQL sum over `trip_fee_components`, not stored on `contests`
 - [ ] `contest_winners` is the single source of truth for who won what — no other table needs to be queried for winner identity
 - [ ] `contest_winners.paid` is the single source of truth for paid status
-- [ ] The cash-needed sheet renders from `contests` × `contest_payout_structure` × `contest_participants` with no app-code aggregator
+- [ ] The cash-needed sheet renders from `contests` × `contest_payout_structure` × `trip_fee_components` × `contest_participants` with no app-code aggregator
 - [ ] The Winners grid aggregator file (`src/lib/payout-events/grid.ts`) is
       under 100 lines and contains zero per-kind dispatch
 - [ ] Lifetime payout queries (e.g. "Don's total winnings across all trips")
@@ -358,24 +430,26 @@ regressions, and only between trips.
 
 ## Effort estimate
 
-With the zero-downtime phasing, this is **8–12 calendar days** of work
-spread over multiple weeks — most of that time is the dual-write
-verification windows in Phases C and D, not coding. Active coding work is
-roughly **4–6 days**. The 120-day off-season window is comfortable for
-this pace.
+With #125 already in place, this is **6–9 calendar weeks** for the
+zero-downtime phasing (active coding ~3–4 days; the rest is verification
+windows). The 120-day off-season window comfortably absorbs both #125 and
+this issue back-to-back.
 
-Suggested cadence:
-- Week 1: Phase A (schema foundation)
-- Week 2: Phase B (backfill missing contest rows + payout structures)
+Suggested cadence (after #125 has shipped):
+- Week 1: Phase A (schema foundation — smaller now, since `buy_in`/
+  `pot_source`/`fixed_pot` are dropped)
+- Week 2: Phase B (backfill missing contest rows + payout split structures)
 - Weeks 3–4: Phase C (write triggers + one-shot historical backfill +
   verification week)
-- Weeks 5–8: Phase D (switch reads one feature at a time, one per week,
+- Weeks 5–7: Phase D (switch reads one feature at a time, one per week,
   each behind a flag with a side-by-side verification log)
-- Week 9: Phase E (switch writes with mirror triggers; live for a week)
-- Week 10+ (between trips): Phase F (destructive cleanup)
+- Week 8: Phase E (switch writes with mirror triggers; live for a week)
+- Week 9+ (between trips): Phase F (destructive cleanup)
 
 ## Dependencies
 
+- **#125 must ship first.** This issue's plan assumes line items are the
+  source of truth for pot dollars.
 - Bridge layer (`payout_sheet_events.winner_source`) keeps the current
   surface working through every phase. No user-facing functionality
   pauses or breaks during the migration.

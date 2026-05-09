@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkPermissionAccess } from "@/lib/permissions-server";
+import { computeOptionCosts } from "@/lib/cost-items/compute";
 
 export async function GET(request: Request) {
   const admin = await checkPermissionAccess("manage_finances");
@@ -19,7 +20,9 @@ export async function GET(request: Request) {
     .order("sort_order");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ options: data || [] });
+  // Replace stored option costs with values computed from linked cost_items.
+  const options = await computeOptionCosts(adminClient, data || []);
+  return NextResponse.json({ options });
 }
 
 export async function POST(request: Request) {

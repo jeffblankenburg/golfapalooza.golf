@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { syncContestEnrollment } from "@/lib/option-contest-sync";
+import { syncContestEnrollment, syncCostItemContestEnrollment } from "@/lib/option-contest-sync";
 import { getEffectiveUserId } from "@/lib/simulator";
+import { computeOptionCosts } from "@/lib/cost-items/compute";
 
 function normalizeQuantityValue(
   raw: unknown,
@@ -97,12 +98,16 @@ export async function PUT(request: Request) {
   }
 
   // Load the option upfront so we can validate quantity-shaped values
-  const { data: option, error: optionError } = await adminClient
+  const { data: rawOption, error: optionError } = await adminClient
     .from("trip_options")
     .select("*")
     .eq("id", option_id)
     .single();
   if (optionError) return NextResponse.json({ error: optionError.message }, { status: 500 });
+
+  // Replace stored cost with the value computed from linked cost_items so the
+  // charge we record matches what the user saw on the options page.
+  const [option] = await computeOptionCosts(adminClient, [rawOption]);
 
   let value = rawValue;
   if (option.option_type === "quantity" && rawValue != null) {
@@ -142,7 +147,10 @@ export async function PUT(request: Request) {
 
   // If value is null (deletion), cascade-clear dependent options, sync contest enrollment, and we're done
   if (value === null || value === undefined) {
-    await syncContestEnrollment(adminClient, effectiveUserId, option, null);
+    await Promise.all([
+      syncContestEnrollment(adminClient, effectiveUserId, option, null),
+      syncCostItemContestEnrollment(adminClient, effectiveUserId, option_id, null),
+    ]);
 
     // Find options that depend on this one and clear their selections too
     const { data: dependents } = await adminClient
@@ -166,9 +174,10 @@ export async function PUT(request: Request) {
           .in("option_id", depIds)
           .eq("source", "option"),
         // Unenroll from each dependent's contest (can't batch — each has different contest_id)
-        ...dependents.map((dep) =>
-          syncContestEnrollment(adminClient, effectiveUserId, dep, null)
-        ),
+        ...dependents.flatMap((dep) => [
+          syncContestEnrollment(adminClient, effectiveUserId, dep, null),
+          syncCostItemContestEnrollment(adminClient, effectiveUserId, dep.id, null),
+        ]),
       ]);
     }
 
@@ -225,8 +234,11 @@ export async function PUT(request: Request) {
     if (chargeError) return NextResponse.json({ error: chargeError.message }, { status: 500 });
   }
 
-  // 4. Sync contest enrollment
-  await syncContestEnrollment(adminClient, effectiveUserId, option, value);
+  // 4. Sync contest enrollment (legacy linked_contest_id + new cost_item chain)
+  await Promise.all([
+    syncContestEnrollment(adminClient, effectiveUserId, option, value),
+    syncCostItemContestEnrollment(adminClient, effectiveUserId, option_id, value),
+  ]);
 
   return NextResponse.json({ success: true });
 }

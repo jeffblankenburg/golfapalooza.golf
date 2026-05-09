@@ -118,3 +118,79 @@ export async function syncContestEnrollment(
   }
   // text and number types: no contest linking
 }
+
+/**
+ * Sync `contest_participants` based on cost_item linkages — issue #124.
+ *
+ * Today's `syncContestEnrollment` (above) wires options → contests directly
+ * via `trip_options.linked_contest_id` / `choices[].contest_id`. The newer
+ * model wires options → cost_items → contests, where:
+ *   - `cost_items.linked_option_id` says which option funds the cost item
+ *   - `cost_item_option_choices(choice_value)` filters to specific choices
+ *     (empty rows = funded by any non-zero selection on the option)
+ *   - `contests.buy_in_cost_item_id` says which cost_item bankrolls the contest
+ *
+ * When a user changes their selection on `optionId`, this resolves every
+ * cost_item that fundable from that option, decides whether the user's value
+ * funds it, and upserts/deletes contest_participants for every contest whose
+ * buy-in cost_item matches.
+ *
+ * Idempotent. Can run alongside `syncContestEnrollment` — they upsert the
+ * same composite key with no conflicts.
+ */
+export async function syncCostItemContestEnrollment(
+  adminClient: SupabaseClient,
+  userId: string,
+  optionId: string,
+  value: unknown,
+): Promise<void> {
+  const { data: items } = await adminClient
+    .from("cost_items")
+    .select("id, choices:cost_item_option_choices(choice_value)")
+    .eq("linked_option_id", optionId);
+  if (!items || items.length === 0) return;
+
+  for (const item of items as Array<{ id: string; choices?: { choice_value: string }[] | null }>) {
+    const choices = item.choices || [];
+    const fundsThis = (() => {
+      if (choices.length === 0) return isYesValue(value);
+      const choiceSet = new Set(choices.map((c) => c.choice_value));
+      if (Array.isArray(value)) return (value as unknown[]).some((v) => typeof v === "string" && choiceSet.has(v));
+      if (typeof value === "string") return choiceSet.has(value);
+      // checkbox `true` against a choice-filtered cost_item is a config bug —
+      // we treat it as funded so admins notice rather than silently skip.
+      return value === true;
+    })();
+
+    const { data: contests } = await adminClient
+      .from("contests")
+      .select("id")
+      .eq("buy_in_cost_item_id", item.id);
+    if (!contests || contests.length === 0) continue;
+
+    for (const c of contests as Array<{ id: string }>) {
+      if (fundsThis) {
+        await adminClient
+          .from("contest_participants")
+          .upsert(
+            { contest_id: c.id, user_id: userId },
+            { onConflict: "contest_id,user_id" },
+          );
+      } else {
+        await adminClient
+          .from("contest_participants")
+          .delete()
+          .eq("contest_id", c.id)
+          .eq("user_id", userId);
+      }
+    }
+  }
+}
+
+function isYesValue(value: unknown): boolean {
+  if (value === true) return true;
+  if (typeof value === "string") return value !== "" && value !== "none";
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "number") return value > 0;
+  return false;
+}

@@ -6,9 +6,14 @@
 // `splitForRow` chooses a strategy per event kind so the bill mix matches
 // how the cash will actually be subdivided.
 
+import { computePayoutSplits, type PayoutSplit } from "./splits";
+
 export const ALL_DENOMS = [100, 50, 20, 10, 5, 2, 1] as const;
 
 export const DEFAULT_TEAM_SIZE = 4;
+// Legacy default 2nd-place flat. Used only when a row has no payout_splits
+// configured. New rows are seeded with the same value via the backfill
+// script and admin can edit per row in the modal.
 export const SCRAMBLE_2ND_PLACE_AMOUNT = 80;
 
 export function splitGreedy(
@@ -107,25 +112,31 @@ function splitSkins(total: number, allowed: readonly number[]): Map<number, numb
   return out;
 }
 
-// Scramble Team: pot − $80 to 1st-place team, $80 to 2nd-place team.
+// Scramble Team: per-place amounts come from the row's admin-configured
+// payout_splits (default for scramble_team: 1st = remainder, 2nd = $80 flat).
 // Each team is divided among `teamSize` members (default 4), so the bill
-// mix = teamSize × greedy(per-member 1st share) + teamSize × greedy(per-member 2nd share).
+// mix per place = teamSize × greedy(per-member share). Sum across all places.
 function splitScrambleTeam(
   total: number,
+  splits: PayoutSplit[] | null | undefined,
   allowed: readonly number[],
   teamSize: number = DEFAULT_TEAM_SIZE,
 ): Map<number, number> {
   if (total <= 0 || teamSize <= 0) return new Map();
-  const second = SCRAMBLE_2ND_PLACE_AMOUNT;
-  const first = Math.max(0, total - second);
-
-  const firstPerMember = Math.round((first / teamSize) * 100) / 100;
-  const secondPerMember = Math.round((second / teamSize) * 100) / 100;
-
-  const firstSplit = multiply(splitGreedy(firstPerMember, allowed), teamSize);
-  const secondSplit = multiply(splitGreedy(secondPerMember, allowed), teamSize);
-  return sumByDenom([firstSplit, secondSplit]);
+  const placeAmounts = computePayoutSplits(total, splits ?? DEFAULT_SCRAMBLE_TEAM_SPLITS);
+  const perPlaceMixes: Array<Map<number, number>> = [];
+  for (const [, amount] of placeAmounts) {
+    if (amount <= 0) continue;
+    const perMember = Math.round((amount / teamSize) * 100) / 100;
+    perPlaceMixes.push(multiply(splitGreedy(perMember, allowed), teamSize));
+  }
+  return sumByDenom(perPlaceMixes);
 }
+
+const DEFAULT_SCRAMBLE_TEAM_SPLITS: PayoutSplit[] = [
+  { place: 1, kind: "remainder" },
+  { place: 2, kind: "flat", amount: SCRAMBLE_2ND_PLACE_AMOUNT },
+];
 
 // Daily contests (CTP, LD, LP) pay out per day to one winner per day. Bill
 // mix = day_count × greedy(per-day amount).
@@ -145,6 +156,7 @@ export function splitForRow(
     participant_source: string;
     day_count: number;
     total: number;
+    payout_splits?: PayoutSplit[] | null;
   },
   allowedDenoms: readonly number[] = ALL_DENOMS,
   opts: { teamSize?: number } = {},
@@ -152,7 +164,7 @@ export function splitForRow(
   const kind = classifyForDenoms(row);
   switch (kind) {
     case "scramble_team":
-      return splitScrambleTeam(row.total, allowedDenoms, opts.teamSize ?? DEFAULT_TEAM_SIZE);
+      return splitScrambleTeam(row.total, row.payout_splits ?? null, allowedDenoms, opts.teamSize ?? DEFAULT_TEAM_SIZE);
     case "scramble_skins":
       return splitSkins(row.total, allowedDenoms);
     case "ctp":

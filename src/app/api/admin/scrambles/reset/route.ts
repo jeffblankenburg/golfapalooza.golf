@@ -69,7 +69,10 @@ export async function POST(request: Request) {
     }
 
     // 3. Delete scramble data per contest (cascades handle child tables:
-    //    scramble_teams -> scramble_team_members, scramble_hole_scores, bspitw_bonus_points)
+    //    scramble_teams -> scramble_team_members, scramble_hole_scores, bspitw_bonus_points).
+    //    NOTE: contest_participants is intentionally NOT cleared. Participation
+    //    is now driven by current option selections (issue #124) — wiping the
+    //    roster here would diverge from what Loozers actually paid for.
     for (const contestId of contestIds) {
       await adminClient
         .from("scramble_teams")
@@ -78,11 +81,6 @@ export async function POST(request: Request) {
 
       await adminClient
         .from("contest_hole_tees")
-        .delete()
-        .eq("contest_id", contestId);
-
-      await adminClient
-        .from("contest_participants")
         .delete()
         .eq("contest_id", contestId);
     }

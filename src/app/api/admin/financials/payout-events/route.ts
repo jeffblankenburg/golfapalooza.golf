@@ -81,6 +81,9 @@ export async function POST(request: Request) {
       is_payout,
       winner_source,
       winner_day_number,
+      cost_item_id,
+      payout_splits,
+      contest_id,
       notes,
     } = body;
 
@@ -92,27 +95,52 @@ export async function POST(request: Request) {
     }
 
     const adminClient = createAdminClient();
+
+    // When linked to a contest, contest-level fields write to the contest;
+    // the row's own copies start dead-letter (null). Without a contest the
+    // row holds them itself (Lodge-style pass-through).
+    const insertPayload: Record<string, unknown> = {
+      trip_id,
+      label,
+      sort_order: sort_order ?? 0,
+      participant_source,
+      source_ref: source_ref ?? null,
+      source_filter: source_filter ?? null,
+      amount_per_participant: amount_per_participant ?? 0,
+      day_count: day_count ?? 1,
+      is_payout: is_payout ?? true,
+      winner_source: winner_source ?? "none",
+      winner_day_number: winner_day_number ?? null,
+      contest_id: contest_id ?? null,
+      cost_item_id: contest_id ? null : (cost_item_id ?? null),
+      payout_splits: contest_id ? null : (payout_splits ?? null),
+      notes: notes ?? null,
+    };
+
     const { data, error } = await adminClient
       .from("payout_sheet_events")
-      .insert({
-        trip_id,
-        label,
-        sort_order: sort_order ?? 0,
-        participant_source,
-        source_ref: source_ref ?? null,
-        source_filter: source_filter ?? null,
-        amount_per_participant: amount_per_participant ?? 0,
-        day_count: day_count ?? 1,
-        is_payout: is_payout ?? true,
-        winner_source: winner_source ?? "none",
-        winner_day_number: winner_day_number ?? null,
-        notes: notes ?? null,
-      })
+      .insert(insertPayload)
       .select()
       .single();
-
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ row: data });
+
+    if (contest_id) {
+      const contestUpdates: Record<string, unknown> = {};
+      if (cost_item_id !== undefined) contestUpdates.buy_in_cost_item_id = cost_item_id;
+      if (payout_splits !== undefined) contestUpdates.payout_splits = payout_splits;
+      if (Object.keys(contestUpdates).length > 0) {
+        const { error: contestErr } = await adminClient
+          .from("contests")
+          .update(contestUpdates)
+          .eq("id", contest_id);
+        if (contestErr) return NextResponse.json({ error: contestErr.message }, { status: 500 });
+      }
+    }
+
+    // Re-load through loadPayoutSheet so the response carries the projected
+    // (contest-overridden) values.
+    const sheet = await loadPayoutSheet(adminClient, trip_id);
+    return NextResponse.json({ row: sheet.find((r) => r.id === data.id) ?? data });
   } catch (err) {
     console.error("Create payout event error:", err);
     return NextResponse.json({ error: "Failed to create row" }, { status: 500 });

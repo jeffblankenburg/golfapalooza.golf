@@ -1,10 +1,25 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { BTN_BACK, BTN_PRIMARY, BTN_DESTRUCTIVE } from "@/lib/ui/buttons";
-import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import { BTN_BACK, BTN_PRIMARY } from "@/lib/ui/buttons";
+import type { PayoutSplit, PayoutSplitKind } from "@/lib/payout-events/splits";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 type Source =
   | "option"
@@ -38,9 +53,18 @@ interface Row {
   is_payout: boolean;
   winner_source: WinnerSource | null;
   winner_day_number: number | null;
+  cost_item_id: string | null;
+  payout_splits: PayoutSplit[] | null;
   notes: string | null;
   participant_count: number;
   total: number;
+  contest_id: string | null;
+  contest: {
+    id: string;
+    name: string;
+    contest_type: string;
+    day_number: number | null;
+  } | null;
 }
 
 interface OptionRef {
@@ -52,6 +76,14 @@ interface ContestRef {
   id: string;
   name: string;
   contest_type: string;
+  day_number?: number | null;
+}
+interface CostItemRef {
+  id: string;
+  name: string;
+  cost: number;
+  category: string | null;
+  sort_order: number;
 }
 
 const SOURCE_LABELS: Record<Source, string> = {
@@ -64,14 +96,14 @@ const SOURCE_LABELS: Record<Source, string> = {
 };
 
 const WINNER_SOURCE_LABELS: Record<WinnerSource, string> = {
-  scramble_team: "Scramble team (gross score top 2)",
-  scramble_skins: "Skins (computed)",
+  scramble_team: "Scramble team",
+  scramble_skins: "Skins",
   ctp_front: "Closest to Pin — Front",
   ctp_back: "Closest to Pin — Back",
   long_drive: "Long Drive",
   long_putt: "Long Putt",
-  hundred_feet: "100 Feet (lowest total)",
-  pickem: "Pick'em rankings",
+  hundred_feet: "100 Feet",
+  pickem: "Pick'em",
   none: "None — pass-through cash",
 };
 
@@ -82,8 +114,41 @@ const WINNER_NEEDS_DAY: Set<WinnerSource> = new Set([
   "long_putt",
 ]);
 
+// Default split structure when admin first picks a winner_source. Admin can
+// edit any of these in the modal — these are just sensible starting points.
+// Mirrors scripts/backfill-payout-splits.mjs.
+const DEFAULT_SPLITS_BY_KIND: Record<WinnerSource, PayoutSplit[] | null> = {
+  scramble_team: [
+    { place: 1, kind: "remainder" },
+    { place: 2, kind: "flat", amount: 80 },
+  ],
+  scramble_skins: [{ place: 1, kind: "skins_proportional" }],
+  ctp_front: [{ place: 1, kind: "single_winner" }],
+  ctp_back: [{ place: 1, kind: "single_winner" }],
+  long_drive: [{ place: 1, kind: "single_winner" }],
+  long_putt: [{ place: 1, kind: "single_winner" }],
+  hundred_feet: [{ place: 1, kind: "single_winner" }],
+  pickem: null,
+  none: null,
+};
+
+const SPLIT_KIND_LABELS: Record<PayoutSplitKind, string> = {
+  remainder: "Remainder",
+  flat: "Flat $",
+  percentage: "Percentage %",
+  single_winner: "Single winner (full pot)",
+  skins_proportional: "Skins-proportional (calcSkins)",
+};
+
+
 const fmt = (n: number) =>
-  n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: n % 1 === 0 ? 0 : 2 });
+  n.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: n % 1 === 0 ? 0 : 2,
+  });
+
+type ModalState = { mode: "add" } | { mode: "edit"; row: Row } | null;
 
 export default function PayoutEventsAdminPage() {
   const router = useRouter();
@@ -92,9 +157,15 @@ export default function PayoutEventsAdminPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [options, setOptions] = useState<OptionRef[]>([]);
   const [contests, setContests] = useState<ContestRef[]>([]);
+  const [costItems, setCostItems] = useState<CostItemRef[]>([]);
   const [tripId, setTripId] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<Row | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [modal, setModal] = useState<ModalState>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+  );
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -116,9 +187,10 @@ export default function PayoutEventsAdminPage() {
     setTripId(data.trip_id || null);
 
     if (data.trip_id) {
-      const [optsRes, contestsRes] = await Promise.all([
+      const [optsRes, contestsRes, costRes] = await Promise.all([
         fetch(`/api/admin/options?trip_id=${data.trip_id}`).catch(() => null),
         fetch(`/api/admin/contests?trip_id=${data.trip_id}`).catch(() => null),
+        fetch(`/api/admin/financials/cost-items?trip_id=${data.trip_id}`).catch(() => null),
       ]);
       if (optsRes && optsRes.ok) {
         const od = await optsRes.json();
@@ -128,6 +200,10 @@ export default function PayoutEventsAdminPage() {
         const cd = await contestsRes.json();
         setContests(cd.contests || []);
       }
+      if (costRes && costRes.ok) {
+        const ci = await costRes.json();
+        setCostItems(ci.items || []);
+      }
     }
     setLoading(false);
   }, []);
@@ -136,53 +212,121 @@ export default function PayoutEventsAdminPage() {
     if (allowed) fetchAll();
   }, [allowed, fetchAll]);
 
-  async function patchRow(id: string, patch: Partial<Row>) {
-    const r = await fetch(`/api/admin/financials/payout-events/${id}`, {
+  async function saveRow(id: string, patch: Partial<Row>) {
+    const before = rows.find((r) => r.id === id);
+    let displayPatch: Partial<Row> = patch;
+    if ("cost_item_id" in patch && patch.cost_item_id) {
+      const ci = costItems.find((c) => c.id === patch.cost_item_id);
+      if (ci) displayPatch = { ...patch, amount_per_participant: Number(ci.cost) };
+    }
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r.id !== id) return r;
+        const merged = { ...r, ...displayPatch };
+        const total =
+          Math.round(
+            Number(merged.amount_per_participant || 0) *
+              merged.participant_count *
+              (merged.day_count || 1) *
+              100,
+          ) / 100;
+        return { ...merged, total };
+      }),
+    );
+    const res = await fetch(`/api/admin/financials/payout-events/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     });
-    if (!r.ok) {
-      const err = await r.json().catch(() => ({}));
+    if (!res.ok) {
+      if (before) setRows((prev) => prev.map((r) => (r.id === id ? before : r)));
+      const err = await res.json().catch(() => ({}));
       setErrorMsg(err.error || "Save failed");
       return;
     }
     setErrorMsg(null);
-    await fetchAll();
   }
 
-  async function addRow() {
+  async function createRow(patch: Partial<Row>) {
     if (!tripId) return;
     const sortMax = rows.reduce((m, r) => Math.max(m, r.sort_order), 0);
-    const r = await fetch("/api/admin/financials/payout-events", {
+    const res = await fetch("/api/admin/financials/payout-events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         trip_id: tripId,
-        label: "New event",
         sort_order: sortMax + 10,
         participant_source: "manual",
         amount_per_participant: 0,
         day_count: 1,
         is_payout: true,
+        ...patch,
       }),
     });
-    if (!r.ok) {
-      const err = await r.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
       setErrorMsg(err.error || "Create failed");
       return;
     }
+    const data = await res.json();
+    if (data.row) {
+      setRows((prev) => [...prev, { ...data.row, participant_count: 0, total: 0 }]);
+    }
     setErrorMsg(null);
-    await fetchAll();
+    setModal(null);
   }
 
   async function deleteRow(id: string) {
-    const r = await fetch(`/api/admin/financials/payout-events/${id}`, { method: "DELETE" });
-    if (!r.ok) { setErrorMsg("Delete failed"); return; }
+    const before = rows;
+    setRows((prev) => prev.filter((r) => r.id !== id));
+    setModal(null);
+    const res = await fetch(`/api/admin/financials/payout-events/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      setRows(before);
+      setErrorMsg("Delete failed");
+      return;
+    }
     setErrorMsg(null);
-    setConfirmDelete(null);
-    await fetchAll();
   }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const sorted = [...rows].sort((a, b) => a.sort_order - b.sort_order);
+    const oldIdx = sorted.findIndex((r) => r.id === active.id);
+    const newIdx = sorted.findIndex((r) => r.id === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+    const reordered = [...sorted];
+    const [moved] = reordered.splice(oldIdx, 1);
+    reordered.splice(newIdx, 0, moved);
+    const newSortById = new Map(reordered.map((r, i) => [r.id, i * 10]));
+    const before = rows;
+    setRows((prev) =>
+      prev.map((r) => (newSortById.has(r.id) ? { ...r, sort_order: newSortById.get(r.id)! } : r)),
+    );
+    try {
+      await Promise.all(
+        reordered.map((r, i) =>
+          fetch(`/api/admin/financials/payout-events/${r.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sort_order: i * 10 }),
+          }).then((res) => {
+            if (!res.ok) throw new Error("reorder save failed");
+          }),
+        ),
+      );
+      setErrorMsg(null);
+    } catch {
+      setRows(before);
+      setErrorMsg("Reorder save failed");
+    }
+  }
+
+  const visibleRows = useMemo(
+    () => rows.slice().sort((a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label)),
+    [rows],
+  );
 
   if (!allowed) {
     return (
@@ -192,18 +336,22 @@ export default function PayoutEventsAdminPage() {
     );
   }
 
-  const grandTotal = rows.reduce((s, r) => s + (r.total || 0), 0);
-
   return (
-    <div className="px-4 pt-6 pb-8 space-y-4">
+    <div className="px-4 pt-6 pb-8 space-y-3">
       <Link href="/admin/financials" className={BTN_BACK}>← Financials</Link>
-      <div className="flex items-center justify-between">
+
+      <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-gray-900">Payout Events</h1>
-        <button type="button" onClick={addRow} className={BTN_PRIMARY}>+ Add row</button>
+        <button
+          type="button"
+          onClick={() => setModal({ mode: "add" })}
+          className={`${BTN_PRIMARY} whitespace-nowrap`}
+        >
+          + Add
+        </button>
       </div>
-      <p className="text-sm text-gray-500">
-        Defines the columns of the cash-needed sheet. Live totals reflect current
-        option selections, scramble rosters, and Pick&apos;em payment status.
+      <p className="text-xs text-gray-500 -mt-1">
+        Defines the cash-needed sheet. Live totals reflect option selections, scramble rosters, and Pick&apos;em payments.
       </p>
 
       {errorMsg && (
@@ -217,104 +365,237 @@ export default function PayoutEventsAdminPage() {
         <div className="flex justify-center py-12">
           <div className="w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : rows.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-8">
-          No rows yet. Run <code className="px-1 bg-gray-100 rounded">node scripts/seed-payout-sheet-events.mjs</code> to populate.
-        </p>
-      ) : (
-        <div className="space-y-3">
-          {rows.map((row) => (
-            <RowCard
-              key={row.id}
-              row={row}
-              options={options}
-              contests={contests}
-              onPatch={(patch) => patchRow(row.id, patch)}
-              onDelete={() => setConfirmDelete(row)}
-            />
-          ))}
-
-          <div className="flex justify-end px-2 py-3 border-t border-gray-200 mt-2">
-            <span className="text-sm text-gray-500 mr-2">Grand total:</span>
-            <span className="text-lg font-bold text-gray-900 tabular-nums">{fmt(grandTotal)}</span>
-          </div>
+      ) : visibleRows.length === 0 ? (
+        <div className="text-sm text-gray-400 text-center py-12 border border-dashed border-gray-200 rounded-2xl">
+          No events yet. Click <strong className="text-gray-600">+ Add</strong> to start.
         </div>
+      ) : (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={visibleRows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
+              {visibleRows.map((row) => (
+                <ItemRow
+                  key={row.id}
+                  row={row}
+                  costItems={costItems}
+                  onClick={() => setModal({ mode: "edit", row })}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
-      {confirmDelete && (
-        <ConfirmModal
-          open
-          title={`Delete "${confirmDelete.label}"?`}
-          message="This row is removed from every payout view."
-          confirmLabel="Delete"
-          destructive
-          onConfirm={() => deleteRow(confirmDelete.id)}
-          onCancel={() => setConfirmDelete(null)}
+      {modal !== null && (
+        <PayoutEventModal
+          state={modal}
+          options={options}
+          contests={contests}
+          costItems={costItems}
+          onCancel={() => setModal(null)}
+          onCreate={createRow}
+          onSave={saveRow}
+          onDelete={deleteRow}
         />
       )}
     </div>
   );
 }
 
-function RowCard({
+function ItemRow({
   row,
-  options,
-  contests,
-  onPatch,
-  onDelete,
+  costItems,
+  onClick,
 }: {
   row: Row;
+  costItems: CostItemRef[];
+  onClick: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: row.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+  const linked = row.cost_item_id ? costItems.find((c) => c.id === row.cost_item_id) : null;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-1.5 px-2 py-2 active:bg-gray-50 hover:bg-gray-50 transition-colors cursor-pointer"
+      onClick={onClick}
+    >
+      <div
+        {...listeners}
+        {...attributes}
+        onClick={(e) => e.stopPropagation()}
+        className="touch-none p-1 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing flex-shrink-0"
+        aria-label="Drag to reorder"
+      >
+        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+          <circle cx="5" cy="3" r="1.5" />
+          <circle cx="11" cy="3" r="1.5" />
+          <circle cx="5" cy="8" r="1.5" />
+          <circle cx="11" cy="8" r="1.5" />
+          <circle cx="5" cy="13" r="1.5" />
+          <circle cx="11" cy="13" r="1.5" />
+        </svg>
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="font-medium text-gray-900 text-sm">{row.label}</span>
+          {!row.is_payout && (
+            <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[9px] font-semibold uppercase tracking-wide">
+              pass-through
+            </span>
+          )}
+          {linked && (
+            <span className="px-1.5 py-0.5 rounded bg-green-50 text-green-700 text-[9px] font-semibold uppercase tracking-wide" title={`Linked to: ${linked.name}`}>
+              linked
+            </span>
+          )}
+        </div>
+        <div className="text-[10px] text-gray-400 mt-0.5 tabular-nums">
+          {row.participant_count} × {fmt(row.amount_per_participant)}
+        </div>
+      </div>
+
+      <div className="text-base font-bold text-gray-900 tabular-nums shrink-0">
+        {fmt(row.total)}
+      </div>
+      <svg className="w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+    </div>
+  );
+}
+
+function PayoutEventModal({
+  state,
+  options,
+  contests,
+  costItems,
+  onCancel,
+  onCreate,
+  onSave,
+  onDelete,
+}: {
+  state: NonNullable<ModalState>;
   options: OptionRef[];
   contests: ContestRef[];
-  onPatch: (patch: Partial<Row>) => void | Promise<void>;
-  onDelete: () => void;
+  costItems: CostItemRef[];
+  onCancel: () => void;
+  onCreate: (patch: Partial<Row>) => Promise<void>;
+  onSave: (id: string, patch: Partial<Row>) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
-  const [label, setLabel] = useState(row.label);
-  const [amount, setAmount] = useState(String(row.amount_per_participant));
-  const [days, setDays] = useState(String(row.day_count));
-  const [sortOrder, setSortOrder] = useState(String(row.sort_order));
-  const [notes, setNotes] = useState(row.notes || "");
+  const isEdit = state.mode === "edit";
+  const initial = isEdit ? state.row : null;
 
-  const src = row.participant_source;
-  const sourceOptions: Array<[Source, string]> = (Object.entries(SOURCE_LABELS) as Array<[Source, string]>);
+  const [label, setLabel] = useState(initial?.label ?? "");
+  const [contestId, setContestId] = useState<string | null>(initial?.contest_id ?? null);
+  const [costItemId, setCostItemId] = useState<string | null>(initial?.cost_item_id ?? null);
+  const [participantSource, setParticipantSource] = useState<Source>(initial?.participant_source ?? "manual");
+  const [sourceRef, setSourceRef] = useState<string | null>(initial?.source_ref ?? null);
+  const [sourceFilter, setSourceFilter] = useState<{ choice_values?: string[]; count?: number } | null>(initial?.source_filter ?? null);
+  const [winnerSource, setWinnerSource] = useState<WinnerSource>(initial?.winner_source ?? "none");
+  const [winnerDay, setWinnerDay] = useState<number | null>(initial?.winner_day_number ?? null);
+  const [payoutSplits, setPayoutSplits] = useState<PayoutSplit[] | null>(initial?.payout_splits ?? null);
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [saving, setSaving] = useState(false);
 
+  const linkedContest = contestId ? contests.find((c) => c.id === contestId) : null;
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  const linkedCostItem = costItemId ? costItems.find((c) => c.id === costItemId) : null;
+
+  const canSave = label.trim().length > 0 && !saving;
+
+  async function handleSave() {
+    if (!canSave) return;
+    setSaving(true);
+    const patch: Partial<Row> = {
+      label: label.trim(),
+      contest_id: contestId,
+      cost_item_id: costItemId,
+      // amount_per_participant only sent on create (and only as 0 fallback);
+      // linked rows derive their amount from cost_items at read time.
+      day_count: 1,
+      is_payout: winnerSource !== "none",
+      participant_source: participantSource,
+      source_ref: sourceRef,
+      source_filter: sourceFilter,
+      winner_source: winnerSource,
+      winner_day_number: WINNER_NEEDS_DAY.has(winnerSource) ? winnerDay : null,
+      payout_splits: payoutSplits,
+      notes: notes.trim() ? notes.trim() : null,
+    };
+    if (isEdit && initial) {
+      await onSave(initial.id, patch);
+    } else {
+      // For create, include the fallback amount when no cost item is linked.
+      await onCreate({
+        ...patch,
+        amount_per_participant: linkedCostItem ? Number(linkedCostItem.cost) : 0,
+      });
+    }
+    setSaving(false);
+  }
+
+  async function handleDelete() {
+    if (!isEdit || !initial) return;
+    setSaving(true);
+    await onDelete(initial.id);
+  }
+
+  // When admin changes the participant source, clear source_ref + source_filter
+  function changeParticipantSource(next: Source) {
+    setParticipantSource(next);
+    setSourceRef(null);
+    setSourceFilter(null);
+  }
+
+  // Source-ref picker depending on participant_source
   const sourceRefPicker = (() => {
-    if (src === "option" || src === "option_value") {
+    if (participantSource === "option" || participantSource === "option_value") {
       return (
         <select
-          value={row.source_ref || ""}
-          onChange={(e) => onPatch({ source_ref: e.target.value || null })}
-          className="border border-gray-300 rounded-md px-2 py-1 text-sm bg-white"
+          value={sourceRef || ""}
+          onChange={(e) => setSourceRef(e.target.value || null)}
+          className="border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white"
         >
-          <option value="">—</option>
+          <option value="">— pick option —</option>
           {options.map((o) => (
             <option key={o.id} value={o.id}>{o.name}</option>
           ))}
         </select>
       );
     }
-    if (src === "scramble") {
+    if (participantSource === "scramble") {
       return (
         <select
-          value={row.source_ref || ""}
-          onChange={(e) => onPatch({ source_ref: e.target.value || null })}
-          className="border border-gray-300 rounded-md px-2 py-1 text-sm bg-white"
+          value={sourceRef || ""}
+          onChange={(e) => setSourceRef(e.target.value || null)}
+          className="border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white"
         >
-          <option value="">—</option>
+          <option value="">— pick scramble —</option>
           {contests.filter((c) => c.contest_type === "scramble").map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
       );
     }
-    if (src === "pickem_payments") {
+    if (participantSource === "pickem_payments") {
       return (
         <select
-          value={row.source_ref || ""}
-          onChange={(e) => onPatch({ source_ref: e.target.value || null })}
-          className="border border-gray-300 rounded-md px-2 py-1 text-sm bg-white"
+          value={sourceRef || ""}
+          onChange={(e) => setSourceRef(e.target.value || null)}
+          className="border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white"
         >
-          <option value="">—</option>
+          <option value="">— pick pickem contest —</option>
           {contests.filter((c) => c.contest_type === "pickem").map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
@@ -325,37 +606,40 @@ function RowCard({
   })();
 
   const filterEditor = (() => {
-    if (src === "option_value") {
-      const opt = options.find((o) => o.id === row.source_ref);
-      const selected = new Set(row.source_filter?.choice_values || []);
+    if (participantSource === "option_value") {
+      const opt = options.find((o) => o.id === sourceRef);
+      const selected = new Set(sourceFilter?.choice_values || []);
+      if (!opt) {
+        return <span className="text-xs text-gray-400">Pick the option above first.</span>;
+      }
       return (
         <div className="flex flex-wrap gap-1.5">
-          {(opt?.choices || []).map((ch) => (
+          {(opt.choices || []).map((ch) => (
             <label key={ch.value} className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-gray-50 rounded border border-gray-200">
               <input
                 type="checkbox"
                 checked={selected.has(ch.value)}
                 onChange={(e) => {
                   const next = new Set(selected);
-                  if (e.target.checked) next.add(ch.value); else next.delete(ch.value);
-                  onPatch({ source_filter: { choice_values: [...next] } });
+                  if (e.target.checked) next.add(ch.value);
+                  else next.delete(ch.value);
+                  setSourceFilter({ choice_values: [...next] });
                 }}
               />
               {ch.label}
             </label>
           ))}
-          {!opt && <span className="text-xs text-gray-400">Pick an option above first.</span>}
         </div>
       );
     }
-    if (src === "manual") {
+    if (participantSource === "manual") {
       return (
         <input
           type="number"
           min={0}
-          value={row.source_filter?.count ?? 0}
-          onChange={(e) => onPatch({ source_filter: { count: Number(e.target.value) || 0 } })}
-          className="border border-gray-300 rounded-md px-2 py-1 text-sm w-24"
+          value={sourceFilter?.count ?? 0}
+          onChange={(e) => setSourceFilter({ count: Number(e.target.value) || 0 })}
+          className="border border-gray-300 rounded-md px-2 py-1.5 text-sm w-28"
           placeholder="count"
         />
       );
@@ -364,129 +648,327 @@ function RowCard({
   })();
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <input
-            type="text"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            onBlur={() => label !== row.label && onPatch({ label })}
-            className="w-full text-base font-bold text-gray-900 border-b border-transparent focus:border-gray-300 focus:outline-none"
-          />
-          <p className="text-[11px] text-gray-400 mt-0.5">
-            {row.participant_count} × {fmt(row.amount_per_participant)} × {row.day_count} day{row.day_count !== 1 ? "s" : ""} = <span className="font-semibold text-gray-900">{fmt(row.total)}</span>
-            {!row.is_payout && <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 uppercase tracking-wide">pass-through</span>}
-          </p>
+    <div className="fixed top-14 left-0 right-0 z-35 flex items-end justify-center bottom-[calc(4rem+env(safe-area-inset-bottom))]">
+      <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
+      <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up max-h-full flex flex-col">
+        <div className="px-6 pt-5 pb-3 border-b border-gray-100 shrink-0">
+          <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900">
+            {isEdit ? "Edit payout event" : "New payout event"}
+          </h2>
         </div>
-        <button type="button" onClick={onDelete} className={BTN_DESTRUCTIVE}>Delete</button>
-      </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-        <label className="flex flex-col">
-          <span className="text-gray-500 uppercase tracking-wide text-[10px] mb-0.5">$/Person</span>
-          <input
-            type="number"
-            step="0.01"
-            min={0}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            onBlur={() => Number(amount) !== row.amount_per_participant && onPatch({ amount_per_participant: Number(amount) || 0 })}
-            className="border border-gray-300 rounded-md px-2 py-1 bg-white"
-          />
-        </label>
-        <label className="flex flex-col">
-          <span className="text-gray-500 uppercase tracking-wide text-[10px] mb-0.5">Days</span>
-          <input
-            type="number"
-            min={1}
-            value={days}
-            onChange={(e) => setDays(e.target.value)}
-            onBlur={() => Number(days) !== row.day_count && onPatch({ day_count: Number(days) || 1 })}
-            className="border border-gray-300 rounded-md px-2 py-1 bg-white"
-          />
-        </label>
-        <label className="flex flex-col">
-          <span className="text-gray-500 uppercase tracking-wide text-[10px] mb-0.5">Sort</span>
-          <input
-            type="number"
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value)}
-            onBlur={() => Number(sortOrder) !== row.sort_order && onPatch({ sort_order: Number(sortOrder) || 0 })}
-            className="border border-gray-300 rounded-md px-2 py-1 bg-white"
-          />
-        </label>
-        <label className="flex flex-col">
-          <span className="text-gray-500 uppercase tracking-wide text-[10px] mb-0.5">Type</span>
-          <select
-            value={row.is_payout ? "payout" : "passthrough"}
-            onChange={(e) => onPatch({ is_payout: e.target.value === "payout" })}
-            className="border border-gray-300 rounded-md px-2 py-1 bg-white"
-          >
-            <option value="payout">Payout</option>
-            <option value="passthrough">Pass-through</option>
-          </select>
-        </label>
-      </div>
+        <div className="px-6 py-4 space-y-4 overflow-y-auto">
+          <label className="flex flex-col">
+            <span className="text-gray-500 uppercase tracking-wide text-[10px] mb-0.5">Label</span>
+            <input
+              type="text"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              autoFocus={!isEdit}
+              placeholder="e.g. Thursday Skins"
+              className="border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white"
+            />
+          </label>
 
-      <div className="space-y-1.5">
-        <span className="text-gray-500 uppercase tracking-wide text-[10px]">Participant source</span>
-        <div className="flex flex-wrap gap-2 items-center">
-          <select
-            value={src}
-            onChange={(e) => onPatch({ participant_source: e.target.value as Source, source_ref: null, source_filter: null })}
-            className="border border-gray-300 rounded-md px-2 py-1 text-sm bg-white"
-          >
-            {sourceOptions.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
-          {sourceRefPicker}
-        </div>
-        {filterEditor && <div className="mt-1.5">{filterEditor}</div>}
-      </div>
-
-      <div className="space-y-1.5">
-        <span className="text-gray-500 uppercase tracking-wide text-[10px]">Winner source</span>
-        <div className="flex flex-wrap gap-2 items-center">
-          <select
-            value={row.winner_source ?? "none"}
-            onChange={(e) => {
-              const next = e.target.value as WinnerSource;
-              const patch: Partial<Row> = { winner_source: next };
-              if (!WINNER_NEEDS_DAY.has(next)) patch.winner_day_number = null;
-              onPatch(patch);
-            }}
-            className="border border-gray-300 rounded-md px-2 py-1 text-sm bg-white"
-          >
-            {(Object.entries(WINNER_SOURCE_LABELS) as Array<[WinnerSource, string]>).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
-            ))}
-          </select>
-          {row.winner_source && WINNER_NEEDS_DAY.has(row.winner_source) && (
+          {/* Contest — when linked, the contest determines who pays
+              (via cost item links), who wins (via contest_type + day),
+              and seeds the payout splits. */}
+          <label className="flex flex-col">
+            <span className="text-gray-500 uppercase tracking-wide text-[10px] mb-0.5">Contest</span>
             <select
-              value={row.winner_day_number ?? ""}
-              onChange={(e) => onPatch({ winner_day_number: e.target.value ? Number(e.target.value) : null })}
-              className="border border-gray-300 rounded-md px-2 py-1 text-sm bg-white"
+              value={contestId ?? ""}
+              onChange={(e) => setContestId(e.target.value || null)}
+              className="border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white"
             >
-              <option value="">— pick day —</option>
-              <option value="2">Thursday (day 2)</option>
-              <option value="3">Friday (day 3)</option>
-              <option value="4">Saturday (day 4)</option>
+              <option value="">— none (pass-through cash) —</option>
+              {contests
+                .slice()
+                .sort((a, b) => (a.day_number ?? 99) - (b.day_number ?? 99) || a.name.localeCompare(b.name))
+                .map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
             </select>
+            {linkedContest && (
+              <span className="text-[10px] text-gray-400 mt-1">
+                Type: {linkedContest.contest_type}.
+                Edits to cost item and payout splits below save to this contest.
+              </span>
+            )}
+            {!linkedContest && (
+              <span className="text-[10px] text-gray-400 mt-1">
+                No contest = pass-through cash (e.g. Lodge nights). Configure who pays
+                and how it&apos;s distributed manually below.
+              </span>
+            )}
+          </label>
+
+          <label className="flex flex-col">
+            <span className="text-gray-500 uppercase tracking-wide text-[10px] mb-0.5">Cost item</span>
+            <select
+              value={costItemId ?? ""}
+              onChange={(e) => setCostItemId(e.target.value || null)}
+              className="border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white"
+            >
+              <option value="">— none —</option>
+              {costItems
+                .slice()
+                .sort((a, b) => (a.category || "zzz").localeCompare(b.category || "zzz") || a.sort_order - b.sort_order || a.name.localeCompare(b.name))
+                .map((ci) => (
+                  <option key={ci.id} value={ci.id}>
+                    {ci.name} — {fmt(Number(ci.cost))}
+                  </option>
+                ))}
+            </select>
+            {linkedCostItem && (
+              <span className="text-[10px] text-gray-400 mt-1">
+                $/Person comes from this cost item ({fmt(Number(linkedCostItem.cost))}). Edit on the Cost Items page.
+              </span>
+            )}
+          </label>
+
+          {/* Participant source — only relevant for pass-through rows
+              (no contest). When a contest is linked, who-pays comes from
+              the cost item's option/choice links. */}
+          {!linkedContest && (
+            <div className="space-y-2">
+              <span className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Who pays / participates</span>
+              <select
+                value={participantSource}
+                onChange={(e) => changeParticipantSource(e.target.value as Source)}
+                className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white"
+              >
+                {(Object.entries(SOURCE_LABELS) as Array<[Source, string]>).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+              {sourceRefPicker && <div>{sourceRefPicker}</div>}
+              {filterEditor && <div>{filterEditor}</div>}
+            </div>
+          )}
+
+          {/* Winner source — same story. Hidden when a contest is linked,
+              because contest_type + day_number already say which winner-
+              determination logic applies. */}
+          {!linkedContest && (
+            <div className="space-y-2">
+              <span className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Who wins</span>
+              <select
+                value={winnerSource}
+                onChange={(e) => {
+                  const next = e.target.value as WinnerSource;
+                  setWinnerSource(next);
+                  if (!WINNER_NEEDS_DAY.has(next)) setWinnerDay(null);
+                  // Seed default payout splits when switching kinds (admin can
+                  // edit further). null = no payout (Pickem uses pickem_settings).
+                  setPayoutSplits(DEFAULT_SPLITS_BY_KIND[next] ? structuredClone(DEFAULT_SPLITS_BY_KIND[next]!) : null);
+                }}
+                className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white"
+              >
+                {(Object.entries(WINNER_SOURCE_LABELS) as Array<[WinnerSource, string]>).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+              {WINNER_NEEDS_DAY.has(winnerSource) && (
+                <select
+                  value={winnerDay ?? ""}
+                  onChange={(e) => setWinnerDay(e.target.value ? Number(e.target.value) : null)}
+                  className="border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white"
+                >
+                  <option value="">— pick day —</option>
+                  <option value="2">Thursday (day 2)</option>
+                  <option value="3">Friday (day 3)</option>
+                  <option value="4">Saturday (day 4)</option>
+                </select>
+              )}
+            </div>
+          )}
+
+          {/* Payout splits — how the pot divides among places. Always
+              visible when there's a payout; saves to the contest when
+              one is linked, otherwise to the row. */}
+          {payoutSplits !== null && (
+            <PayoutSplitsEditor
+              splits={payoutSplits}
+              onChange={setPayoutSplits}
+            />
+          )}
+          {linkedContest && payoutSplits === null && (
+            <button
+              type="button"
+              onClick={() => setPayoutSplits([{ place: 1, kind: "single_winner" }])}
+              className="text-xs text-green-700 underline"
+            >
+              + Add payout splits
+            </button>
+          )}
+
+          <label className="flex flex-col">
+            <span className="text-gray-500 uppercase tracking-wide text-[10px] mb-0.5">Notes</span>
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="(optional)"
+              className="border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white"
+            />
+          </label>
+
+          {isEdit && (
+            <div className="pt-3 mt-3 border-t border-gray-100">
+              {!confirmingDelete ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(true)}
+                  disabled={saving}
+                  className="w-full py-2 rounded-lg text-sm font-medium text-red-600 bg-red-50 border border-red-200 active:bg-red-100"
+                >
+                  Delete this event
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-red-700 px-1">
+                    Permanently delete &ldquo;{initial?.label}&rdquo;?
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDelete}
+                      disabled={saving}
+                      className="flex-1 py-2 rounded-lg text-sm font-semibold text-white bg-red-600 active:opacity-80"
+                    >
+                      Confirm delete
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingDelete(false)}
+                      disabled={saving}
+                      className="flex-1 py-2 rounded-lg text-sm font-medium text-gray-600 border border-gray-300 active:bg-gray-50"
+                    >
+                      Keep
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
-      </div>
 
-      <label className="flex flex-col">
-        <span className="text-gray-500 uppercase tracking-wide text-[10px] mb-0.5">Notes</span>
-        <input
-          type="text"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          onBlur={() => notes !== (row.notes || "") && onPatch({ notes: notes || null })}
-          className="border border-gray-300 rounded-md px-2 py-1 text-sm bg-white"
-          placeholder="(optional)"
-        />
-      </label>
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!canSave}
+            className={`flex-1 py-3 rounded-xl font-semibold text-[15px] active:opacity-80 ${
+              canSave ? "bg-green-600 text-white" : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            }`}
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={saving}
+            className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600 active:bg-gray-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
+
+function PayoutSplitsEditor({
+  splits,
+  onChange,
+}: {
+  splits: PayoutSplit[];
+  onChange: (next: PayoutSplit[]) => void;
+}) {
+  function updateSplit(idx: number, patch: Partial<PayoutSplit>) {
+    onChange(splits.map((s, i) => (i === idx ? { ...s, ...patch } : s)));
+  }
+  function removeSplit(idx: number) {
+    onChange(splits.filter((_, i) => i !== idx));
+  }
+  function addSplit() {
+    const nextPlace = (splits.reduce((m, s) => Math.max(m, s.place), 0) || 0) + 1;
+    onChange([...splits, { place: nextPlace, kind: "flat", amount: 0 }]);
+  }
+
+  return (
+    <div className="space-y-2">
+      <span className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+        Payout splits
+      </span>
+      <div className="space-y-1.5">
+        {splits.map((s, idx) => {
+          const showAmount = s.kind === "flat" || s.kind === "percentage";
+          return (
+            <div key={idx} className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                value={s.place}
+                onChange={(e) => updateSplit(idx, { place: Number(e.target.value) || 1 })}
+                className="w-12 border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white tabular-nums"
+              />
+              <select
+                value={s.kind}
+                onChange={(e) => {
+                  const nextKind = e.target.value as PayoutSplitKind;
+                  const nextAmount = nextKind === "flat" || nextKind === "percentage" ? (s.amount ?? 0) : undefined;
+                  updateSplit(idx, { kind: nextKind, amount: nextAmount });
+                }}
+                className="flex-1 border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white"
+              >
+                {(Object.entries(SPLIT_KIND_LABELS) as Array<[PayoutSplitKind, string]>).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+              {showAmount ? (
+                <input
+                  type="number"
+                  step={s.kind === "percentage" ? "0.01" : "1"}
+                  min={0}
+                  value={s.amount ?? 0}
+                  onChange={(e) => updateSplit(idx, { amount: Number(e.target.value) || 0 })}
+                  className="w-20 border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white tabular-nums"
+                  placeholder={s.kind === "flat" ? "$" : "%"}
+                />
+              ) : (
+                <span className="w-20 text-xs text-gray-300 text-center">—</span>
+              )}
+              <button
+                type="button"
+                onClick={() => removeSplit(idx)}
+                title="Remove this split"
+                className="p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={addSplit}
+        className="text-[11px] text-green-700 font-medium active:opacity-70"
+      >
+        + Add place
+      </button>
+      {splits.length > 0 && (
+        <div className="text-[10px] text-gray-400 leading-snug">
+          Place numbers indicate finishing position (1 = winner, 2 = runner-up, …).{" "}
+          Splits are applied in order: flat amounts and percentages take their cut first,
+          then <em>Remainder</em> absorbs whatever&apos;s left.
+        </div>
+      )}
+    </div>
+  );
+}
+

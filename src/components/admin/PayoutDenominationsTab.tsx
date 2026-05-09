@@ -11,6 +11,7 @@ import {
   DEFAULT_TEAM_SIZE,
   SCRAMBLE_2ND_PLACE_AMOUNT,
 } from "@/lib/payout-events/denominations";
+import type { PayoutSplit } from "@/lib/payout-events/splits";
 
 interface Row {
   id: string;
@@ -22,6 +23,7 @@ interface Row {
   total: number;
   is_payout: boolean;
   notes: string | null;
+  payout_splits: PayoutSplit[] | null;
 }
 
 const fmt = (n: number) =>

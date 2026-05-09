@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkPermissionAccess } from "@/lib/permissions-server";
+import { applyComputedTransactionAmounts } from "@/lib/cost-items/transaction-amounts";
 
 // GET - Full transaction history for a single user
 export async function GET(request: Request) {
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
       adminClient
         .from("financial_transactions")
         .select(
-          "id, trip_id, financial_contest_id, type, source, description, amount, method, notes, created_by, created_at, trip:trip_settings!financial_transactions_trip_id_fkey(trip_name), contest:financial_contests!financial_transactions_financial_contest_id_fkey(name), creator:users!financial_transactions_created_by_fkey(display_name)"
+          "id, user_id, option_id, trip_id, financial_contest_id, type, source, description, amount, method, notes, created_by, created_at, trip:trip_settings!financial_transactions_trip_id_fkey(trip_name), contest:financial_contests!financial_transactions_financial_contest_id_fkey(name), creator:users!financial_transactions_created_by_fkey(display_name)"
         )
         .eq("user_id", userId)
         .order("created_at", { ascending: false }),
@@ -37,6 +38,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: txnResult.error.message }, { status: 500 });
     }
 
+    // Recompute amounts on option-driven transactions from current cost_items.
+    const recomputed = await applyComputedTransactionAmounts(adminClient, txnResult.data || []);
+
     // Build map: transaction_id -> most recent editor (first entry per txn since sorted desc)
     const lastEditorMap = new Map<string, { name: string; has_history: boolean }>();
     for (const h of historyResult.data || []) {
@@ -49,7 +53,7 @@ export async function GET(request: Request) {
       }
     }
 
-    const formatted = (txnResult.data || []).map((t) => {
+    const formatted = recomputed.map((t) => {
       const editor = lastEditorMap.get(t.id);
       const creatorName = (t.creator as unknown as { display_name: string } | null)?.display_name ?? null;
 

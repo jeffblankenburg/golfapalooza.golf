@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkPermissionAccess } from "@/lib/permissions-server";
+import { applyComputedTransactionAmounts } from "@/lib/cost-items/transaction-amounts";
 
 // GET - Financial summary dashboard for a trip
 export async function GET(request: Request) {
@@ -47,16 +48,17 @@ export async function GET(request: Request) {
 
     const userIds = Array.from(userMap.keys());
 
-    // 2. Get trip + lifetime transactions in parallel
+    // 2. Get trip + lifetime transactions in parallel. Need source/option_id
+    // so the cost-items recompute helper can recognize option-driven rows.
     const [tripTxnResult, lifetimeTxnResult] = await Promise.all([
       adminClient
         .from("financial_transactions")
-        .select("user_id, type, amount")
+        .select("user_id, type, amount, source, option_id")
         .in("user_id", userIds)
         .eq("trip_id", tripId),
       adminClient
         .from("financial_transactions")
-        .select("user_id, type, amount")
+        .select("user_id, type, amount, source, option_id")
         .in("user_id", userIds),
     ]);
 
@@ -64,9 +66,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: tripTxnResult.error.message }, { status: 500 });
     }
 
+    // Recompute amounts on option-driven transactions from current cost_items.
+    const [tripTxns, lifetimeTxns] = await Promise.all([
+      applyComputedTransactionAmounts(adminClient, tripTxnResult.data || []),
+      applyComputedTransactionAmounts(adminClient, lifetimeTxnResult.data || []),
+    ]);
+
     // Build per-user aggregates
     const tripAgg = new Map<string, { charges: number; payments: number }>();
-    for (const t of tripTxnResult.data || []) {
+    for (const t of tripTxns) {
       const agg = tripAgg.get(t.user_id) || { charges: 0, payments: 0 };
       if (t.type === "charge") agg.charges += Number(t.amount);
       else agg.payments += Number(t.amount);
@@ -74,7 +82,7 @@ export async function GET(request: Request) {
     }
 
     const lifeAgg = new Map<string, { charges: number; payments: number }>();
-    for (const t of lifetimeTxnResult.data || []) {
+    for (const t of lifetimeTxns) {
       const agg = lifeAgg.get(t.user_id) || { charges: 0, payments: 0 };
       if (t.type === "charge") agg.charges += Number(t.amount);
       else agg.payments += Number(t.amount);

@@ -796,35 +796,44 @@ export function SelectionDashboard({
 
   return (
     <>
-    <div className="overflow-x-auto border border-gray-200 rounded-2xl">
-      <table className="min-w-full text-sm">
-        {/* ── Group header row ── */}
+    <div className="overflow-auto max-h-[70vh] border border-gray-200 rounded-2xl">
+      {/* border-separate + border-spacing-0: avoids the 2px gaps between
+          cells that body rows would otherwise scroll through behind the
+          sticky headers. (border-collapse:collapse breaks sticky on th in
+          Chrome, so we use this combo instead.) */}
+      <table className="min-w-full text-sm border-separate border-spacing-0">
+        {/* ── Group header row ──
+             Sticky tops are measured from the wrapping div (which scrolls
+             both axes). top-0 = first row, top-9 = second row. The group
+             row is forced to exactly h-9 (36px) so the option row sits
+             flush below it with no gap for body to scroll through. */}
         <thead>
-          <tr>
-            {/* Empty cell above sticky name column */}
-            <th className="sticky left-0 z-20 bg-gray-50" />
+          <tr className="h-9">
+            {/* Empty cell above sticky name column. Top-left corner — sticks
+                both top + left, must outrank single-axis sticky cells. */}
+            <th className="sticky left-0 top-0 z-30 bg-gray-50 h-9" />
             {groupedOptions.map((go) => (
               <th
                 key={go.group.id}
                 colSpan={go.options.length}
-                className="bg-gray-50 px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-b border-gray-200"
+                className="sticky top-0 z-20 bg-gray-50 h-9 px-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-b border-gray-200"
               >
                 {go.group.name}
               </th>
             ))}
             {/* Cost column group header */}
-            <th className="bg-gray-50 px-3 py-2 border-b border-gray-200" />
+            <th className="sticky top-0 z-20 bg-gray-50 h-9 px-3 border-b border-gray-200" />
           </tr>
 
           {/* ── Option header row ── */}
           <tr>
-            <th className="sticky left-0 z-20 bg-gray-50 px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+            <th className="sticky left-0 top-9 z-30 bg-gray-50 px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
               Loozer
             </th>
             {flatOptions.map((opt) => (
               <th
                 key={opt.id}
-                className="bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wider text-center whitespace-nowrap border-b border-gray-100"
+                className="sticky top-9 z-20 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wider text-center whitespace-nowrap border-b border-gray-100"
               >
                 <div>{opt.name}</div>
                 {opt.cost ? (
@@ -834,7 +843,7 @@ export function SelectionDashboard({
                 ) : null}
               </th>
             ))}
-            <th className="bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wider text-right whitespace-nowrap border-b border-gray-100">
+            <th className="sticky top-9 z-20 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wider text-right whitespace-nowrap border-b border-gray-100">
               Trip Cost
             </th>
           </tr>

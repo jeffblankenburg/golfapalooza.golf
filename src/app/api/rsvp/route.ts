@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
-import { cascadeRemoveFromRoster, addToContestsAndChat } from "@/lib/roster";
+import { cascadeRemoveFromRoster, addToEventChat } from "@/lib/roster";
 
 /**
  * @swagger
@@ -136,8 +136,9 @@ export async function POST(request: Request) {
     }
 
     if (attending && !wasOnRoster) {
-      // Joining the roster: add to all contests + chat
-      await addToContestsAndChat(trip.id, effectiveUserId);
+      // Joining the roster: add to event chat. Contest enrollment comes
+      // from option selections (issue #124), not from RSVP.
+      await addToEventChat(trip.id, effectiveUserId);
     } else if (!attending && wasOnRoster) {
       // Leaving the roster: cascade remove from contests/teams/etc
       await cascadeRemoveFromRoster(trip.id, effectiveUserId);

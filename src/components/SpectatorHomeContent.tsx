@@ -52,7 +52,7 @@ const spectatorQuickLinks = [
     icon: <SvgIcon src="/noun-trophy-8286316.svg" />,
   },
   {
-    href: "/spectator/scorecards",
+    href: "/spectator/scrambles",
     label: "Scrambles",
     color: "bg-lime-50 text-lime-700",
     icon: <SvgIcon src="/noun-golf-tee-3895707.svg" />,

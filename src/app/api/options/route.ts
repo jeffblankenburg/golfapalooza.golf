@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { computeOptionCosts } from "@/lib/cost-items/compute";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -38,9 +39,12 @@ export async function GET(request: Request) {
 
   const settings = settingsResult.data || { selection_deadline: null, is_open: true };
 
+  // Replace stored option costs with values computed from linked cost_items.
+  const options = await computeOptionCosts(adminClient, optionsResult.data || []);
+
   return NextResponse.json({
     groups: groupsResult.data || [],
-    options: optionsResult.data || [],
+    options,
     settings: {
       selection_deadline: settings.selection_deadline,
       is_open: settings.is_open ?? true,

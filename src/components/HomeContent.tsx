@@ -264,7 +264,7 @@ export function HomeContent({
   contestTypes = [],
   activeRounds = [],
   kgbCupActiveRound = null,
-  teeTimeLinkHref = "/scorecards",
+  teeTimeLinkHref = "/scrambles",
   calcuttaAuctionActive = false,
   pickemUrgent = false,
   myWinnings = null,

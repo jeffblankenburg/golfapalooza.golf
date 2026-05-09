@@ -46,7 +46,7 @@ const navItems = [
     ),
   },
   {
-    href: "/scorecards",
+    href: "/scrambles",
     label: "Scrambles",
     exact: false,
     icon: (

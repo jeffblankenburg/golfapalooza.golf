@@ -20,6 +20,25 @@ interface EventDay {
   name: string;
 }
 
+// Single source of truth for contest_type options shown in both the
+// "new contest" form and the edit drawer. Order matters — first entry
+// is the default, so it's the most generic ("other") to avoid
+// accidentally tagging a new contest as "Ryder Cup."
+const CONTEST_TYPE_OPTIONS: Array<[string, string]> = [
+  ["other", "Other"],
+  ["ryder_cup", "Ryder Cup"],
+  ["scramble", "Scramble"],
+  ["scramble_skins", "Skins (scramble side game)"],
+  ["ctp_front", "Closest to Pin — Front"],
+  ["ctp_back", "Closest to Pin — Back"],
+  ["long_drive", "Long Drive"],
+  ["long_putt", "Long Putt"],
+  ["cornhole_singles", "Cornhole Singles"],
+  ["cornhole_doubles", "Cornhole Doubles"],
+  ["calcutta", "Calcutta"],
+  ["pickem", "Pick'em"],
+];
+
 export function ContestManager({ tripId }: { tripId: string }) {
   const [contests, setContests] = useState<Contest[]>([]);
   const [eventDays, setEventDays] = useState<EventDay[]>([]);
@@ -180,13 +199,9 @@ export function ContestManager({ tripId }: { tripId: string }) {
               className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
               style={{ backgroundColor: "transparent" }}
             >
-              <option value="ryder_cup">Ryder Cup</option>
-              <option value="scramble">Scramble</option>
-              <option value="cornhole_singles">Cornhole Singles</option>
-              <option value="cornhole_doubles">Cornhole Doubles</option>
-              <option value="calcutta">Calcutta</option>
-              <option value="pickem">Pick&apos;em</option>
-              <option value="other">Other</option>
+              {CONTEST_TYPE_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
             </select>
             <select
               value={newContestDay}
@@ -227,7 +242,6 @@ export function ContestManager({ tripId }: { tripId: string }) {
               <div className="text-sm font-medium text-gray-900">{contest.name}</div>
               <div className="text-xs text-gray-500">
                 {contest.participant_count} participant{contest.participant_count !== 1 ? "s" : ""}
-                {contest.day_number ? ` · Day ${contest.day_number}` : ""}
               </div>
             </button>
             <button
@@ -276,13 +290,9 @@ export function ContestManager({ tripId }: { tripId: string }) {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
               style={{ backgroundColor: "transparent" }}
             >
-              <option value="ryder_cup">Ryder Cup</option>
-              <option value="scramble">Scramble</option>
-              <option value="cornhole_singles">Cornhole Singles</option>
-              <option value="cornhole_doubles">Cornhole Doubles</option>
-              <option value="calcutta">Calcutta</option>
-              <option value="pickem">Pick&apos;em</option>
-              <option value="other">Other</option>
+              {CONTEST_TYPE_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
             </select>
             <p className="text-xs text-gray-400">
               Day, participants, and tees are managed on each contest&apos;s dedicated page.

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkPermissionAccess } from "@/lib/permissions-server";
+import { applyComputedTransactionAmounts } from "@/lib/cost-items/transaction-amounts";
 
 // GET - Balances data: all users with lifetime financial summaries
 export async function GET() {
@@ -32,7 +33,7 @@ export async function GET() {
         .order("trip_year", { ascending: false }),
       adminClient
         .from("financial_transactions")
-        .select("user_id, financial_contest_id, trip_id, type, amount"),
+        .select("user_id, financial_contest_id, trip_id, type, amount, source, option_id"),
       adminClient
         .from("users")
         .select("id, display_name, full_name, avatar_url")
@@ -66,7 +67,12 @@ export async function GET() {
 
     const contests = contestsResult.data || [];
     const trips = tripsResult.data || [];
-    const transactions = txnResult.data || [];
+    // Recompute amounts on option-driven transactions from current cost_items
+    // before aggregating, so balances reflect live prices.
+    const transactions = await applyComputedTransactionAmounts(
+      adminClient,
+      txnResult.data || [],
+    );
     const allUsers = usersResult.data || [];
 
     // Build participation sets

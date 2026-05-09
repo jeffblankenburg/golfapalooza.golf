@@ -26,7 +26,7 @@ export function ConfirmModal({
   if (!open) return null;
 
   return (
-    <div className="fixed top-14 bottom-16 left-0 right-0 z-35 flex items-end justify-center">
+    <div className="fixed top-14 left-0 right-0 z-35 flex items-end justify-center bottom-[calc(4rem+env(safe-area-inset-bottom))]">
       <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
       <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up">
         <div className="px-6 pt-5 pb-3 border-b border-gray-100">

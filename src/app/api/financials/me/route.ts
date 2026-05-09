@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveUserId } from "@/lib/simulator";
+import { applyComputedTransactionAmounts } from "@/lib/cost-items/transaction-amounts";
 
 /**
  * @swagger
@@ -31,7 +32,7 @@ export async function GET() {
     const { data: transactions, error } = await adminClient
       .from("financial_transactions")
       .select(
-        "id, trip_id, financial_contest_id, type, source, description, amount, method, notes, created_at, trip:trip_settings!financial_transactions_trip_id_fkey(trip_name, trip_year), contest:financial_contests!financial_transactions_financial_contest_id_fkey(name)"
+        "id, user_id, option_id, trip_id, financial_contest_id, type, source, description, amount, method, notes, created_at, trip:trip_settings!financial_transactions_trip_id_fkey(trip_name, trip_year), contest:financial_contests!financial_transactions_financial_contest_id_fkey(name)"
       )
       .eq("user_id", effectiveUserId)
       .order("created_at", { ascending: false });
@@ -40,7 +41,10 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const formatted = (transactions || []).map((t) => {
+    // Recompute amounts on option-driven transactions from current cost_items.
+    const recomputed = await applyComputedTransactionAmounts(adminClient, transactions || []);
+
+    const formatted = recomputed.map((t) => {
       const trip = t.trip as unknown as {
         trip_name: string;
         trip_year: number;

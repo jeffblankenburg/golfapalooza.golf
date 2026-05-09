@@ -36,18 +36,44 @@ export async function GET(request: Request) {
     participantCount = count || 0;
   }
 
-  // Per-player Skins amount comes from the matching payout_sheet_events row
-  // (admin-editable). Falls back to $10 when no row is configured.
+  // Per-player Skins amount comes from the Skins child contest's buy-in
+  // cost item. The Skins contest hangs off the Scramble Day contest via
+  // parent_contest_id (issue #124 Phase B). Falls back to the legacy
+  // payout_sheet_events lookup for trips that haven't been migrated, then
+  // to $10 as a last resort.
   let perPlayerAmount = 10;
-  const { data: skinsEvent } = await supabase
-    .from("payout_sheet_events")
-    .select("amount_per_participant")
-    .eq("participant_source", "scramble")
-    .eq("source_ref", contestId)
-    .ilike("label", "%skins%")
+  const { data: skinsContest } = await supabase
+    .from("contests")
+    .select("buy_in_cost_item:cost_items!contests_buy_in_cost_item_id_fkey(cost)")
+    .eq("parent_contest_id", contestId)
+    .eq("contest_type", "scramble_skins")
     .maybeSingle();
-  if (skinsEvent && Number(skinsEvent.amount_per_participant) > 0) {
-    perPlayerAmount = Number(skinsEvent.amount_per_participant);
+  type CostJoin = { cost: number | string } | Array<{ cost: number | string }> | null | undefined;
+  const skinsCostJoin = (skinsContest as { buy_in_cost_item?: CostJoin } | null)?.buy_in_cost_item;
+  const skinsItem = Array.isArray(skinsCostJoin) ? skinsCostJoin[0] : skinsCostJoin;
+  const skinsCost = skinsItem && skinsItem.cost != null ? Number(skinsItem.cost) : null;
+  if (skinsCost !== null && skinsCost > 0) {
+    perPlayerAmount = skinsCost;
+  } else {
+    // Legacy fallback for un-migrated trips.
+    const { data: skinsEvent } = await supabase
+      .from("payout_sheet_events")
+      .select("amount_per_participant, cost_item:cost_items(cost)")
+      .eq("participant_source", "scramble")
+      .eq("source_ref", contestId)
+      .ilike("label", "%skins%")
+      .maybeSingle();
+    if (skinsEvent) {
+      const joined = (skinsEvent as { cost_item?: CostJoin }).cost_item;
+      const item = Array.isArray(joined) ? joined[0] : joined;
+      const linkedCost = item && item.cost != null ? Number(item.cost) : null;
+      const stored = Number(skinsEvent.amount_per_participant);
+      if (linkedCost !== null && linkedCost > 0) {
+        perPlayerAmount = linkedCost;
+      } else if (stored > 0) {
+        perPlayerAmount = stored;
+      }
+    }
   }
 
   // Fetch teams

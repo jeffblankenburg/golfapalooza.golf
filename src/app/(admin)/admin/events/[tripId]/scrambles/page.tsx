@@ -275,7 +275,7 @@ export default function ScramblesAdminPage() {
         onClick={() =>
           setConfirmModal({
             title: "Reset All Scrambles",
-            message: "This will permanently delete ALL scramble tee assignments, participants, teams, team members, and scores across all days. This cannot be undone.",
+            message: "This will permanently delete ALL scramble tee assignments, teams, team members, and scores across all days. Roster (who's enrolled) is preserved — that's driven by option selections. This cannot be undone.",
             onConfirm: async () => {
               setConfirmModal(null);
               await handleReset();

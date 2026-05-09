@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { checkPermissionAccess } from "@/lib/permissions-server";
-import { syncContestEnrollment } from "@/lib/option-contest-sync";
+import { syncContestEnrollment, syncCostItemContestEnrollment } from "@/lib/option-contest-sync";
+import { computeOptionCosts } from "@/lib/cost-items/compute";
 
 function normalizeQuantityValue(
   raw: unknown,
@@ -123,11 +124,16 @@ export async function PUT(request: Request) {
     .eq("source", "option");
   if (deleteChargeError) return NextResponse.json({ error: deleteChargeError.message }, { status: 500 });
 
-  const option = optionPre;
+  // Replace stored option cost with the value computed from linked
+  // cost_items so charges always reflect the current cost-items truth.
+  const [option] = await computeOptionCosts(adminClient, [optionPre]);
 
   // If value is null (deletion), sync contest enrollment (unenroll) and we're done
   if (value === null || value === undefined) {
-    await syncContestEnrollment(adminClient, user_id, option, null);
+    await Promise.all([
+      syncContestEnrollment(adminClient, user_id, option, null),
+      syncCostItemContestEnrollment(adminClient, user_id, option_id, null),
+    ]);
     return NextResponse.json({ success: true });
   }
 
@@ -181,8 +187,11 @@ export async function PUT(request: Request) {
     if (chargeError) return NextResponse.json({ error: chargeError.message }, { status: 500 });
   }
 
-  // 3. Sync contest enrollment
-  await syncContestEnrollment(adminClient, user_id, option, value);
+  // 3. Sync contest enrollment (legacy linked_contest_id + new cost_item chain)
+  await Promise.all([
+    syncContestEnrollment(adminClient, user_id, option, value),
+    syncCostItemContestEnrollment(adminClient, user_id, option_id, value),
+  ]);
 
   return NextResponse.json({ success: true });
 }

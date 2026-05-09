@@ -122,28 +122,16 @@ export async function cascadeRemoveFromRoster(tripId: string, userId: string) {
 }
 
 /**
- * Add a user to all contests and event chat for a given trip.
+ * Add a user to the event chat room for a given trip.
+ *
+ * Does NOT enroll them in contests — contest membership is driven by
+ * option selections (issue #124). RSVP yes just means "on the roster
+ * and in the chat"; what they're playing in derives from what they've
+ * selected.
  */
-export async function addToContestsAndChat(tripId: string, userId: string) {
+export async function addToEventChat(tripId: string, userId: string) {
   const adminClient = createAdminClient();
 
-  // Add to all contests
-  const { data: contests } = await adminClient
-    .from("contests")
-    .select("id")
-    .eq("trip_id", tripId);
-
-  if (contests && contests.length > 0) {
-    const entries = contests.map((c) => ({
-      contest_id: c.id,
-      user_id: userId,
-    }));
-    await adminClient
-      .from("contest_participants")
-      .upsert(entries, { onConflict: "contest_id,user_id" });
-  }
-
-  // Add to event chat room
   const { data: eventRoom } = await adminClient
     .from("chat_rooms")
     .select("id")

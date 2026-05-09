@@ -22,6 +22,7 @@ interface SkinsData {
   message?: string;
   totalSkins?: number;
   participantCount?: number;
+  perPlayerAmount?: number;
   teams?: SkinTeam[];
 }
 
@@ -165,7 +166,8 @@ export function SkinsContent({
       )}
 
       {!loading && data?.complete && data.teams && (() => {
-        const pot = (data.participantCount || 0) * 10;
+        const perPlayer = data.perPlayerAmount ?? 10;
+        const pot = (data.participantCount || 0) * perPlayer;
         const totalSkins = data.totalSkins || 0;
 
         return (

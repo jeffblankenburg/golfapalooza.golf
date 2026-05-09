@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { PayoutDenominationsTab } from "./PayoutDenominationsTab";
+import { PayoutWinnersTab } from "./PayoutWinnersTab";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -34,7 +36,7 @@ interface ActiveTrip {
   trip_year: number;
 }
 
-type TabKey = "all" | "current";
+type TabKey = "all" | "current" | "denominations" | "winners";
 type SortKey = "_name" | "_charges" | "_payments" | "_total";
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -212,6 +214,8 @@ export function FinancialGrid() {
             {([
               { key: "all" as const, label: "All Events" },
               { key: "current" as const, label: activeTrip.trip_name },
+              { key: "winners" as const, label: "Winners" },
+              { key: "denominations" as const, label: "Payout Denominations" },
             ]).map((t) => (
               <button
                 key={t.key}
@@ -235,6 +239,12 @@ export function FinancialGrid() {
         </div>
       )}
 
+      {tab === "denominations" ? (
+        <PayoutDenominationsTab />
+      ) : tab === "winners" ? (
+        <PayoutWinnersTab />
+      ) : (
+        <>
       <input
         type="text"
         placeholder="Search Loozers..."
@@ -326,6 +336,8 @@ export function FinancialGrid() {
           </tbody>
         </table>
       </div>
+        </>
+      )}
 
       {/* User Full Ledger Modal */}
       {userLedgerModal && (

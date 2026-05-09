@@ -36,6 +36,20 @@ export async function GET(request: Request) {
     participantCount = count || 0;
   }
 
+  // Per-player Skins amount comes from the matching payout_sheet_events row
+  // (admin-editable). Falls back to $10 when no row is configured.
+  let perPlayerAmount = 10;
+  const { data: skinsEvent } = await supabase
+    .from("payout_sheet_events")
+    .select("amount_per_participant")
+    .eq("participant_source", "scramble")
+    .eq("source_ref", contestId)
+    .ilike("label", "%skins%")
+    .maybeSingle();
+  if (skinsEvent && Number(skinsEvent.amount_per_participant) > 0) {
+    perPlayerAmount = Number(skinsEvent.amount_per_participant);
+  }
+
   // Fetch teams
   const { data: teams, error: teamsError } = await supabase
     .from("scramble_teams")
@@ -165,6 +179,7 @@ export async function GET(request: Request) {
     complete: true,
     totalSkins: result.totalSkins,
     participantCount,
+    perPlayerAmount,
     teams: teamData,
   });
 }

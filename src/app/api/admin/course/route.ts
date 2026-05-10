@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkPermissionAccess } from "@/lib/permissions-server";
 import { geocodeAddress } from "@/lib/geocode";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 // GET - Fetch course for the active trip with all tees
 export async function GET(request: Request) {
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
     const { data: trip } = await adminClient
       .from("trip_settings")
       .select("id, course_id")
-      .eq("status", "active")
+      .eq("id", (await getEffectiveTripId())!)
       .single();
 
     courseId = trip?.course_id || null;

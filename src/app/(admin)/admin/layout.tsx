@@ -5,7 +5,7 @@ import { AdminNav } from "@/components/AdminNav";
 import { HeaderBar } from "@/components/HeaderBar";
 import { SimulatorBanner } from "@/components/SimulatorBanner";
 import { hasAnyPermission } from "@/lib/permissions";
-import { getSimUserId, getSimDate } from "@/lib/simulator";
+import { getSimUserId, getSimDate, getEffectiveTripId, isSimulatingTrip } from "@/lib/simulator";
 
 export default async function AdminLayout({
   children,
@@ -54,7 +54,8 @@ export default async function AdminLayout({
     simAvatarUrl = simProfile?.avatar_url || null;
   }
 
-  const showBanner = realIsAdmin && (simDate || simUserId);
+  const simTripActive = realIsAdmin ? await isSimulatingTrip() : false;
+  const showBanner = realIsAdmin && (simDate || simUserId || simTripActive);
 
   const effectiveUserId = simUserId || user.id;
   const effectiveDisplayName = simUserName || profile?.display_name || "";
@@ -65,7 +66,7 @@ export default async function AdminLayout({
   const { data: activeTrip } = await adminClient2
     .from("trip_settings")
     .select("id, trip_year")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   // Get unread notification count (exclude chat_message, same as app layout)
@@ -82,6 +83,7 @@ export default async function AdminLayout({
         <SimulatorBanner
           simDate={simDate}
           simUserName={simUserName}
+          simTripActive={simTripActive}
         />
       )}
       <HeaderBar

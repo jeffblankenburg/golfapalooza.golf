@@ -3,6 +3,7 @@ import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { PickemContent } from "@/components/PickemContent";
 import { AdminLink } from "@/components/AdminLink";
 import { PickemHeader } from "@/components/pickem/PickemHeader";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 function HomeButton() {
   return (
@@ -44,7 +45,7 @@ export default async function PickemPage() {
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

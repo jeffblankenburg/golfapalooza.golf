@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNotification } from "@/lib/notifications/service";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 /**
  * Cron endpoint: runs every 5 minutes.
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id, start_date, timezone, tee_time_reminder_minutes")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip || !trip.start_date) {

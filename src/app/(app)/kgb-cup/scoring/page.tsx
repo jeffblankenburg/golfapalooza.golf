@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getEffectiveUserId, getEffectiveDate, isSimulating } from "@/lib/simulator";
+import { getEffectiveUserId, getEffectiveDate, isSimulating, getEffectiveTripId } from "@/lib/simulator";
 import { KgbCupLiveScorer } from "@/components/scoring/KgbCupLiveScorer";
 
 export default async function KgbCupScoringPage() {
@@ -21,7 +21,7 @@ export default async function KgbCupScoringPage() {
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id, start_date, course_id")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) redirect("/");

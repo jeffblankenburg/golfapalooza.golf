@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isSimulatingTrip } from "@/lib/simulator";
 
 if (
   process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY &&
@@ -89,6 +90,12 @@ export async function sendNotification(
   userId: string,
   payload: NotificationPayload
 ) {
+  // Issue #126 — when an admin is in trip-sim mode, suppress real-user
+  // dispatch entirely. Real Loozers never see fake notifications.
+  if (await isSimulatingTrip()) {
+    console.log("[Sim] sendNotification suppressed (sim mode)");
+    return;
+  }
   const supabase = createAdminClient();
 
   // Insert into DB
@@ -108,6 +115,10 @@ export async function sendBulkNotifications(
   userIds: string[],
   payload: NotificationPayload
 ) {
+  if (await isSimulatingTrip()) {
+    console.log(`[Sim] sendBulkNotifications suppressed (sim mode, ${userIds.length} users)`);
+    return;
+  }
   const supabase = createAdminClient();
 
   // Bulk insert into DB
@@ -128,6 +139,10 @@ export async function sendBulkNotifications(
 }
 
 export async function sendAnnouncement(payload: Omit<NotificationPayload, "type">) {
+  if (await isSimulatingTrip()) {
+    console.log("[Sim] sendAnnouncement suppressed (sim mode)");
+    return;
+  }
   const supabase = createAdminClient();
 
   const { data: users } = await supabase

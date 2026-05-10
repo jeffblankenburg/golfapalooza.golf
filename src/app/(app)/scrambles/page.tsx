@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ScorecardsContent } from "@/components/ScorecardsContent";
 import { loadPayoutSheet } from "@/lib/payout-events/compute";
 import { computePayoutSplits } from "@/lib/payout-events/splits";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 export { zoomableViewport as viewport } from "@/lib/viewport";
 
@@ -17,7 +18,7 @@ export default async function ScorecardsPage() {
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id, start_date")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

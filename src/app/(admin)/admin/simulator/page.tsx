@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { SimulatorControls } from "@/components/admin/SimulatorControls";
-import { getSimUserId } from "@/lib/simulator";
+import { getSimUserId, getEffectiveTripId } from "@/lib/simulator";
 
 export default async function SimulatorPage() {
   const supabase = await createClient();
@@ -8,7 +8,7 @@ export default async function SimulatorPage() {
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id, start_date")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   const [usersResult, eventDaysResult] = await Promise.all([

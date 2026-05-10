@@ -1,7 +1,7 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { HomeContent } from "@/components/HomeContent";
-import { getEffectiveUserId, getEffectiveDate, getSimDate, isSimulating } from "@/lib/simulator";
+import { getEffectiveUserId, getEffectiveDate, getSimDate, isSimulating, getEffectiveTripId } from "@/lib/simulator";
 import { isFeatureVisible } from "@/lib/visibility";
 import { stripMarkdown } from "@/lib/strip-markdown";
 import { getBirthdaysToday } from "@/lib/birthday/today";
@@ -29,7 +29,7 @@ export default async function HomePage() {
     supabase
       .from("trip_settings")
       .select("*")
-      .eq("status", "active")
+      .eq("id", (await getEffectiveTripId())!)
       .single(),
   ]);
 

@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SpectatorHomeContent } from "@/components/SpectatorHomeContent";
 import { stripMarkdown } from "@/lib/strip-markdown";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 export default async function SpectatorPage() {
   const adminClient = createAdminClient();
@@ -9,7 +10,7 @@ export default async function SpectatorPage() {
   const { data: trip } = await adminClient
     .from("trip_settings")
     .select("id, trip_name, trip_year, start_date, location, course_id")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

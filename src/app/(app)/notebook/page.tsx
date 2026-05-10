@@ -1,6 +1,7 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { NotebookContent } from "@/components/notebook/NotebookContent";
 import { AdminLink } from "@/components/AdminLink";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 export default async function NotebookPage() {
   const user = await getAuthUser();
@@ -11,7 +12,7 @@ export default async function NotebookPage() {
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

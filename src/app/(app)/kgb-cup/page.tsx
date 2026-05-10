@@ -1,5 +1,5 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
-import { getSimDate } from "@/lib/simulator";
+import { getSimDate, getEffectiveTripId } from "@/lib/simulator";
 import { KgbCupPageClient } from "./KgbCupPageClient";
 import { AdminLink } from "@/components/AdminLink";
 
@@ -14,7 +14,7 @@ export default async function KgbCupPage() {
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id, trip_name, start_date, timezone")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

@@ -1,7 +1,7 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
-import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
+import { getEffectiveUserId, isSimulating, getEffectiveTripId } from "@/lib/simulator";
 import { GalleryPage } from "@/components/gallery/GalleryPage";
 import { AdminLink } from "@/components/AdminLink";
 
@@ -19,7 +19,7 @@ export default async function GalleryServerPage() {
   const { data: trip } = await queryClient
     .from("trip_settings")
     .select("id")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   // Get current user info

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getEffectiveUserId, getEffectiveDate, isSimulating } from "@/lib/simulator";
+import { getEffectiveUserId, getEffectiveDate, isSimulating, getEffectiveTripId } from "@/lib/simulator";
 import { LiveScorer } from "@/components/scoring/LiveScorer";
 
 export default async function ScoringPage({ searchParams }: { searchParams: Promise<{ contest_id?: string }> }) {
@@ -22,7 +22,7 @@ export default async function ScoringPage({ searchParams }: { searchParams: Prom
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id, start_date, course_id")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) redirect("/");

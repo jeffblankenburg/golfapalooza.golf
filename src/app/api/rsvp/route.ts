@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
+import { getEffectiveUserId, isSimulating, getEffectiveTripId } from "@/lib/simulator";
 import { cascadeRemoveFromRoster, addToEventChat } from "@/lib/roster";
 
 /**
@@ -29,7 +29,7 @@ export async function GET() {
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
     const { data: trip } = await supabase
       .from("trip_settings")
       .select("id")
-      .eq("status", "active")
+      .eq("id", (await getEffectiveTripId())!)
       .single();
 
     if (!trip) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAudienceUserIds } from "@/lib/audience";
 import { sendBulkNotifications } from "@/lib/notifications/service";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 /**
  * @swagger
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
   const { data: toClose } = await adminClient
     .from("polls")
     .select("id")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .lte("ends_at", now);
 
   let closed = 0;
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
   const { data: activeRow } = await adminClient
     .from("polls")
     .select("id")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .maybeSingle();
 
   let activated = 0;

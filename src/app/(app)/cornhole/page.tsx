@@ -1,6 +1,7 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { CornholeBrackets } from "@/components/CornholeBrackets";
 import { AdminLink } from "@/components/AdminLink";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 export { zoomableViewport as viewport } from "@/lib/viewport";
 
@@ -13,7 +14,7 @@ export default async function CornholePage() {
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

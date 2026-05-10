@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CornholeBrackets } from "@/components/CornholeBrackets";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 export default async function SpectatorCornholePage() {
   const adminClient = createAdminClient();
@@ -7,7 +8,7 @@ export default async function SpectatorCornholePage() {
   const { data: trip } = await adminClient
     .from("trip_settings")
     .select("id")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

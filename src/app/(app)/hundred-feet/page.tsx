@@ -1,6 +1,6 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { HundredFeetContent } from "@/components/HundredFeetContent";
-import { getEffectiveDate } from "@/lib/simulator";
+import { getEffectiveDate, getEffectiveTripId } from "@/lib/simulator";
 import { isFeatureVisible } from "@/lib/visibility";
 import { AdminLink } from "@/components/AdminLink";
 
@@ -17,7 +17,7 @@ export default async function HundredFeetPage() {
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id, start_date, visibility_overrides")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

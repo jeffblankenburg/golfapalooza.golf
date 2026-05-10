@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkPermissionAccess } from "@/lib/permissions-server";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 /**
  * @swagger
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
     const { data: active } = await adminClient
       .from("trip_settings")
       .select("id, trip_name")
-      .eq("status", "active")
+      .eq("id", (await getEffectiveTripId())!)
       .single();
     tripId = active?.id ?? null;
   }

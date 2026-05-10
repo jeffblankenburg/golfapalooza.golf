@@ -1,5 +1,6 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { BspitwContent } from "@/components/BspitwContent";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 export { zoomableViewport as viewport } from "@/lib/viewport";
 
@@ -14,7 +15,7 @@ export default async function BspitwPage() {
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id, start_date")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

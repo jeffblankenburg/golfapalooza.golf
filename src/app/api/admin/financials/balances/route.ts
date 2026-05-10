@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkPermissionAccess } from "@/lib/permissions-server";
 import { applyComputedTransactionAmounts } from "@/lib/cost-items/transaction-amounts";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 // GET - Balances data: all users with lifetime financial summaries
 export async function GET() {
@@ -48,7 +49,7 @@ export async function GET() {
       adminClient
         .from("trip_settings")
         .select("id, trip_name, trip_year")
-        .eq("status", "active")
+        .eq("id", (await getEffectiveTripId())!)
         .maybeSingle(),
     ]);
 

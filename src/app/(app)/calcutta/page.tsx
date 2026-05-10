@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { CalcuttaResults } from "@/components/calcutta/CalcuttaResults";
 import { AdminLink } from "@/components/AdminLink";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 export { zoomableViewport as viewport } from "@/lib/viewport";
 
@@ -15,7 +16,7 @@ export default async function CalcuttaPage() {
   const { data: trip } = await adminClient
     .from("trip_settings")
     .select("id")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

@@ -1,5 +1,5 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
-import { getEffectiveUserId, getEffectiveDate } from "@/lib/simulator";
+import { getEffectiveUserId, getEffectiveDate, getEffectiveTripId } from "@/lib/simulator";
 import { ContestList } from "@/components/ContestList";
 import { deriveFoursomes } from "@/lib/kgb-cup/derive-foursomes";
 import { isFeatureVisible } from "@/lib/visibility";
@@ -13,7 +13,7 @@ export default async function ContestsPage() {
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id, trip_name, start_date, show_teams, visibility_overrides")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

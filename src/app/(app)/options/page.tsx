@@ -2,6 +2,7 @@ import { createClient, getAuthUser } from "@/lib/supabase/server";
 import OptionSelectionForm from "@/components/OptionSelectionForm";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 import { AdminLink } from "@/components/AdminLink";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 export default async function OptionsPage() {
   const user = await getAuthUser();
@@ -13,7 +14,7 @@ export default async function OptionsPage() {
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id, trip_name, trip_year")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

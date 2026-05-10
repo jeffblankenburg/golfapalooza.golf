@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { KgbCupPageClient } from "@/app/(app)/kgb-cup/KgbCupPageClient";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 export default async function SpectatorKgbCupPage() {
   const adminClient = createAdminClient();
@@ -7,7 +8,7 @@ export default async function SpectatorKgbCupPage() {
   const { data: trip } = await adminClient
     .from("trip_settings")
     .select("id, trip_name, start_date, timezone")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

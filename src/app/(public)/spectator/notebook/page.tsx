@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NotebookContent } from "@/components/notebook/NotebookContent";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 export default async function SpectatorNotebookPage() {
   const adminClient = createAdminClient();
@@ -8,7 +9,7 @@ export default async function SpectatorNotebookPage() {
   const { data: trip } = await adminClient
     .from("trip_settings")
     .select("id")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

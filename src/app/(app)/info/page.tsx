@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { TripInfo } from "@/components/TripInfo";
 import { PastEvents } from "@/components/PastEvents";
 import { RsvpStatus } from "@/components/RsvpStatus";
-import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
+import { getEffectiveUserId, isSimulating, getEffectiveTripId } from "@/lib/simulator";
 
 export default async function InfoPage() {
   const user = await getAuthUser();
@@ -16,7 +16,7 @@ export default async function InfoPage() {
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("*")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   const { count: playerCount } = await supabase

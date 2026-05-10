@@ -6,14 +6,16 @@ import { useState } from "react";
 export function SimulatorBanner({
   simDate,
   simUserName,
+  simTripActive = false,
 }: {
   simDate: string | null;
   simUserName: string | null;
+  simTripActive?: boolean;
 }) {
   const router = useRouter();
-  const [clearing, setClearing] = useState<"date" | "user" | null>(null);
+  const [clearing, setClearing] = useState<"date" | "user" | "trip" | null>(null);
 
-  async function clearSim(type: "date" | "user") {
+  async function clearSim(type: "date" | "user" | "trip") {
     setClearing(type);
     await fetch("/api/admin/simulator", {
       method: "DELETE",
@@ -21,6 +23,7 @@ export function SimulatorBanner({
       body: JSON.stringify({
         clearDate: type === "date",
         clearUser: type === "user",
+        clearTrip: type === "trip",
       }),
     });
     router.refresh();
@@ -50,6 +53,30 @@ export function SimulatorBanner({
   }
 
   return (
+    <>
+      {simTripActive && (
+        <div className="bg-emerald-100 border-b border-emerald-300 px-3 py-1.5 flex items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            <span aria-hidden>🧪</span>
+            <span className="text-emerald-900 font-bold uppercase tracking-wide">
+              Sim Mode
+            </span>
+            <span className="text-emerald-800 truncate">
+              — viewing test event, not real data
+            </span>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => clearSim("trip")}
+              disabled={clearing === "trip"}
+              className="text-emerald-700 hover:text-emerald-900 text-xs font-medium border border-emerald-300 rounded px-2 py-0.5"
+            >
+              Exit
+            </button>
+          </div>
+        </div>
+      )}
+      {(simDate || simUserName) && (
     <div className="bg-amber-100 border-b border-amber-300 px-3 py-1.5 flex items-center justify-between gap-2 text-xs">
       <div className="flex items-center gap-3 flex-1 min-w-0">
         {simDate && (
@@ -101,5 +128,7 @@ export function SimulatorBanner({
         </svg>
       </a>
     </div>
+      )}
+    </>
   );
 }

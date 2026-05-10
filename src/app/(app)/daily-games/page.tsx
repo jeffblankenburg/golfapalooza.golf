@@ -2,7 +2,7 @@ import { getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
-import { getEffectiveDate } from "@/lib/simulator";
+import { getEffectiveDate, getEffectiveTripId } from "@/lib/simulator";
 import { isFeatureVisible } from "@/lib/visibility";
 
 export { zoomableViewport as viewport } from "@/lib/viewport";
@@ -16,7 +16,7 @@ export default async function DailyGamesPage() {
   const { data: trip } = await adminClient
     .from("trip_settings")
     .select("id, start_date, visibility_overrides")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

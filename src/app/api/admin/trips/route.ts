@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkIsAdmin, checkAnyEventAccess } from "@/lib/permissions-server";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 /**
  * @swagger
@@ -111,7 +112,7 @@ export async function POST(request: Request) {
       await adminClient
         .from("trip_settings")
         .update({ status: "archived", updated_at: new Date().toISOString() })
-        .eq("status", "active");
+        .eq("id", (await getEffectiveTripId())!);
     }
 
     const { data, error } = await adminClient
@@ -254,7 +255,7 @@ export async function PATCH(request: Request) {
       await adminClient
         .from("trip_settings")
         .update({ status: "archived", updated_at: new Date().toISOString() })
-        .eq("status", "active");
+        .eq("id", (await getEffectiveTripId())!);
     }
 
     const { error } = await adminClient

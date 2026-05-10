@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { BspitwContent } from "@/components/BspitwContent";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 export default async function SpectatorBspitwPage() {
   const adminClient = createAdminClient();
@@ -7,7 +8,7 @@ export default async function SpectatorBspitwPage() {
   const { data: trip } = await adminClient
     .from("trip_settings")
     .select("id, start_date")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

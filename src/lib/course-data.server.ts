@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { CourseData, HoleData } from "./course-data";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 interface DbHole {
   hole_number: number;
@@ -21,11 +22,12 @@ interface DbHole {
 export async function getCourseData(client?: SupabaseClient): Promise<CourseData | null> {
   const supabase = client || await createClient();
 
-  // Get active trip with course_id
+  // Get active trip with course_id (sim-mode aware)
+  const tripId = await getEffectiveTripId();
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("course_id")
-    .eq("status", "active")
+    .eq("id", tripId!)
     .single();
 
   if (!trip?.course_id) return null;

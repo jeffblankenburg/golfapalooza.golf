@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isSimulatingTrip } from "@/lib/simulator";
 
 const DEV_USER_ID = "fd9c3a4b-e728-4e28-ac12-ed9099e389b5";
 
@@ -22,6 +23,13 @@ export async function POST(request: NextRequest) {
 
   if (!event_type) {
     return NextResponse.json({ error: "event_type is required" }, { status: 400 });
+  }
+
+  // Issue #126 — skip activity-log writes from sim-mode admins so
+  // analytics stay clean. The page-view ping from a sim-mode session
+  // would otherwise count toward the real Loozer's stats.
+  if (await isSimulatingTrip()) {
+    return NextResponse.json({ ok: true, sim: true });
   }
 
   const adminClient = createAdminClient();

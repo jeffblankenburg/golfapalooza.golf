@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getEffectiveUserId, getEffectiveDate, isSimulating } from "@/lib/simulator";
+import { getEffectiveUserId, getEffectiveDate, isSimulating, getEffectiveTripId } from "@/lib/simulator";
 
 export async function GET() {
   const supabase = await createClient();
@@ -22,7 +22,7 @@ export async function GET() {
     const { data: trip } = await supabase
       .from("trip_settings")
       .select("id, start_date, course_id")
-      .eq("status", "active")
+      .eq("id", (await getEffectiveTripId())!)
       .single();
 
     if (!trip) {

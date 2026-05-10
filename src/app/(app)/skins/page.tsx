@@ -1,6 +1,6 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { SkinsContent } from "@/components/SkinsContent";
-import { getEffectiveDate } from "@/lib/simulator";
+import { getEffectiveDate, getEffectiveTripId } from "@/lib/simulator";
 import { isFeatureVisible } from "@/lib/visibility";
 
 export { zoomableViewport as viewport } from "@/lib/viewport";
@@ -16,7 +16,7 @@ export default async function SkinsPage() {
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id, start_date, visibility_overrides")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

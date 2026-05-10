@@ -203,6 +203,7 @@ export default function AdminPage() {
     timezone: "America/New_York",
   });
   const [creating, setCreating] = useState(false);
+  const [duplicating, setDuplicating] = useState<string | null>(null);
 
   const fetchEvents = useCallback(async () => {
     const res = await fetch("/api/admin/trips?status=all");
@@ -238,6 +239,43 @@ export default function AdminPage() {
         return requiredPerm && access.permissions?.[requiredPerm] === true;
       });
 
+  const handleDuplicate = useCallback(
+    async (event: TripSummary) => {
+      const nextYear = event.trip_year + 1;
+      const today = new Date();
+      const yyyy = nextYear;
+      const mm = String(today.getMonth() + 1).padStart(2, "0");
+      const dd = String(today.getDate()).padStart(2, "0");
+      if (!confirm(
+        `Duplicate "${event.trip_name} ${event.trip_year}"?\n\nA new archived event will be created with the same contests, options, cost items, payouts, notebook, itinerary, and tee time slots — but no participants, scores, or selections.`,
+      )) return;
+      setDuplicating(event.id);
+      const res = await fetch("/api/admin/trips/duplicate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source_trip_id: event.id,
+          trip_name: event.trip_name,
+          trip_year: nextYear,
+          start_date: `${yyyy}-${mm}-${dd}`,
+          status: "archived",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      setDuplicating(null);
+      if (!res.ok) {
+        alert(data.error || "Failed to duplicate event");
+        return;
+      }
+      await fetchEvents();
+      if (data.warnings?.length > 0) {
+        console.warn("[duplicate] warnings:", data.warnings);
+      }
+      alert(`Duplicated as archived event. Promote to Active when ready.`);
+    },
+    [fetchEvents],
+  );
+
   const handleCreate = async () => {
     if (!newTrip.trip_name || !newTrip.start_date || !newTrip.end_date) return;
     setCreating(true);
@@ -260,51 +298,95 @@ export default function AdminPage() {
   };
 
   const activeEvent = events.find((e) => e.status === "active");
-  const pastEvents = events.filter((e) => e.status !== "active");
+  const testEvent = events.find((e) => e.status === "test");
+  const pastEvents = events.filter((e) => e.status !== "active" && e.status !== "test");
 
-  const renderEventCard = (event: TripSummary) => (
-    <Link
+  const statusStyles: Record<string, { border: string; badge: string; label: string }> = {
+    active: {
+      border: "border-green-600 border-2",
+      badge: "bg-green-100 text-green-700",
+      label: "Active",
+    },
+    test: {
+      border: "border-emerald-500 border-2 border-dashed",
+      badge: "bg-emerald-100 text-emerald-800",
+      label: "TEST",
+    },
+    archived: {
+      border: "border-gray-200",
+      badge: "bg-gray-100 text-gray-500",
+      label: "Archived",
+    },
+    draft: {
+      border: "border-gray-200",
+      badge: "bg-amber-100 text-amber-700",
+      label: "Draft",
+    },
+  };
+
+  const renderEventCard = (event: TripSummary) => {
+    const s = statusStyles[event.status] ?? statusStyles.archived;
+    const isDuplicating = duplicating === event.id;
+    // Hidden for now — admin doesn't need duplication until after the
+    // first real event runs. Re-enable by flipping back to
+    // `event.status !== "test"`. The cloneTrip primitive + API endpoint
+    // (#85) remain in place; only the UI button is hidden.
+    const showDuplicate = false;
+    return (
+    <div
       key={event.id}
-      href={`/admin/events/${event.id}`}
-      className={`block bg-white rounded-2xl border shadow-sm p-4 active:scale-[0.98] transition-transform ${
-        event.status === "active"
-          ? "border-green-600 border-2"
-          : "border-gray-200"
-      }`}
+      className={`relative bg-white rounded-2xl border shadow-sm ${s.border}`}
     >
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="text-sm font-semibold text-gray-900">
-            {event.trip_name} {event.trip_year}
+      <Link
+        href={`/admin/events/${event.id}`}
+        className="block p-4 active:scale-[0.98] transition-transform"
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-sm font-semibold text-gray-900">
+              {event.trip_name} {event.trip_year}
+            </div>
+            <div className="flex items-center gap-2 mt-1">
+              <span
+                className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${s.badge}`}
+              >
+                {s.label}
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 mt-1">
-            <span
-              className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${
-                event.status === "active"
-                  ? "bg-green-100 text-green-700"
-                  : "bg-gray-100 text-gray-500"
-              }`}
-            >
-              {event.status === "active" ? "Active" : "Archived"}
-            </span>
-          </div>
+          <svg
+            className="w-5 h-5 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
         </div>
-        <svg
-          className="w-5 h-5 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+      </Link>
+      {showDuplicate && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleDuplicate(event);
+          }}
+          disabled={isDuplicating}
+          className="absolute top-2 right-10 px-2 py-1 rounded-md text-[10px] font-semibold uppercase tracking-wide text-gray-600 bg-gray-50 border border-gray-200 active:bg-gray-100 disabled:opacity-50"
+          title={`Duplicate "${event.trip_name} ${event.trip_year}" structure into a new archived event`}
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 5l7 7-7 7"
-          />
-        </svg>
-      </div>
-    </Link>
-  );
+          {isDuplicating ? "…" : "Duplicate"}
+        </button>
+      )}
+    </div>
+    );
+  };
 
   if (accessLoading) {
     return (
@@ -457,6 +539,26 @@ export default function AdminPage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Test Event — full admins only */}
+      {access.isAdmin && !loading && testEvent && (
+        <div>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Test Event
+          </h2>
+          <p className="text-xs text-gray-500 mb-2">
+            A structural mirror of the active event. Use this to verify
+            scoring, payouts, leaderboards, and admin tools end-to-end
+            after the active event has real attendees, without touching
+            any real Loozer data. Manage sim mode + populate/wipe at{" "}
+            <Link href="/admin/simulator" className="text-emerald-700 underline font-medium">
+              /admin/simulator
+            </Link>
+            .
+          </p>
+          {renderEventCard(testEvent)}
         </div>
       )}
 

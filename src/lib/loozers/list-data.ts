@@ -3,6 +3,7 @@
 //   - /loozers server page (SSR; eliminates a double-fetch)
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 export interface LoozerListItem {
   id: string;
@@ -21,11 +22,14 @@ export async function loadLoozerList(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   adminClient: SupabaseClient<any, "public", any>,
 ): Promise<LoozerListItem[]> {
-  const { data: activeTrip } = await adminClient
-    .from("trip_settings")
-    .select("id")
-    .eq("status", "active")
-    .maybeSingle();
+  const effectiveTripId = await getEffectiveTripId();
+  const { data: activeTrip } = effectiveTripId
+    ? await adminClient
+        .from("trip_settings")
+        .select("id")
+        .eq("id", effectiveTripId)
+        .maybeSingle()
+    : { data: null };
 
   const [{ data: users }, { data: bios }, { data: roster }, { data: rosterAll }] =
     await Promise.all([

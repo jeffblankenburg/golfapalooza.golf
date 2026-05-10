@@ -7,7 +7,7 @@ import { SimulatorBanner } from "@/components/SimulatorBanner";
 import { MusicPlayerProvider } from "@/components/MusicPlayerProvider";
 import { AppShell } from "@/components/AppShell";
 import { RouteProgress } from "@/components/RouteProgress";
-import { getSimDate, getSimUserId, getEffectiveUserId, isSimulating } from "@/lib/simulator";
+import { getSimDate, getSimUserId, getEffectiveUserId, isSimulating, isSimulatingTrip } from "@/lib/simulator";
 import { hasAnyPermission } from "@/lib/permissions";
 
 export default async function AppLayout({
@@ -98,8 +98,9 @@ export default async function AppLayout({
   // Get sim state for banner (only show to real admins)
   const simDate = realIsAdmin ? await getSimDate() : null;
   const simUserId = realIsAdmin ? await getSimUserId() : null;
+  const simTripActive = realIsAdmin ? await isSimulatingTrip() : false;
   const simUserName = simulating ? (profile?.display_name || null) : null;
-  const showBanner = realIsAdmin && (simDate || simUserId);
+  const showBanner = realIsAdmin && (simDate || simUserId || simTripActive);
 
   return (
     <MusicPlayerProvider>
@@ -109,6 +110,7 @@ export default async function AppLayout({
           <SimulatorBanner
             simDate={simDate}
             simUserName={simUserName}
+            simTripActive={simTripActive}
           />
         )}
         <HeaderBar

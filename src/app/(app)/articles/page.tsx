@@ -1,6 +1,6 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
+import { getEffectiveUserId, isSimulating, getEffectiveTripId } from "@/lib/simulator";
 import { ArticleList } from "@/components/articles/ArticleList";
 import { AdminLink } from "@/components/AdminLink";
 
@@ -15,7 +15,7 @@ export default async function ArticlesPage() {
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

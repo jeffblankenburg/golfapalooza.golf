@@ -1,7 +1,7 @@
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ScheduleView } from "@/components/ScheduleView";
-import { getEffectiveUserId, getEffectiveDate, isSimulating } from "@/lib/simulator";
+import { getEffectiveUserId, getEffectiveDate, isSimulating, getEffectiveTripId } from "@/lib/simulator";
 import { isFeatureVisible } from "@/lib/visibility";
 
 export default async function SchedulePage() {
@@ -15,7 +15,7 @@ export default async function SchedulePage() {
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id, start_date, show_tee_times, timezone, visibility_overrides")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

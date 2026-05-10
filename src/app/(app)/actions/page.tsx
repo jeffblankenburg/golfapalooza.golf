@@ -2,7 +2,7 @@ import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { ActionItemsList } from "@/components/ActionItemsList";
-import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
+import { getEffectiveUserId, isSimulating, getEffectiveTripId } from "@/lib/simulator";
 
 export default async function ActionsPage() {
   const user = await getAuthUser();
@@ -19,7 +19,7 @@ export default async function ActionsPage() {
   const { data: trip } = await supabase
     .from("trip_settings")
     .select("id")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

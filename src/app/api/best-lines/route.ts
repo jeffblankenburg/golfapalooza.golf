@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getEffectiveUserId } from "@/lib/simulator";
+import { getEffectiveUserId, getEffectiveTripId } from "@/lib/simulator";
 import { checkPermissionAccess } from "@/lib/permissions-server";
 
 /**
@@ -32,7 +32,7 @@ export async function GET() {
   const { data: trip } = await adminClient
     .from("trip_settings")
     .select("id")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .maybeSingle();
 
   if (!trip) {
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
   const { data: trip } = await adminClient
     .from("trip_settings")
     .select("id")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .maybeSingle();
 
   if (!trip) {

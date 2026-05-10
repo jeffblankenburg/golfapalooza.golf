@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendBulkNotifications } from "@/lib/notifications/service";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
+import { getEffectiveUserId, isSimulating, isSimulatingTrip } from "@/lib/simulator";
 
 /**
  * @swagger
@@ -204,6 +204,16 @@ export async function POST(
     return NextResponse.json(
       { error: "Message must have content or an image" },
       { status: 400 }
+    );
+  }
+
+  // Issue #126 — never write chat messages while operating against the
+  // test event. Real Loozers don't see them anyway, but writes would
+  // pollute real chat rooms when sim-mode admin sends them.
+  if (await isSimulatingTrip()) {
+    return NextResponse.json(
+      { sim: true, suppressed: "chat write suppressed in sim mode" },
+      { status: 200 },
     );
   }
 

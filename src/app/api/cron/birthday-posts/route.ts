@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getBirthdaysToday, currentYearInTimezone } from "@/lib/birthday/today";
 import { pickBirthdayMessage } from "@/lib/birthday/messages";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 /**
  * Cron endpoint: runs once per day.
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
   const { data: trip } = await adminClient
     .from("trip_settings")
     .select("timezone")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
   const tz = trip?.timezone || "America/New_York";
 

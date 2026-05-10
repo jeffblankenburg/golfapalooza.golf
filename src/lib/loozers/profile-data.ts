@@ -3,7 +3,7 @@
 //   - /loozers/{userId} server page (SSR; eliminates a client waterfall)
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getEffectiveDate } from "@/lib/simulator";
+import { getEffectiveDate, getEffectiveTripId } from "@/lib/simulator";
 import { isFeatureVisible } from "@/lib/visibility";
 
 export interface LoozerProfileResponse {
@@ -129,11 +129,16 @@ export async function loadLoozerProfile(
       .eq("user_id", userId)
       .eq("on_roster", true),
     // Active trip — needed for the during-event room number badge below.
-    adminClient
-      .from("trip_settings")
-      .select("id, start_date, visibility_overrides")
-      .eq("status", "active")
-      .maybeSingle(),
+    // Routed through getEffectiveTripId so admin sim mode sees the test event.
+    (async () => {
+      const tripId = await getEffectiveTripId();
+      if (!tripId) return { data: null };
+      return adminClient
+        .from("trip_settings")
+        .select("id, start_date, visibility_overrides")
+        .eq("id", tripId)
+        .maybeSingle();
+    })(),
   ]);
 
   if (profileError || !profile) return null;

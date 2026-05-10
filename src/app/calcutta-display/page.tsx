@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { CalcuttaDisplay } from "@/components/calcutta/CalcuttaDisplay";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 export default async function CalcuttaDisplayPage() {
   const supabase = await createClient();
@@ -16,7 +17,7 @@ export default async function CalcuttaDisplayPage() {
   const { data: trip } = await adminClient
     .from("trip_settings")
     .select("id")
-    .eq("status", "active")
+    .eq("id", (await getEffectiveTripId())!)
     .single();
 
   if (!trip) {

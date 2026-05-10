@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveTripId } from "@/lib/simulator";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
     const { data: trip } = await supabase
       .from("trip_settings")
       .select("id")
-      .eq("status", "active")
+      .eq("id", (await getEffectiveTripId())!)
       .single();
     tripId = trip?.id || null;
   }

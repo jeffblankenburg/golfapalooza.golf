@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 import { PickemHeader } from "@/components/pickem/PickemHeader";
 import { logActivity } from "@/components/ActivityTracker";
+import { computePickemPayouts } from "@/lib/pickem/payouts";
 
 interface Game {
   id: string;
@@ -59,6 +60,7 @@ export function PickemContent({
   const [entryFee, setEntryFee] = useState<number>(0);
   const [payoutPcts, setPayoutPcts] = useState<Array<{ place: number; percentage: number }>>([]);
   const [hasPaid, setHasPaid] = useState(true);
+  const [paidCount, setPaidCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [tab, setTab] = useState<"picks" | "leaderboard">("picks");
@@ -76,6 +78,7 @@ export function PickemContent({
     setEntryFee(data.settings?.entry_fee || 0);
     setPayoutPcts(data.settings?.payout_json || []);
     setHasPaid(data.has_paid || false);
+    setPaidCount(data.paid_count || 0);
   }, [contestId]);
 
   useEffect(() => {
@@ -170,6 +173,16 @@ export function PickemContent({
     });
   };
 
+  const pickemPayouts = useMemo(() => {
+    if (paidCount <= 0 || entryFee <= 0 || payoutPcts.length === 0) return [];
+    const splits = payoutPcts.map((p) => ({
+      place: p.place,
+      kind: "percentage" as const,
+      amount: p.percentage,
+    }));
+    return computePickemPayouts(entryFee * paidCount, splits);
+  }, [entryFee, paidCount, payoutPcts]);
+
   if (loading) {
     return (
       <div className="flex justify-center py-12">
@@ -260,6 +273,15 @@ export function PickemContent({
           </div>
         );
       })()}
+
+      {/* Pickem payouts — visible as soon as Whitey has games set up
+          (i.e. picks are available). Pot updates as more Loozers pay. */}
+      {games.length > 0 && pickemPayouts.length > 0 && (
+        <PickemPayoutPanel
+          pot={entryFee * paidCount}
+          payouts={pickemPayouts}
+        />
+      )}
 
       {/* Tabs */}
       <div className="flex rounded-xl bg-gray-100 p-1 mb-4">
@@ -603,5 +625,50 @@ function PickButton({
       </p>
       <p className="text-xs text-gray-500 mt-0.5">{spreadLabel}</p>
     </button>
+  );
+}
+
+const fmtMoney = (n: number) =>
+  n.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: n % 1 === 0 ? 0 : 2,
+  });
+
+function ordinalLabel(place: number): string {
+  if (place === 1) return "1st place";
+  if (place === 2) return "2nd place";
+  if (place === 3) return "3rd place";
+  return `${place}th place`;
+}
+
+function PickemPayoutPanel({
+  pot,
+  payouts,
+}: {
+  pot: number;
+  payouts: Array<{ place: number; percentage: number; amount: number }>;
+}) {
+  return (
+    <div className="bg-lime-50 border border-lime-200 rounded-2xl p-3 mb-4">
+      <div className="flex items-baseline justify-between mb-2">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-lime-800">
+          Pick&apos;em payouts
+        </h2>
+        <span className="text-[10px] text-lime-700 tabular-nums">
+          {fmtMoney(pot)} pot
+        </span>
+      </div>
+      <div className={`grid gap-2 ${payouts.length === 1 ? "grid-cols-1" : payouts.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+        {payouts.map((p) => (
+          <div key={p.place} className="bg-white rounded-lg border border-lime-100 px-3 py-2 flex items-baseline justify-between">
+            <span className="text-xs font-semibold text-gray-700">{ordinalLabel(p.place)}</span>
+            <span className="text-base font-bold text-gray-900 tabular-nums">
+              {fmtMoney(p.amount)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

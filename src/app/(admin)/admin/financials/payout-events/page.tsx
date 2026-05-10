@@ -29,17 +29,6 @@ type Source =
   | "pickem_payments"
   | "manual";
 
-type WinnerSource =
-  | "scramble_team"
-  | "scramble_skins"
-  | "ctp_front"
-  | "ctp_back"
-  | "long_drive"
-  | "long_putt"
-  | "hundred_feet"
-  | "pickem"
-  | "none";
-
 interface Row {
   id: string;
   trip_id: string;
@@ -51,10 +40,11 @@ interface Row {
   amount_per_participant: number;
   day_count: number;
   is_payout: boolean;
-  winner_source: WinnerSource | null;
-  winner_day_number: number | null;
-  cost_item_id: string | null;
+  // payout_splits and cost_item_id come from the linked contest at read
+  // time (compute.ts projection). On save, the modal sends both here and
+  // the API routes them to contests.payout_splits / buy_in_cost_item_id.
   payout_splits: PayoutSplit[] | null;
+  cost_item_id: string | null;
   notes: string | null;
   participant_count: number;
   total: number;
@@ -95,30 +85,11 @@ const SOURCE_LABELS: Record<Source, string> = {
   manual: "Manual count",
 };
 
-const WINNER_SOURCE_LABELS: Record<WinnerSource, string> = {
-  scramble_team: "Scramble team",
-  scramble_skins: "Skins",
-  ctp_front: "Closest to Pin — Front",
-  ctp_back: "Closest to Pin — Back",
-  long_drive: "Long Drive",
-  long_putt: "Long Putt",
-  hundred_feet: "100 Feet",
-  pickem: "Pick'em",
-  none: "None — pass-through cash",
-};
-
-const WINNER_NEEDS_DAY: Set<WinnerSource> = new Set([
-  "ctp_front",
-  "ctp_back",
-  "long_drive",
-  "long_putt",
-]);
-
-// Default split structure when admin first picks a winner_source. Admin can
-// edit any of these in the modal — these are just sensible starting points.
-// Mirrors scripts/backfill-payout-splits.mjs.
-const DEFAULT_SPLITS_BY_KIND: Record<WinnerSource, PayoutSplit[] | null> = {
-  scramble_team: [
+// Default splits seeded into a contest's payout_splits when admin sets
+// the contest_type and there's no existing config. Each entry is an
+// admin-editable starting point.
+const DEFAULT_SPLITS_BY_CONTEST_TYPE: Record<string, PayoutSplit[] | null> = {
+  scramble: [
     { place: 1, kind: "remainder" },
     { place: 2, kind: "flat", amount: 80 },
   ],
@@ -127,9 +98,6 @@ const DEFAULT_SPLITS_BY_KIND: Record<WinnerSource, PayoutSplit[] | null> = {
   ctp_back: [{ place: 1, kind: "single_winner" }],
   long_drive: [{ place: 1, kind: "single_winner" }],
   long_putt: [{ place: 1, kind: "single_winner" }],
-  hundred_feet: [{ place: 1, kind: "single_winner" }],
-  pickem: null,
-  none: null,
 };
 
 const SPLIT_KIND_LABELS: Record<PayoutSplitKind, string> = {
@@ -212,7 +180,7 @@ export default function PayoutEventsAdminPage() {
     if (allowed) fetchAll();
   }, [allowed, fetchAll]);
 
-  async function saveRow(id: string, patch: Partial<Row>) {
+  async function saveRow(id: string, patch: Partial<Row>): Promise<boolean> {
     const before = rows.find((r) => r.id === id);
     let displayPatch: Partial<Row> = patch;
     if ("cost_item_id" in patch && patch.cost_item_id) {
@@ -242,9 +210,10 @@ export default function PayoutEventsAdminPage() {
       if (before) setRows((prev) => prev.map((r) => (r.id === id ? before : r)));
       const err = await res.json().catch(() => ({}));
       setErrorMsg(err.error || "Save failed");
-      return;
+      return false;
     }
     setErrorMsg(null);
+    return true;
   }
 
   async function createRow(patch: Partial<Row>) {
@@ -489,7 +458,7 @@ function PayoutEventModal({
   costItems: CostItemRef[];
   onCancel: () => void;
   onCreate: (patch: Partial<Row>) => Promise<void>;
-  onSave: (id: string, patch: Partial<Row>) => Promise<void>;
+  onSave: (id: string, patch: Partial<Row>) => Promise<boolean>;
   onDelete: (id: string) => Promise<void>;
 }) {
   const isEdit = state.mode === "edit";
@@ -501,8 +470,6 @@ function PayoutEventModal({
   const [participantSource, setParticipantSource] = useState<Source>(initial?.participant_source ?? "manual");
   const [sourceRef, setSourceRef] = useState<string | null>(initial?.source_ref ?? null);
   const [sourceFilter, setSourceFilter] = useState<{ choice_values?: string[]; count?: number } | null>(initial?.source_filter ?? null);
-  const [winnerSource, setWinnerSource] = useState<WinnerSource>(initial?.winner_source ?? "none");
-  const [winnerDay, setWinnerDay] = useState<number | null>(initial?.winner_day_number ?? null);
   const [payoutSplits, setPayoutSplits] = useState<PayoutSplit[] | null>(initial?.payout_splits ?? null);
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [saving, setSaving] = useState(false);
@@ -521,27 +488,28 @@ function PayoutEventModal({
       label: label.trim(),
       contest_id: contestId,
       cost_item_id: costItemId,
-      // amount_per_participant only sent on create (and only as 0 fallback);
-      // linked rows derive their amount from cost_items at read time.
       day_count: 1,
-      is_payout: winnerSource !== "none",
+      // is_payout: contest-linked rows pay out; non-contest rows are
+      // pass-through cash (Lodge), no payout.
+      is_payout: !!linkedContest,
       participant_source: participantSource,
       source_ref: sourceRef,
       source_filter: sourceFilter,
-      winner_source: winnerSource,
-      winner_day_number: WINNER_NEEDS_DAY.has(winnerSource) ? winnerDay : null,
       payout_splits: payoutSplits,
       notes: notes.trim() ? notes.trim() : null,
     };
     if (isEdit && initial) {
-      await onSave(initial.id, patch);
-    } else {
-      // For create, include the fallback amount when no cost item is linked.
-      await onCreate({
-        ...patch,
-        amount_per_participant: linkedCostItem ? Number(linkedCostItem.cost) : 0,
-      });
+      const ok = await onSave(initial.id, patch);
+      setSaving(false);
+      if (ok) onCancel();
+      return;
     }
+    // For create, include the fallback amount when no cost item is linked.
+    // onCreate closes the modal itself on success.
+    await onCreate({
+      ...patch,
+      amount_per_participant: linkedCostItem ? Number(linkedCostItem.cost) : 0,
+    });
     setSaving(false);
   }
 
@@ -747,47 +715,10 @@ function PayoutEventModal({
             </div>
           )}
 
-          {/* Winner source — same story. Hidden when a contest is linked,
-              because contest_type + day_number already say which winner-
-              determination logic applies. */}
-          {!linkedContest && (
-            <div className="space-y-2">
-              <span className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Who wins</span>
-              <select
-                value={winnerSource}
-                onChange={(e) => {
-                  const next = e.target.value as WinnerSource;
-                  setWinnerSource(next);
-                  if (!WINNER_NEEDS_DAY.has(next)) setWinnerDay(null);
-                  // Seed default payout splits when switching kinds (admin can
-                  // edit further). null = no payout (Pickem uses pickem_settings).
-                  setPayoutSplits(DEFAULT_SPLITS_BY_KIND[next] ? structuredClone(DEFAULT_SPLITS_BY_KIND[next]!) : null);
-                }}
-                className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white"
-              >
-                {(Object.entries(WINNER_SOURCE_LABELS) as Array<[WinnerSource, string]>).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </select>
-              {WINNER_NEEDS_DAY.has(winnerSource) && (
-                <select
-                  value={winnerDay ?? ""}
-                  onChange={(e) => setWinnerDay(e.target.value ? Number(e.target.value) : null)}
-                  className="border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-white"
-                >
-                  <option value="">— pick day —</option>
-                  <option value="2">Thursday (day 2)</option>
-                  <option value="3">Friday (day 3)</option>
-                  <option value="4">Saturday (day 4)</option>
-                </select>
-              )}
-            </div>
-          )}
-
-          {/* Payout splits — how the pot divides among places. Always
-              visible when there's a payout; saves to the contest when
-              one is linked, otherwise to the row. */}
-          {payoutSplits !== null && (
+          {/* Payout splits — how the pot divides among places. Saves to
+              the linked contest's `payout_splits`. Hidden for non-contest
+              rows (Lodge / pass-through cash) — they have no payout. */}
+          {linkedContest && payoutSplits !== null && (
             <PayoutSplitsEditor
               splits={payoutSplits}
               onChange={setPayoutSplits}
@@ -796,7 +727,12 @@ function PayoutEventModal({
           {linkedContest && payoutSplits === null && (
             <button
               type="button"
-              onClick={() => setPayoutSplits([{ place: 1, kind: "single_winner" }])}
+              onClick={() => {
+                const seeded = DEFAULT_SPLITS_BY_CONTEST_TYPE[linkedContest.contest_type];
+                setPayoutSplits(
+                  seeded ? structuredClone(seeded) : [{ place: 1, kind: "single_winner" }],
+                );
+              }}
               className="text-xs text-green-700 underline"
             >
               + Add payout splits

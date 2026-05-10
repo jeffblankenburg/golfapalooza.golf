@@ -558,7 +558,7 @@ export function HomeContent({
                 return (
                   <div key={option.value}>
                     <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
-                      {option.label} ({group.length})
+                      {option.label} {option.value}% ({group.length})
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {group.map((p) => {

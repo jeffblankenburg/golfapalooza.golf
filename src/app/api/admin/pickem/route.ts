@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 
     const tripId = contestRow?.trip_id;
 
-    const [gamesRes, settingsRes, participantsRes, picksRes] = await Promise.all([
+    const [gamesRes, settingsRes, contestSplitsRes, participantsRes, picksRes] = await Promise.all([
       adminClient
         .from("pickem_games")
         .select("*")
@@ -37,13 +37,22 @@ export async function GET(request: Request) {
         .order("game_time"),
       adminClient
         .from("pickem_settings")
-        .select("*")
+        .select("contest_id, entry_fee, is_open")
         .eq("contest_id", contestId)
-        .single(),
+        .maybeSingle(),
+      // Issue #124: payout structure now lives on contests.payout_splits.
       adminClient
-        .from("event_participants")
-        .select("user_id, user:users!event_participants_user_id_fkey(id, display_name, full_name, avatar_url)")
-        .eq("trip_id", tripId),
+        .from("contests")
+        .select("payout_splits")
+        .eq("id", contestId)
+        .single(),
+      // Pickem participants come from the contest's roster (issue #124).
+      // contest_participants is auto-populated when a Loozer selects the
+      // funding option, and Whitey can add/remove via the accordion.
+      adminClient
+        .from("contest_participants")
+        .select("user_id, user:users!contest_participants_user_id_fkey(id, display_name, full_name, avatar_url)")
+        .eq("contest_id", contestId),
       adminClient
         .from("pickem_picks")
         .select("game_id, user_id, picked_team, tiebreaker_total"),
@@ -69,9 +78,25 @@ export async function GET(request: Request) {
       };
     });
 
+    // Translate contests.payout_splits → the legacy {place, percentage}
+    // shape the PickemManager UI still consumes. Caller doesn't need to
+    // know the structure moved.
+    type Split = { place: number; kind: string; amount?: number };
+    const splits = (contestSplitsRes.data?.payout_splits || []) as Split[];
+    const payout_json = splits
+      .filter((s) => s.kind === "percentage")
+      .map((s) => ({ place: Number(s.place), percentage: Number(s.amount ?? 0) }));
+
+    const settings = {
+      contest_id: contestId,
+      entry_fee: settingsRes.data?.entry_fee ?? 0,
+      is_open: settingsRes.data?.is_open ?? false,
+      payout_json,
+    };
+
     return NextResponse.json({
       games: gamesRes.data || [],
-      settings: settingsRes.data || null,
+      settings,
       participants,
       picks: contestPicks,
       payments: payments || [],

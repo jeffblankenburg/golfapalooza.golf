@@ -38,13 +38,19 @@ export default async function DailyGamesPage() {
     );
   }
 
-  const [winnersResult, eventDaysResult] = await Promise.all([
+  // Issue #124 Phase F: daily winners now live on contest_winners,
+  // keyed by per-day contest_id. We pull contests joined to their
+  // winners and re-shape into the {day_number, contest_type, user} rows
+  // the view loop expects.
+  const [dailyContestsResult, eventDaysResult] = await Promise.all([
     adminClient
-      .from("daily_contest_winners")
-      .select("id, day_number, contest_type, user_id, user:users!daily_contest_winners_user_id_fkey(display_name, avatar_url)")
+      .from("contests")
+      .select(
+        "id, day_number, contest_type, contest_winners(user_id, user:users!contest_winners_user_id_fkey(display_name, avatar_url))",
+      )
       .eq("trip_id", trip.id)
-      .order("day_number")
-      .order("contest_type"),
+      .in("contest_type", ["ctp_front", "ctp_back", "long_drive", "long_putt"])
+      .not("day_number", "is", null),
     adminClient
       .from("contests")
       .select("day_number")
@@ -54,7 +60,26 @@ export default async function DailyGamesPage() {
       .order("day_number"),
   ]);
 
-  const winners = winnersResult.data;
+  type DailyWinner = {
+    day_number: number;
+    contest_type: string;
+    user_id: string;
+    user: { display_name: string; avatar_url: string | null } | { display_name: string; avatar_url: string | null }[] | null;
+  };
+  const winners: DailyWinner[] = [];
+  for (const c of dailyContestsResult.data || []) {
+    const cwArr = (c.contest_winners ?? []) as Array<{
+      user_id: string;
+      user: { display_name: string; avatar_url: string | null } | { display_name: string; avatar_url: string | null }[] | null;
+    }>;
+    if (cwArr.length === 0 || c.day_number == null) continue;
+    winners.push({
+      day_number: c.day_number,
+      contest_type: c.contest_type,
+      user_id: cwArr[0].user_id,
+      user: cwArr[0].user,
+    });
+  }
 
   const startDate = new Date(trip.start_date + "T00:00:00");
   const dayLabels = (dayNum: number) => {

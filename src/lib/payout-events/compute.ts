@@ -16,17 +16,6 @@ export type ParticipantSource =
   | "pickem_payments"
   | "manual";
 
-export type WinnerSource =
-  | "scramble_team"
-  | "scramble_skins"
-  | "ctp_front"
-  | "ctp_back"
-  | "long_drive"
-  | "long_putt"
-  | "hundred_feet"
-  | "pickem"
-  | "none";
-
 export interface PayoutSheetEvent {
   id: string;
   trip_id: string;
@@ -36,31 +25,21 @@ export interface PayoutSheetEvent {
   source_ref: string | null;
   source_filter: { choice_values?: string[]; count?: number } | null;
   /**
-   * Effective per-participant amount. When the row is linked to a `cost_item`
-   * (cost_item_id is set), this is the cost_item's current `cost`. Otherwise
-   * falls back to the stored amount_per_participant column. Always treat this
-   * as the authoritative per-participant value.
+   * Per-participant amount. For contest-linked rows, comes from the
+   * contest's `buy_in_cost_item` cost (overlaid at projection time).
+   * For Lodge-style pass-through rows, comes from the row's stored
+   * `amount_per_participant`.
    */
   amount_per_participant: number;
   day_count: number;
   is_payout: boolean;
   notes: string | null;
-  winner_source: WinnerSource | null;
-  winner_day_number: number | null;
-  cost_item_id: string | null;
   /**
-   * Admin-configured per-place split. null = no split configured (Pickem
-   * uses pickem_settings.payout_json; pass-through rows have no payout).
-   * See src/lib/payout-events/splits.ts for the shape.
+   * Per-place split for the contest's pot. Sourced from the linked
+   * contest (issue #124 Phase F dropped the row-level column).
+   * null for non-payout rows (Lodge) or unconfigured contests.
    */
   payout_splits: PayoutSplit[] | null;
-  /**
-   * Issue #124 Phase B+: link to the contests row that owns this payout.
-   * Once Phase D ships, winner_source/winner_day_number/payout_splits/
-   * cost_item_id all come from the contest. Today they're duplicated on
-   * both rows and kept in sync by the admin UI. Lodge (pass-through) rows
-   * have no contest.
-   */
   contest_id: string | null;
   contest: PayoutSheetEventContest | null;
 }
@@ -200,14 +179,14 @@ export async function computeParticipantCount(
 
 type CostItemJoin = { cost: number | string } | { cost: number | string }[] | null | undefined;
 
-// Raw shape from PostgREST. The contest join nests its own buy_in cost item,
-// so the contest can carry its current cost without an extra round-trip.
+// Raw shape from PostgREST. The contest join nests its own buy_in cost
+// item so the contest's current cost ships without an extra round-trip.
 type RawJoinedContest = PayoutSheetEventContest & {
   buy_in_cost_item?: CostItemJoin;
 };
 
-type RawJoinedRow = PayoutSheetEvent & {
-  cost_item?: CostItemJoin;
+type RawJoinedRow = Omit<PayoutSheetEvent, "amount_per_participant" | "payout_splits" | "contest"> & {
+  amount_per_participant: number | string;
   contest?: RawJoinedContest | RawJoinedContest[] | null;
 };
 
@@ -224,29 +203,19 @@ function costFromJoin(raw: CostItemJoin): number | null {
 }
 
 /**
- * Per row, decide which fields are *actually* authoritative — the row's
- * stored values, or the linked contest's. When `contest_id` is set the
- * contest wins for cost_item_id, payout_splits, and the cost overlay.
- * The row's own columns become dead-letter (kept around so we can
- * roll back, removed in a later migration).
- *
- * Returns the projection ready to ship to consumers — neither readers nor
- * the admin UI need to know which side it came from.
+ * Project a raw row into the canonical `PayoutSheetEvent` shape. When
+ * a contest is linked, contest fields (cost, splits) are authoritative.
+ * For Lodge-style pass-through rows (no contest), the row's stored
+ * `amount_per_participant` stands, and `payout_splits` is null.
  */
 function projectRow(raw: RawJoinedRow): PayoutSheetEvent {
   const contest = unwrapJoin(raw.contest);
-  const rowCost = costFromJoin(raw.cost_item);
   const contestCost = contest ? costFromJoin(contest.buy_in_cost_item) : null;
-
-  // Resolve fields. With contest: contest wins. Without: row data stands.
-  const cost_item_id = contest ? contest.buy_in_cost_item_id : raw.cost_item_id;
-  const payout_splits = contest ? contest.payout_splits : raw.payout_splits;
-  const overlayCost = contest ? contestCost : rowCost;
   const amount_per_participant =
-    overlayCost != null ? overlayCost : Number(raw.amount_per_participant) || 0;
+    contestCost != null ? contestCost : Number(raw.amount_per_participant) || 0;
 
-  // Strip the join shape from the contest object so callers only see the
-  // declared `PayoutSheetEventContest` fields.
+  const payout_splits = contest ? contest.payout_splits : null;
+
   const projectedContest: PayoutSheetEventContest | null = contest
     ? {
         id: contest.id,
@@ -271,9 +240,6 @@ function projectRow(raw: RawJoinedRow): PayoutSheetEvent {
     day_count: raw.day_count,
     is_payout: raw.is_payout,
     notes: raw.notes,
-    winner_source: raw.winner_source,
-    winner_day_number: raw.winner_day_number,
-    cost_item_id,
     payout_splits,
     contest_id: raw.contest_id,
     contest: projectedContest,
@@ -287,13 +253,13 @@ export async function loadPayoutSheet(
   const { data: events, error } = await client
     .from("payout_sheet_events")
     .select(
-      "id, trip_id, label, sort_order, participant_source, source_ref, source_filter, amount_per_participant, day_count, is_payout, winner_source, winner_day_number, notes, cost_item_id, payout_splits, contest_id, cost_item:cost_items(cost), contest:contests(id, name, contest_type, day_number, parent_contest_id, buy_in_cost_item_id, payout_splits, buy_in_cost_item:cost_items!contests_buy_in_cost_item_id_fkey(cost))",
+      "id, trip_id, label, sort_order, participant_source, source_ref, source_filter, amount_per_participant, day_count, is_payout, notes, contest_id, contest:contests(id, name, contest_type, day_number, parent_contest_id, buy_in_cost_item_id, payout_splits, buy_in_cost_item:cost_items!contests_buy_in_cost_item_id_fkey(cost))",
     )
     .eq("trip_id", tripId)
     .order("sort_order");
   if (error || !events) return [];
 
-  const projected = (events as RawJoinedRow[]).map(projectRow);
+  const projected = (events as unknown as RawJoinedRow[]).map(projectRow);
 
   const counts = await Promise.all(
     projected.map((e) => computeParticipantCount(client, tripId, e)),

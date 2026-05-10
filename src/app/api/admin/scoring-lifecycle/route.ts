@@ -6,6 +6,10 @@ import {
   attemptBspitwResolution,
   clearWinnersForContest,
 } from "@/lib/winners/resolve";
+import {
+  materializeScrambleTeamWinners,
+  materializeSkinsWinners,
+} from "@/lib/winners/materialize";
 
 export async function PUT(request: Request) {
   const admin = await checkIsAdmin();
@@ -55,6 +59,30 @@ export async function PUT(request: Request) {
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      // Issue #124: snapshot winners at the moment scoring freezes.
+      // Verify will rerun this; that's fine — it's idempotent.
+      const { data: closedContest } = await adminClient
+        .from("contests")
+        .select("contest_type")
+        .eq("id", contest_id)
+        .single();
+      if (closedContest?.contest_type === "scramble") {
+        await materializeScrambleTeamWinners(adminClient, contest_id).catch((err) =>
+          console.error("close: materializeScrambleTeamWinners failed:", err),
+        );
+        const { data: skinsChild } = await adminClient
+          .from("contests")
+          .select("id")
+          .eq("parent_contest_id", contest_id)
+          .eq("contest_type", "scramble_skins")
+          .maybeSingle();
+        if (skinsChild?.id) {
+          await materializeSkinsWinners(adminClient, skinsChild.id).catch((err) =>
+            console.error("close: materializeSkinsWinners failed:", err),
+          );
+        }
       }
     } else if (action === "open") {
       if (contest.verified_at) {
@@ -107,6 +135,33 @@ export async function PUT(request: Request) {
       for (const r of winnerResults) {
         if (!r.resolved && r.error) {
           console.error("Winner resolution failed:", r.error);
+        }
+      }
+
+      // Issue #124: also materialize this contest's winners into the
+      // unified `contest_winners` shape (Team/place rows + per-user
+      // amounts), and trigger the matching child Skins contest if any.
+      // This is the "Phase E" write of the Phase C+D+E streamlined ship.
+      const { data: thisContest } = await adminClient
+        .from("contests")
+        .select("contest_type")
+        .eq("id", contest_id)
+        .single();
+
+      if (thisContest?.contest_type === "scramble") {
+        await materializeScrambleTeamWinners(adminClient, contest_id).catch((err) =>
+          console.error("materializeScrambleTeamWinners failed:", err),
+        );
+        const { data: skinsChild } = await adminClient
+          .from("contests")
+          .select("id")
+          .eq("parent_contest_id", contest_id)
+          .eq("contest_type", "scramble_skins")
+          .maybeSingle();
+        if (skinsChild?.id) {
+          await materializeSkinsWinners(adminClient, skinsChild.id).catch((err) =>
+            console.error("materializeSkinsWinners failed:", err),
+          );
         }
       }
 

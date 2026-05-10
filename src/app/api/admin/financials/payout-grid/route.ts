@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkPermissionAccess } from "@/lib/permissions-server";
-import { loadPayoutGrid } from "@/lib/payout-events/grid";
+import { loadPayoutGridV2 } from "@/lib/payout-events/grid-v2";
 
 /**
  * @swagger
@@ -44,6 +44,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "No active trip" }, { status: 400 });
   }
 
-  const data = await loadPayoutGrid(adminClient, tripId);
+  const data = await loadPayoutGridV2(adminClient, tripId);
   return NextResponse.json({ trip_id: tripId, ...data });
 }

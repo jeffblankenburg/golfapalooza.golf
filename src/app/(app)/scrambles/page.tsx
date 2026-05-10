@@ -6,16 +6,6 @@ import { computePayoutSplits } from "@/lib/payout-events/splits";
 
 export { zoomableViewport as viewport } from "@/lib/viewport";
 
-const DAY_NAMES = ["thursday", "friday", "saturday"];
-
-function dayFromLabel(label: string): number | null {
-  const lbl = label.toLowerCase();
-  for (let i = 0; i < DAY_NAMES.length; i++) {
-    if (lbl.includes(DAY_NAMES[i])) return i + 2; // Thu=2, Fri=3, Sat=4
-  }
-  return null;
-}
-
 export default async function ScorecardsPage() {
   const user = await getAuthUser();
 
@@ -46,18 +36,16 @@ export default async function ScorecardsPage() {
     .eq("contest_type", "scramble")
     .order("day_number");
 
-  // Per-day scramble Team payout pulled from the new cost_items-driven
-  // payout sheet. Pot total = row.total. Per-place amounts come from the
-  // row's admin-configured payout_splits column (default for scramble_team:
-  // [{place:1, kind:"remainder"}, {place:2, kind:"flat", amount:80}]).
-  // Skins, CTP, LD, LP are intentionally excluded — the page is about the
-  // scramble team competition specifically.
+  // Per-day scramble Team payout. Pot total = row.total; per-place
+  // amounts come from the contest's admin-configured payout_splits
+  // (default: 1st = remainder, 2nd = flat $80). Skins/CTP/LD/LP live
+  // on different contest types; we filter to scramble Team specifically.
   const adminClient = createAdminClient();
   const allPayoutRows = await loadPayoutSheet(adminClient, trip.id);
   const dayScramblePayouts: Record<number, { pot: number; first: number; second: number }> = {};
   for (const row of allPayoutRows) {
-    if (row.winner_source !== "scramble_team") continue;
-    const day = dayFromLabel(row.label);
+    if (row.contest?.contest_type !== "scramble") continue;
+    const day = row.contest.day_number;
     if (day == null) continue;
     const splits = computePayoutSplits(row.total, row.payout_splits);
     dayScramblePayouts[day] = {

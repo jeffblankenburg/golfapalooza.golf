@@ -3,8 +3,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { CollapsibleSection } from "@/components/admin/CollapsibleSection";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import { ContestParticipantsAccordion } from "@/components/admin/ContestParticipantsAccordion";
 import { FBS_TEAMS, getTeamLogoUrl, type FBSTeam } from "@/lib/data/fbs-teams";
 import { BTN_NEUTRAL, BTN_PRIMARY } from "@/lib/ui/buttons";
+import { computePickemPayouts } from "@/lib/pickem/payouts";
 
 function SvgIcon({ src, className = "w-5 h-5" }: { src: string; className?: string }) {
   return (
@@ -202,32 +204,19 @@ function TeamSelector({
   );
 }
 
-// Compute payouts from percentages, rounded to nearest $5, higher places benefit
+// Compute payouts from percentages — single source for the algorithm
+// is `@/lib/pickem/payouts` (issue #124). Keeps this UI and the winners
+// materializer in lockstep.
 function computePayouts(
   totalPot: number,
   percentages: Array<{ place: number; percentage: number }>
 ): Array<{ place: number; percentage: number; amount: number }> {
-  if (totalPot <= 0 || percentages.length === 0) return [];
-
-  // Calculate raw amounts and round each down to nearest $5
-  const results = percentages.map((p) => ({
+  const splits = percentages.map((p) => ({
     place: p.place,
-    percentage: p.percentage,
-    rawAmount: (totalPot * p.percentage) / 100,
-    amount: Math.floor((totalPot * p.percentage) / 100 / 5) * 5,
+    kind: "percentage" as const,
+    amount: p.percentage,
   }));
-
-  // Distribute remaining $5 increments starting from 1st place
-  const allocated = results.reduce((sum, r) => sum + r.amount, 0);
-  let remaining = totalPot - allocated;
-  for (const r of results) {
-    if (remaining >= 5) {
-      r.amount += 5;
-      remaining -= 5;
-    }
-  }
-
-  return results.map((r) => ({ place: r.place, percentage: r.percentage, amount: r.amount }));
+  return computePickemPayouts(totalPot, splits);
 }
 
 // ============================================================
@@ -637,6 +626,17 @@ export function PickemManager({ tripId }: { tripId: string }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </a>
+      )}
+
+      {/* ====== PARTICIPANTS ====== */}
+      {contestId && (
+        <ContestParticipantsAccordion
+          tripId={tripId}
+          contestName="Pick'em"
+          contestId={contestId}
+          contestType="pickem"
+          onChanged={fetchData}
+        />
       )}
 
       {/* ====== GAMES ====== */}

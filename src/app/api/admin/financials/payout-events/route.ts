@@ -79,8 +79,6 @@ export async function POST(request: Request) {
       amount_per_participant,
       day_count,
       is_payout,
-      winner_source,
-      winner_day_number,
       cost_item_id,
       payout_splits,
       contest_id,
@@ -96,9 +94,6 @@ export async function POST(request: Request) {
 
     const adminClient = createAdminClient();
 
-    // When linked to a contest, contest-level fields write to the contest;
-    // the row's own copies start dead-letter (null). Without a contest the
-    // row holds them itself (Lodge-style pass-through).
     const insertPayload: Record<string, unknown> = {
       trip_id,
       label,
@@ -109,11 +104,7 @@ export async function POST(request: Request) {
       amount_per_participant: amount_per_participant ?? 0,
       day_count: day_count ?? 1,
       is_payout: is_payout ?? true,
-      winner_source: winner_source ?? "none",
-      winner_day_number: winner_day_number ?? null,
       contest_id: contest_id ?? null,
-      cost_item_id: contest_id ? null : (cost_item_id ?? null),
-      payout_splits: contest_id ? null : (payout_splits ?? null),
       notes: notes ?? null,
     };
 
@@ -137,8 +128,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Re-load through loadPayoutSheet so the response carries the projected
-    // (contest-overridden) values.
+    // Re-load so the response includes the projected contest values.
     const sheet = await loadPayoutSheet(adminClient, trip_id);
     return NextResponse.json({ row: sheet.find((r) => r.id === data.id) ?? data });
   } catch (err) {

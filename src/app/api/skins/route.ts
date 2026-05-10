@@ -38,9 +38,8 @@ export async function GET(request: Request) {
 
   // Per-player Skins amount comes from the Skins child contest's buy-in
   // cost item. The Skins contest hangs off the Scramble Day contest via
-  // parent_contest_id (issue #124 Phase B). Falls back to the legacy
-  // payout_sheet_events lookup for trips that haven't been migrated, then
-  // to $10 as a last resort.
+  // parent_contest_id (issue #124 Phase B). Defaults to $10 if nothing
+  // is configured.
   let perPlayerAmount = 10;
   const { data: skinsContest } = await supabase
     .from("contests")
@@ -54,26 +53,6 @@ export async function GET(request: Request) {
   const skinsCost = skinsItem && skinsItem.cost != null ? Number(skinsItem.cost) : null;
   if (skinsCost !== null && skinsCost > 0) {
     perPlayerAmount = skinsCost;
-  } else {
-    // Legacy fallback for un-migrated trips.
-    const { data: skinsEvent } = await supabase
-      .from("payout_sheet_events")
-      .select("amount_per_participant, cost_item:cost_items(cost)")
-      .eq("participant_source", "scramble")
-      .eq("source_ref", contestId)
-      .ilike("label", "%skins%")
-      .maybeSingle();
-    if (skinsEvent) {
-      const joined = (skinsEvent as { cost_item?: CostJoin }).cost_item;
-      const item = Array.isArray(joined) ? joined[0] : joined;
-      const linkedCost = item && item.cost != null ? Number(item.cost) : null;
-      const stored = Number(skinsEvent.amount_per_participant);
-      if (linkedCost !== null && linkedCost > 0) {
-        perPlayerAmount = linkedCost;
-      } else if (stored > 0) {
-        perPlayerAmount = stored;
-      }
-    }
   }
 
   // Fetch teams

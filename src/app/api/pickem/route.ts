@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 
     const tripId = contestRow?.trip_id;
 
-    const [gamesRes, allPicksRes, participantsRes, settingsRes] = await Promise.all([
+    const [gamesRes, allPicksRes, participantsRes, settingsRes, contestSplitsRes] = await Promise.all([
       adminClient
         .from("pickem_games")
         .select("*")
@@ -52,8 +52,14 @@ export async function GET(request: Request) {
         .eq("trip_id", tripId),
       adminClient
         .from("pickem_settings")
-        .select("entry_fee, payout_json")
+        .select("entry_fee")
         .eq("contest_id", contestId)
+        .maybeSingle(),
+      // Issue #124: payout structure now lives on contests.payout_splits.
+      adminClient
+        .from("contests")
+        .select("payout_splits")
+        .eq("id", contestId)
         .single(),
     ]);
 
@@ -200,21 +206,42 @@ export async function GET(request: Request) {
       (leaderboard[i] as Record<string, unknown>).rank = rank;
     }
 
-    // Check if current user has paid
-    const { data: myPayment } = await adminClient
-      .from("pickem_payments")
-      .select("paid")
-      .eq("contest_id", contestId)
-      .eq("user_id", effectiveUserId)
-      .single();
+    // Check if current user has paid + total paid count for pot math.
+    const [myPaymentRes, paidCountRes] = await Promise.all([
+      adminClient
+        .from("pickem_payments")
+        .select("paid")
+        .eq("contest_id", contestId)
+        .eq("user_id", effectiveUserId)
+        .single(),
+      adminClient
+        .from("pickem_payments")
+        .select("id", { count: "exact", head: true })
+        .eq("contest_id", contestId)
+        .eq("paid", true),
+    ]);
+    const myPayment = myPaymentRes.data;
+    const paidCount = paidCountRes.count ?? 0;
 
     return NextResponse.json({
       games: gamesWithStatus,
       my_picks: myPicks,
       leaderboard,
-      settings: settingsRes.data || null,
+      settings: (() => {
+        type Split = { place: number; kind: string; amount?: number };
+        const splits = (contestSplitsRes.data?.payout_splits || []) as Split[];
+        const payout_json = splits
+          .filter((s) => s.kind === "percentage")
+          .map((s) => ({ place: Number(s.place), percentage: Number(s.amount ?? 0) }));
+        return {
+          contest_id: contestId,
+          entry_fee: settingsRes.data?.entry_fee ?? 0,
+          payout_json,
+        };
+      })(),
       effective_user_id: effectiveUserId,
       has_paid: myPayment?.paid || false,
+      paid_count: paidCount,
     });
   } catch (error) {
     console.error("Get pickem data error:", error);
@@ -298,6 +325,17 @@ export async function POST(request: Request) {
           tiebreaker_total: tiebreaker_total !== undefined ? tiebreaker_total : null,
         },
         { onConflict: "game_id,user_id" }
+      );
+
+    // Anyone who makes a pick auto-enrolls in contest_participants so
+    // Whitey can see them in the Payments tab and chase the entry fee.
+    // Paid status stays untouched — they're not on the leaderboard until
+    // Whitey marks them paid (which requires real money to come in).
+    await adminClient
+      .from("contest_participants")
+      .upsert(
+        { contest_id: game.contest_id, user_id: effectiveUserId },
+        { onConflict: "contest_id,user_id" },
       );
 
     if (error) {

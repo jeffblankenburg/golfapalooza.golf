@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { ConfirmModal } from "@/components/admin/ConfirmModal";
 
 interface Participant {
   id: string;
@@ -13,17 +14,26 @@ interface Participant {
  * Reusable accordion that shows all event participants with checkboxes
  * to toggle contest enrollment. Fetches contest participants on mount
  * and syncs with the contest_participants API.
+ *
+ * Removing a participant is destructive — the API also clears any
+ * type-specific child rows ("they were a mistake" semantics). Pickem
+ * removals also wipe the user's picks and payment record. We surface a
+ * warning modal so admins know what they're about to delete.
  */
 export function ContestParticipantsAccordion({
   tripId,
   contestName,
   contestId,
+  contestType,
   defaultOpen = false,
   onChanged,
 }: {
   tripId: string;
   contestName: string;
   contestId: string;
+  /** Optional — drives the warning-modal copy. Pickem callouts the
+   *  picks + payment cleanup; everything else just says "remove". */
+  contestType?: string;
   defaultOpen?: boolean;
   onChanged?: () => void;
 }) {
@@ -31,7 +41,10 @@ export function ContestParticipantsAccordion({
   const [loading, setLoading] = useState(true);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [enrolledIds, setEnrolledIds] = useState<Set<string>>(new Set());
+  const [fundedByOptionIds, setFundedByOptionIds] = useState<Set<string>>(new Set());
   const [togglingUser, setTogglingUser] = useState<string | null>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<Participant | null>(null);
+  const [blockedRemoval, setBlockedRemoval] = useState<Participant | null>(null);
 
   const fetchData = useCallback(async () => {
     const [rosterRes, enrolledRes] = await Promise.all([
@@ -55,9 +68,11 @@ export function ContestParticipantsAccordion({
     const enrolled = new Set<string>(
       (enrolledData.participants || []).map((p: { user_id: string }) => p.user_id)
     );
+    const funded = new Set<string>(enrolledData.funded_by_option_user_ids || []);
 
     setParticipants(roster);
     setEnrolledIds(enrolled);
+    setFundedByOptionIds(funded);
     setLoading(false);
   }, [tripId, contestId]);
 
@@ -66,38 +81,65 @@ export function ContestParticipantsAccordion({
   }, [fetchData]);
 
   const toggle = async (userId: string) => {
-    setTogglingUser(userId);
     const isIn = enrolledIds.has(userId);
-
-    // Optimistic update
+    if (isIn) {
+      const p = participants.find((x) => x.id === userId);
+      if (!p) return;
+      // Blocked: paid via option. Surface an info modal instead of the
+      // destructive confirm — admin must clear the option first.
+      if (fundedByOptionIds.has(userId)) {
+        setBlockedRemoval(p);
+        return;
+      }
+      // Removal is destructive — show confirmation first.
+      setPendingRemoval(p);
+      return;
+    }
+    // Adding is non-destructive — optimistic immediate write.
+    setTogglingUser(userId);
     setEnrolledIds((prev) => {
       const next = new Set(prev);
-      if (isIn) next.delete(userId);
-      else next.add(userId);
+      next.add(userId);
       return next;
     });
-
     try {
-      if (isIn) {
-        await fetch("/api/admin/contests/participants", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contest_id: contestId, user_id: userId }),
-        });
-      } else {
-        await fetch("/api/admin/contests/participants", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contest_id: contestId, user_id: userId }),
-        });
-      }
+      await fetch("/api/admin/contests/participants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contest_id: contestId, user_id: userId }),
+      });
       onChanged?.();
     } catch {
-      // Revert on error
       setEnrolledIds((prev) => {
         const next = new Set(prev);
-        if (isIn) next.add(userId);
-        else next.delete(userId);
+        next.delete(userId);
+        return next;
+      });
+    }
+    setTogglingUser(null);
+  };
+
+  const confirmRemoval = async () => {
+    if (!pendingRemoval) return;
+    const userId = pendingRemoval.id;
+    setTogglingUser(userId);
+    setPendingRemoval(null);
+    setEnrolledIds((prev) => {
+      const next = new Set(prev);
+      next.delete(userId);
+      return next;
+    });
+    try {
+      await fetch("/api/admin/contests/participants", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contest_id: contestId, user_id: userId }),
+      });
+      onChanged?.();
+    } catch {
+      setEnrolledIds((prev) => {
+        const next = new Set(prev);
+        next.add(userId);
         return next;
       });
     }
@@ -168,6 +210,30 @@ export function ContestParticipantsAccordion({
           )}
         </div>
       )}
+
+      <ConfirmModal
+        open={!!pendingRemoval}
+        title={`Remove ${pendingRemoval?.display_name ?? ""} from ${contestName}?`}
+        message={
+          contestType === "pickem"
+            ? "This will permanently delete their picks, payment record, and roster entry. Cannot be undone."
+            : "This will remove them from this contest's roster. Cannot be undone."
+        }
+        confirmLabel="Remove"
+        destructive
+        onConfirm={confirmRemoval}
+        onCancel={() => setPendingRemoval(null)}
+      />
+
+      <ConfirmModal
+        open={!!blockedRemoval}
+        title={`${blockedRemoval?.display_name ?? ""} paid via option`}
+        message="This Loozer's option selection funds the contest, so removing them here would orphan their charge. Clear their option in /admin/selections first to refund, then come back and remove them."
+        confirmLabel="OK"
+        cancelLabel={null}
+        onConfirm={() => setBlockedRemoval(null)}
+        onCancel={() => setBlockedRemoval(null)}
+      />
     </div>
   );
 }

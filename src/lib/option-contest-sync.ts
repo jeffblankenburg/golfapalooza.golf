@@ -164,11 +164,11 @@ export async function syncCostItemContestEnrollment(
 
     const { data: contests } = await adminClient
       .from("contests")
-      .select("id")
+      .select("id, contest_type")
       .eq("buy_in_cost_item_id", item.id);
     if (!contests || contests.length === 0) continue;
 
-    for (const c of contests as Array<{ id: string }>) {
+    for (const c of contests as Array<{ id: string; contest_type: string }>) {
       if (fundsThis) {
         await adminClient
           .from("contest_participants")
@@ -176,12 +176,41 @@ export async function syncCostItemContestEnrollment(
             { contest_id: c.id, user_id: userId },
             { onConflict: "contest_id,user_id" },
           );
+
+        // Pickem stores paid status on `pickem_payments`. When a Loozer
+        // funds the contest via their option selection, the trip ledger
+        // collects from them automatically — mark them paid up front.
+        // Manual accordion adds bypass this and require a separate
+        // Venmo + admin toggle.
+        if (c.contest_type === "pickem") {
+          await adminClient
+            .from("pickem_payments")
+            .upsert(
+              {
+                contest_id: c.id,
+                user_id: userId,
+                paid: true,
+                paid_at: new Date().toISOString(),
+              },
+              { onConflict: "contest_id,user_id" },
+            );
+        }
       } else {
         await adminClient
           .from("contest_participants")
           .delete()
           .eq("contest_id", c.id)
           .eq("user_id", userId);
+
+        // Mirror un-enroll: drop the auto-paid mark when the user
+        // deselects the option.
+        if (c.contest_type === "pickem") {
+          await adminClient
+            .from("pickem_payments")
+            .delete()
+            .eq("contest_id", c.id)
+            .eq("user_id", userId);
+        }
       }
     }
   }

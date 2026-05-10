@@ -39,8 +39,13 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
   const [saving, setSaving] = useState<string | null>(null);
   const [ctpContestId, setCtpContestId] = useState<string | null>(null);
   const [longDriveContestId, setLongDriveContestId] = useState<string | null>(null);
-  const [ctpParticipantIds, setCtpParticipantIds] = useState<Set<string>>(new Set());
-  const [ldParticipantIds, setLdParticipantIds] = useState<Set<string>>(new Set());
+  // Eligibility per (day, contest_type) → Set<user_id>. Built from the
+  // per-day contests' contest_participants (issue #124). Falls back to
+  // "everyone" when the corresponding contest doesn't exist or has no
+  // roster yet.
+  const [eligibilityByDayType, setEligibilityByDayType] = useState<Map<string, Set<string>>>(
+    new Map(),
+  );
   const [showRealNames, setShowRealNames] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
@@ -62,38 +67,54 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
     if (data.days) setEventDays(data.days);
   }, [tripId]);
 
-  const fetchContestParticipants = useCallback(async (cId: string | null, ldId: string | null) => {
-    const fetches = await Promise.all([
-      cId ? fetch(`/api/admin/contests/participants?contest_id=${cId}`).then((r) => r.json()) : Promise.resolve({ participants: [] }),
-      ldId ? fetch(`/api/admin/contests/participants?contest_id=${ldId}`).then((r) => r.json()) : Promise.resolve({ participants: [] }),
-    ]);
-    setCtpParticipantIds(new Set<string>((fetches[0].participants || []).map((p: { user_id: string }) => p.user_id)));
-    setLdParticipantIds(new Set<string>((fetches[1].participants || []).map((p: { user_id: string }) => p.user_id)));
-  }, []);
-
   const fetchScrambleDays = useCallback(async () => {
     const res = await fetch(`/api/admin/contests?trip_id=${tripId}`);
     const data = await res.json();
-    const contests = data.contests || [] as { id: string; name: string; contest_type: string; day_number: number | null }[];
+    type ContestRow = {
+      id: string;
+      name: string;
+      contest_type: string;
+      day_number: number | null;
+    };
+    const contests = (data.contests || []) as ContestRow[];
+
     const dayNums = [
       ...new Set(
         contests
-          .filter((c: { contest_type: string; day_number: number | null }) => c.contest_type === "scramble" && c.day_number != null)
-          .map((c: { day_number: number }) => c.day_number)
+          .filter((c) => c.contest_type === "scramble" && c.day_number != null)
+          .map((c) => c.day_number as number),
       ),
-    ] as number[];
+    ];
     dayNums.sort((a, b) => a - b);
     setScrambleDayNumbers(dayNums);
 
-    // Find CTP and Long Drive contest IDs
-    const ctp = contests.find((c: { name: string; contest_type: string }) => c.name === "Closest to the Pin" && c.contest_type === "other");
-    const ld = contests.find((c: { name: string; contest_type: string }) => c.name === "Long Drive" && c.contest_type === "other");
-    const newCtpId = ctp?.id || null;
-    const newLdId = ld?.id || null;
-    setCtpContestId(newCtpId);
-    setLongDriveContestId(newLdId);
-    fetchContestParticipants(newCtpId, newLdId);
-  }, [tripId, fetchContestParticipants]);
+    // Legacy umbrella contests for the participants-accordion UI.
+    const ctp = contests.find((c) => c.name === "Closest to the Pin" && c.contest_type === "other");
+    const ld = contests.find((c) => c.name === "Long Drive" && c.contest_type === "other");
+    setCtpContestId(ctp?.id || null);
+    setLongDriveContestId(ld?.id || null);
+
+    // Issue #124: eligibility comes from per-day contests now, not the
+    // umbrella. Find every per-day contest for the four daily types and
+    // batch-load their participants.
+    const PER_DAY_TYPES = new Set(["ctp_front", "ctp_back", "long_drive", "long_putt"]);
+    const dayTypeContests = contests.filter(
+      (c) => PER_DAY_TYPES.has(c.contest_type) && c.day_number != null,
+    );
+    const lookups = await Promise.all(
+      dayTypeContests.map((c) =>
+        fetch(`/api/admin/contests/participants?contest_id=${c.id}`)
+          .then((r) => r.json())
+          .then((d) => ({ c, participants: (d.participants || []) as { user_id: string }[] })),
+      ),
+    );
+    const map = new Map<string, Set<string>>();
+    for (const { c, participants: ps } of lookups) {
+      const key = `${c.day_number}-${c.contest_type}`;
+      map.set(key, new Set(ps.map((p) => p.user_id)));
+    }
+    setEligibilityByDayType(map);
+  }, [tripId]);
 
   const fetchData = useCallback(async () => {
     const res = await fetch(`/api/admin/daily-winners?trip_id=${tripId}`);
@@ -186,13 +207,15 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
         </button>
       </div>
 
-      {/* Contest Participant Accordions */}
+      {/* Contest Participant Accordions — these still edit the legacy
+          umbrella contests for now. Eligibility on the dropdowns below
+          uses the per-day contests' participant lists (issue #124). */}
       {ctpContestId && (
         <ContestParticipantsAccordion
           tripId={tripId}
           contestName="Closest to the Pin"
           contestId={ctpContestId}
-          onChanged={() => fetchContestParticipants(ctpContestId, longDriveContestId)}
+          onChanged={() => fetchScrambleDays()}
         />
       )}
       {longDriveContestId && (
@@ -200,7 +223,7 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
           tripId={tripId}
           contestName="Long Drive"
           contestId={longDriveContestId}
-          onChanged={() => fetchContestParticipants(ctpContestId, longDriveContestId)}
+          onChanged={() => fetchScrambleDays()}
         />
       )}
 
@@ -212,14 +235,15 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
             const selectedUserId = winners[key] || "";
             const isSaving = saving === key;
 
-            // Filter eligible participants by contest type
-            let eligible = participants;
-            if ((ct.type === "ctp_front" || ct.type === "ctp_back") && ctpParticipantIds.size > 0) {
-              eligible = participants.filter((p) => ctpParticipantIds.has(p.id));
-            } else if (ct.type === "long_drive" && ldParticipantIds.size > 0) {
-              eligible = participants.filter((p) => ldParticipantIds.has(p.id));
-            }
-            // long_putt: everyone is eligible
+            // Issue #124: eligibility comes from the per-day contest's
+            // contest_participants. If no per-day contest exists or its
+            // roster hasn't been built yet, fall back to "everyone" so
+            // the admin isn't blocked.
+            const eligibleIds = eligibilityByDayType.get(`${d.day}-${ct.type}`);
+            const eligible =
+              eligibleIds && eligibleIds.size > 0
+                ? participants.filter((p) => eligibleIds.has(p.id))
+                : participants;
 
             return (
               <div key={ct.type} className="flex items-center gap-3">

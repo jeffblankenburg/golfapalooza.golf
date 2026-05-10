@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkIsAdmin } from "@/lib/permissions-server";
 
-// GET - Fetch payout statuses for a contest
+// As of issue #124 Phase F, paid status lives on `contest_winners.paid`
+// (the legacy `pickem_payouts` table is dropped). The endpoint shape is
+// preserved so existing UI consumers keep working: GET returns
+// `{user_id, paid_out, paid_out_at}[]` translated from contest_winners,
+// and PUT writes back to contest_winners.
+
 export async function GET(request: Request) {
   const admin = await checkIsAdmin();
   if (!admin) {
@@ -17,18 +22,22 @@ export async function GET(request: Request) {
 
   const adminClient = createAdminClient();
   const { data, error } = await adminClient
-    .from("pickem_payouts")
-    .select("user_id, paid_out, paid_out_at")
+    .from("contest_winners")
+    .select("user_id, paid, paid_at")
     .eq("contest_id", contestId);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ payouts: data || [] });
+  const payouts = (data || []).map((r) => ({
+    user_id: r.user_id,
+    paid_out: !!r.paid,
+    paid_out_at: r.paid_at,
+  }));
+  return NextResponse.json({ payouts });
 }
 
-// PUT - Toggle payout status for a winner
 export async function PUT(request: Request) {
   const admin = await checkIsAdmin();
   if (!admin) {
@@ -44,16 +53,14 @@ export async function PUT(request: Request) {
 
     const adminClient = createAdminClient();
     const { error } = await adminClient
-      .from("pickem_payouts")
-      .upsert(
-        {
-          contest_id,
-          user_id,
-          paid_out: !!paid_out,
-          paid_out_at: paid_out ? new Date().toISOString() : null,
-        },
-        { onConflict: "contest_id,user_id" }
-      );
+      .from("contest_winners")
+      .update({
+        paid: !!paid_out,
+        paid_at: paid_out ? new Date().toISOString() : null,
+        paid_by: paid_out ? admin.id : null,
+      })
+      .eq("contest_id", contest_id)
+      .eq("user_id", user_id);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

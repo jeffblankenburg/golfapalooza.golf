@@ -23,12 +23,9 @@ export async function PUT(
   const { id } = await params;
   const body = await request.json();
 
-  // Two destinations:
-  //   - Row-level fields (label, sort_order, presentation, pass-through).
-  //   - Contest-level fields (cost_item_id → buy_in_cost_item_id, payout_splits).
-  // When the row has a contest_id, contest-level fields write to the contest;
-  // the row's own copies are dead-letter (kept until a later migration drops
-  // them). Lodge-style rows have no contest, so the row's columns still hold.
+  // Row-level fields (presentation + Lodge-pass-through plumbing) live on
+  // the row. Contest-level fields (cost_item_id, payout_splits) route to
+  // the linked contest's columns.
   const ROW_FIELDS = [
     "label",
     "sort_order",
@@ -38,17 +35,12 @@ export async function PUT(
     "amount_per_participant",
     "day_count",
     "is_payout",
-    "winner_source",
-    "winner_day_number",
     "contest_id",
     "notes",
   ] as const;
-  const CONTEST_FIELDS = ["cost_item_id", "payout_splits"] as const;
 
   const adminClient = createAdminClient();
 
-  // Fetch the row's current contest_id so we know where contest-level
-  // writes should land (even when the body isn't changing it).
   const { data: existing, error: fetchErr } = await adminClient
     .from("payout_sheet_events")
     .select("id, contest_id")
@@ -63,13 +55,6 @@ export async function PUT(
   const rowUpdates: Record<string, unknown> = {};
   for (const key of ROW_FIELDS) {
     if (key in body) rowUpdates[key] = body[key];
-  }
-  // Without a contest, contest-level fields still need somewhere to live —
-  // fall back to the row's columns.
-  if (!targetContestId) {
-    for (const key of CONTEST_FIELDS) {
-      if (key in body) rowUpdates[key] = body[key];
-    }
   }
 
   if (Object.keys(rowUpdates).length > 0) {
@@ -94,7 +79,7 @@ export async function PUT(
   }
 
   // Return the row in its projected form so the client sees the
-  // resolved contest-derived values, not stale row columns.
+  // resolved contest-derived values.
   const { data: refreshed } = await adminClient
     .from("payout_sheet_events")
     .select("trip_id")

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkIsAdmin } from "@/lib/permissions-server";
+import { materializeHundredFeetWinners } from "@/lib/winners/materialize";
 
 export async function GET(request: Request) {
   const admin = await checkIsAdmin();
@@ -106,6 +107,22 @@ export async function PUT(request: Request) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Issue #124: re-materialize the 100 Feet contest's winner whenever
+    // any score changes. Lowest cumulative wins, so a single new score
+    // can shift the leader.
+    const { data: hundredFeetContest } = await adminClient
+      .from("contests")
+      .select("id")
+      .eq("trip_id", trip_id)
+      .eq("name", "100 Feet!")
+      .eq("contest_type", "other")
+      .maybeSingle();
+    if (hundredFeetContest?.id) {
+      await materializeHundredFeetWinners(adminClient, hundredFeetContest.id).catch((err) => {
+        console.error("materializeHundredFeetWinners failed:", err);
+      });
     }
 
     return NextResponse.json({ success: true });

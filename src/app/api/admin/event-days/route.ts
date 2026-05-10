@@ -210,8 +210,10 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Event day not found" }, { status: 404 });
     }
 
-    // Check for dependencies across tables that reference this day_number
-    const [contests, teeTimes, itinerary, hundredFeet, dailyWinners] = await Promise.all([
+    // Check for dependencies across tables that reference this day_number.
+    // Per-day daily-contest winners are covered by the `contests` check
+    // since each lives on its own contest row (issue #124).
+    const [contests, teeTimes, itinerary, hundredFeet] = await Promise.all([
       adminClient
         .from("contests")
         .select("id", { count: "exact", head: true })
@@ -232,11 +234,6 @@ export async function DELETE(request: Request) {
         .select("id", { count: "exact", head: true })
         .eq("trip_id", day.trip_id)
         .eq("day_number", day.day_number),
-      adminClient
-        .from("daily_contest_winners")
-        .select("id", { count: "exact", head: true })
-        .eq("trip_id", day.trip_id)
-        .eq("day_number", day.day_number),
     ]);
 
     const deps: string[] = [];
@@ -244,7 +241,6 @@ export async function DELETE(request: Request) {
     if ((teeTimes.count ?? 0) > 0) deps.push(`${teeTimes.count} tee time(s)`);
     if ((itinerary.count ?? 0) > 0) deps.push(`${itinerary.count} itinerary item(s)`);
     if ((hundredFeet.count ?? 0) > 0) deps.push(`${hundredFeet.count} 100-feet score(s)`);
-    if ((dailyWinners.count ?? 0) > 0) deps.push(`${dailyWinners.count} daily winner(s)`);
 
     if (deps.length > 0) {
       return NextResponse.json(

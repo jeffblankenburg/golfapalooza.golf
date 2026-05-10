@@ -338,14 +338,18 @@ export function ScorecardsContent({
         ))}
       </div>
 
-      {/* Scramble Team payouts for the selected day (derived from
-          cost_items via the new payout-events data layer) */}
-      {dayScramblePayouts[selectedDay] && (
-        <ScramblePayoutPanel
-          dayLabel={getDayLabel(startDate, selectedDay)}
-          payout={dayScramblePayouts[selectedDay]}
-        />
-      )}
+      {/* Scramble Team payouts for the selected day. Only show once
+          the rest of the day's data is revealed (tee sheet published
+          or leaderboard live) — keeps the page tidy pre-reveal. */}
+      {!loading &&
+        teams.length > 0 &&
+        (showLeaderboard || teeSheetPublished) &&
+        dayScramblePayouts[selectedDay] && (
+          <ScramblePayoutPanel
+            dayLabel={getDayLabel(startDate, selectedDay)}
+            payout={dayScramblePayouts[selectedDay]}
+          />
+        )}
 
       {loading && (
         <div className="flex justify-center py-12">

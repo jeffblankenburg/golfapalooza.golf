@@ -32,15 +32,26 @@ function getDayLabel(startDate: string, dayNumber: number): string {
   return date.toLocaleDateString("en-US", { weekday: "short" });
 }
 
+const fmtMoney = (n: number) =>
+  n.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: n % 1 === 0 ? 0 : 2,
+  });
+
 export function HundredFeetContent({
   tripId,
   startDate,
   scrambleDays = [],
+  winnerUserId = null,
+  payoutAmount = 0,
   headerAction,
 }: {
   tripId: string;
   startDate: string;
   scrambleDays?: number[];
+  winnerUserId?: string | null;
+  payoutAmount?: number;
   headerAction?: React.ReactNode;
 }) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -106,6 +117,11 @@ export function HundredFeetContent({
           <h1 className="text-2xl font-bold text-gray-900">100 Feet!</h1>
           {headerAction}
           <PinnedNoteButton pinnedTo="hundred_feet" />
+          {payoutAmount > 0 ? (
+            <span className="ml-auto px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-xs font-bold tabular-nums">
+              {fmtMoney(payoutAmount)} pot
+            </span>
+          ) : null}
         </div>
         <p className="text-sm text-gray-500 mt-1">
           Distance from the pin on #18. Miss the green? 100 feet!
@@ -180,6 +196,11 @@ export function HundredFeetContent({
                   <span className="text-sm font-medium text-gray-900 truncate">
                     {entry.display_name}
                   </span>
+                  {entry.user_id === winnerUserId && payoutAmount > 0 ? (
+                    <span className="shrink-0 text-xs font-bold tabular-nums text-green-700">
+                      {fmtMoney(payoutAmount)}
+                    </span>
+                  ) : null}
                 </div>
                 {DAYS.map((d) => {
                   const dayScore = entry.days[d];

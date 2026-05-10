@@ -3,6 +3,8 @@
 //   - /loozers/{userId} server page (SSR; eliminates a client waterfall)
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getEffectiveDate } from "@/lib/simulator";
+import { isFeatureVisible } from "@/lib/visibility";
 
 export interface LoozerProfileResponse {
   profile: {
@@ -45,6 +47,7 @@ export interface LoozerProfileResponse {
   isFounder: boolean;
   sponsor: { id: string; display_name: string; avatar_url: string | null } | null;
   eventsAttended: number;
+  currentRoomNumber: string | null;
 }
 
 export async function loadLoozerProfile(
@@ -63,6 +66,7 @@ export async function loadLoozerProfile(
     { data: song },
     { data: teamMemberships },
     { count: eventsAttendedCount },
+    { data: activeTrip },
   ] = await Promise.all([
     queryClient
       .from("users")
@@ -124,6 +128,12 @@ export async function loadLoozerProfile(
       .select("trip_id", { count: "exact", head: true })
       .eq("user_id", userId)
       .eq("on_roster", true),
+    // Active trip — needed for the during-event room number badge below.
+    adminClient
+      .from("trip_settings")
+      .select("id, start_date, visibility_overrides")
+      .eq("status", "active")
+      .maybeSingle(),
   ]);
 
   if (profileError || !profile) return null;
@@ -174,6 +184,37 @@ export async function loadLoozerProfile(
     })
     .filter((x): x is NonNullable<typeof x> => x != null);
 
+  // Room number — only surfaced during the rooms-visible window
+  // (1 week before trip start through trip end). Same gate that controls
+  // the Rooms quick link, so the room number appears on profile around
+  // the same time players start checking lodging.
+  let currentRoomNumber: string | null = null;
+  if (activeTrip) {
+    const trip = activeTrip as {
+      id: string;
+      start_date: string;
+      visibility_overrides: Record<string, boolean> | null;
+    };
+    const now = await getEffectiveDate();
+    const visible = isFeatureVisible(
+      "rooms",
+      { start_date: trip.start_date, visibility_overrides: trip.visibility_overrides || {} },
+      now,
+    );
+    if (visible) {
+      const { data: assignment } = await adminClient
+        .from("room_assignments")
+        .select("room:rooms(room_number)")
+        .eq("user_id", userId)
+        .eq("trip_id", trip.id)
+        .maybeSingle();
+      const room = assignment
+        ? (Array.isArray(assignment.room) ? assignment.room[0] : assignment.room)
+        : null;
+      currentRoomNumber = (room?.room_number as string) ?? null;
+    }
+  }
+
   const profileOut = profile;
 
   return {
@@ -190,5 +231,6 @@ export async function loadLoozerProfile(
     isFounder: profileOut.is_founder === true,
     sponsor,
     eventsAttended: eventsAttendedCount ?? 0,
+    currentRoomNumber,
   };
 }

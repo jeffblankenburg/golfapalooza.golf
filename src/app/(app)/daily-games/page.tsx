@@ -46,7 +46,7 @@ export default async function DailyGamesPage() {
     adminClient
       .from("contests")
       .select(
-        "id, day_number, contest_type, contest_winners(user_id, user:users!contest_winners_user_id_fkey(display_name, avatar_url))",
+        "id, day_number, contest_type, contest_winners(user_id, amount, user:users!contest_winners_user_id_fkey(display_name, avatar_url))",
       )
       .eq("trip_id", trip.id)
       .in("contest_type", ["ctp_front", "ctp_back", "long_drive", "long_putt"])
@@ -64,12 +64,14 @@ export default async function DailyGamesPage() {
     day_number: number;
     contest_type: string;
     user_id: string;
+    amount: number;
     user: { display_name: string; avatar_url: string | null } | { display_name: string; avatar_url: string | null }[] | null;
   };
   const winners: DailyWinner[] = [];
   for (const c of dailyContestsResult.data || []) {
     const cwArr = (c.contest_winners ?? []) as Array<{
       user_id: string;
+      amount: number | string | null;
       user: { display_name: string; avatar_url: string | null } | { display_name: string; avatar_url: string | null }[] | null;
     }>;
     if (cwArr.length === 0 || c.day_number == null) continue;
@@ -77,6 +79,7 @@ export default async function DailyGamesPage() {
       day_number: c.day_number,
       contest_type: c.contest_type,
       user_id: cwArr[0].user_id,
+      amount: Number(cwArr[0].amount ?? 0),
       user: cwArr[0].user,
     });
   }
@@ -94,6 +97,13 @@ export default async function DailyGamesPage() {
     long_drive: "Long Drive",
     long_putt: "Long Putt",
   };
+
+  const fmtMoney = (n: number) =>
+    n.toLocaleString("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: n % 1 === 0 ? 0 : 2,
+    });
 
   const days = [...new Set(
     (eventDaysResult.data || []).map((d) => d.day_number as number)
@@ -159,6 +169,11 @@ export default async function DailyGamesPage() {
                       </div>
                     ) : null}
                   </div>
+                  {winner && winner.amount > 0 ? (
+                    <span className="shrink-0 text-sm font-bold tabular-nums text-green-700">
+                      {fmtMoney(winner.amount)}
+                    </span>
+                  ) : null}
                 </div>
               );
             })}

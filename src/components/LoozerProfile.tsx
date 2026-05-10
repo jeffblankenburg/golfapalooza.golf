@@ -84,6 +84,7 @@ export interface LoozerProfileData {
   isFounder?: boolean;
   sponsor?: SponsorRef | null;
   eventsAttended?: number;
+  currentRoomNumber?: string | null;
 }
 
 function getInitials(name: string): string {
@@ -146,6 +147,7 @@ export function LoozerProfile({
           isFounder: d.isFounder === true,
           sponsor: d.sponsor ?? null,
           eventsAttended: d.eventsAttended ?? 0,
+          currentRoomNumber: d.currentRoomNumber ?? null,
         });
         setLoading(false);
       })
@@ -191,7 +193,7 @@ export function LoozerProfile({
     );
   }
 
-  const { profile, accolades, taggedPhotos, taggedPhotosCount, handicapIndex, eightBagAverage, avgScrambleScore, bio, song, scorecards, isFounder, sponsor, eventsAttended } = profileData;
+  const { profile, accolades, taggedPhotos, taggedPhotosCount, handicapIndex, eightBagAverage, avgScrambleScore, bio, song, scorecards, isFounder, sponsor, eventsAttended, currentRoomNumber } = profileData;
 
   const openChat = async () => {
     if (spectator) return;
@@ -373,6 +375,23 @@ export function LoozerProfile({
           )}
         </div>
       </div>
+
+      {/* ── During-event Room number — prominent, links to /rooms ── */}
+      {currentRoomNumber && !spectator && (
+        <Link
+          href="/rooms"
+          className="block bg-white rounded-2xl p-6 border-2 border-green-600 shadow-sm active:opacity-90 transition-opacity"
+        >
+          <p className="text-green-600 text-sm font-medium uppercase tracking-wide">
+            {isOwnProfile ? "Your Room" : `${profile.display_name}'s Room`}
+          </p>
+          <div className="mt-2">
+            <span className="text-5xl font-bold text-green-700">
+              {currentRoomNumber}
+            </span>
+          </div>
+        </Link>
+      )}
 
       {/* ── Accordion Sections ── */}
 

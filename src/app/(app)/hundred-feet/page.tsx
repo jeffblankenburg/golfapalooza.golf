@@ -41,20 +41,43 @@ export default async function HundredFeetPage() {
     );
   }
 
-  // Get scramble day numbers from contests
-  const { data: scrambleContests } = await supabase
-    .from("contests")
-    .select("day_number")
-    .eq("trip_id", trip.id)
-    .eq("contest_type", "scramble")
-    .not("day_number", "is", null)
-    .order("day_number");
+  // Get scramble day numbers + the 100 Feet contest's materialized winner
+  // (issue #122 — display the per-winner payout amount on the leaderboard).
+  const [scrambleContestsResult, hundredFeetContestResult] = await Promise.all([
+    supabase
+      .from("contests")
+      .select("day_number")
+      .eq("trip_id", trip.id)
+      .eq("contest_type", "scramble")
+      .not("day_number", "is", null)
+      .order("day_number"),
+    supabase
+      .from("contests")
+      .select("contest_winners(user_id, amount)")
+      .eq("trip_id", trip.id)
+      .eq("name", "100 Feet!")
+      .eq("contest_type", "other")
+      .maybeSingle(),
+  ]);
 
   const scrambleDays = [...new Set(
-    (scrambleContests || []).map((c) => c.day_number as number)
+    (scrambleContestsResult.data || []).map((c) => c.day_number as number)
   )];
 
+  const hfWinner = (hundredFeetContestResult.data?.contest_winners ?? [])[0] as
+    | { user_id: string; amount: number | string | null }
+    | undefined;
+  const winnerUserId = hfWinner?.user_id ?? null;
+  const payoutAmount = hfWinner ? Number(hfWinner.amount ?? 0) : 0;
+
   return (
-    <HundredFeetContent tripId={trip.id} startDate={trip.start_date} scrambleDays={scrambleDays} headerAction={<AdminLink permissionKey="manage_scrambles" href={`/admin/events/${trip.id}/hundred-feet`} />} />
+    <HundredFeetContent
+      tripId={trip.id}
+      startDate={trip.start_date}
+      scrambleDays={scrambleDays}
+      winnerUserId={winnerUserId}
+      payoutAmount={payoutAmount}
+      headerAction={<AdminLink permissionKey="manage_scrambles" href={`/admin/events/${trip.id}/hundred-feet`} />}
+    />
   );
 }

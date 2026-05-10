@@ -590,12 +590,12 @@ export default async function HomePage() {
       )
     : false;
 
-  // Compute which quick link categories are visible
+  // Quick-link visibility: the scoring leaderboards (Scrambles, Skins, 100
+  // Feet, Daily Games) always show when their contest exists — each
+  // destination page renders its own pre-event empty state via
+  // isFeatureVisible. Rooms stays time-gated (lodging info is private until
+  // close to the trip). Options/Polls hide when there's nothing to see.
   const hiddenQuickLinks: string[] = [];
-  if (!isFeatureVisible("scorecards", visCtx, effectiveDate)) hiddenQuickLinks.push("/scrambles");
-  if (!isFeatureVisible("skins", visCtx, effectiveDate)) hiddenQuickLinks.push("/skins");
-  if (!isFeatureVisible("hundred_feet", visCtx, effectiveDate)) hiddenQuickLinks.push("/hundred-feet");
-  if (!isFeatureVisible("daily_games", visCtx, effectiveDate)) hiddenQuickLinks.push("/daily-games");
   if (!isFeatureVisible("rooms", visCtx, effectiveDate)) hiddenQuickLinks.push("/rooms");
   if (!optionsDeadline) hiddenQuickLinks.push("/options");
   if (!(await userHasClosedPolls(adminClient, effectiveUserId))) hiddenQuickLinks.push("/polls");

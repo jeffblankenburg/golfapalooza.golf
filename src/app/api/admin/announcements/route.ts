@@ -333,6 +333,111 @@ export async function PUT(request: NextRequest) {
 /**
  * @swagger
  * /api/admin/announcements:
+ *   patch:
+ *     summary: Edit a pending scheduled announcement
+ *     tags: [Admin, Notifications]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [id]
+ *             properties:
+ *               id:
+ *                 type: string
+ *               title:
+ *                 type: string
+ *               body:
+ *                 type: string
+ *               audience_type:
+ *                 type: string
+ *                 enum: [everyone, event, custom]
+ *               audience_user_ids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               trip_id:
+ *                 type: string
+ *               scheduled_for:
+ *                 type: string
+ *                 format: date-time
+ *     responses:
+ *       200:
+ *         description: Announcement updated
+ *       400:
+ *         description: Already sent or invalid fields
+ *       401:
+ *         description: Unauthorized
+ */
+export async function PATCH(request: NextRequest) {
+  const admin = await checkIsAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const { id, title, body, audience_type, audience_user_ids, trip_id, scheduled_for } =
+      await request.json();
+
+    if (!id) {
+      return NextResponse.json({ error: "id is required" }, { status: 400 });
+    }
+
+    const adminClient = createAdminClient();
+
+    // Pending-only — once sent, the notification has already gone out
+    // and editing the row would only mislead anyone reading history.
+    const { data: existing } = await adminClient
+      .from("scheduled_announcements")
+      .select("status")
+      .eq("id", id)
+      .maybeSingle();
+    if (!existing) {
+      return NextResponse.json({ error: "Announcement not found" }, { status: 404 });
+    }
+    if (existing.status !== "pending") {
+      return NextResponse.json(
+        { error: "Only pending announcements can be edited" },
+        { status: 400 },
+      );
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (title !== undefined) updates.title = title;
+    if (body !== undefined) updates.body = body || null;
+    if (audience_type !== undefined) {
+      updates.audience_type = audience_type;
+      updates.audience_user_ids =
+        audience_type === "custom" ? audience_user_ids ?? null : null;
+      updates.trip_id = audience_type === "event" ? trip_id ?? null : null;
+    }
+    if (scheduled_for !== undefined) updates.scheduled_for = scheduled_for;
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+    }
+
+    const { data, error } = await adminClient
+      .from("scheduled_announcements")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ announcement: data });
+  } catch (error) {
+    console.error("Edit announcement error:", error);
+    return NextResponse.json({ error: "Failed to edit announcement" }, { status: 500 });
+  }
+}
+
+/**
+ * @swagger
+ * /api/admin/announcements:
  *   delete:
  *     summary: Cancel a pending scheduled announcement
  *     tags: [Admin, Notifications]

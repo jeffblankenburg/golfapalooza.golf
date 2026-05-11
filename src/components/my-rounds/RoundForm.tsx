@@ -786,7 +786,7 @@ export default function RoundForm() {
           </div>
         )}
 
-        <div className="space-y-1 max-h-52 overflow-y-auto">
+        <div className="space-y-1 max-h-[60vh] overflow-y-auto">
           {unselectedLoozers.map((l) => {
             const isMe = l.id === currentUserId;
             const atMax = selectedPlayerIds.length >= 4;

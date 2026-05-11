@@ -25,6 +25,7 @@ interface AnnouncementRecord {
   title: string;
   body: string | null;
   audience_type: string;
+  audience_user_ids?: string[];
   audience_names?: string[];
   scheduled_for: string;
   status: string;
@@ -104,6 +105,9 @@ export function AnnouncementManager() {
   const [timing, setTiming] = useState<TimingMode>("now");
   const [scheduledFor, setScheduledFor] = useState("");
   const [sending, setSending] = useState(false);
+  // When set, the form is editing this pending announcement instead of
+  // creating a new one. Submit routes through PATCH.
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -207,7 +211,31 @@ export function AnnouncementManager() {
     setShowConfirm(false);
     setSending(true);
     try {
-      if (timing === "schedule") {
+      if (editingId) {
+        // Edit existing pending announcement (schedule timing only — you
+        // can't "edit-then-send-now"; cancel and re-create for that).
+        const res = await fetch("/api/admin/announcements", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: editingId,
+            title: title.trim(),
+            body: body.trim() || null,
+            audience_type: audience,
+            audience_user_ids: audience === "custom" ? Array.from(selectedUserIds) : undefined,
+            trip_id: audience === "event" ? activeTripId : undefined,
+            scheduled_for: naiveDatetimeToUTC(scheduledFor, tripTimezone),
+          }),
+        });
+        if (res.ok) {
+          showToastMsg("Announcement updated!");
+          resetForm();
+          fetchData();
+        } else {
+          const err = await res.json();
+          showToastMsg(err.error || "Failed to update");
+        }
+      } else if (timing === "schedule") {
         const res = await fetch("/api/admin/announcements", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -357,6 +385,39 @@ export function AnnouncementManager() {
     setScheduledFor("");
     setSelectedUserIds(new Set());
     setRecipientListOpen(false);
+    setEditingId(null);
+  };
+
+  const startEditing = (a: AnnouncementRecord) => {
+    setEditingId(a.id);
+    setTitle(a.title);
+    setBody(a.body || "");
+    setAudience(a.audience_type as AudienceType);
+    setTiming("schedule");
+    // Convert UTC scheduled_for back into the trip-timezone naive
+    // datetime-local format the input expects.
+    const d = new Date(a.scheduled_for);
+    const opts: Intl.DateTimeFormatOptions = {
+      timeZone: tripTimezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    };
+    const parts = new Intl.DateTimeFormat("en-CA", opts).formatToParts(d);
+    const get = (t: string) => parts.find((p) => p.type === t)?.value || "";
+    setScheduledFor(`${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`);
+    // Custom audience: prefill selected user ids if available
+    if (a.audience_type === "custom" && Array.isArray(a.audience_user_ids)) {
+      setSelectedUserIds(new Set(a.audience_user_ids));
+    } else {
+      setSelectedUserIds(new Set());
+    }
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
 
   const confirmMessage = () => {
@@ -620,6 +681,14 @@ export function AnnouncementManager() {
 
         {/* Form fields */}
         <div className="p-4 space-y-3">
+          {editingId && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700 flex items-center justify-between">
+              <span>Editing scheduled announcement</span>
+              <button onClick={resetForm} className="underline font-medium">
+                Cancel
+              </button>
+            </div>
+          )}
           <input
             type="text"
             placeholder="Title (required)"
@@ -686,20 +755,32 @@ export function AnnouncementManager() {
             className="w-full bg-green-600 text-white rounded-xl py-3 font-semibold text-[15px] active:opacity-80 disabled:opacity-50"
           >
             {sending
-              ? timing === "schedule" ? "Scheduling..." : "Sending..."
+              ? editingId
+                ? "Saving..."
+                : timing === "schedule" ? "Scheduling..." : "Sending..."
+              : editingId
+              ? "Save Changes"
               : timing === "schedule"
               ? "Schedule Announcement"
               : `Send to ${recipientCount} Loozer${recipientCount === 1 ? "" : "s"}`}
           </button>
+          {editingId && (
+            <button
+              onClick={resetForm}
+              className="w-full text-sm text-gray-500 mt-2 underline"
+            >
+              Cancel edit
+            </button>
+          )}
         </div>
       </div>
 
       {/* Confirm Send/Schedule Modal */}
       <ConfirmModal
         open={showConfirm}
-        title={timing === "schedule" ? "Schedule Announcement" : "Send Announcement"}
-        message={confirmMessage()}
-        confirmLabel={timing === "schedule" ? "Schedule" : "Send"}
+        title={editingId ? "Save Changes" : timing === "schedule" ? "Schedule Announcement" : "Send Announcement"}
+        message={editingId ? "Update this scheduled announcement?" : confirmMessage()}
+        confirmLabel={editingId ? "Save" : timing === "schedule" ? "Schedule" : "Send"}
         onConfirm={handleSend}
         onCancel={() => setShowConfirm(false)}
       />
@@ -866,12 +947,18 @@ export function AnnouncementManager() {
                     )}
                     <AudienceLabel announcement={a} />
                   </div>
-                  <div className="flex flex-col justify-between items-end gap-2 flex-shrink-0 self-stretch">
+                  <div className="flex flex-col justify-between items-end gap-1.5 flex-shrink-0 self-stretch">
                     <button
                       onClick={() => setSendingNowId(a.id)}
                       className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700"
                     >
                       Send Now
+                    </button>
+                    <button
+                      onClick={() => startEditing(a)}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    >
+                      Edit
                     </button>
                     <button
                       onClick={() => setCancellingId(a.id)}

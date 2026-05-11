@@ -68,7 +68,8 @@ export async function generatePickem(
     };
   }
 
-  // 1. Ensure pickem_settings.
+  // 1. Ensure pickem_settings (is_open only — entry fee lives on the
+  //    contest's buy_in_cost_item_id since issue #125 Phase 4).
   const { data: existingSettings } = await client
     .from("pickem_settings")
     .select("id")
@@ -77,10 +78,33 @@ export async function generatePickem(
   if (!existingSettings) {
     const { error } = await client.from("pickem_settings").insert({
       contest_id: pickem.id,
-      entry_fee: 20,
       is_open: true,
     });
     if (error) warnings.push(`pickem_settings: ${error.message}`);
+  }
+
+  // Link the contest to the "Pickem entry" cost_item if not already linked.
+  const { data: contestRow } = await client
+    .from("contests")
+    .select("buy_in_cost_item_id")
+    .eq("id", pickem.id)
+    .maybeSingle();
+  if (!contestRow?.buy_in_cost_item_id) {
+    const { data: pickemCostItem } = await client
+      .from("cost_items")
+      .select("id")
+      .eq("trip_id", testTripId)
+      .eq("name", "Pickem entry")
+      .maybeSingle();
+    if (pickemCostItem?.id) {
+      const { error } = await client
+        .from("contests")
+        .update({ buy_in_cost_item_id: pickemCostItem.id })
+        .eq("id", pickem.id);
+      if (error) warnings.push(`contests.buy_in_cost_item_id: ${error.message}`);
+    } else {
+      warnings.push("No 'Pickem entry' cost_item in test trip — entry fee will read as $0.");
+    }
   }
 
   // 2. Wipe games + picks.

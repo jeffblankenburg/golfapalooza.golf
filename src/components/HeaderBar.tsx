@@ -188,7 +188,7 @@ export function HeaderBar({
 
   return (
     <>
-      <header className="sticky top-0 z-30 bg-white border-b border-gray-200">
+      <header className="sticky top-0 z-[60] bg-white border-b border-gray-200">
         <div className="relative flex items-center justify-between h-14 px-4">
           {/* Center: Logo (absolutely centered) */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">

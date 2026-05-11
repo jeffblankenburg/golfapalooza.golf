@@ -55,17 +55,31 @@ async function main() {
   if (tripErr || !trip) throw new Error("No active trip");
   console.log(`Active trip: ${trip.trip_name} (${trip.id})`);
 
-  // Look up Trip Cost option's actual cost so we can derive the Operational
-  // placeholder dynamically rather than hardcoding $651.
-  const { data: tripCostOption } = await admin
-    .from("trip_options")
-    .select("name, cost")
-    .eq("trip_id", trip.id)
-    .eq("name", "Trip Cost")
-    .single();
-  if (!tripCostOption) throw new Error("Could not find 'Trip Cost' trip_option");
-  const tripCostTotal = Number(tripCostOption.cost);
-  console.log(`Trip Cost option = $${tripCostTotal}`);
+  // Look up Trip Cost option's bundled total. Pre-Phase 5 this came from
+  // trip_options.cost; post-Phase 5 (issue #125) we sum the existing
+  // `included_in_trip_cost=true` cost_items, or fall back to a CLI flag.
+  // The script is idempotent per (trip_id, name), so re-running on the
+  // active trip is safe regardless of which path we take.
+  const cliTotalArg = process.argv.find((a) => a.startsWith("--trip-cost="));
+  const cliTotal = cliTotalArg ? Number(cliTotalArg.split("=")[1]) : null;
+
+  let tripCostTotal = cliTotal;
+  if (tripCostTotal == null) {
+    const { data: bundled } = await admin
+      .from("cost_items")
+      .select("cost")
+      .eq("trip_id", trip.id)
+      .eq("included_in_trip_cost", true);
+    if (bundled && bundled.length > 0) {
+      tripCostTotal = bundled.reduce((s, r) => s + Number(r.cost), 0);
+    }
+  }
+  if (tripCostTotal == null) {
+    throw new Error(
+      "Could not determine Trip Cost total. Pass --trip-cost=NNN explicitly when seeding a brand-new trip.",
+    );
+  }
+  console.log(`Trip Cost total = $${tripCostTotal}`);
 
   // Explicit payout earmarks bundled inside the Trip Cost lump.
   // Each scramble day funds: $10 Team + $10 Skins + $5 Long Putt = $25/day × 3 days = $75

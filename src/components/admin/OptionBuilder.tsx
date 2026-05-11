@@ -212,7 +212,8 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
   const [optionName, setOptionName] = useState("");
   const [optionDescription, setOptionDescription] = useState("");
   const [optionType, setOptionType] = useState<Option["option_type"]>("checkbox");
-  const [optionCost, setOptionCost] = useState<number | "">("");
+  // Note: option-level and per-choice cost are derived from cost_items via
+  // computeOptionCosts (issue #125 Phase 4). No raw cost input remains.
   const [optionChoices, setOptionChoices] = useState<ChoiceWithId[]>([]);
   const [optionMaxTotal, setOptionMaxTotal] = useState<number | "">("");
   const [optionIsRequired, setOptionIsRequired] = useState(false);
@@ -417,7 +418,6 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
     setOptionName("");
     setOptionDescription("");
     setOptionType("checkbox");
-    setOptionCost("");
     setOptionChoices([]);
     setOptionMaxTotal("");
     setOptionIsRequired(false);
@@ -440,7 +440,6 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
     setOptionName(option.name);
     setOptionDescription(option.description || "");
     setOptionType(option.option_type);
-    setOptionCost(option.cost ?? "");
     setOptionChoices((option.choices || []).map(attachDragId));
     setOptionMaxTotal(option.max_total ?? "");
     setOptionIsRequired(option.is_required);
@@ -454,22 +453,22 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
     if (!optionName.trim() || !showOptionFormForGroup) return;
     setSaving("option");
 
+    // Issue #125 Phase 4: option-level and per-choice `cost` are derived
+    // from linked cost_items at read time (computeOptionCosts). The
+    // OptionBuilder UI no longer takes cost input — admin manages prices
+    // on /admin/financials/cost-items. We strip `cost` from the save
+    // payload so stored values stop drifting on every save.
     const payload = {
       group_id: showOptionFormForGroup,
       name: optionName.trim(),
       description: optionDescription.trim() || null,
       icon: optionIcon,
       option_type: optionType,
-      cost: optionType === "checkbox" && optionCost !== "" ? Number(optionCost) : null,
       choices:
         optionType === "select" || optionType === "multi_select" || optionType === "quantity"
-          ? optionChoices.map(({ _dragId: _drop, ...rest }) => {
+          ? optionChoices.map(({ _dragId: _drop, cost: _cost, ...rest }) => {
               void _drop;
-              if (optionType === "quantity") {
-                const { cost: _cost, ...withoutCost } = rest;
-                void _cost;
-                return withoutCost;
-              }
+              void _cost;
               return rest;
             })
           : null,
@@ -1509,7 +1508,10 @@ function SortableChoiceRow({
         className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
       />
       {showCost && (
-        <div className="w-24 px-3 py-2 text-sm text-right tabular-nums text-gray-500 flex-shrink-0">
+        <div
+          className="w-24 px-3 py-2 text-sm text-right tabular-nums text-gray-500 flex-shrink-0"
+          title={choice.cost ? "Derived from linked cost items — edit on Cost Items page" : undefined}
+        >
           {choice.cost ? `$${choice.cost}` : "—"}
         </div>
       )}

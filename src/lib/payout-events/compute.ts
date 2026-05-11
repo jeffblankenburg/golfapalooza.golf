@@ -40,6 +40,12 @@ export interface PayoutSheetEvent {
    * null for non-payout rows (Lodge) or unconfigured contests.
    */
   payout_splits: PayoutSplit[] | null;
+  /**
+   * Projected from `contest.buy_in_cost_item_id` when a contest is linked.
+   * null for Lodge-style pass-through rows (no contest = no single
+   * cost_item; admin manages amount_per_participant directly).
+   */
+  cost_item_id: string | null;
   contest_id: string | null;
   contest: PayoutSheetEventContest | null;
 }
@@ -73,7 +79,7 @@ type Client = SupabaseClient<any, "public", any>;
 async function countOption(client: Client, optionId: string): Promise<number> {
   const { data: option } = await client
     .from("trip_options")
-    .select("option_type, choices")
+    .select("option_type")
     .eq("id", optionId)
     .single();
   if (!option) return 0;
@@ -87,16 +93,28 @@ async function countOption(client: Client, optionId: string): Promise<number> {
   if (option.option_type === "checkbox") {
     return selections.filter((s) => s.value === true).length;
   }
-  // select / multi_select / number / text — treat as "in" when chosen
-  // value's cost > 0 (i.e. they paid for the contest).
-  const choiceCost = new Map<string, number>();
-  for (const ch of (option.choices as Array<{ value: string; cost?: number }>) || []) {
-    choiceCost.set(ch.value, Number(ch.cost) || 0);
+  // select / multi_select — "in" means the user picked a choice value that
+  // funds a cost_item (issue #125 Phase 5 — choice cost moved out of JSONB).
+  // Paid choice values come from cost_item_option_choices joined via
+  // cost_items.linked_option_id.
+  const { data: linkedItems } = await client
+    .from("cost_items")
+    .select("id, choices:cost_item_option_choices(choice_value)")
+    .eq("linked_option_id", optionId);
+  const paidValues = new Set<string>();
+  for (const item of linkedItems || []) {
+    for (const c of (item.choices as Array<{ choice_value: string }> | null) || []) {
+      paidValues.add(c.choice_value);
+    }
   }
+  if (paidValues.size === 0) return 0;
   let count = 0;
   for (const s of selections) {
     const v = s.value;
-    if (typeof v === "string" && (choiceCost.get(v) || 0) > 0) count += 1;
+    if (typeof v === "string" && paidValues.has(v)) count += 1;
+    else if (Array.isArray(v)) {
+      if ((v as unknown[]).some((x) => typeof x === "string" && paidValues.has(x))) count += 1;
+    }
   }
   return count;
 }
@@ -241,6 +259,7 @@ function projectRow(raw: RawJoinedRow): PayoutSheetEvent {
     is_payout: raw.is_payout,
     notes: raw.notes,
     payout_splits,
+    cost_item_id: contest?.buy_in_cost_item_id ?? null,
     contest_id: raw.contest_id,
     contest: projectedContest,
   };

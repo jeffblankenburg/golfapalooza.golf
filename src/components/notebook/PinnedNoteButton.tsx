@@ -54,7 +54,7 @@ export function PinnedNoteButton({ pinnedTo, tripId }: { pinnedTo: string; tripI
       {open && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" onClick={() => setOpen(false)}>
           <div
-            className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[85vh] flex flex-col"
+            className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[85vh] flex flex-col mb-16 pb-safe sm:mb-0 sm:pb-0"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

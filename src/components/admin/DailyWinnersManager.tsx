@@ -18,6 +18,15 @@ interface Winner {
   user_id: string;
 }
 
+interface NoWinnerRecord {
+  day_number: number;
+  contest_type: string;
+}
+
+// Long Putt always has a winner; CTP and LD can be declared no-winner.
+const NO_WINNER_VALUE = "__no_winner__";
+const NO_WINNER_TYPES = new Set(["ctp_front", "ctp_back", "long_drive"]);
+
 interface EventDay {
   day_number: number;
   name: string;
@@ -33,6 +42,9 @@ const CONTEST_TYPES = [
 export function DailyWinnersManager({ tripId }: { tripId: string }) {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [winners, setWinners] = useState<Record<string, string>>({});
+  // Tracks contests where admin explicitly declared "no winner". Key
+  // shape matches `winnerKey`. Mutually exclusive with `winners`.
+  const [noWinners, setNoWinners] = useState<Set<string>>(new Set());
   const [eventDays, setEventDays] = useState<EventDay[]>([]);
   const [scrambleDayNumbers, setScrambleDayNumbers] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,6 +139,13 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
       map[winnerKey(w.day_number, w.contest_type)] = w.user_id;
     }
     setWinners(map);
+
+    const nw = new Set<string>();
+    for (const r of (data.no_winners || []) as NoWinnerRecord[]) {
+      nw.add(winnerKey(r.day_number, r.contest_type));
+    }
+    setNoWinners(nw);
+
     setLoading(false);
   }, [tripId]);
 
@@ -151,6 +170,11 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
   const setWinner = async (day: number, contestType: string, userId: string) => {
     const key = winnerKey(day, contestType);
     setWinners((prev) => ({ ...prev, [key]: userId }));
+    setNoWinners((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
     setSaving(key);
 
     try {
@@ -175,11 +199,44 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
     setSaving(null);
   };
 
+  const setNoWinner = async (day: number, contestType: string) => {
+    const key = winnerKey(day, contestType);
+    setWinners((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setNoWinners((prev) => new Set(prev).add(key));
+    setSaving(key);
+
+    try {
+      await fetch("/api/admin/daily-winners", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trip_id: tripId,
+          day_number: day,
+          contest_type: contestType,
+          no_winner: true,
+        }),
+      });
+    } catch {
+      // Revert on error
+      setNoWinners((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+    setSaving(null);
+  };
+
   const handleReset = async () => {
     try {
       const res = await fetch(`/api/admin/daily-winners?trip_id=${tripId}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Reset failed");
       setWinners({});
+      setNoWinners(new Set());
     } catch {
       // silent
     }
@@ -245,6 +302,10 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
                 ? participants.filter((p) => eligibleIds.has(p.id))
                 : participants;
 
+            const isNoWinner = noWinners.has(key);
+            const canDeclareNoWinner = NO_WINNER_TYPES.has(ct.type);
+            const selectValue = isNoWinner ? NO_WINNER_VALUE : selectedUserId;
+
             return (
               <div key={ct.type} className="flex items-center gap-3">
                 <label className="text-xs text-gray-500 w-24 flex-shrink-0">
@@ -252,16 +313,22 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
                 </label>
                 <div className="relative flex-1">
                   <select
-                    value={selectedUserId}
+                    value={selectValue}
                     onChange={(e) => {
-                      if (e.target.value) {
-                        setWinner(d.day, ct.type, e.target.value);
+                      const v = e.target.value;
+                      if (v === NO_WINNER_VALUE) {
+                        setNoWinner(d.day, ct.type);
+                      } else if (v) {
+                        setWinner(d.day, ct.type, v);
                       }
                     }}
                     disabled={isSaving}
                     className="w-full text-sm border border-gray-200 rounded-lg py-1.5 px-2 bg-white focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none disabled:opacity-50 appearance-none"
                   >
                     <option value="">Select winner...</option>
+                    {canDeclareNoWinner && (
+                      <option value={NO_WINNER_VALUE}>🚫 No winner (pot carries)</option>
+                    )}
                     {eligible.map((p) => (
                       <option key={p.id} value={p.id}>
                         {showRealNames ? (p.full_name || p.display_name) : p.display_name}

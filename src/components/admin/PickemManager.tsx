@@ -56,8 +56,17 @@ interface Participant {
 interface Settings {
   contest_id: string;
   entry_fee: number;
+  cost_item_id: string | null;
   payout_json: Array<{ place: number; percentage: number }>;
   is_open: boolean;
+}
+
+interface CostItem {
+  id: string;
+  name: string;
+  cost: number;
+  category: string | null;
+  sort_order: number;
 }
 
 interface PickemPick {
@@ -253,9 +262,15 @@ export function PickemManager({ tripId }: { tripId: string }) {
   const [showAddForm, setShowAddForm] = useState(false);
 
   // Settings form state
-  const [entryFee, setEntryFee] = useState("");
+  const [costItems, setCostItems] = useState<CostItem[]>([]);
+  const [costItemId, setCostItemId] = useState<string | null>(null);
   const [payouts, setPayouts] = useState<Array<{ place: number; percentage: string }>>([]);
   const [isOpen, setIsOpen] = useState(false);
+
+  // Derived entry fee for display
+  const entryFee = costItemId
+    ? Number(costItems.find((ci) => ci.id === costItemId)?.cost ?? 0)
+    : Number(settings?.entry_fee ?? 0);
 
   // Helper: combine Saturday date + time into ISO string
   const buildGameTime = (time: string): string => {
@@ -316,7 +331,7 @@ export function PickemManager({ tripId }: { tripId: string }) {
     setPayments(data.payments || []);
     if (data.settings) {
       setSettings(data.settings);
-      setEntryFee(String(data.settings.entry_fee || ""));
+      setCostItemId(data.settings.cost_item_id ?? null);
       setIsOpen(data.settings.is_open || false);
       setPayouts(
         (data.settings.payout_json || []).map((p: { place: number; percentage: number }) => ({
@@ -347,6 +362,15 @@ export function PickemManager({ tripId }: { tripId: string }) {
       fetchStandings();
     }
   }, [contestId, fetchData, fetchStandings]);
+
+  // Load the trip's cost items for the entry-fee picker (issue #125 Phase 4).
+  useEffect(() => {
+    if (!tripId) return;
+    fetch(`/api/admin/financials/cost-items?trip_id=${tripId}`)
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d) => setCostItems(d.items || []))
+      .catch(() => {});
+  }, [tripId]);
 
   const addGame = async () => {
     if (!contestId || !awayTeamObj || !homeTeamObj || !gameTime) return;
@@ -455,7 +479,7 @@ export function PickemManager({ tripId }: { tripId: string }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contest_id: contestId,
-        entry_fee: parseFloat(entryFee) || 0,
+        cost_item_id: costItemId,
         payout_json: payouts.map((p) => ({
           place: p.place,
           percentage: parseFloat(p.percentage) || 0,
@@ -477,7 +501,7 @@ export function PickemManager({ tripId }: { tripId: string }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contest_id: contestId,
-        entry_fee: parseFloat(entryFee) || 0,
+        cost_item_id: costItemId,
         payout_json: payouts.map((p) => ({
           place: p.place,
           percentage: parseFloat(p.percentage) || 0,
@@ -879,7 +903,7 @@ export function PickemManager({ tripId }: { tripId: string }) {
       {/* ====== SETTINGS ====== */}
       <CollapsibleSection
         title="Settings"
-        summary={settings?.entry_fee ? `$${settings.entry_fee} entry` : "Configure"}
+        summary={entryFee ? `$${entryFee} entry` : "Configure"}
         icon={
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -888,15 +912,32 @@ export function PickemManager({ tripId }: { tripId: string }) {
       >
         <div className="space-y-3">
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Entry Fee ($)</label>
-            <input
-              type="number"
-              step="1"
-              value={entryFee}
-              onChange={(e) => setEntryFee(e.target.value)}
-              className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              placeholder="20"
-            />
+            <label className="text-xs text-gray-500 block mb-1">Entry fee (cost item)</label>
+            <select
+              value={costItemId ?? ""}
+              onChange={(e) => setCostItemId(e.target.value || null)}
+              className="w-full max-w-md border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="">— none ($0 entry) —</option>
+              {costItems
+                .slice()
+                .sort(
+                  (a, b) =>
+                    (a.category || "zzz").localeCompare(b.category || "zzz") ||
+                    a.sort_order - b.sort_order ||
+                    a.name.localeCompare(b.name),
+                )
+                .map((ci) => (
+                  <option key={ci.id} value={ci.id}>
+                    {ci.name} — ${Number(ci.cost)}
+                  </option>
+                ))}
+            </select>
+            {costItemId && (
+              <p className="text-[10px] text-gray-400 mt-1">
+                Edit on the Cost Items page. Pot derives from this amount × paid participants.
+              </p>
+            )}
           </div>
 
           <div>
@@ -943,7 +984,7 @@ export function PickemManager({ tripId }: { tripId: string }) {
             {/* Computed payout preview */}
             {(() => {
               const paidCount = payments.filter((pay) => pay.paid).length;
-              const fee = parseFloat(entryFee) || 0;
+              const fee = entryFee;
               const pot = fee * paidCount;
               const parsed = payouts.map((p) => ({
                 place: p.place,

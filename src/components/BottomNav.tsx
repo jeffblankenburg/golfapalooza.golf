@@ -98,7 +98,7 @@ export function BottomNav({ isAdmin }: { isAdmin: boolean }) {
   const items = isAdmin ? [...navItems, adminItem] : navItems;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 pb-safe z-40">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 pb-safe z-[60]">
       <div className="flex justify-around items-center h-16">
         {items.map((item) => {
           const isActive = item.exact

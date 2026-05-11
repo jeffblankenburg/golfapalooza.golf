@@ -100,7 +100,7 @@ export function RouteProgress() {
 
   return (
     <div
-      className="fixed top-0 left-0 right-0 z-50 h-[2px] bg-green-600 transition-[width] duration-200 ease-out"
+      className="fixed top-0 left-0 right-0 z-[70] h-[2px] bg-green-600 transition-[width] duration-200 ease-out"
       style={{ width: `${progress}%` }}
       aria-hidden="true"
     />

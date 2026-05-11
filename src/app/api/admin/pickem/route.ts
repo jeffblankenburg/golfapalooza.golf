@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkIsAdmin } from "@/lib/permissions-server";
+import { getPickemEntryFee } from "@/lib/pickem/entry-fee";
 
 // GET - Fetch all games for a contest, plus settings and participants
 export async function GET(request: Request) {
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
 
     const tripId = contestRow?.trip_id;
 
-    const [gamesRes, settingsRes, contestSplitsRes, participantsRes, picksRes] = await Promise.all([
+    const [gamesRes, settingsRes, entryFeeRes, contestSplitsRes, participantsRes, picksRes] = await Promise.all([
       adminClient
         .from("pickem_games")
         .select("*")
@@ -37,9 +38,11 @@ export async function GET(request: Request) {
         .order("game_time"),
       adminClient
         .from("pickem_settings")
-        .select("contest_id, entry_fee, is_open")
+        .select("contest_id, is_open")
         .eq("contest_id", contestId)
         .maybeSingle(),
+      // Issue #125 Phase 4: entry fee derives from contests.buy_in_cost_item_id.
+      getPickemEntryFee(adminClient, contestId),
       // Issue #124: payout structure now lives on contests.payout_splits.
       adminClient
         .from("contests")
@@ -89,7 +92,8 @@ export async function GET(request: Request) {
 
     const settings = {
       contest_id: contestId,
-      entry_fee: settingsRes.data?.entry_fee ?? 0,
+      entry_fee: entryFeeRes.entry_fee,
+      cost_item_id: entryFeeRes.cost_item_id,
       is_open: settingsRes.data?.is_open ?? false,
       payout_json,
     };

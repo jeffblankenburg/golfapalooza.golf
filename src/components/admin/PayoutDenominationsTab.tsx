@@ -41,17 +41,17 @@ interface Prefs {
 }
 
 function loadPrefs(): Prefs {
-  if (typeof window === "undefined") return { excluded: [2, 1], inHand: {} };
+  if (typeof window === "undefined") return { excluded: [1], inHand: {} };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { excluded: [2, 1], inHand: {} };
+    if (!raw) return { excluded: [1], inHand: {} };
     const parsed = JSON.parse(raw);
     return {
-      excluded: Array.isArray(parsed.excluded) ? parsed.excluded : [2, 1],
+      excluded: Array.isArray(parsed.excluded) ? parsed.excluded : [1],
       inHand: parsed.inHand && typeof parsed.inHand === "object" ? parsed.inHand : {},
     };
   } catch {
-    return { excluded: [2, 1], inHand: {} };
+    return { excluded: [1], inHand: {} };
   }
 }
 
@@ -83,7 +83,12 @@ export function PayoutDenominationsTab() {
   );
 
   const perRowSplit = useMemo(
-    () => rows.map((r) => ({ row: r, split: splitForRow(r, allowedDenoms) })),
+    () =>
+      rows.map((r) => {
+        const split = splitForRow(r, allowedDenoms);
+        const billedTotal = totalFromDenom(split);
+        return { row: r, split, billedTotal };
+      }),
     [rows, allowedDenoms],
   );
 
@@ -93,8 +98,8 @@ export function PayoutDenominationsTab() {
   );
 
   const grandTotal = useMemo(
-    () => rows.reduce((s, r) => s + r.total, 0),
-    [rows],
+    () => perRowSplit.reduce((s, p) => s + p.billedTotal, 0),
+    [perRowSplit],
   );
 
   function toggleExcluded(d: number) {
@@ -186,7 +191,7 @@ export function PayoutDenominationsTab() {
             </tr>
           </thead>
           <tbody>
-            {perRowSplit.map(({ row, split }, i) => (
+            {perRowSplit.map(({ row, split, billedTotal }, i) => (
               <tr
                 key={row.id}
                 className={i % 2 === 0 ? "bg-white" : "bg-gray-50/50"}
@@ -205,7 +210,12 @@ export function PayoutDenominationsTab() {
                   {row.day_count > 1 ? ` × ${row.day_count}d` : ""}
                 </td>
                 <td className="px-3 py-2 border-b border-gray-100 text-right font-bold tabular-nums">
-                  {fmt(row.total)}
+                  {fmt(billedTotal)}
+                  {billedTotal !== row.total && (
+                    <div className="text-[10px] font-normal text-gray-400">
+                      from {fmt(row.total)}
+                    </div>
+                  )}
                 </td>
                 <td className="px-3 py-2 border-b border-gray-100">
                   {split.size === 0 ? (

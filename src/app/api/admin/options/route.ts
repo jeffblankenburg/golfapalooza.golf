@@ -3,6 +3,21 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { checkPermissionAccess } from "@/lib/permissions-server";
 import { computeOptionCosts } from "@/lib/cost-items/compute";
 
+// Issue #125 Phase 4: option-level `cost` and per-choice `cost` derive from
+// linked cost_items at read time (computeOptionCosts). The admin UI no
+// longer writes these fields, but any legacy client that still sends them
+// must be ignored so stored values can't drift further. Phase 5 drops the
+// columns entirely.
+function stripCostFromChoices(choices: unknown): unknown {
+  if (!Array.isArray(choices)) return choices;
+  return choices.map((c) => {
+    if (!c || typeof c !== "object") return c;
+    const { cost: _cost, ...rest } = c as Record<string, unknown>;
+    void _cost;
+    return rest;
+  });
+}
+
 export async function GET(request: Request) {
   const admin = await checkPermissionAccess("manage_finances");
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -33,6 +48,9 @@ export async function POST(request: Request) {
   if (!group_id || !trip_id || !name || !option_type) {
     return NextResponse.json({ error: "group_id, trip_id, name, and option_type are required" }, { status: 400 });
   }
+  if (cost !== undefined && cost !== null) {
+    console.warn(`[POST /api/admin/options] Ignoring legacy 'cost' field for ${name} — costs derive from cost_items (issue #125 Phase 4).`);
+  }
 
   const adminClient = createAdminClient();
 
@@ -50,8 +68,7 @@ export async function POST(request: Request) {
 
   const insert: Record<string, unknown> = { group_id, trip_id, name, option_type, sort_order: order };
   if (description !== undefined) insert.description = description;
-  if (choices !== undefined) insert.choices = choices;
-  if (cost !== undefined) insert.cost = cost;
+  if (choices !== undefined) insert.choices = stripCostFromChoices(choices);
   if (is_required !== undefined) insert.is_required = is_required;
   if (icon !== undefined) insert.icon = icon;
   if (linked_contest_id !== undefined) insert.linked_contest_id = linked_contest_id;
@@ -74,14 +91,16 @@ export async function PUT(request: Request) {
 
   const { id, name, description, option_type, choices, cost, is_required, icon, linked_contest_id, depends_on_option_id, sort_order, max_total } = await request.json();
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+  if (cost !== undefined && cost !== null) {
+    console.warn(`[PUT /api/admin/options] Ignoring legacy 'cost' field for option ${id} — costs derive from cost_items (issue #125 Phase 4).`);
+  }
 
   const adminClient = createAdminClient();
   const updates: Record<string, unknown> = {};
   if (name !== undefined) updates.name = name;
   if (description !== undefined) updates.description = description;
   if (option_type !== undefined) updates.option_type = option_type;
-  if (choices !== undefined) updates.choices = choices;
-  if (cost !== undefined) updates.cost = cost;
+  if (choices !== undefined) updates.choices = stripCostFromChoices(choices);
   if (is_required !== undefined) updates.is_required = is_required;
   if (icon !== undefined) updates.icon = icon;
   if (linked_contest_id !== undefined) updates.linked_contest_id = linked_contest_id;

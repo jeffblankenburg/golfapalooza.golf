@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveDate, getEffectiveUserId } from "@/lib/simulator";
+import { getPickemEntryFee } from "@/lib/pickem/entry-fee";
 
 // GET - Fetch games, user's picks, and leaderboard
 export async function GET(request: Request) {
@@ -36,7 +37,7 @@ export async function GET(request: Request) {
 
     const tripId = contestRow?.trip_id;
 
-    const [gamesRes, allPicksRes, participantsRes, settingsRes, contestSplitsRes] = await Promise.all([
+    const [gamesRes, allPicksRes, participantsRes, entryFeeRes, contestSplitsRes] = await Promise.all([
       adminClient
         .from("pickem_games")
         .select("*")
@@ -50,11 +51,8 @@ export async function GET(request: Request) {
         .from("event_participants")
         .select("user_id, user:users!event_participants_user_id_fkey(id, display_name, full_name, avatar_url)")
         .eq("trip_id", tripId),
-      adminClient
-        .from("pickem_settings")
-        .select("entry_fee")
-        .eq("contest_id", contestId)
-        .maybeSingle(),
+      // Issue #125 Phase 4: entry fee derives from contests.buy_in_cost_item_id.
+      getPickemEntryFee(adminClient, contestId),
       // Issue #124: payout structure now lives on contests.payout_splits.
       adminClient
         .from("contests")
@@ -235,7 +233,7 @@ export async function GET(request: Request) {
           .map((s) => ({ place: Number(s.place), percentage: Number(s.amount ?? 0) }));
         return {
           contest_id: contestId,
-          entry_fee: settingsRes.data?.entry_fee ?? 0,
+          entry_fee: entryFeeRes.entry_fee,
           payout_json,
         };
       })(),

@@ -8,7 +8,9 @@
 
 import { computePayoutSplits, type PayoutSplit } from "./splits";
 
-export const ALL_DENOMS = [100, 50, 20, 10, 5, 2, 1] as const;
+// $2 bills are deliberately omitted — they're not a realistic part of the
+// cash mix Sheiker brings to the trip.
+export const ALL_DENOMS = [100, 50, 20, 10, 5, 1] as const;
 
 export const DEFAULT_TEAM_SIZE = 4;
 // Legacy default 2nd-place flat. Used only when a row has no payout_splits
@@ -56,6 +58,23 @@ function multiply(map: Map<number, number>, n: number): Map<number, number> {
   const out = new Map<number, number>();
   for (const [d, c] of map) out.set(d, c * n);
   return out;
+}
+
+// Round a fractional share UP to the smallest enabled denomination so the
+// bill mix can represent it exactly. Winners get the rounded amount —
+// e.g. a $17.50/day CTP becomes $18/day when $1 is on (overage of $1.50
+// across 3 days), or $20/day when only $5+ are on (overage of $7.50).
+// Keeps the cash-needed sheet honest: bills brought ≥ pot owed.
+function smallestOf(allowed: readonly number[]): number {
+  return allowed.length > 0 ? Math.min(...allowed) : 1;
+}
+
+function roundUpToDenom(amount: number, smallest: number): number {
+  if (smallest <= 0 || amount <= 0) return amount;
+  // Work in cents to avoid float drift.
+  const cents = Math.ceil(amount * 100);
+  const step = Math.round(smallest * 100);
+  return (Math.ceil(cents / step) * step) / 100;
 }
 
 // Detect what kind of event a row represents purely from its label + source,
@@ -124,10 +143,11 @@ function splitScrambleTeam(
 ): Map<number, number> {
   if (total <= 0 || teamSize <= 0) return new Map();
   const placeAmounts = computePayoutSplits(total, splits ?? DEFAULT_SCRAMBLE_TEAM_SPLITS);
+  const smallest = smallestOf(allowed);
   const perPlaceMixes: Array<Map<number, number>> = [];
   for (const [, amount] of placeAmounts) {
     if (amount <= 0) continue;
-    const perMember = Math.round((amount / teamSize) * 100) / 100;
+    const perMember = roundUpToDenom(amount / teamSize, smallest);
     perPlaceMixes.push(multiply(splitGreedy(perMember, allowed), teamSize));
   }
   return sumByDenom(perPlaceMixes);
@@ -146,7 +166,7 @@ function splitPerDay(
   allowed: readonly number[],
 ): Map<number, number> {
   if (total <= 0 || dayCount <= 0) return new Map();
-  const perDay = Math.round((total / dayCount) * 100) / 100;
+  const perDay = roundUpToDenom(total / dayCount, smallestOf(allowed));
   return multiply(splitGreedy(perDay, allowed), dayCount);
 }
 
@@ -175,6 +195,6 @@ export function splitForRow(
     case "pickem":
     case "default":
     default:
-      return splitGreedy(row.total, allowedDenoms);
+      return splitGreedy(roundUpToDenom(row.total, smallestOf(allowedDenoms)), allowedDenoms);
   }
 }

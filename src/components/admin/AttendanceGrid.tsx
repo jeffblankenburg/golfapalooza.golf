@@ -159,23 +159,30 @@ export function AttendanceGrid() {
         className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
       />
 
-      <div className="overflow-x-auto border border-gray-200 rounded-xl bg-white">
+      {/* Table is its own scroll region (both axes) so sticky cells are
+          predictable cross-browser. max-height leaves room for the
+          global HeaderBar + page title + search above. */}
+      <div className="overflow-auto border border-gray-200 rounded-xl bg-white max-h-[calc(100vh-200px)]">
         <table className="text-xs border-collapse">
           <thead>
+            {/* Top sticky relative to this scroll container. Corner cells
+                bump z to 30 so they stay above both the row's sticky
+                first/last cells (z-10) and the rest of the sticky thead
+                (z-20). */}
             <tr className="bg-gray-50">
-              <th className="sticky left-0 z-20 bg-gray-50 px-3 py-2 text-left font-semibold text-gray-600 uppercase tracking-wider min-w-[140px] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+              <th className="sticky top-0 left-0 z-30 bg-gray-50 px-3 py-2 text-left font-semibold text-gray-600 uppercase tracking-wider min-w-[140px] shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                 Loozer
               </th>
               {trips.map((t) => (
                 <th
                   key={t.id}
-                  className="px-1.5 py-2 text-center font-semibold text-gray-600 whitespace-nowrap min-w-[44px]"
+                  className="sticky top-0 z-20 bg-gray-50 px-1.5 py-2 text-center font-semibold text-gray-600 whitespace-nowrap min-w-[44px]"
                   title={t.trip_name}
                 >
                   {t.trip_year}
                 </th>
               ))}
-              <th className="sticky right-0 z-20 bg-gray-50 px-2 py-2 text-center font-semibold text-gray-900 uppercase tracking-wider min-w-[44px] shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+              <th className="sticky top-0 right-0 z-30 bg-gray-50 px-2 py-2 text-center font-semibold text-gray-900 uppercase tracking-wider min-w-[44px] shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                 Total
               </th>
             </tr>

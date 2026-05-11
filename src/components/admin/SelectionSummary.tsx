@@ -20,7 +20,7 @@ interface TripOption {
   group_id: string;
   name: string;
   description?: string;
-  option_type: "checkbox" | "select" | "multi_select" | "text" | "number" | "quantity";
+  option_type: "checkbox" | "select" | "multi_select" | "text" | "number" | "quantity" | "trip_cost";
   choices?: Choice[];
   cost?: number;
   is_required?: boolean;
@@ -55,7 +55,7 @@ function calcLoozerCost(
   for (const opt of options) {
     const sel = userSels[opt.id];
     if (!sel) continue;
-    if (opt.option_type === "checkbox") {
+    if (opt.option_type === "checkbox" || opt.option_type === "trip_cost") {
       if (sel.value === true && opt.cost) total += Number(opt.cost);
     } else if (opt.option_type === "select") {
       const matched = (opt.choices || []).find((c) => c.value === sel.value);
@@ -517,7 +517,7 @@ function OptionCard({
           </span>
         ) : null}
       </div>
-      {opt.option_type === "checkbox" && (
+      {(opt.option_type === "checkbox" || opt.option_type === "trip_cost") && (
         <CheckboxSummary opt={opt} participants={participants} selections={selections} />
       )}
       {(opt.option_type === "select" || opt.option_type === "multi_select") && (

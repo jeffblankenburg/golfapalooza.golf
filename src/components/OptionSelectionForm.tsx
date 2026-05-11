@@ -19,7 +19,7 @@ interface Option {
   name: string;
   description?: string;
   icon?: string | null;
-  option_type: "checkbox" | "select" | "multi_select" | "text" | "number" | "quantity";
+  option_type: "checkbox" | "select" | "multi_select" | "text" | "number" | "quantity" | "trip_cost";
   cost?: number;
   choices?: OptionChoice[];
   is_required: boolean;
@@ -205,7 +205,7 @@ export default function OptionSelectionForm({ tripId }: OptionSelectionFormProps
       const val = selections[opt.id];
       if (val === null || val === undefined) continue;
 
-      if (opt.option_type === "checkbox" && val === true) {
+      if ((opt.option_type === "checkbox" || opt.option_type === "trip_cost") && val === true) {
         total += opt.cost ? Number(opt.cost) : 0;
       } else if (opt.option_type === "select" && typeof val === "string") {
         const matched = (opt.choices || []).find((c) => c.value === val);
@@ -238,7 +238,7 @@ export default function OptionSelectionForm({ tripId }: OptionSelectionFormProps
   const isAnswered = (opt: Option): boolean => {
     const val = selections[opt.id];
     if (val === null || val === undefined) return false;
-    if (opt.option_type === "checkbox") return val === true;
+    if (opt.option_type === "checkbox" || opt.option_type === "trip_cost") return val === true;
     if (opt.option_type === "select") return typeof val === "string" && val.length > 0;
     if (opt.option_type === "multi_select") return Array.isArray(val) && val.length > 0;
     if (opt.option_type === "text") return typeof val === "string" && val.trim().length > 0;
@@ -313,11 +313,13 @@ export default function OptionSelectionForm({ tripId }: OptionSelectionFormProps
         </div>
       )}
 
-      {/* Running cost total */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sticky top-0 z-10">
+      {/* Running cost total — sticks just below the global HeaderBar
+          (h-14, sticky top-0) so the user always sees their running
+          subtotal as they add items. */}
+      <div className="bg-green-50 rounded-2xl border-2 border-green-600 shadow-md p-4 sticky top-14 z-20">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-500">Your estimated cost</span>
-          <span className="text-2xl font-bold text-gray-900">
+          <span className="text-sm font-semibold text-green-700 uppercase tracking-wide">Your estimated cost</span>
+          <span className="text-2xl font-bold text-green-700 tabular-nums">
             ${totalCost.toLocaleString()}
           </span>
         </div>
@@ -439,7 +441,7 @@ function OptionField({
           <div className="flex items-center gap-1.5">
             <span className="font-semibold text-gray-900">{option.name}</span>
             {option.is_required && <span className="text-red-500 text-sm">*</span>}
-            {option.option_type === "checkbox" && option.cost ? (
+            {(option.option_type === "checkbox" || option.option_type === "trip_cost") && option.cost ? (
               <span className="text-green-700 font-semibold text-sm ml-1">
                 ${Number(option.cost).toLocaleString()}
               </span>
@@ -456,7 +458,7 @@ function OptionField({
       </div>
 
       {/* Input based on type */}
-      {option.option_type === "checkbox" && (
+      {(option.option_type === "checkbox" || option.option_type === "trip_cost") && (
         <CheckboxInput option={option} value={value} onChange={onChange} disabled={disabled} />
       )}
       {option.option_type === "select" && (

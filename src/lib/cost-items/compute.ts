@@ -7,6 +7,11 @@
 // that haven't been linked yet, but should be considered legacy.
 //
 // Cost rules:
+//   - option_type='trip_cost':
+//       option.cost = SUM(cost_items.cost) WHERE trip_id matches AND
+//                    included_in_trip_cost=true. Explicit linkages are
+//                    ignored. Adding a new trip-cost-flagged item flows
+//                    in automatically — admin doesn't re-link each time.
 //   - Option has NO linked cost_items                → keep stored cost (fallback).
 //   - Option has linked items + option_type='checkbox':
 //       option.cost = SUM(linked items with no choice junction rows).
@@ -19,7 +24,8 @@
 //
 // One bulk query fetches every cost_item linked to any of the input options
 // (with their junction rows joined) — O(1) round trips per call regardless of
-// how many options are passed in.
+// how many options are passed in. The auto-trip-cost path adds a second
+// bulk query (one per distinct trip_id in the input).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -37,6 +43,7 @@ export interface OptionLike {
   option_type?: string;
   cost?: number | null;
   choices?: OptionChoice[] | null;
+  trip_id?: string;
   // Other fields are passed through unchanged.
   [k: string]: unknown;
 }
@@ -80,7 +87,34 @@ export async function computeOptionCosts<T extends OptionLike>(
     itemsByOption.get(item.linked_option_id)!.push(item);
   }
 
+  // option_type='trip_cost' path: SUM(cost_items.cost) WHERE
+  // included_in_trip_cost=true, scoped per trip_id. Bulk-fetch one sum per
+  // distinct trip_id present in the input.
+  const tripCostTripIds = new Set<string>();
+  for (const opt of options) {
+    if (opt.option_type === "trip_cost" && opt.trip_id) {
+      tripCostTripIds.add(opt.trip_id);
+    }
+  }
+  const tripCostByTripId = new Map<string, number>();
+  if (tripCostTripIds.size > 0) {
+    const { data: tripCostRows } = await client
+      .from("cost_items")
+      .select("trip_id, cost")
+      .in("trip_id", Array.from(tripCostTripIds))
+      .eq("included_in_trip_cost", true);
+    for (const row of tripCostRows || []) {
+      const tid = row.trip_id as string;
+      tripCostByTripId.set(tid, (tripCostByTripId.get(tid) || 0) + Number(row.cost || 0));
+    }
+  }
+
   return options.map((opt) => {
+    if (opt.option_type === "trip_cost" && opt.trip_id) {
+      const computed = tripCostByTripId.get(opt.trip_id) || 0;
+      return { ...opt, cost: round2(computed) };
+    }
+
     const linked = itemsByOption.get(opt.id);
     if (!linked || linked.length === 0) return opt;
 

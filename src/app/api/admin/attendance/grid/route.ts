@@ -24,6 +24,7 @@ export async function GET() {
     adminClient
       .from("trip_settings")
       .select("id, trip_name, trip_year, status")
+      .neq("status", "test")
       .order("trip_year", { ascending: true }),
     // Show every Loozer, including financial-only — historical attendance
     // doesn't care whether someone uses the app. Only bots are excluded.

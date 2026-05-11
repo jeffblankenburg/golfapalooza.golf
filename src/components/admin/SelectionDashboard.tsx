@@ -33,7 +33,7 @@ interface TripOption {
   group_id: string;
   name: string;
   description?: string;
-  option_type: "checkbox" | "select" | "multi_select" | "text" | "number" | "quantity";
+  option_type: "checkbox" | "select" | "multi_select" | "text" | "number" | "quantity" | "trip_cost";
   choices?: Choice[];
   cost?: number;
   is_required?: boolean;
@@ -63,7 +63,7 @@ function calcLoozerCost(
     const sel = userSels[opt.id];
     if (!sel) continue;
 
-    if (opt.option_type === "checkbox") {
+    if (opt.option_type === "checkbox" || opt.option_type === "trip_cost") {
       if (sel.value === true && opt.cost) total += Number(opt.cost);
     } else if (opt.option_type === "select") {
       const choices = (opt.choices || []) as Choice[];
@@ -592,6 +592,7 @@ export function SelectionDashboard({
 
     switch (opt.option_type) {
       case "checkbox":
+      case "trip_cost":
         return (
           <CheckboxCell
             checked={sel?.value === true}
@@ -688,7 +689,7 @@ export function SelectionDashboard({
       );
     }
 
-    if (opt.option_type === "checkbox") {
+    if (opt.option_type === "checkbox" || opt.option_type === "trip_cost") {
       let count = 0;
       for (const p of participants) {
         const sel = selections[p.user_id]?.[opt.id];

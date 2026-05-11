@@ -17,6 +17,7 @@ interface CostItem {
   sort_order: number;
   linked_option_id: string | null;
   linked_choices: string[]; // populated by the loader
+  included_in_trip_cost: boolean;
 }
 
 interface OptionChoice {
@@ -89,10 +90,15 @@ export function CostItemLinksModal({
       }
     }
 
-    const items: CostItem[] = (data.items || []).map((i: CostItem) => ({
-      ...i,
-      linked_choices: choiceRowsByItem.get(i.id) || [],
-    }));
+    // Cost items flagged `included_in_trip_cost` flow into the Trip Cost
+    // option (option_type='trip_cost') automatically. Linking them to a
+    // regular option would double-count them — hide from this picker.
+    const items: CostItem[] = (data.items || [])
+      .filter((i: CostItem) => !i.included_in_trip_cost)
+      .map((i: CostItem) => ({
+        ...i,
+        linked_choices: choiceRowsByItem.get(i.id) || [],
+      }));
     setAllItems(items);
 
     // Initialize draft from current state, scoped to THIS option.

@@ -37,11 +37,13 @@ export async function GET(request: Request) {
 
     const adminClient = createAdminClient();
 
-    // Get all users
+    // Get all users — excludes bots (is_system=true) and financial-only
+    // accounts; both are never real participants in an event.
     const { data: users, error: usersError } = await adminClient
       .from("users")
       .select("id, display_name, full_name, avatar_url")
       .eq("is_financial_only", false)
+      .eq("is_system", false)
       .order("display_name");
 
     if (usersError) {

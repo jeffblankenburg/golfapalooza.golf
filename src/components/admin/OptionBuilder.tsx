@@ -51,7 +51,7 @@ interface Option {
   name: string;
   description?: string;
   icon?: string | null;
-  option_type: "checkbox" | "select" | "multi_select" | "text" | "number" | "quantity";
+  option_type: "checkbox" | "select" | "multi_select" | "text" | "number" | "quantity" | "trip_cost";
   cost?: number;
   choices?: OptionChoice[];
   is_required: boolean;
@@ -72,6 +72,7 @@ const TYPE_OPTIONS = [
   { value: "quantity", label: "Quantity", icon: "Hash" },
   { value: "text", label: "Text", icon: "Type" },
   { value: "number", label: "Number", icon: "Hash" },
+  { value: "trip_cost", label: "Trip Cost", icon: "DollarSign" },
 ];
 
 const TYPE_META: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
@@ -132,6 +133,16 @@ const TYPE_META: Record<string, { label: string; color: string; bg: string; icon
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h2m4 0h2m4 0h2M4 6h16M4 14h16M6 18h12" />
+      </svg>
+    ),
+  },
+  trip_cost: {
+    label: "Trip Cost",
+    color: "text-green-700",
+    bg: "bg-green-50",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
   },
@@ -545,7 +556,7 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
   // ── Helpers ──
 
   const getOptionCostSummary = (option: Option): string | null => {
-    if (option.option_type === "checkbox" && option.cost) {
+    if ((option.option_type === "checkbox" || option.option_type === "trip_cost") && option.cost) {
       return formatCurrency(option.cost);
     }
     if ((option.option_type === "select" || option.option_type === "multi_select") && option.choices) {
@@ -699,16 +710,32 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
             </select>
           </div>
 
-          {optionType === "checkbox" && (
-            <div className="flex-1 min-w-0 text-xs text-gray-500 italic">
-              Cost is computed from linked cost items —{" "}
-              <a href="/admin/financials/cost-items" className="text-green-700 underline">
-                manage on Cost Items
-              </a>
-              .
+          {optionType !== "text" && optionType !== "number" && optionType !== "trip_cost" && (
+            <div className="flex-1 min-w-0 flex items-end">
+              {editingOptionId ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const existing = options.find((o) => o.id === editingOptionId);
+                    if (existing) setLinksModalOption(existing);
+                  }}
+                  className="w-full px-3 py-2 border border-green-300 bg-green-50 text-green-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-green-100 transition-colors"
+                  title="Attach cost items to this option"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                  Link cost items
+                </button>
+              ) : (
+                <div className="text-xs text-gray-500 italic">
+                  Save the option first, then link cost items here.
+                </div>
+              )}
             </div>
           )}
         </div>
+
 
         {(optionType === "select" || optionType === "multi_select" || optionType === "quantity") && (
           <div className="space-y-2">
@@ -834,6 +861,21 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
           >
             Cancel
           </button>
+          {editingOptionId && (
+            <button
+              onClick={() => {
+                const existing = options.find((o) => o.id === editingOptionId);
+                if (existing) deleteOption(existing);
+              }}
+              className="ml-auto p-2 border border-red-200 text-red-600 rounded-xl active:bg-red-50"
+              title="Delete this option"
+              aria-label="Delete this option"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
     );
@@ -885,6 +927,15 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
             </button>
           </div>
         </div>
+        <a
+          href="/admin/financials/cost-items"
+          className="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-green-700 bg-green-50 border border-green-200 hover:bg-green-100 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Manage cost items
+        </a>
       </div>
 
       {/* ── Option Groups ── */}
@@ -1226,10 +1277,13 @@ function SortableGroupCard({
                     option={option}
                     allOptions={allOptions}
                     startEditOption={startEditOption}
-                    deleteOption={deleteOption}
                     getOptionCostSummary={getOptionCostSummary}
                     getOptionChoiceSummary={getOptionChoiceSummary}
-                    onOpenLinks={onOpenLinks ? () => onOpenLinks(option) : undefined}
+                    onOpenLinks={
+                      onOpenLinks && option.option_type !== "trip_cost"
+                        ? () => onOpenLinks(option)
+                        : undefined
+                    }
                   />
                 );
               })}
@@ -1327,13 +1381,22 @@ const TYPE_META_LOOKUP: Record<string, { label: string; color: string; bg: strin
       </svg>
     ),
   },
+  trip_cost: {
+    label: "Trip Cost",
+    color: "text-green-700",
+    bg: "bg-green-50",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
 };
 
 function SortableOptionRow({
   option,
   allOptions,
   startEditOption,
-  deleteOption,
   getOptionCostSummary,
   getOptionChoiceSummary,
   onOpenLinks,
@@ -1341,7 +1404,6 @@ function SortableOptionRow({
   option: Option;
   allOptions: Option[];
   startEditOption: (o: Option) => void;
-  deleteOption: (o: Option) => void;
   onOpenLinks?: () => void;
   getOptionCostSummary: (o: Option) => string | null;
   getOptionChoiceSummary: (o: Option) => string | null;
@@ -1375,42 +1437,33 @@ function SortableOptionRow({
       </div>
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-900">{option.name}</span>
+        <div className="flex items-baseline gap-1 min-w-0">
+          <span className="text-sm font-medium text-gray-900 truncate">{option.name}</span>
           {option.is_required && (
-            <span className="text-[10px] font-bold uppercase tracking-wider text-red-500 bg-red-50 px-1.5 py-0.5 rounded">
-              Req
-            </span>
+            <span className="text-red-500 text-sm leading-none shrink-0" title="Required">*</span>
           )}
         </div>
-        {option.depends_on_option_id && (
-          <span className="text-[10px] text-amber-600 flex items-center gap-0.5 mt-0.5">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-            </svg>
+        {option.depends_on_option_id ? (
+          <div className="text-[11px] text-gray-400 mt-0.5 truncate">
             Requires {allOptions.find((o) => o.id === option.depends_on_option_id)?.name || "..."}
-          </span>
-        )}
-        {!option.depends_on_option_id && (option.description || choiceSummary) && (
+          </div>
+        ) : (option.description || choiceSummary) ? (
           <div className="text-xs text-gray-400 mt-0.5 line-clamp-1 prose prose-xs prose-gray max-w-none [&_p]:m-0 [&_p]:inline">
             {option.description ? (
               <ReactMarkdown remarkPlugins={[remarkBreaks]}>{option.description}</ReactMarkdown>
             ) : choiceSummary}
           </div>
-        )}
+        ) : null}
       </div>
 
-      {costStr && (
-        <span className="text-sm font-semibold text-green-700 flex-shrink-0">
-          {costStr}
-        </span>
-      )}
-
+      {/* Link icon sits before the price so the price column is always
+          the rightmost element — keeps prices truly right-aligned across
+          every row whether or not the link button is present. */}
       {onOpenLinks && (
         <button
           onClick={(e) => { e.stopPropagation(); onOpenLinks(); }}
           title="Link cost items"
-          className="p-1 text-gray-300 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors flex-shrink-0"
+          className="p-1 text-gray-300 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors shrink-0"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
@@ -1418,14 +1471,9 @@ function SortableOptionRow({
         </button>
       )}
 
-      <button
-        onClick={(e) => { e.stopPropagation(); deleteOption(option); }}
-        className="p-1 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-      </button>
+      <div className="w-20 text-right text-sm font-semibold text-green-700 tabular-nums shrink-0">
+        {costStr || ""}
+      </div>
     </div>
   );
 }

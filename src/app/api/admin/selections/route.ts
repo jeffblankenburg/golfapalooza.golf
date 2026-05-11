@@ -140,7 +140,7 @@ export async function PUT(request: Request) {
   let chargeAmount: number | null = null;
   let description = option.name;
 
-  if (option.option_type === "checkbox") {
+  if (option.option_type === "checkbox" || option.option_type === "trip_cost") {
     if (value === true) {
       chargeAmount = option.cost ? Number(option.cost) : null;
     }

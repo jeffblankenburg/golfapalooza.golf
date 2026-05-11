@@ -15,7 +15,7 @@ export interface ExportOption {
   id: string;
   group_id: string;
   name: string;
-  option_type: "checkbox" | "select" | "multi_select" | "text" | "number" | "quantity";
+  option_type: "checkbox" | "select" | "multi_select" | "text" | "number" | "quantity" | "trip_cost";
   choices?: Choice[];
   cost?: number;
   sort_order: number;
@@ -64,7 +64,7 @@ function calcLoozerCost(
     const sel = userSels[opt.id];
     if (!sel) continue;
 
-    if (opt.option_type === "checkbox") {
+    if (opt.option_type === "checkbox" || opt.option_type === "trip_cost") {
       if (sel.value === true && opt.cost) total += Number(opt.cost);
     } else if (opt.option_type === "select") {
       const matched = (opt.choices || []).find((c) => c.value === sel.value);
@@ -85,7 +85,7 @@ function formatCellValue(
   opt: ExportOption,
   sel: ExportSelectionValue | undefined
 ): string | number | null {
-  if (opt.option_type === "checkbox") {
+  if (opt.option_type === "checkbox" || opt.option_type === "trip_cost") {
     return sel?.value === true ? "Y" : "N";
   }
   if (!sel) return null;
@@ -124,7 +124,7 @@ function topCountForColumn(
   participants: ExportParticipant[],
   selections: ExportSelectionsMap
 ): number | null {
-  if (opt.option_type === "checkbox") {
+  if (opt.option_type === "checkbox" || opt.option_type === "trip_cost") {
     let n = 0;
     for (const p of participants) {
       if (selections[p.user_id]?.[opt.id]?.value === true) n++;
@@ -182,7 +182,7 @@ function buildColumnSummary(
     return `Total: ${sum.toLocaleString()}\nAvg: ${avgStr}`;
   }
 
-  if (opt.option_type === "checkbox") {
+  if (opt.option_type === "checkbox" || opt.option_type === "trip_cost") {
     let count = 0;
     for (const p of participants) {
       const sel = selections[p.user_id]?.[opt.id];
@@ -314,7 +314,7 @@ export async function downloadOptionsExcel(input: ExportInput) {
     if (opt.option_type === "text") continue;
     const headerLabel = opt.cost ? `${opt.name} ($${opt.cost})` : opt.name;
 
-    if (opt.option_type === "checkbox") {
+    if (opt.option_type === "checkbox" || opt.option_type === "trip_cost") {
       let yes = 0;
       for (const p of input.participants) {
         if (input.selections[p.user_id]?.[opt.id]?.value === true) yes++;

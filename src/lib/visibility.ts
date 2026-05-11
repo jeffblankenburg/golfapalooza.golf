@@ -66,15 +66,15 @@ export function isFeatureVisible(
       return diffDays >= -1;
 
     case "scorecards":
-    case "skins":
     case "hundred_feet":
     case "teams":
       // Show from trip start date onward
       return diffDays >= 0;
 
     case "daily_games":
-      // Always visible — empty contest tiles are useful as a preview
-      // before winners are decided.
+    case "skins":
+      // Always visible — empty tiles + pot previews are useful before
+      // scoring begins.
       return true;
 
     case "rooms":
@@ -95,7 +95,7 @@ export const VISIBILITY_FEATURES: {
   { key: "scoring", label: "Live Scoring", autoDescription: "1 hour before tee time" },
   { key: "tee_times", label: "Tee Times", autoDescription: "1 day before trip" },
   { key: "scorecards", label: "Scorecards", autoDescription: "Trip start date" },
-  { key: "skins", label: "Skins", autoDescription: "Trip start date" },
+  { key: "skins", label: "Skins", autoDescription: "Always visible" },
   { key: "hundred_feet", label: "100 Feet", autoDescription: "Trip start date" },
   { key: "daily_games", label: "Daily Games", autoDescription: "Always visible" },
   { key: "rooms", label: "Room Assignments", autoDescription: "1 week before trip" },

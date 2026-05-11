@@ -9,11 +9,19 @@ interface Contest {
   day_number: number;
 }
 
+interface SkinTeamMember {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  amount: number;
+}
+
 interface SkinTeam {
   id: string;
   team_handicap: number;
-  members: { display_name: string; avatar_url: string | null }[];
+  members: SkinTeamMember[];
   skins: number;
+  team_total: number;
   winningHoles: { hole: number; score: number | null; par: number | null }[];
 }
 
@@ -154,16 +162,25 @@ export function SkinsContent({
         </div>
       )}
 
-      {!loading && data && !data.complete && (
-        <div className="bg-lime-50 rounded-xl px-4 py-3 border border-lime-200 text-center">
-          <p className="text-sm text-lime-700 font-medium">
-            {data.message || "Scores still being entered"}
-          </p>
-          <p className="text-xs text-lime-600 mt-1">
-            Skins will be calculated once all teams have complete scores.
-          </p>
-        </div>
-      )}
+      {!loading && data && !data.complete && (() => {
+        const perPlayer = data.perPlayerAmount ?? 10;
+        const previewPot = (data.participantCount || 0) * perPlayer;
+        return (
+          <div className="space-y-2">
+            <div className="bg-lime-50 rounded-2xl border border-lime-200 px-4 py-5 text-center">
+              <p className="text-[10px] uppercase tracking-wider text-lime-700 font-semibold">
+                Prize Pool
+              </p>
+              <p className="text-3xl font-bold text-lime-700 tabular-nums mt-1">
+                {previewPot > 0 ? `$${previewPot}` : "—"}
+              </p>
+            </div>
+            <p className="text-sm text-gray-500 text-center">
+              {data.message || "Skins will be calculated once all teams have complete scores."}
+            </p>
+          </div>
+        );
+      })()}
 
       {!loading && data?.complete && data.teams && (() => {
         const perPlayer = data.perPlayerAmount ?? 10;
@@ -172,21 +189,20 @@ export function SkinsContent({
 
         return (
           <div className="space-y-3">
-            <div className="bg-lime-50 rounded-xl px-4 py-2 border border-lime-200 text-center">
-              <span className="text-sm text-lime-700 font-semibold">
+            <div className="bg-lime-50 rounded-2xl border border-lime-200 px-4 py-5 text-center">
+              <p className="text-[10px] uppercase tracking-wider text-lime-700 font-semibold">
+                Prize Pool
+              </p>
+              <p className="text-3xl font-bold text-lime-700 tabular-nums mt-1">
+                {pot > 0 ? `$${pot}` : "—"}
+              </p>
+              <p className="text-xs text-lime-600 mt-1">
                 {totalSkins} skin{totalSkins !== 1 ? "s" : ""} awarded
-              </span>
-              {pot > 0 && (
-                <span className="text-sm text-lime-600 ml-2">
-                  &middot; ${pot} pot
-                </span>
-              )}
+              </p>
             </div>
 
             {data.teams.map((team) => {
-              const winnings = totalSkins > 0 && pot > 0
-                ? (team.skins / totalSkins) * pot
-                : 0;
+              const winnings = team.team_total ?? 0;
 
               return (
                 <div
@@ -240,9 +256,20 @@ export function SkinsContent({
                       </div>
                       {winnings > 0 && (
                         <div className="flex-shrink-0 text-right ml-3">
-                          <span className="text-2xl font-bold text-green-600">
-                            ${Math.round(winnings / 5) * 5}
+                          <span className="text-2xl font-bold text-green-600 tabular-nums">
+                            ${winnings}
                           </span>
+                          {team.members.length > 0 && (() => {
+                            const amounts = team.members.map((m) => m.amount);
+                            const min = Math.min(...amounts);
+                            const max = Math.max(...amounts);
+                            const label = min === max ? `$${min} ea` : `$${min}–$${max} ea`;
+                            return (
+                              <div className="text-[10px] text-gray-500 mt-0.5 tabular-nums">
+                                {label}
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>

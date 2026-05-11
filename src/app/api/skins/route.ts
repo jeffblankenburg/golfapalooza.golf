@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { calcSkins } from "@/lib/skins";
+import { calcSkins, distributeSkinsPot } from "@/lib/skins";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -26,14 +26,25 @@ export async function GET(request: Request) {
     .eq("id", contestId)
     .single();
 
-  // Count event participants for the pot calculation
+  // Skins is funded by the bundled Trip Cost option. The accurate
+  // "paying" count is the number of Loozers who've checked Trip Cost
+  // in their selections — not the roster, since the option form is
+  // how people commit to the bundle.
   let participantCount = 0;
   if (contest?.trip_id) {
-    const { count } = await supabase
-      .from("event_participants")
-      .select("*", { count: "exact", head: true })
-      .eq("trip_id", contest.trip_id);
-    participantCount = count || 0;
+    const { data: tripCostOpt } = await supabase
+      .from("trip_options")
+      .select("id")
+      .eq("trip_id", contest.trip_id)
+      .eq("option_type", "trip_cost")
+      .maybeSingle();
+    if (tripCostOpt?.id) {
+      const { data: sels } = await supabase
+        .from("user_option_selections")
+        .select("value")
+        .eq("option_id", tripCostOpt.id);
+      participantCount = (sels || []).filter((s) => s.value === true).length;
+    }
   }
 
   // Per-player Skins amount comes from the Skins child contest's buy-in
@@ -75,13 +86,23 @@ export async function GET(request: Request) {
   }
 
   if (!teams || teams.length === 0) {
-    return NextResponse.json({ complete: false, message: "No teams found" });
+    return NextResponse.json({
+      complete: false,
+      message: "Teams not yet assigned",
+      participantCount,
+      perPlayerAmount,
+    });
   }
 
   // Check if all teams have complete scores
   const allComplete = teams.every((t) => t.gross_score !== null);
   if (!allComplete) {
-    return NextResponse.json({ complete: false, message: "Scores still being entered" });
+    return NextResponse.json({
+      complete: false,
+      message: "Scores still being entered",
+      participantCount,
+      perPlayerAmount,
+    });
   }
 
   // Fetch hole scores
@@ -156,13 +177,32 @@ export async function GET(request: Request) {
   const skinTeams = teams.map((t) => ({ id: t.id, team_handicap: t.team_handicap }));
   const result = calcSkins(skinTeams, holes, holeScores);
 
+  // Distribute the day's pot using the whole-dollar algorithm. Returns
+  // per-team totals + per-player amounts (sum exactly = pool).
+  const pot = participantCount * perPlayerAmount;
+  const distInput = teams
+    .filter((t) => (result.skinCounts.get(t.id) ?? 0) > 0)
+    .map((t) => ({
+      id: t.id,
+      skins: result.skinCounts.get(t.id) ?? 0,
+      member_user_ids: (t.members || []).map(
+        (m: { user_id: string }) => m.user_id,
+      ),
+    }));
+  const payouts = distributeSkinsPot(pot, distInput);
+  const payoutByTeam = new Map(payouts.map((p) => [p.team_id, p]));
+
   // Normalize team data for response
   const teamData = teams.map((t) => {
+    const skins = result.skinCounts.get(t.id) || 0;
+    const payout = payoutByTeam.get(t.id);
     const members = (t.members || []).map((m: { user_id: string; user: { display_name: string; avatar_url: string | null } | { display_name: string; avatar_url: string | null }[] }) => {
       const u = Array.isArray(m.user) ? m.user[0] : m.user;
       return {
+        user_id: m.user_id,
         display_name: u?.display_name || "Unknown",
         avatar_url: u?.avatar_url || null,
+        amount: payout?.per_player.get(m.user_id) ?? 0,
       };
     });
 
@@ -170,7 +210,8 @@ export async function GET(request: Request) {
       id: t.id,
       team_handicap: t.team_handicap,
       members,
-      skins: result.skinCounts.get(t.id) || 0,
+      skins,
+      team_total: payout?.team_total ?? 0,
       winningHoles: Array.from(result.skinWins.get(t.id) || [])
         .sort((a, b) => a - b)
         .map((h) => ({ hole: h, score: holeScores[t.id]?.[h] ?? null, par: holePars[h] ?? null })),

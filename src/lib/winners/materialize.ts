@@ -429,7 +429,7 @@ export async function materializeSkinsWinners(
     holeScores[r.team_id][r.hole_number] = r.strokes;
   }
 
-  const { calcSkins } = await import("@/lib/skins");
+  const { calcSkins, distributeSkinsPot } = await import("@/lib/skins");
   const result = calcSkins(teams, holes, holeScores);
 
   if (result.totalSkins === 0) {
@@ -438,28 +438,35 @@ export async function materializeSkinsWinners(
   }
 
   const { pot } = await loadContestPotAndSplits(client, skinsContestId);
-  // Skins is always all-pot-place-1 (skins_proportional). Distribute the
-  // pot proportionally to each team's skin count, then split each team's
-  // share equally among its members.
-  const teamSizeById = new Map<string, number>();
-  for (const m of teamMembers) {
-    teamSizeById.set(m.team_id, (teamSizeById.get(m.team_id) ?? 0) + 1);
-  }
 
-  const desired: WinnerRow[] = [];
+  // Build the input shape: for each team, ordered member list + skin count.
+  const teamMembersByTeam = new Map<string, string[]>();
   for (const m of teamMembers) {
-    const skinCount = result.skinCounts.get(m.team_id) ?? 0;
-    if (skinCount === 0) continue;
-    const teamSize = teamSizeById.get(m.team_id) || 1;
-    const teamShare = (skinCount / result.totalSkins) * pot;
-    const perUser = Math.round((teamShare / teamSize) * 100) / 100;
-    desired.push({
-      contest_id: skinsContestId,
-      place: 1,
-      user_id: m.user_id,
-      amount: perUser,
-      notes: `${skinCount} skin${skinCount === 1 ? "" : "s"}`,
-    });
+    if (!teamMembersByTeam.has(m.team_id)) teamMembersByTeam.set(m.team_id, []);
+    teamMembersByTeam.get(m.team_id)!.push(m.user_id);
+  }
+  const distInput = teams
+    .filter((t) => (result.skinCounts.get(t.id) ?? 0) > 0)
+    .map((t) => ({
+      id: t.id,
+      skins: result.skinCounts.get(t.id) ?? 0,
+      member_user_ids: teamMembersByTeam.get(t.id) ?? [],
+    }));
+
+  const payouts = distributeSkinsPot(pot, distInput);
+  const desired: WinnerRow[] = [];
+  for (const p of payouts) {
+    const skinCount = result.skinCounts.get(p.team_id) ?? 0;
+    for (const [userId, amount] of p.per_player) {
+      if (amount <= 0) continue;
+      desired.push({
+        contest_id: skinsContestId,
+        place: 1,
+        user_id: userId,
+        amount,
+        notes: `${skinCount} skin${skinCount === 1 ? "" : "s"}`,
+      });
+    }
   }
   await reconcileWinners(client, skinsContestId, desired);
 }

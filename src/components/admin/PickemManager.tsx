@@ -1051,8 +1051,8 @@ export function PickemManager({ tripId }: { tripId: string }) {
       <button
         onClick={() =>
           setConfirmModal({
-            title: "Reset Pick'em",
-            message: "This will delete all games, picks, and payment records. This cannot be undone. Are you sure?",
+            title: "Reset Pick'em Picks",
+            message: "This will clear every Loozer's picks for this Pick'em. The game slate, results, and payment records stay intact. Are you sure?",
             onConfirm: async () => {
               setConfirmModal(null);
               setSaving("reset");

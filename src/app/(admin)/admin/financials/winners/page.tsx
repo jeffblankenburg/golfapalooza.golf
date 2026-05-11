@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { FinancialGrid } from "@/components/admin/FinancialGrid";
+import Link from "next/link";
+import { PayoutWinnersTab } from "@/components/admin/PayoutWinnersTab";
 
-export default function FinancialGridPage() {
+export default function FinancialWinnersPage() {
   const router = useRouter();
   const [allowed, setAllowed] = useState<boolean | null>(null);
 
@@ -31,8 +32,17 @@ export default function FinancialGridPage() {
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-4">
-      <h1 className="text-2xl font-bold text-gray-900">Balances Grid</h1>
-      <FinancialGrid />
+      <Link
+        href="/admin/financials"
+        className="flex items-center gap-1 text-green-700 text-sm font-medium"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Back to Financials
+      </Link>
+      <h1 className="text-2xl font-bold text-gray-900">Winners</h1>
+      <PayoutWinnersTab />
     </div>
   );
 }

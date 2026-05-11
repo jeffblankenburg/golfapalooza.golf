@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkIsAdmin } from "@/lib/permissions-server";
 
-// POST - Reset all pick'em data for a contest
+// POST - Clear picks (and payouts) for a contest. The game slate and
+// payment records stay intact so admin can reuse the same games without
+// rebuilding them.
 export async function POST(request: Request) {
   const admin = await checkIsAdmin();
   if (!admin) {
@@ -18,17 +20,19 @@ export async function POST(request: Request) {
 
     const adminClient = createAdminClient();
 
-    // Delete in order: picks (FK to games), then games, then payments
-    // Picks cascade from games, so deleting games handles picks automatically
-    await adminClient
+    // Pickem_picks has a FK to pickem_games — delete picks scoped to this
+    // contest's games. Games and their results stay.
+    const { data: games } = await adminClient
       .from("pickem_games")
-      .delete()
+      .select("id")
       .eq("contest_id", contest_id);
+    const gameIds = (games || []).map((g) => g.id as string);
+    if (gameIds.length > 0) {
+      await adminClient.from("pickem_picks").delete().in("game_id", gameIds);
+    }
 
-    await adminClient
-      .from("pickem_payments")
-      .delete()
-      .eq("contest_id", contest_id);
+    // Clear any materialized winner rows so the standings recompute cleanly.
+    await adminClient.from("contest_winners").delete().eq("contest_id", contest_id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

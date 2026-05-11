@@ -8,6 +8,66 @@ interface OptionChoice {
 }
 
 /**
+ * Enroll a user in a contest. If the contest is a Pickem (where paid
+ * status lives on `pickem_payments`, not `contest_winners`), also mark
+ * them paid — Loozers who fund Pickem via their option selection have
+ * the entry fee collected through the trip ledger automatically.
+ */
+async function upsertParticipantWithPickemPayment(
+  adminClient: SupabaseClient,
+  contestId: string,
+  userId: string,
+): Promise<void> {
+  await adminClient
+    .from("contest_participants")
+    .upsert({ contest_id: contestId, user_id: userId }, { onConflict: "contest_id,user_id" });
+
+  const { data: contest } = await adminClient
+    .from("contests")
+    .select("contest_type")
+    .eq("id", contestId)
+    .maybeSingle();
+  if (contest?.contest_type === "pickem") {
+    await adminClient
+      .from("pickem_payments")
+      .upsert(
+        {
+          contest_id: contestId,
+          user_id: userId,
+          paid: true,
+          paid_at: new Date().toISOString(),
+        },
+        { onConflict: "contest_id,user_id" },
+      );
+  }
+}
+
+async function removeParticipantWithPickemPayment(
+  adminClient: SupabaseClient,
+  contestId: string,
+  userId: string,
+): Promise<void> {
+  await adminClient
+    .from("contest_participants")
+    .delete()
+    .eq("contest_id", contestId)
+    .eq("user_id", userId);
+
+  const { data: contest } = await adminClient
+    .from("contests")
+    .select("contest_type")
+    .eq("id", contestId)
+    .maybeSingle();
+  if (contest?.contest_type === "pickem") {
+    await adminClient
+      .from("pickem_payments")
+      .delete()
+      .eq("contest_id", contestId)
+      .eq("user_id", userId);
+  }
+}
+
+/**
  * Sync contest_participants based on a user's option selection.
  *
  * For checkbox options with linked_contest_id:
@@ -38,81 +98,37 @@ export async function syncContestEnrollment(
   value: unknown
 ): Promise<void> {
   if (option.option_type === "checkbox") {
-    // Checkbox with a linked contest
     if (!option.linked_contest_id) return;
-
     if (value === true) {
-      await adminClient
-        .from("contest_participants")
-        .upsert(
-          { contest_id: option.linked_contest_id, user_id: userId },
-          { onConflict: "contest_id,user_id" }
-        );
+      await upsertParticipantWithPickemPayment(adminClient, option.linked_contest_id, userId);
     } else {
-      await adminClient
-        .from("contest_participants")
-        .delete()
-        .eq("contest_id", option.linked_contest_id)
-        .eq("user_id", userId);
+      await removeParticipantWithPickemPayment(adminClient, option.linked_contest_id, userId);
     }
   } else if (option.option_type === "select") {
-    // Select with a linked contest — any non-empty selection = enrolled
     if (!option.linked_contest_id) return;
-
     if (value && value !== "none" && value !== "") {
-      await adminClient
-        .from("contest_participants")
-        .upsert(
-          { contest_id: option.linked_contest_id, user_id: userId },
-          { onConflict: "contest_id,user_id" }
-        );
+      await upsertParticipantWithPickemPayment(adminClient, option.linked_contest_id, userId);
     } else {
-      await adminClient
-        .from("contest_participants")
-        .delete()
-        .eq("contest_id", option.linked_contest_id)
-        .eq("user_id", userId);
+      await removeParticipantWithPickemPayment(adminClient, option.linked_contest_id, userId);
     }
   } else if (option.option_type === "multi_select") {
-    // Multi-select: check each choice for contest_id
     const choices = (option.choices || []) as OptionChoice[];
     const selectedValues = Array.isArray(value) ? (value as string[]) : [];
 
-    // Also handle top-level linked_contest_id (enrolled if ANY choice is selected)
     if (option.linked_contest_id) {
       if (selectedValues.length > 0) {
-        await adminClient
-          .from("contest_participants")
-          .upsert(
-            { contest_id: option.linked_contest_id, user_id: userId },
-            { onConflict: "contest_id,user_id" }
-          );
+        await upsertParticipantWithPickemPayment(adminClient, option.linked_contest_id, userId);
       } else {
-        await adminClient
-          .from("contest_participants")
-          .delete()
-          .eq("contest_id", option.linked_contest_id)
-          .eq("user_id", userId);
+        await removeParticipantWithPickemPayment(adminClient, option.linked_contest_id, userId);
       }
     }
 
-    // Per-choice contest linking
     for (const choice of choices) {
       if (!choice.contest_id) continue;
-
       if (selectedValues.includes(choice.value)) {
-        await adminClient
-          .from("contest_participants")
-          .upsert(
-            { contest_id: choice.contest_id, user_id: userId },
-            { onConflict: "contest_id,user_id" }
-          );
+        await upsertParticipantWithPickemPayment(adminClient, choice.contest_id, userId);
       } else {
-        await adminClient
-          .from("contest_participants")
-          .delete()
-          .eq("contest_id", choice.contest_id)
-          .eq("user_id", userId);
+        await removeParticipantWithPickemPayment(adminClient, choice.contest_id, userId);
       }
     }
   }

@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { PayoutDenominationsTab } from "./PayoutDenominationsTab";
-import { PayoutWinnersTab } from "./PayoutWinnersTab";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -36,7 +34,7 @@ interface ActiveTrip {
   trip_year: number;
 }
 
-type TabKey = "all" | "current" | "denominations" | "winners";
+type ScopeKey = "all" | "current";
 type SortKey = "_name" | "_charges" | "_payments" | "_total";
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -63,7 +61,9 @@ export function FinancialGrid() {
 
   const [activeTrip, setActiveTrip] = useState<ActiveTrip | null>(null);
   const [activeAttending, setActiveAttending] = useState<Set<string>>(new Set());
-  const [tab, setTab] = useState<TabKey>("all");
+  // Default to the active trip's attendees — admins almost always want the
+  // current-event view first. All-Loozers is one click away.
+  const [scope, setScope] = useState<ScopeKey>("current");
 
   // Full user ledger drill-down
   const [userLedgerModal, setUserLedgerModal] = useState<{
@@ -115,17 +115,17 @@ export function FinancialGrid() {
 
   // ── Filter + sort ──────────────────────────────────────────────────
 
-  const tabScopedUsers =
-    tab === "current"
+  const scopedUsers =
+    scope === "current"
       ? users.filter((u) => activeAttending.has(u.user_id))
       : users;
 
   const filtered = (
     search
-      ? tabScopedUsers.filter((u) =>
+      ? scopedUsers.filter((u) =>
           u.display_name.toLowerCase().includes(search.toLowerCase())
         )
-      : tabScopedUsers
+      : scopedUsers
   )
     .slice()
     .sort((a, b) => {
@@ -207,44 +207,37 @@ export function FinancialGrid() {
         Back to Financials
       </Link>
 
-      {/* Tabs */}
+      {/* Scope toggle: All Loozers vs only Loozers attending the active trip */}
       {activeTrip && (
-        <div className="border-b border-gray-200 -mx-4 px-2 overflow-x-auto">
-          <div className="flex gap-0.5 min-w-max">
-            {([
-              { key: "all" as const, label: "All Events" },
-              { key: "current" as const, label: activeTrip.trip_name },
-              { key: "winners" as const, label: "Winners" },
-              { key: "denominations" as const, label: "Payout Denominations" },
-            ]).map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setTab(t.key)}
-                className={`px-3 py-2 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${
-                  tab === t.key
-                    ? "text-green-700 border-green-600"
-                    : "text-gray-400 border-transparent active:text-gray-600"
-                }`}
-              >
-                {t.label}
-                {t.key === "current" && (
-                  <span className="ml-1.5 text-[11px] font-normal text-gray-400">
-                    ({activeAttending.size} attending)
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
+        <div className="inline-flex rounded-xl border border-gray-200 bg-white p-0.5 text-xs font-semibold">
+          <button
+            type="button"
+            onClick={() => setScope("all")}
+            className={`px-3 py-1.5 rounded-lg transition-colors ${
+              scope === "all"
+                ? "bg-green-600 text-white"
+                : "text-gray-600 active:bg-gray-100"
+            }`}
+          >
+            All Loozers
+          </button>
+          <button
+            type="button"
+            onClick={() => setScope("current")}
+            className={`px-3 py-1.5 rounded-lg transition-colors ${
+              scope === "current"
+                ? "bg-green-600 text-white"
+                : "text-gray-600 active:bg-gray-100"
+            }`}
+          >
+            {activeTrip.trip_name}{" "}
+            <span className={`ml-1 text-[10px] font-normal ${scope === "current" ? "text-white/70" : "text-gray-400"}`}>
+              ({activeAttending.size} attending)
+            </span>
+          </button>
         </div>
       )}
 
-      {tab === "denominations" ? (
-        <PayoutDenominationsTab />
-      ) : tab === "winners" ? (
-        <PayoutWinnersTab />
-      ) : (
-        <>
       <input
         type="text"
         placeholder="Search Loozers..."
@@ -336,8 +329,6 @@ export function FinancialGrid() {
           </tbody>
         </table>
       </div>
-        </>
-      )}
 
       {/* User Full Ledger Modal */}
       {userLedgerModal && (

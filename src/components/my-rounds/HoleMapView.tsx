@@ -21,6 +21,10 @@ const FMB_YARDS = 250;          // show front/middle/back distances when user wi
 // GPS jitter is typically 1–2 yards; anything past this counts as real movement
 // and (a) re-frames the camera and (b) clears any manual pan/zoom override.
 const RESET_YARDS = 3;
+// Magnetic snap radius around the green center. While the target crosshair is
+// being dragged within this distance, it pins to the green center so users
+// don't have to fight for pixel-perfect placement on a small marker.
+const GREEN_SNAP_YARDS = 8;
 
 function getBearing(from: [number, number], to: [number, number]): number {
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -473,7 +477,14 @@ export default function HoleMapView({
           });
           driveMarker.on("drag", () => {
             const lngLat = driveMarker.getLngLat();
-            const drivePos: [number, number] = [lngLat.lat, lngLat.lng];
+            let drivePos: [number, number] = [lngLat.lat, lngLat.lng];
+            // Magnetic snap to the green center when close enough. The
+            // marker visually pins to the green and the distance labels
+            // update to read "0y to green".
+            if (green && calcYards(drivePos, green) <= GREEN_SNAP_YARDS) {
+              drivePos = green;
+              driveMarker.setLngLat([green[1], green[0]]);
+            }
             currentDriveRef.current = drivePos;
             const origin =
               gpsEnabledRef.current && userPosRef.current

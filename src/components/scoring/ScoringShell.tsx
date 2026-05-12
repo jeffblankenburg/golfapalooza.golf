@@ -226,7 +226,10 @@ export default function ScoringShell({
   if (!hole) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col">
+    <div
+      className="fixed top-14 left-0 right-0 z-50 bg-white flex flex-col"
+      style={{ bottom: "calc(4rem + env(safe-area-inset-bottom))" }}
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-white shrink-0">
         <button

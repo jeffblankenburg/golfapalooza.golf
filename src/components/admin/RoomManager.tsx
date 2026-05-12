@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { BottomDrawer } from "@/components/admin/BottomDrawer";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import { FeatureVisibilityRow } from "@/components/admin/FeatureVisibilityRow";
 import { BTN_DESTRUCTIVE, BTN_PRIMARY } from "@/lib/ui/buttons";
 
 interface Room {
@@ -238,14 +239,22 @@ export function RoomManager({ tripId: propTripId }: { tripId?: string } = {}) {
 
   if (linkedFacilities.length === 0) {
     return (
-      <p className="text-sm text-gray-500 py-4 text-center">
-        No facilities linked to this event. Link facilities first.
-      </p>
+      <div className="space-y-3">
+        {trip && <FeatureVisibilityRow feature="rooms" tripId={trip.id} />}
+        <p className="text-sm text-gray-500 py-4 text-center">
+          No facilities linked to this event. Link facilities first.
+        </p>
+      </div>
     );
   }
 
   return (
     <div>
+      {trip && (
+        <div className="mb-4">
+          <FeatureVisibilityRow feature="rooms" tripId={trip.id} />
+        </div>
+      )}
       {unassigned.length > 0 && (
         <div className="mb-4 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
           {unassigned.length} Loozer{unassigned.length !== 1 ? "s" : ""} unassigned:{" "}

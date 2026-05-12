@@ -39,8 +39,12 @@ export function isFeatureVisible(
     teeTimeDayNumber?: number | null;
   }
 ): boolean {
-  // Admin override always wins
-  if (trip.visibility_overrides?.[feature] === true) return true;
+  // Admin override always wins. Explicit true = force visible, explicit
+  // false = force hidden. Anything else (undefined / missing) falls
+  // through to the auto rules below.
+  const override = trip.visibility_overrides?.[feature];
+  if (override === true) return true;
+  if (override === false) return false;
 
   const [y, m, d] = trip.start_date.split("-").map(Number);
   const tripStart = new Date(y, m - 1, d);

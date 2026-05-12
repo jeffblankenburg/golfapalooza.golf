@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { compressImage } from "@/lib/gallery/compress";
 import { GifPicker } from "./GifPicker";
 import { EmojiPicker } from "./EmojiPicker";
 
@@ -76,12 +77,32 @@ export function MessageInput({
     try {
       const supabase = createClient();
 
-      const fileName = `${roomId}/${Date.now()}-${file.name}`;
+      // Compress to chat-sized dimensions before upload. Chat images are
+      // viewed at <500px wide on mobile, so 1280px max + 80% JPEG quality
+      // keeps Loozers' photos legible while cutting storage to a fraction
+      // of the original.
+      let blob: Blob = file;
+      let ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+      if (file.type.startsWith("image/")) {
+        try {
+          const compressed = await compressImage(file, 1280, 0.8);
+          blob = compressed.blob;
+          ext = "jpg";
+        } catch (err) {
+          // Compression failed — fall back to original. Better to send a
+          // big file than to lose the message.
+          console.warn("Chat image compression failed; uploading original.", err);
+        }
+      }
+
+      const baseName = file.name.replace(/\.[^.]+$/, "");
+      const fileName = `${roomId}/${Date.now()}-${baseName}.${ext}`;
       const { data, error } = await supabase.storage
         .from("chat-images")
-        .upload(fileName, file, {
+        .upload(fileName, blob, {
           cacheControl: "3600",
           upsert: false,
+          contentType: blob.type || file.type,
         });
 
       if (error) {

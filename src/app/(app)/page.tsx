@@ -83,11 +83,11 @@ export default async function HomePage() {
     queryClient.from("user_action_completions").select("action_item_id").eq("user_id", effectiveUserId),
     // RSVP
     queryClient.from("event_participants").select("likelihood").eq("trip_id", trip.id).eq("user_id", effectiveUserId).maybeSingle(),
-    // All participants — restricted to the admin-confirmed roster so the
-    // home page "Participants" pill matches the count shown on /loozers,
-    // /admin/events/[id], and the Selections tab. Loozers who've RSVP'd
-    // but aren't rostered (likelihood < 99) are excluded.
-    queryClient.from("event_participants").select("user_id, likelihood, likelihood_set_at, user:users(display_name, avatar_url)").eq("trip_id", trip.id).eq("on_roster", true),
+    // All participants who've responded — grouped on the home page by
+    // their `likelihood` bucket (99/75/50/25). Loozers who haven't
+    // responded yet (NULL) are excluded so the box stays focused on
+    // people who've actually weighed in.
+    queryClient.from("event_participants").select("user_id, likelihood, likelihood_set_at, user:users(display_name, avatar_url)").eq("trip_id", trip.id).not("likelihood", "is", null),
     // Tee time players
     queryClient.from("tee_time_players").select("tee_time_id, tee_time:tee_times(id, trip_id, day_number, tee_time, starting_hole)").eq("user_id", effectiveUserId),
     // Scramble memberships

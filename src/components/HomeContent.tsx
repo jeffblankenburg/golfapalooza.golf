@@ -533,17 +533,20 @@ export function HomeContent({
             </button>
             <button
               onClick={openModal}
-              className="flex items-center gap-1.5 text-sm text-green-600 px-4 py-3 active:bg-gray-50 transition-colors border-l border-gray-100"
+              className="relative flex items-center gap-1.5 text-sm text-green-600 px-4 py-3 active:bg-gray-50 transition-colors border-l border-gray-100"
             >
               <span>{likelihoodOptions.find(o => o.value === currentLikelihood)?.label}</span>
               <span className="text-green-600/60">{currentLikelihood}%</span>
               <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
               </svg>
+              <span className="absolute left-0 right-0 bottom-0.5 text-center text-[8px] font-semibold tracking-wider text-gray-400 pointer-events-none">
+                YOUR RESPONSE
+              </span>
             </button>
           </div>
           {participantsExpanded && (
-            <div className="border-t border-gray-100 px-4 py-3 space-y-3 max-h-96 overflow-y-auto">
+            <div className="border-t border-gray-100 px-4 py-3 space-y-3">
               {likelihoodOptions.map((option) => {
                 const group = participants
                   .filter((p) => p.likelihood === option.value)

@@ -78,7 +78,7 @@ export default async function AdminLayout({
     .neq("type", "chat_message");
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="min-h-dvh pb-20">
       {showBanner && (
         <SimulatorBanner
           simDate={simDate}

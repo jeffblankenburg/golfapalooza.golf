@@ -143,7 +143,7 @@ export default function RootLayout({
         <style dangerouslySetInnerHTML={{ __html: SPLASH_CSS }} />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50 text-gray-900 min-h-screen`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50 text-gray-900 min-h-dvh`}
       >
         <SplashFader />
         <PullToRefresh />

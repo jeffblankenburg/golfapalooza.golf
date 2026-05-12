@@ -1,6 +1,7 @@
 "use client";
 
 import { useEditor, EditorContent } from "@tiptap/react";
+import { Node, mergeAttributes } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
@@ -19,6 +20,50 @@ const SIZE_PRESETS: { label: string; value: string | null }[] = [
 // Image extension with a `width` attribute that round-trips through markdown.
 // When width is set, the image serializes as inline HTML so the `style` survives;
 // when null, it falls back to the standard `![alt](src)` markdown output.
+// Native Tiptap nodes don't include video. Without an explicit Node, raw
+// <video> HTML from the Markdown extension gets escaped and shown as
+// text in the editor. This node registers the schema so videos render
+// as a real player while authoring AND survive markdown round-trips.
+const VideoNode = Node.create({
+  name: "video",
+  group: "block",
+  atom: true,
+  draggable: true,
+  selectable: true,
+  addAttributes() {
+    return {
+      src: { default: null },
+      controls: { default: true },
+      playsinline: { default: true },
+      preload: { default: "metadata" },
+      style: { default: "width:100%" },
+    };
+  },
+  parseHTML() {
+    return [{ tag: "video[src]" }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["video", mergeAttributes(HTMLAttributes)];
+  },
+  addStorage() {
+    return {
+      markdown: {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        serialize(state: any, node: any) {
+          const src: string | null = node.attrs.src;
+          if (!src) return;
+          const escSrc = src.replace(/"/g, "&quot;");
+          state.write(
+            `<video src="${escSrc}" controls playsinline preload="metadata" style="width:100%"></video>`,
+          );
+          state.closeBlock(node);
+        },
+        parse: {},
+      },
+    };
+  },
+});
+
 const ResizableImage = Image.extend({
   addAttributes() {
     return {
@@ -89,6 +134,9 @@ export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
         HTMLAttributes: { class: "text-green-700 underline font-medium" },
       }),
       ResizableImage.configure({
+        HTMLAttributes: { class: "rounded-xl max-w-full" },
+      }),
+      VideoNode.configure({
         HTMLAttributes: { class: "rounded-xl max-w-full" },
       }),
       Markdown.configure({
@@ -271,11 +319,27 @@ export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
         </div>
       )}
 
-      {/* Image picker drawer */}
+      {/* Image / video picker drawer */}
       <ArticleImageDrawer
         open={showImagePicker}
         onSelect={(url) => {
-          editor.chain().focus().setImage({ src: url }).run();
+          const isVideo = /\.(mp4|webm|mov)(\?|#|$)/i.test(url);
+          if (isVideo) {
+            // Tiptap's StarterKit has no native video node, so we insert
+            // raw HTML <video>. The Markdown extension (html: true)
+            // preserves it through round-trips; `rehypeRaw` in
+            // ArticleDetail lets it render in the published view.
+            const safeSrc = url.replace(/"/g, "&quot;");
+            editor
+              .chain()
+              .focus()
+              .insertContent(
+                `<video src="${safeSrc}" controls playsinline preload="metadata" style="width:100%"></video>`,
+              )
+              .run();
+          } else {
+            editor.chain().focus().setImage({ src: url }).run();
+          }
           setShowImagePicker(false);
         }}
         onClose={() => setShowImagePicker(false)}

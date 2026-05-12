@@ -108,6 +108,24 @@ export function ArticleDetail({ article }: { article: Article }) {
                   </a>
                 );
               },
+              // ![alt](url) — render <video> when the URL points at a
+              // video file (admins insert article videos through the
+              // same drawer / markdown syntax as images).
+              img: ({ src, alt }) => {
+                if (typeof src === "string" && /\.(mp4|webm|mov)(\?|#|$)/i.test(src)) {
+                  return (
+                    <video
+                      src={src}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className="w-full rounded-lg"
+                    />
+                  );
+                }
+                // eslint-disable-next-line @next/next/no-img-element
+                return <img src={src} alt={alt || ""} />;
+              },
             }}
           >
             {article.content}

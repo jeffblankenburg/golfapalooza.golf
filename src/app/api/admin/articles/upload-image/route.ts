@@ -3,7 +3,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { checkPermissionAccess } from "@/lib/permissions-server";
 import { getEffectiveUserId } from "@/lib/simulator";
 
-// GET - List previously uploaded article images
+const IMAGE_EXT_RE = /\.(jpg|jpeg|png|gif|webp)$/i;
+const VIDEO_EXT_RE = /\.(mp4|webm|mov)$/i;
+
+type Kind = "image" | "video";
+
+function classifyByExt(name: string): Kind | null {
+  if (IMAGE_EXT_RE.test(name)) return "image";
+  if (VIDEO_EXT_RE.test(name)) return "video";
+  return null;
+}
+
+// GET - List previously uploaded article images + videos
 export async function GET() {
   const user = await checkPermissionAccess("manage_articles");
   if (!user) {
@@ -17,13 +28,14 @@ export async function GET() {
     .from("gallery-media")
     .list("articles", { limit: 200, sortBy: { column: "created_at", order: "desc" } });
 
-  const allFiles: { path: string; created_at: string }[] = [];
+  const allFiles: { path: string; created_at: string; kind: Kind }[] = [];
   const subfolders: string[] = [];
 
   for (const item of topLevel || []) {
     if (!item.name) continue;
-    if (/\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)) {
-      allFiles.push({ path: `articles/${item.name}`, created_at: item.created_at || "" });
+    const kind = classifyByExt(item.name);
+    if (kind) {
+      allFiles.push({ path: `articles/${item.name}`, created_at: item.created_at || "", kind });
     } else if (!item.name.includes(".")) {
       // Likely a subfolder (no extension)
       subfolders.push(item.name);
@@ -39,8 +51,14 @@ export async function GET() {
     );
     subResults.forEach((result, i) => {
       for (const file of result.data || []) {
-        if (file.name && /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name)) {
-          allFiles.push({ path: `articles/${subfolders[i]}/${file.name}`, created_at: file.created_at || "" });
+        if (!file.name) continue;
+        const kind = classifyByExt(file.name);
+        if (kind) {
+          allFiles.push({
+            path: `articles/${subfolders[i]}/${file.name}`,
+            created_at: file.created_at || "",
+            kind,
+          });
         }
       }
     });
@@ -53,7 +71,7 @@ export async function GET() {
     const { data: urlData } = admin.storage
       .from("gallery-media")
       .getPublicUrl(f.path);
-    return { name: f.path, url: urlData.publicUrl, created_at: f.created_at };
+    return { name: f.path, url: urlData.publicUrl, created_at: f.created_at, kind: f.kind };
   });
 
   return NextResponse.json({ images });
@@ -73,23 +91,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "file is required" }, { status: 400 });
     }
 
-    // 10MB limit for article images
-    if (file.size > 10 * 1024 * 1024) {
-      return NextResponse.json({ error: "Image must be under 10MB" }, { status: 400 });
+    const isVideo = (file.type || "").startsWith("video/");
+    // 10MB for images, 100MB for videos (client compresses to ~720p
+    // before upload via compressVideo, so a typical 30s clip is well
+    // under this cap).
+    const maxBytes = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      const maxMB = Math.round(maxBytes / 1024 / 1024);
+      const kindLabel = isVideo ? "Video" : "Image";
+      return NextResponse.json(
+        { error: `${kindLabel} must be under ${maxMB}MB` },
+        { status: 400 },
+      );
     }
 
     const effectiveUserId = await getEffectiveUserId(user.id);
     const admin = createAdminClient();
 
     const timestamp = Date.now();
-    const ext = file.name.split(".").pop() || "jpg";
+    const ext = file.name.split(".").pop() || (isVideo ? "mp4" : "jpg");
     const filePath = `articles/${timestamp}-${effectiveUserId}.${ext}`;
+    const fallbackType = isVideo ? "video/mp4" : "image/jpeg";
 
     const arrayBuffer = await file.arrayBuffer();
     const { error: uploadError } = await admin.storage
       .from("gallery-media")
       .upload(filePath, arrayBuffer, {
-        contentType: file.type || "image/jpeg",
+        contentType: file.type || fallbackType,
         cacheControl: "31536000",
         upsert: false,
       });
@@ -102,7 +130,7 @@ export async function POST(request: NextRequest) {
       .from("gallery-media")
       .getPublicUrl(filePath);
 
-    return NextResponse.json({ url: urlData.publicUrl });
+    return NextResponse.json({ url: urlData.publicUrl, kind: isVideo ? "video" : "image" });
   } catch (err) {
     console.error("Article image upload error:", err);
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });

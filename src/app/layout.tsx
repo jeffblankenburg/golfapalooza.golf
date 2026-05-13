@@ -4,6 +4,7 @@ import "./globals.css";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { ActivityTracker } from "@/components/ActivityTracker";
 import { SplashFader } from "@/components/SplashFader";
+import { WakeLockKeeper } from "@/components/WakeLockKeeper";
 
 const SPLASH_CSS = `
 #app-splash {
@@ -148,6 +149,7 @@ export default function RootLayout({
         <SplashFader />
         <PullToRefresh />
         <ActivityTracker />
+        <WakeLockKeeper />
         {children}
       </body>
     </html>

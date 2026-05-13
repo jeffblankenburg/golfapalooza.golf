@@ -29,20 +29,16 @@ export default async function HundredFeetPage() {
   }
 
   const now = await getEffectiveDate();
-  if (!isFeatureVisible("hundred_feet", { start_date: trip.start_date, visibility_overrides: (trip.visibility_overrides as Record<string, boolean>) || {} }, now)) {
-    return (
-      <div className="px-4 pt-6">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold text-gray-900">100 Feet</h1>
-          <AdminLink permissionKey="manage_scrambles" href={`/admin/events/${trip.id}/hundred-feet`} />
-        </div>
-        <p className="text-gray-500 text-center py-8">100 Feet results will be available once the event begins.</p>
-      </div>
-    );
-  }
+  const featureVisible = isFeatureVisible(
+    "hundred_feet",
+    { start_date: trip.start_date, visibility_overrides: (trip.visibility_overrides as Record<string, boolean>) || {} },
+    now,
+  );
 
   // Get scramble day numbers + the 100 Feet contest's materialized winner
   // (issue #122 — display the per-winner payout amount on the leaderboard).
+  // Also pull the buy-in cost + participant count so we can show the prize
+  // pool pre-event, before any winner row exists.
   const [scrambleContestsResult, hundredFeetContestResult] = await Promise.all([
     supabase
       .from("contests")
@@ -53,7 +49,7 @@ export default async function HundredFeetPage() {
       .order("day_number"),
     supabase
       .from("contests")
-      .select("contest_winners(user_id, amount)")
+      .select("id, contest_winners(user_id, amount), buy_in_cost_item:cost_items!contests_buy_in_cost_item_id_fkey(cost)")
       .eq("trip_id", trip.id)
       .eq("name", "100 Feet!")
       .eq("contest_type", "other")
@@ -64,11 +60,26 @@ export default async function HundredFeetPage() {
     (scrambleContestsResult.data || []).map((c) => c.day_number as number)
   )];
 
-  const hfWinner = (hundredFeetContestResult.data?.contest_winners ?? [])[0] as
+  const hfContest = hundredFeetContestResult.data;
+  const hfWinner = (hfContest?.contest_winners ?? [])[0] as
     | { user_id: string; amount: number | string | null }
     | undefined;
   const winnerUserId = hfWinner?.user_id ?? null;
-  const payoutAmount = hfWinner ? Number(hfWinner.amount ?? 0) : 0;
+
+  let payoutAmount = hfWinner ? Number(hfWinner.amount ?? 0) : 0;
+  if (!payoutAmount && hfContest?.id) {
+    const costItem = Array.isArray(hfContest.buy_in_cost_item)
+      ? hfContest.buy_in_cost_item[0]
+      : hfContest.buy_in_cost_item;
+    const perPerson = Number((costItem as { cost?: number | string } | null)?.cost ?? 0);
+    if (perPerson > 0) {
+      const { count } = await supabase
+        .from("contest_participants")
+        .select("id", { count: "exact", head: true })
+        .eq("contest_id", hfContest.id);
+      payoutAmount = Math.round(perPerson * (count ?? 0) * 100) / 100;
+    }
+  }
 
   return (
     <HundredFeetContent
@@ -77,6 +88,7 @@ export default async function HundredFeetPage() {
       scrambleDays={scrambleDays}
       winnerUserId={winnerUserId}
       payoutAmount={payoutAmount}
+      featureVisible={featureVisible}
       headerAction={<AdminLink permissionKey="manage_scrambles" href={`/admin/events/${trip.id}/hundred-feet`} />}
     />
   );

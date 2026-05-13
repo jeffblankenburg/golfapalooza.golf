@@ -113,8 +113,8 @@ export async function loadLoozerProfile(
         id, round_date, round_type, status,
         course:courses(name),
         round_players!inner(
-          user_id, final_gross_score, score_differential,
-          player_tee:course_tees(par)
+          user_id, final_gross_score, score_differential, tee_id,
+          player_tee:course_tees(id, par)
         )
       `)
       .eq("round_players.user_id", userId)
@@ -162,8 +162,33 @@ export async function loadLoozerProfile(
     .map((row) => (Array.isArray(row.item) ? row.item[0] : row.item))
     .filter(Boolean);
 
+  // For 9-hole rounds we need the par of just the played holes — not the
+  // tee's full 18-hole par. Batch-fetch per-hole pars for every tee that
+  // backs a non-18 scorecard so we don't N+1 the DB.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const scorecards = ((teamMemberships as any[]) || [])
+  const rawRounds = (teamMemberships as any[]) || [];
+  const nineHoleTeeIds = new Set<string>();
+  for (const r of rawRounds) {
+    if (r.round_type === "18") continue;
+    const players = Array.isArray(r.round_players) ? r.round_players : [r.round_players];
+    const player = players.find((p: { user_id: string }) => p.user_id === userId) || players[0];
+    if (player?.tee_id) nineHoleTeeIds.add(player.tee_id);
+  }
+  const nineHoleParByTee = new Map<string, { front: number; back: number }>();
+  if (nineHoleTeeIds.size > 0) {
+    const { data: holes } = await adminClient
+      .from("course_holes")
+      .select("tee_id, hole_number, par")
+      .in("tee_id", [...nineHoleTeeIds]);
+    for (const h of holes || []) {
+      const entry = nineHoleParByTee.get(h.tee_id) || { front: 0, back: 0 };
+      if (h.hole_number <= 9) entry.front += h.par;
+      else entry.back += h.par;
+      nineHoleParByTee.set(h.tee_id, entry);
+    }
+  }
+
+  const scorecards = rawRounds
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .map((r: any) => {
       const players = Array.isArray(r.round_players) ? r.round_players : [r.round_players];
@@ -175,7 +200,16 @@ export async function loadLoozerProfile(
           ? player.player_tee[0]
           : player.player_tee
         : null;
-      const par = playerTee?.par || 72;
+      const teePar = playerTee?.par || 72;
+      let par = teePar;
+      if (r.round_type !== "18" && player.tee_id) {
+        const split = nineHoleParByTee.get(player.tee_id);
+        if (split) {
+          par = r.round_type === "9-back" ? split.back : split.front;
+        } else {
+          par = Math.round(teePar / 2);
+        }
+      }
       return {
         roundId: r.id as string,
         roundDate: r.round_date as string,

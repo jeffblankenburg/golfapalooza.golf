@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import ScorecardEntry from "./ScorecardEntry";
 import LiveScoringEntry from "./LiveScoringEntry";
@@ -69,6 +69,7 @@ const STEPS = [
   { key: "course", label: "Course" },
   { key: "details", label: "Details" },
   { key: "players", label: "Players" },
+  { key: "tees", label: "Tees" },
   { key: "scores", label: "Scores" },
 ] as const;
 
@@ -77,7 +78,9 @@ type StepKey = (typeof STEPS)[number]["key"];
 type Step = StepKey | "score-mode" | "total-entry" | "scorecard" | "live";
 
 function getStepIndex(step: Step): number {
-  if (step === "score-mode" || step === "total-entry" || step === "scorecard" || step === "live") return 3;
+  if (step === "score-mode" || step === "total-entry" || step === "scorecard" || step === "live") {
+    return STEPS.findIndex((s) => s.key === "scores");
+  }
   return STEPS.findIndex((s) => s.key === step);
 }
 
@@ -91,16 +94,28 @@ export default function RoundForm() {
 
   const [selectedCourse, setSelectedCourse] = useState<CourseSummary | null>(null);
   const [tees, setTees] = useState<Tee[]>([]);
-  const [selectedTee, setSelectedTee] = useState<Tee | null>(null);
   const [roundType, setRoundType] = useState<"18" | "9-front" | "9-back">("18");
   const [roundDate, setRoundDate] = useState(new Date().toISOString().split("T")[0]);
 
   const [allLoozers, setAllLoozers] = useState<Loozer[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+  // Refs used by the Players step to preserve scroll position when toggling
+  // a player. The selected/unselected lists are siblings — removing a row
+  // from the unselected list shrinks it and silently shifts scrollTop, so
+  // we capture pre-toggle and restore post-render via useLayoutEffect.
+  const unselectedListRef = useRef<HTMLDivElement>(null);
+  const pendingScrollRef = useRef<number | null>(null);
+
+  useLayoutEffect(() => {
+    if (pendingScrollRef.current == null) return;
+    if (unselectedListRef.current) {
+      unselectedListRef.current.scrollTop = pendingScrollRef.current;
+    }
+    pendingScrollRef.current = null;
+  }, [selectedPlayerIds]);
   // Per-player tee overrides: playerId -> teeId (defaults to selectedTee)
   const [playerTees, setPlayerTees] = useState<Record<string, string>>({});
-  const [editingPlayerTee, setEditingPlayerTee] = useState<string | null>(null);
   const [teeTab, setTeeTab] = useState<"mens" | "womens">("mens");
 
   const hasWomensTees = tees.some((t) => t.gender === "women");
@@ -124,7 +139,11 @@ export default function RoundForm() {
 
   const allPlayerIds = selectedPlayerIds;
   const getPlayerName = (id: string) => allLoozers.find((l) => l.id === id)?.display_name || "Unknown";
-  const getPlayerTee = (id: string) => tees.find((t) => t.id === (playerTees[id] || selectedTee?.id)) || selectedTee;
+  const getPlayerTee = (id: string) => {
+    const tid = playerTees[id];
+    return tid ? tees.find((t) => t.id === tid) ?? null : null;
+  };
+  const allPlayersHaveTees = allPlayerIds.length > 0 && allPlayerIds.every((id) => !!playerTees[id]);
   const currentStepIndex = getStepIndex(step);
 
   // Search courses (only when on course step). Skipped while nearbyActive
@@ -212,7 +231,12 @@ export default function RoundForm() {
       const res = await fetch("/api/users/list");
       const data = await res.json();
       setAllLoozers(data.users || []);
-      if (data.current_user_id) setCurrentUserId(data.current_user_id);
+      if (data.current_user_id) {
+        setCurrentUserId(data.current_user_id);
+        setSelectedPlayerIds((prev) =>
+          prev.length === 0 ? [data.current_user_id] : prev
+        );
+      }
     }
     fetchLoozers();
   }, []);
@@ -220,48 +244,39 @@ export default function RoundForm() {
   async function selectCourse(course: CourseSummary) {
     setSelectedCourse(course);
     setSearchQuery("");
+    setHoles([]);
+    setPlayerTees({});
     const res = await fetch(`/api/courses/${course.id}/tees`);
     const data = await res.json();
-    const courseTees = data.tees || [];
-    setTees(courseTees);
-
-    // Default to highest-rated non-women's tee — protects male players from
-    // a silent handicap bug if a women's tee is the highest-rated of all.
-    // The tees endpoint already sorts by course_rating desc, so the first
-    // non-women's row is the right pick.
-    if (courseTees.length > 0) {
-      const defaultTee = courseTees.find((t: Tee) => t.gender !== "women") || courseTees[0];
-      setSelectedTee(defaultTee);
-      const holesRes = await fetch(`/api/courses/${course.id}/tees/${defaultTee.id}/holes`);
-      const holesData = await holesRes.json();
-      setHoles(holesData.holes || []);
-    }
-
+    setTees(data.tees || []);
     setStep("details");
   }
 
-  // Reload holes when the default tee changes (e.g., from player tee picker)
-  async function changeDefaultTee(tee: Tee) {
-    if (!selectedCourse) return;
-    setSelectedTee(tee);
-    const res = await fetch(`/api/courses/${selectedCourse.id}/tees/${tee.id}/holes`);
-    const data = await res.json();
-    setHoles(data.holes || []);
-  }
+  // Derive the "primary tee" used for scorecard hole loading, the score-mode
+  // par display, and the live-scoring map. Prefer the current user's pick;
+  // fall back to the first selected player's pick (e.g., when the user is
+  // only scoring for others).
+  const primaryPlayerId = currentUserId && allPlayerIds.includes(currentUserId)
+    ? currentUserId
+    : allPlayerIds[0] || null;
+  const primaryTeeId = primaryPlayerId ? playerTees[primaryPlayerId] : null;
+  const selectedTee = useMemo<Tee | null>(
+    () => (primaryTeeId ? tees.find((t) => t.id === primaryTeeId) ?? null : null),
+    [primaryTeeId, tees],
+  );
 
-  // Reload holes when the current user's tee override changes (e.g., composition tee)
+  // Load hole data for the primary tee. Cleared via `selectCourse` when the
+  // user picks a different course.
   useEffect(() => {
-    if (!selectedCourse || !currentUserId) return;
-    const overrideTeeId = playerTees[currentUserId];
-    if (!overrideTeeId) return; // no override, default tee holes are already loaded
-    async function loadOverrideHoles() {
-      const res = await fetch(`/api/courses/${selectedCourse!.id}/tees/${overrideTeeId}/holes`);
+    if (!selectedCourse || !primaryTeeId) return;
+    let cancelled = false;
+    (async () => {
+      const res = await fetch(`/api/courses/${selectedCourse.id}/tees/${primaryTeeId}/holes`);
       const data = await res.json();
-      setHoles(data.holes || []);
-    }
-    loadOverrideHoles();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUserId, selectedCourse?.id, playerTees[currentUserId || ""]]);
+      if (!cancelled) setHoles(data.holes || []);
+    })();
+    return () => { cancelled = true; };
+  }, [selectedCourse, primaryTeeId]);
 
   function togglePlayer(id: string) {
     setSelectedPlayerIds((prev) => {
@@ -424,7 +439,7 @@ export default function RoundForm() {
               );
             })()}
 
-            {currentStepIndex >= 3 && (
+            {currentStepIndex >= 2 && (
               <div className="text-sm text-gray-500 mt-1">
                 {dateLabel}
                 <span className="mx-2 text-gray-300">|</span>
@@ -432,15 +447,14 @@ export default function RoundForm() {
               </div>
             )}
 
-            {currentStepIndex >= 4 && allPlayerIds.length > 0 && (
+            {currentStepIndex >= 3 && allPlayerIds.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {allPlayerIds.map((id) => {
                   const name = getPlayerName(id);
                   const pTee = getPlayerTee(id);
-                  const hasDifferentTee = playerTees[id] && playerTees[id] !== selectedTee?.id;
                   return (
                     <span key={id} className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-medium">
-                      {name}{hasDifferentTee ? ` (${pTee?.tee_name})` : ""}
+                      {name}{pTee ? ` (${pTee.tee_name})` : ""}
                     </span>
                   );
                 })}
@@ -686,11 +700,27 @@ export default function RoundForm() {
       .filter((l) =>
         !playerQuery ||
         l.display_name.toLowerCase().includes(playerQuery) ||
-        (l.full_name && l.full_name.toLowerCase().includes(playerQuery))
+        (l.full_name && l.full_name.toLowerCase().includes(playerQuery)),
       );
+    const atMax = selectedPlayerIds.length >= 4;
+
+    function handleToggle(id: string) {
+      // Capture the unselected list's scroll position so we can restore it
+      // after the toggle re-render. Without this, removing the tapped row
+      // from the list (because it just moved to the "selected" section
+      // above) silently shifts the scroll under the user's finger.
+      if (unselectedListRef.current) {
+        pendingScrollRef.current = unselectedListRef.current.scrollTop;
+      }
+      togglePlayer(id);
+    }
 
     return (
-      <StepCard title="Who Played?" subtitle="Select up to 4 Loozers. Include yourself if you played." onBack={() => { setStep("details"); setSearchQuery(""); }}>
+      <StepCard
+        title="Who Played?"
+        subtitle="Up to 4 Loozers. You're included by default — uncheck if you only scored."
+        onBack={() => { setStep("details"); setSearchQuery(""); }}
+      >
         <input
           type="text"
           value={searchQuery}
@@ -701,99 +731,34 @@ export default function RoundForm() {
         />
 
         {selectedLoozers.length > 0 && (
-          <div className="space-y-1.5 mb-3">
+          <div className="space-y-1 mb-3">
             {selectedLoozers.map((l) => {
               const isMe = l.id === currentUserId;
-              const pTee = getPlayerTee(l.id);
-              const isEditingTee = editingPlayerTee === l.id;
-              const pDot = getTeeDotStyle(pTee?.tee_color);
-
               return (
-                <div key={l.id} className="bg-green-50 border border-green-200 rounded-lg overflow-hidden">
-                  <div className="flex items-center gap-2.5 px-3 py-2">
-                    <button
-                      onClick={() => togglePlayer(l.id)}
-                      className="w-5 h-5 rounded-full bg-green-600 flex items-center justify-center shrink-0"
-                    >
-                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium text-gray-900">{l.display_name}{isMe ? " (You)" : ""}</span>
-                    </div>
-                    <button
-                      onClick={() => setEditingPlayerTee(isEditingTee ? null : l.id)}
-                      className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-gray-600 hover:bg-green-100 transition-colors"
-                    >
-                      <span className={`w-3 h-3 rounded-full inline-block shrink-0 ${pDot.className || ""}`} style={pDot.style} />
-                      <span>{pTee?.tee_name || "—"}</span>
-                      <svg className={`w-3 h-3 text-gray-400 transition-transform ${isEditingTee ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                  </div>
-                  {isEditingTee && (
-                    <div className="px-3 pb-2">
-                      {hasWomensTees && (
-                        <div className="flex gap-1 mb-2 border-b border-gray-200">
-                          <button
-                            onClick={() => setTeeTab("mens")}
-                            className={`px-2.5 py-1 text-[11px] font-semibold border-b-2 -mb-px ${
-                              teeTab === "mens" ? "border-green-600 text-green-700" : "border-transparent text-gray-500"
-                            }`}
-                          >
-                            Men&apos;s
-                          </button>
-                          <button
-                            onClick={() => setTeeTab("womens")}
-                            className={`px-2.5 py-1 text-[11px] font-semibold border-b-2 -mb-px ${
-                              teeTab === "womens" ? "border-green-600 text-green-700" : "border-transparent text-gray-500"
-                            }`}
-                          >
-                            Women&apos;s
-                          </button>
-                        </div>
-                      )}
-                      <div className="flex flex-wrap gap-1.5">
-                        {visibleTees.map((t) => {
-                          const isActive = (playerTees[l.id] || selectedTee?.id) === t.id;
-                          const tDot = getTeeDotStyle(t.tee_color);
-                          return (
-                            <button
-                              key={t.id}
-                              onClick={() => {
-                                setPlayerTees((prev) => ({ ...prev, [l.id]: t.id }));
-                                setEditingPlayerTee(null);
-                              }}
-                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                                isActive
-                                  ? "bg-green-600 text-white"
-                                  : "bg-white border border-gray-200 text-gray-700 hover:border-green-300"
-                              }`}
-                            >
-                              {!isActive && <span className={`w-2.5 h-2.5 rounded-full inline-block ${tDot.className || ""}`} style={tDot.style} />}
-                              {t.tee_name}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <button
+                  key={l.id}
+                  onClick={() => handleToggle(l.id)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg bg-green-50 border border-green-200 text-left"
+                >
+                  <span className="w-5 h-5 rounded-full bg-green-600 flex items-center justify-center shrink-0">
+                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </span>
+                  <span className="text-sm font-medium text-gray-900">{l.display_name}{isMe ? " (You)" : ""}</span>
+                </button>
               );
             })}
           </div>
         )}
 
-        <div className="space-y-1 max-h-[60vh] overflow-y-auto">
+        <div ref={unselectedListRef} className="space-y-1 max-h-[60vh] overflow-y-auto">
           {unselectedLoozers.map((l) => {
             const isMe = l.id === currentUserId;
-            const atMax = selectedPlayerIds.length >= 4;
             return (
               <button
                 key={l.id}
-                onClick={() => !atMax && togglePlayer(l.id)}
+                onClick={() => !atMax && handleToggle(l.id)}
                 disabled={atMax}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors ${
                   atMax ? "opacity-40" : "hover:bg-gray-50"
@@ -810,7 +775,7 @@ export default function RoundForm() {
         </div>
 
         <button
-          onClick={() => { setStep("score-mode"); setSearchQuery(""); }}
+          onClick={() => { setStep("tees"); setSearchQuery(""); }}
           disabled={selectedPlayerIds.length === 0}
           className="w-full mt-4 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 transition-colors"
         >
@@ -820,10 +785,125 @@ export default function RoundForm() {
     );
   }
 
+  // ── Step: Tees ──
+  if (step === "tees") {
+    function setAllTees(teeId: string) {
+      setPlayerTees((prev) => {
+        const next = { ...prev };
+        for (const id of allPlayerIds) next[id] = teeId;
+        return next;
+      });
+    }
+
+    return (
+      <StepCard
+        title="Pick Tees"
+        subtitle="Every player needs a tee. Use a quick-set to assign everyone in one tap."
+        onBack={() => setStep("players")}
+      >
+        {tees.length === 0 ? (
+          <p className="text-sm text-gray-500 text-center py-6">
+            No tees configured for this course.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {hasWomensTees && (
+              <div className="flex gap-1 border-b border-gray-200">
+                <button
+                  onClick={() => setTeeTab("mens")}
+                  className={`px-2.5 py-1 text-[11px] font-semibold border-b-2 -mb-px ${
+                    teeTab === "mens" ? "border-green-600 text-green-700" : "border-transparent text-gray-500"
+                  }`}
+                >
+                  Men&apos;s
+                </button>
+                <button
+                  onClick={() => setTeeTab("womens")}
+                  className={`px-2.5 py-1 text-[11px] font-semibold border-b-2 -mb-px ${
+                    teeTab === "womens" ? "border-green-600 text-green-700" : "border-transparent text-gray-500"
+                  }`}
+                >
+                  Women&apos;s
+                </button>
+              </div>
+            )}
+
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+                All players
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {visibleTees.map((t) => {
+                  const tDot = getTeeDotStyle(t.tee_color);
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setAllTees(t.id)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-gray-200 text-gray-700 hover:border-green-300"
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full inline-block ${tDot.className || ""}`} style={tDot.style} />
+                      All {t.tee_name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              {allPlayerIds.map((id) => {
+                const name = getPlayerName(id);
+                const isMe = id === currentUserId;
+                const pTee = getPlayerTee(id);
+                const pDot = getTeeDotStyle(pTee?.tee_color);
+                const needsPick = !pTee;
+
+                return (
+                  <div
+                    key={id}
+                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border ${
+                      needsPick ? "bg-amber-50 border-amber-200" : "bg-green-50 border-green-200"
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-gray-900">{name}{isMe ? " (You)" : ""}</span>
+                    </div>
+                    {pTee ? (
+                      <span className={`w-3 h-3 rounded-full inline-block shrink-0 ${pDot.className || ""}`} style={pDot.style} />
+                    ) : null}
+                    <select
+                      value={playerTees[id] || ""}
+                      onChange={(e) => setPlayerTees((prev) => ({ ...prev, [id]: e.target.value }))}
+                      className={`text-xs font-medium rounded-md px-2 py-1 border bg-white ${
+                        needsPick ? "border-amber-300 text-amber-700" : "border-gray-200 text-gray-700"
+                      }`}
+                    >
+                      {!pTee && <option value="">Choose tee</option>}
+                      {visibleTees.map((t) => (
+                        <option key={t.id} value={t.id}>{t.tee_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <button
+          onClick={() => setStep("score-mode")}
+          disabled={!allPlayersHaveTees}
+          className="w-full mt-4 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 transition-colors"
+        >
+          {allPlayersHaveTees ? "Continue" : "Pick a tee for every player"}
+        </button>
+      </StepCard>
+    );
+  }
+
   // ── Step: Score mode ──
   if (step === "score-mode") {
     return (
-      <StepCard title="Enter Scores" subtitle="How do you want to enter scores?" onBack={() => setStep("players")}>
+      <StepCard title="Enter Scores" subtitle="How do you want to enter scores?" onBack={() => setStep("tees")}>
         <div className="space-y-2">
           <button
             onClick={() => setStep("total-entry")}

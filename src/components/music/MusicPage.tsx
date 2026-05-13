@@ -35,7 +35,6 @@ export function MusicPage({ initialSongs, headerAction }: { initialSongs: Song[]
   const [search, setSearch] = useState("");
   const [showLyrics, setShowLyrics] = useState(false);
   const seekBarRef = useRef<HTMLDivElement>(null);
-  const activeRowRef = useRef<HTMLDivElement>(null);
 
   // Load songs on mount if not already loaded
   useEffect(() => {
@@ -44,12 +43,12 @@ export function MusicPage({ initialSongs, headerAction }: { initialSongs: Song[]
     }
   }, [initialSongs, loadSongs, songs.length]);
 
-  // Scroll active song into view
+  // Lock the page to the top whenever the user lands on the music player.
+  // We deliberately do not auto-scroll the playlist as songs advance — the
+  // player UI sits at the top and that's where the user wants to stay.
   useEffect(() => {
-    if (activeRowRef.current) {
-      activeRowRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }
-  }, [currentIndex]);
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, []);
 
   const currentSong = songs[currentIndex] || null;
 
@@ -235,7 +234,6 @@ export function MusicPage({ initialSongs, headerAction }: { initialSongs: Song[]
             return (
               <div
                 key={song.id}
-                ref={isActive ? activeRowRef : undefined}
                 onClick={() => play(originalIndex)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors cursor-pointer ${
                   isActive

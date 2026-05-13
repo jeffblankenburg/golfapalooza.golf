@@ -45,6 +45,7 @@ export function HundredFeetContent({
   scrambleDays = [],
   winnerUserId = null,
   payoutAmount = 0,
+  featureVisible = true,
   headerAction,
 }: {
   tripId: string;
@@ -52,10 +53,11 @@ export function HundredFeetContent({
   scrambleDays?: number[];
   winnerUserId?: string | null;
   payoutAmount?: number;
+  featureVisible?: boolean;
   headerAction?: React.ReactNode;
 }) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(featureVisible);
   const [sortKey, setSortKey] = useState<string>("total");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -67,8 +69,9 @@ export function HundredFeetContent({
   }, [tripId]);
 
   useEffect(() => {
+    if (!featureVisible) return;
     fetchData();
-  }, [fetchData]);
+  }, [featureVisible, fetchData]);
 
   const DAYS = scrambleDays.length > 0 ? scrambleDays : [2, 3, 4];
   const gridCols = { gridTemplateColumns: `2rem 1fr repeat(${DAYS.length}, 3.5rem) 3.5rem` };
@@ -117,28 +120,52 @@ export function HundredFeetContent({
           <h1 className="text-2xl font-bold text-gray-900">100 Feet!</h1>
           {headerAction}
           <PinnedNoteButton pinnedTo="hundred_feet" />
-          {payoutAmount > 0 ? (
-            <span className="ml-auto px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-xs font-bold tabular-nums">
-              {fmtMoney(payoutAmount)} pot
-            </span>
-          ) : null}
         </div>
         <p className="text-sm text-gray-500 mt-1">
           Distance from the pin on #18. Miss the green? 100 feet!
         </p>
       </div>
 
-      {loading && (
+      {(() => {
+        const winner = winnerUserId
+          ? leaderboard.find((e) => e.user_id === winnerUserId)
+          : null;
+        return (
+          <div className="bg-green-50 rounded-2xl border border-green-200 px-4 py-5 text-center">
+            <p className="text-[10px] uppercase tracking-wider text-green-700 font-semibold">
+              Prize Pool
+            </p>
+            <p className="text-3xl font-bold text-green-700 tabular-nums mt-1">
+              {payoutAmount > 0 ? fmtMoney(payoutAmount) : "—"}
+            </p>
+            {winner ? (
+              <p className="text-xs text-green-600 mt-1">
+                Won by {winner.display_name}
+              </p>
+            ) : payoutAmount > 0 ? (
+              <p className="text-xs text-green-600 mt-1">Winner takes all</p>
+            ) : null}
+          </div>
+        );
+      })()}
+
+      {!featureVisible && (
+        <p className="text-gray-500 text-center py-8">
+          100 Feet results will be available once the event begins.
+        </p>
+      )}
+
+      {featureVisible && loading && (
         <div className="flex justify-center py-12">
           <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
         </div>
       )}
 
-      {!loading && leaderboard.length === 0 && (
+      {featureVisible && !loading && leaderboard.length === 0 && (
         <p className="text-gray-500 text-center py-8">No scores entered yet.</p>
       )}
 
-      {!loading && leaderboard.length > 0 && (
+      {featureVisible && !loading && leaderboard.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           {/* Header */}
           <div className="grid gap-0 bg-gray-50 text-xs font-semibold text-gray-500 uppercase select-none" style={gridCols}>

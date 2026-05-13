@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { calculateDifferential, calculateAdjustedGrossScore, calculateCourseHandicap } from "@/lib/golf/calculator";
 import { recalculateHandicap } from "@/lib/golf/handicap";
 import { resolveHolesForTee } from "@/lib/golf/composition-tees";
@@ -18,7 +19,13 @@ export async function GET(
 
   const { id } = await params;
 
-  const { data: round, error } = await supabase
+  // Round details are viewable by any authenticated Loozer (they're already
+  // surfaced on the public Loozer profile scorecards accordion). Auth gate
+  // above is enforced; switch to the admin client for the actual fetch so
+  // RLS doesn't 404 when the viewer isn't the round's creator or a player.
+  // Mutation routes (PUT/DELETE) below keep the RLS-bound client.
+  const adminClient = createAdminClient();
+  const { data: round, error } = await adminClient
     .from("rounds")
     .select(`
       *,
@@ -46,24 +53,29 @@ export async function GET(
   const holeTeeId = currentPlayer?.tee_id || round.tee_id;
   const { data: holes } = await resolveHolesForTee(supabase, holeTeeId, "*");
 
-  // Backfill missing differentials for any player with a score but no differential
+  // Backfill missing differentials only for full 18-hole rounds — 9-hole
+  // and partial rounds aren't WHS-eligible against an 18-hole rating/slope.
   const tee = Array.isArray(round.tee) ? round.tee[0] : round.tee;
-  const playersNeedingDiff = (round.round_players || []).filter(
-    (p: { final_gross_score: number | null; score_differential: number | null }) =>
-      p.final_gross_score != null && p.score_differential == null
-  );
-
-  if (tee && playersNeedingDiff.length > 0) {
-    await Promise.all(
-      playersNeedingDiff.map((p: { id: string; final_gross_score: number; score_differential: number | null }) => {
-        const diff = calculateDifferential(p.final_gross_score, tee.course_rating, tee.slope_rating);
-        // Update in DB
-        supabase.from("round_players").update({ score_differential: diff }).eq("id", p.id);
-        // Patch the response object so the client sees it immediately
-        p.score_differential = diff;
-        return Promise.resolve();
-      })
+  if (tee && (round.round_type ?? "18") === "18") {
+    const playersNeedingDiff = (round.round_players || []).filter(
+      (p: { final_gross_score: number | null; score_differential: number | null; scores?: unknown[] }) => {
+        if (p.final_gross_score == null || p.score_differential != null) return false;
+        // If hole scores exist, require all 18 before backfilling.
+        const holeCount = Array.isArray(p.scores) ? p.scores.length : 0;
+        return holeCount === 0 || holeCount >= 18;
+      },
     );
+
+    if (playersNeedingDiff.length > 0) {
+      await Promise.all(
+        playersNeedingDiff.map((p: { id: string; final_gross_score: number; score_differential: number | null }) => {
+          const diff = calculateDifferential(p.final_gross_score, tee.course_rating, tee.slope_rating);
+          supabase.from("round_players").update({ score_differential: diff }).eq("id", p.id);
+          p.score_differential = diff;
+          return Promise.resolve();
+        }),
+      );
+    }
   }
 
   return NextResponse.json({ round, holes: holes || [], current_user_id: effectiveUserId });
@@ -106,9 +118,11 @@ export async function PUT(
       // Get the round and all player info
       const { data: round } = await supabase
         .from("rounds")
-        .select("tee_id, created_by")
+        .select("tee_id, created_by, round_type")
         .eq("id", id)
         .single();
+
+      const is18 = (round?.round_type ?? "18") === "18";
 
       if (round) {
         // Fetch all players and their tee data
@@ -211,11 +225,19 @@ export async function PUT(
               }
             }
 
-            const differential = calculateDifferential(
-              scoreForDifferential,
-              tee.course_rating,
-              tee.slope_rating
-            );
+            // Handicap differentials are only valid for complete 18-hole
+            // rounds. Quick Entry (no hole scores) trusts the user-typed
+            // total; hole-by-hole entry requires all 18 scored.
+            const playerHoleCount = (scoresByPlayer.get(p.id) || []).length;
+            const eligible =
+              is18 && (playerHoleCount === 0 || playerHoleCount >= 18);
+            const differential = eligible
+              ? calculateDifferential(
+                  scoreForDifferential,
+                  tee.course_rating,
+                  tee.slope_rating,
+                )
+              : null;
 
             await supabase
               .from("round_players")

@@ -130,7 +130,19 @@ export default function RoundDetailPage() {
     ? (Array.isArray(currentPlayer.player_tee) ? currentPlayer.player_tee[0] : currentPlayer.player_tee)
     : null;
   const tee = currentPlayerTee || roundTee;
-  const par = tee?.par || 72;
+  // For 9-hole rounds, par is the sum of the played holes' pars — not the
+  // tee's full 18-hole par. Fall back to halving the tee par if hole data
+  // is missing.
+  const playedHoles = holes.filter((h) => {
+    if (round.round_type === "9-front") return h.hole_number <= 9;
+    if (round.round_type === "9-back") return h.hole_number > 9;
+    return true;
+  });
+  const par = playedHoles.length > 0
+    ? playedHoles.reduce((sum, h) => sum + h.par, 0)
+    : round.round_type === "18"
+      ? tee?.par || 72
+      : Math.round((tee?.par || 72) / 2);
 
   // Resolve creator name from players list
   const creatorPlayer = players.find((p) => p.user_id === round.created_by);
@@ -291,13 +303,15 @@ export default function RoundDetailPage() {
         </div>
       )}
 
-      <button
-        onClick={handleDelete}
-        disabled={deleting}
-        className={`w-full disabled:opacity-50 ${BTN_DESTRUCTIVE}`}
-      >
-        {deleting ? "Deleting..." : "Delete Round"}
-      </button>
+      {creatorIsMe && (
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          className={`w-full disabled:opacity-50 ${BTN_DESTRUCTIVE}`}
+        >
+          {deleting ? "Deleting..." : "Delete Round"}
+        </button>
+      )}
     </div>
   );
 }

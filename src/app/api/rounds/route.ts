@@ -42,6 +42,31 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // For 9-hole rounds we need the par of only the played holes, not the
+  // tee's 18-hole par. Batch fetch hole pars for every distinct tee that
+  // backs a non-18 round so we sum the right nine.
+  const nineHoleTeeIds = new Set<string>();
+  for (const r of rounds || []) {
+    if (r.round_type === "18") continue;
+    const allPlayers = Array.isArray(r.round_players) ? r.round_players : [r.round_players];
+    const player = allPlayers.find((p) => p.user_id === userId) || allPlayers[0];
+    if (player?.tee_id) nineHoleTeeIds.add(player.tee_id);
+  }
+
+  const nineHoleParByTee = new Map<string, { front: number; back: number }>();
+  if (nineHoleTeeIds.size > 0) {
+    const { data: holes } = await supabase
+      .from("course_holes")
+      .select("tee_id, hole_number, par")
+      .in("tee_id", [...nineHoleTeeIds]);
+    for (const h of holes || []) {
+      const entry = nineHoleParByTee.get(h.tee_id) || { front: 0, back: 0 };
+      if (h.hole_number <= 9) entry.front += h.par;
+      else entry.back += h.par;
+      nineHoleParByTee.set(h.tee_id, entry);
+    }
+  }
+
   const summaries = (rounds || []).map((r) => {
     const allPlayers = Array.isArray(r.round_players) ? r.round_players : [r.round_players];
     const player = allPlayers.find((p) => p.user_id === userId) || allPlayers[0];
@@ -50,8 +75,19 @@ export async function GET() {
     const playerTee = player?.player_tee ? (Array.isArray(player.player_tee) ? player.player_tee[0] : player.player_tee) : null;
     const tee = playerTee || roundTee;
     const course = Array.isArray(r.course) ? r.course[0] : r.course;
-    const par = tee?.par || 72;
+    const teePar = tee?.par || 72;
     const score = player?.final_gross_score;
+
+    let par = teePar;
+    if (r.round_type !== "18" && player?.tee_id) {
+      const split = nineHoleParByTee.get(player.tee_id);
+      if (split) {
+        par = r.round_type === "9-back" ? split.back : split.front;
+      } else {
+        // Fallback: halve the 18-hole par when per-hole data is missing.
+        par = Math.round(teePar / 2);
+      }
+    }
 
     return {
       id: r.id,
@@ -97,6 +133,7 @@ export async function POST(request: Request) {
       players && players.length > 0 ? players : [{ user_id: userId }];
 
     const hasHoleScores = hole_scores && Object.keys(hole_scores).length > 0;
+    const effectiveRoundType = round_type || "18";
 
     // If we have hole scores, compute gross totals from them
     if (hasHoleScores) {
@@ -109,6 +146,16 @@ export async function POST(request: Request) {
     }
 
     const isComplete = allPlayers.every((p) => p.final_gross_score != null);
+
+    // Handicap differentials are only valid for complete 18-hole rounds.
+    // Quick Entry (no hole_scores) trusts the user's final_gross_score as a
+    // full-round total. Hole-by-hole entry requires all 18 holes scored.
+    function qualifiesForHandicap(userId: string): boolean {
+      if (effectiveRoundType !== "18") return false;
+      if (!hasHoleScores) return true;
+      const playerHoles = hole_scores[userId];
+      return !!playerHoles && Object.keys(playerHoles).length >= 18;
+    }
 
     // Get all tee data needed for differential calc (round tee + any player overrides)
     const allTeeIds = [...new Set([tee_id, ...allPlayers.map((p) => p.tee_id).filter(Boolean)])];
@@ -142,7 +189,12 @@ export async function POST(request: Request) {
       const playerTeeId = p.tee_id || tee_id;
       const playerTee = teeMap.get(playerTeeId);
       let scoreDifferential: number | null = null;
-      if (p.final_gross_score != null && playerTee?.course_rating && playerTee?.slope_rating) {
+      if (
+        qualifiesForHandicap(p.user_id) &&
+        p.final_gross_score != null &&
+        playerTee?.course_rating &&
+        playerTee?.slope_rating
+      ) {
         scoreDifferential = calculateDifferential(p.final_gross_score, playerTee.course_rating, playerTee.slope_rating);
       }
       return {
@@ -248,10 +300,16 @@ export async function POST(request: Request) {
 
             if (holeScoreData.length > 0) {
               const adjustedGross = calculateAdjustedGrossScore(holeScoreData, courseHandicap);
-              const differential = calculateDifferential(adjustedGross, tee.course_rating, tee.slope_rating);
+              const eligible = qualifiesForHandicap(rp.user_id);
+              const differential = eligible
+                ? calculateDifferential(adjustedGross, tee.course_rating, tee.slope_rating)
+                : null;
               await supabase
                 .from("round_players")
-                .update({ final_adjusted_score: adjustedGross, score_differential: differential })
+                .update({
+                  final_adjusted_score: adjustedGross,
+                  ...(eligible ? { score_differential: differential } : {}),
+                })
                 .eq("id", rp.id);
             }
 

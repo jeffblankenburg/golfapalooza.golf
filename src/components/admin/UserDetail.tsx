@@ -23,6 +23,7 @@ interface DetailUser {
   sponsor_id: string | null;
   permissions: Record<string, boolean> | null;
   handicap_index: number | null;
+  handicap_source: "manual" | "computed" | null;
   eight_bag_average: number | null;
   avg_scramble_score: number | null;
   birthday: string | null;
@@ -203,7 +204,17 @@ export function UserDetail({
         setError(data.error || "Failed to save");
         return;
       }
-      // Patch local user state from formData so the title/avatar reflect changes
+      // Patch local user state from formData so the title/avatar reflect changes.
+      // Mirror the API's handicap source flip: changed value → 'manual', cleared
+      // → null, unchanged → leave source as-is so a computed handicap stays
+      // tagged COMPUTED when the admin saves without editing it.
+      const newHandicap = formData.handicapIndex === "" ? null : parseFloat(formData.handicapIndex);
+      const handicapChanged =
+        newHandicap !== user.handicap_index &&
+        !(newHandicap === null && user.handicap_index === null);
+      let nextSource = user.handicap_source;
+      if (newHandicap === null) nextSource = null;
+      else if (handicapChanged) nextSource = "manual";
       setUser({
         ...user,
         display_name: formData.displayName,
@@ -213,6 +224,8 @@ export function UserDetail({
         permissions: editIsAdmin ? {} : editPermissions,
         is_founder: editIsFounder,
         sponsor_id: editIsFounder ? null : editSponsorId,
+        handicap_index: newHandicap,
+        handicap_source: nextSource,
       });
       setSavedFlash(true);
       window.setTimeout(() => setSavedFlash(false), 1500);
@@ -428,7 +441,20 @@ export function UserDetail({
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Handicap Index (optional)</label>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-600 mb-1">
+                  <span>Handicap Index (optional)</span>
+                  {user.handicap_source && user.handicap_index !== null && (
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide ${
+                        user.handicap_source === "computed"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {user.handicap_source === "computed" ? "COMPUTED" : "MANUAL"}
+                    </span>
+                  )}
+                </label>
                 <input
                   type="number"
                   inputMode="decimal"

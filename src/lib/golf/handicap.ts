@@ -74,6 +74,7 @@ export async function recalculateHandicap(
         rounds_used: result.rounds_used,
         last_calculated_at: new Date().toISOString(),
         effective_date: today,
+        source: "computed",
       },
       { onConflict: "user_id" }
     );

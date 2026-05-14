@@ -241,8 +241,6 @@ export default async function DailyGamesPage() {
                       <p className="text-xs text-gray-400 mt-0.5">
                         No winner — {isLastDay ? "pot forfeited" : "pot carries forward"}
                       </p>
-                    ) : isPending && displayPot > 0 ? (
-                      <p className="text-xs text-gray-400 mt-0.5">Pot pending</p>
                     ) : null}
                   </div>
                   {hasWinner && displayPot > 0 ? (
@@ -250,9 +248,14 @@ export default async function DailyGamesPage() {
                       {fmtMoney(displayPot)}
                     </span>
                   ) : isPending && displayPot > 0 ? (
-                    <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-400">
-                      {fmtMoney(displayPot)}
-                    </span>
+                    <div className="shrink-0 flex flex-col items-end gap-1">
+                      <span className="text-sm font-semibold tabular-nums text-gray-400">
+                        {fmtMoney(displayPot)}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 text-[10px] font-bold tracking-wider">
+                        PENDING
+                      </span>
+                    </div>
                   ) : null}
                 </div>
               );

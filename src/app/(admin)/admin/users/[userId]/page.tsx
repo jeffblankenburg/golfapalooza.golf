@@ -14,7 +14,7 @@ export default async function AdminUserDetailPage({
 
   const { data: userRow } = await adminClient
     .from("users")
-    .select("*, player_handicaps(handicap_index)")
+    .select("*, player_handicaps(handicap_index, source)")
     .eq("id", userId)
     .single();
 
@@ -27,7 +27,11 @@ export default async function AdminUserDetailPage({
     : userRow.player_handicaps;
   const { player_handicaps: _drop, ...rest } = userRow;
   void _drop;
-  const initialUser = { ...rest, handicap_index: ph?.handicap_index ?? null };
+  const initialUser = {
+    ...rest,
+    handicap_index: ph?.handicap_index ?? null,
+    handicap_source: ph?.source ?? null,
+  };
 
   // All users (for sponsor picker + descendant checks)
   const { data: allUsers } = await adminClient

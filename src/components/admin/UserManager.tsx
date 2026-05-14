@@ -17,6 +17,7 @@ interface User {
   sponsor_id: string | null;
   permissions: Record<string, boolean> | null;
   handicap_index: number | null;
+  handicap_source: "manual" | "computed" | null;
   eight_bag_average: number | null;
   avg_scramble_score: number | null;
   birthday: string | null;
@@ -177,19 +178,22 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                 <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 bg-amber-50 text-amber-700">$</span>
               )}
               {!user.is_system && user.handicap_index !== null && (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 bg-blue-50 text-blue-700">
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 ${
+                    user.handicap_source === "computed"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-gray-100 text-gray-600"
+                  }`}
+                >
                   {user.handicap_index}
                 </span>
               )}
-              {user.is_system ? (
+              {user.is_system && (
                 <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 bg-purple-100 text-purple-700">Bot</span>
-              ) : !user.is_financial_only && (
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 ${
-                    user.is_admin ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
-                  }`}
-                >
-                  {user.is_admin ? "Admin" : "User"}
+              )}
+              {!user.is_system && !user.is_financial_only && user.is_admin && (
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 bg-green-100 text-green-700">
+                  Admin
                 </span>
               )}
               <svg className="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

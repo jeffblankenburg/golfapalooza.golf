@@ -24,7 +24,7 @@ export async function GET() {
   const adminClient = createAdminClient();
   const { data: users, error } = await adminClient
     .from("users")
-    .select("*, player_handicaps(handicap_index)")
+    .select("*, player_handicaps(handicap_index, source)")
     // Bots sort to the bottom — admins rarely touch them.
     .order("is_system", { ascending: true })
     .order("display_name", { ascending: true });
@@ -37,7 +37,11 @@ export async function GET() {
   const normalizedUsers = (users || []).map((u) => {
     const ph = Array.isArray(u.player_handicaps) ? u.player_handicaps[0] : u.player_handicaps;
     const { player_handicaps: _, ...rest } = u;
-    return { ...rest, handicap_index: ph?.handicap_index ?? null };
+    return {
+      ...rest,
+      handicap_index: ph?.handicap_index ?? null,
+      handicap_source: ph?.source ?? null,
+    };
   });
 
   return NextResponse.json({ users: normalizedUsers });
@@ -165,12 +169,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // Save handicap index if provided
+    // Save handicap index if provided. New admin entry → 'manual'.
     if (handicapIndex && handicapIndex !== "") {
       await adminClient
         .from("player_handicaps")
         .upsert(
-          { user_id: authUser.user.id, handicap_index: parseFloat(handicapIndex) },
+          {
+            user_id: authUser.user.id,
+            handicap_index: parseFloat(handicapIndex),
+            source: "manual",
+          },
           { onConflict: "user_id" }
         );
     }
@@ -359,7 +367,9 @@ export async function PUT(request: Request) {
       }
     }
 
-    // Upsert handicap if provided
+    // Upsert handicap if provided. An admin save only flips source → 'manual'
+    // when the value actually changes — opening the form and saving without
+    // touching the handicap leaves a 'computed' row untouched.
     if (handicapIndex !== undefined) {
       if (handicapIndex === null || handicapIndex === "") {
         // Remove handicap
@@ -368,14 +378,27 @@ export async function PUT(request: Request) {
           .delete()
           .eq("user_id", userId);
       } else {
-        const { error: hcError } = await adminClient
+        const newValue = parseFloat(handicapIndex);
+        const { data: existingHc } = await adminClient
           .from("player_handicaps")
-          .upsert(
-            { user_id: userId, handicap_index: parseFloat(handicapIndex) },
-            { onConflict: "user_id" }
-          );
-        if (hcError) {
-          return NextResponse.json({ error: hcError.message }, { status: 500 });
+          .select("handicap_index")
+          .eq("user_id", userId)
+          .maybeSingle();
+        const currentValue =
+          existingHc?.handicap_index !== null && existingHc?.handicap_index !== undefined
+            ? parseFloat(String(existingHc.handicap_index))
+            : null;
+        const valueChanged = currentValue === null || currentValue !== newValue;
+        if (valueChanged) {
+          const { error: hcError } = await adminClient
+            .from("player_handicaps")
+            .upsert(
+              { user_id: userId, handicap_index: newValue, source: "manual" },
+              { onConflict: "user_id" }
+            );
+          if (hcError) {
+            return NextResponse.json({ error: hcError.message }, { status: 500 });
+          }
         }
       }
     }

@@ -281,7 +281,6 @@ export default function RoundForm() {
   function togglePlayer(id: string) {
     setSelectedPlayerIds((prev) => {
       if (prev.includes(id)) return prev.filter((p) => p !== id);
-      if (prev.length >= 4) return prev;
       return [...prev, id];
     });
   }
@@ -702,7 +701,6 @@ export default function RoundForm() {
         l.display_name.toLowerCase().includes(playerQuery) ||
         (l.full_name && l.full_name.toLowerCase().includes(playerQuery)),
       );
-    const atMax = selectedPlayerIds.length >= 4;
 
     function handleToggle(id: string) {
       // Capture the unselected list's scroll position so we can restore it
@@ -718,7 +716,7 @@ export default function RoundForm() {
     return (
       <StepCard
         title="Who Played?"
-        subtitle="Up to 4 Loozers. You're included by default — uncheck if you only scored."
+        subtitle="You're included by default — uncheck if you only scored. Live Scoring requires 4 or fewer."
         onBack={() => { setStep("details"); setSearchQuery(""); }}
       >
         <input
@@ -758,11 +756,8 @@ export default function RoundForm() {
             return (
               <button
                 key={l.id}
-                onClick={() => !atMax && handleToggle(l.id)}
-                disabled={atMax}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors ${
-                  atMax ? "opacity-40" : "hover:bg-gray-50"
-                }`}
+                onClick={() => handleToggle(l.id)}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors hover:bg-gray-50"
               >
                 <div className="w-5 h-5 rounded-full border-2 border-gray-300 shrink-0" />
                 <span className="text-sm text-gray-700">{l.display_name}{isMe ? " (You)" : ""}</span>
@@ -902,6 +897,7 @@ export default function RoundForm() {
 
   // ── Step: Score mode ──
   if (step === "score-mode") {
+    const liveDisabled = selectedPlayerIds.length > 4;
     return (
       <StepCard title="Enter Scores" subtitle="How do you want to enter scores?" onBack={() => setStep("tees")}>
         <div className="space-y-2">
@@ -922,11 +918,20 @@ export default function RoundForm() {
           </button>
 
           <button
-            onClick={() => setStep("live")}
-            className="w-full text-left rounded-xl p-4 border border-gray-200 hover:border-green-300 hover:bg-green-50 transition-colors"
+            onClick={() => { if (!liveDisabled) setStep("live"); }}
+            disabled={liveDisabled}
+            className={`w-full text-left rounded-xl p-4 border transition-colors ${
+              liveDisabled
+                ? "border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed"
+                : "border-gray-200 hover:border-green-300 hover:bg-green-50"
+            }`}
           >
             <div className="text-sm font-semibold text-gray-900">Live Scoring</div>
-            <div className="text-xs text-gray-500 mt-0.5">Score one hole at a time with +/- buttons. Best for scoring as you play.</div>
+            <div className="text-xs text-gray-500 mt-0.5">
+              {liveDisabled
+                ? "Only available with 4 or fewer players."
+                : "Score one hole at a time with +/- buttons. Best for scoring as you play."}
+            </div>
           </button>
         </div>
       </StepCard>

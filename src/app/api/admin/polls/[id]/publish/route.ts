@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkIsAdmin } from "@/lib/permissions-server";
-import { loadPollWithQuestions, findOverlappingPolls } from "@/lib/polls";
+import { loadPollWithQuestions } from "@/lib/polls";
 import { resolveAudienceUserIds } from "@/lib/audience";
 import { sendBulkNotifications } from "@/lib/notifications/service";
 
@@ -61,14 +61,6 @@ export async function POST(
     );
   }
 
-  const conflicts = await findOverlappingPolls(adminClient, starts_at, ends_at, id);
-  if (conflicts.length > 0) {
-    return NextResponse.json(
-      { error: "Window overlaps another poll", conflicts },
-      { status: 409 }
-    );
-  }
-
   const now = Date.now();
   const goLive = startDate.getTime() <= now;
   const newStatus = goLive ? "active" : "scheduled";
@@ -79,8 +71,7 @@ export async function POST(
     .eq("id", id);
 
   if (updErr) {
-    // Most likely cause: the partial unique index for one-active-poll fired.
-    return NextResponse.json({ error: updErr.message }, { status: 409 });
+    return NextResponse.json({ error: updErr.message }, { status: 500 });
   }
 
   // Launch notification fires only on immediate activation (cron handles

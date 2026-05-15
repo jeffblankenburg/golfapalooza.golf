@@ -275,6 +275,7 @@ export function HomeContent({
   latestArticle = null,
   hiddenQuickLinks = [],
   initialBirthdays = [],
+  initialActivePolls = [],
 }: {
   displayName: string;
   trip: TripData | null;
@@ -305,6 +306,7 @@ export function HomeContent({
   latestArticle?: { id: string; title: string; publishAt: string; imageUrl: string | null; preview: string | null; focalX?: number; focalY?: number } | null;
   hiddenQuickLinks?: string[];
   initialBirthdays?: { id: string; display_name: string; avatar_url: string | null; age: number }[];
+  initialActivePolls?: { poll: import("@/types/golf").Poll; response: import("@/types/golf").PollResponse | null }[];
 }) {
   const router = useRouter();
 
@@ -940,10 +942,15 @@ export function HomeContent({
         </Link>
       )}
 
-      {/* Active poll CTA — hidden when no active poll exists for this user */}
-      <div className="mt-3">
-        <PollHomeButton />
-      </div>
+      {/* Active poll CTAs — one fuchsia banner per active poll the user can
+          see. Hidden entirely when there are no active polls. */}
+      {initialActivePolls.length > 0 && (
+        <div className="mt-3 space-y-2">
+          {initialActivePolls.map(({ poll, response }) => (
+            <PollHomeButton key={poll.id} initialPoll={poll} initialResponse={response} />
+          ))}
+        </div>
+      )}
 
       {/* Quick Links */}
       <div className="mt-3">

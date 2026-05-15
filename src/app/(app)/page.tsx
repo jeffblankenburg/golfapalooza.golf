@@ -5,7 +5,7 @@ import { getEffectiveUserId, getEffectiveDate, getSimDate, isSimulating, getEffe
 import { isFeatureVisible } from "@/lib/visibility";
 import { stripMarkdown } from "@/lib/strip-markdown";
 import { getBirthdaysToday } from "@/lib/birthday/today";
-import { userHasClosedPolls } from "@/lib/polls";
+import { userHasClosedPolls, loadActivePollsForUser } from "@/lib/polls";
 
 export { zoomableViewport as viewport } from "@/lib/viewport";
 
@@ -72,6 +72,7 @@ export default async function HomePage() {
     optionSelectionsResult,
     latestArticleResult,
     birthdaysResult,
+    activePollsResult,
   ] = await Promise.all([
     // Course info
     trip.course_id
@@ -121,6 +122,8 @@ export default async function HomePage() {
       .maybeSingle(),
     // Today's birthdays (prefetched so the banner doesn't flash in)
     getBirthdaysToday(adminClient, trip.timezone || "America/New_York"),
+    // Active polls for this user (SSR-prefetched so the fuchsia banners don't pop in late)
+    loadActivePollsForUser(adminClient, effectiveUserId),
   ]);
 
   // ── Process Phase 2 results ──
@@ -648,6 +651,7 @@ export default async function HomePage() {
         };
       })() : null}
       hiddenQuickLinks={hiddenQuickLinks}
+      initialActivePolls={activePollsResult}
     />
   );
 }

@@ -3,11 +3,13 @@ import type {
   Poll,
   PollQuestion,
   PollOption,
+  PollResponse,
   PollResults,
   PollQuestionResults,
   PollOptionResult,
   PollTextAnswer,
 } from "@/types/golf";
+import { isUserInAudience } from "@/lib/audience";
 
 /**
  * Loads a poll with its questions and options ordered by order_index.
@@ -200,6 +202,39 @@ export async function loadPollResults(
   });
 
   return { poll_id: poll.id, total_respondents: totalRespondents, questions };
+}
+
+/**
+ * Server-side equivalent of GET /api/polls/active — resolves the list of
+ * currently-active polls the user is eligible to see, each with the user's
+ * existing response (if any). Used to SSR-prefetch the home-page poll banners.
+ * Ordered by `starts_at` ascending so the oldest active poll renders first.
+ */
+export async function loadActivePollsForUser(
+  client: SupabaseClient,
+  userId: string
+): Promise<{ poll: Poll; response: PollResponse | null }[]> {
+  const { data: activeRows } = await client
+    .from("polls")
+    .select("id, audience_type, audience_user_ids, trip_id, starts_at")
+    .eq("status", "active")
+    .order("starts_at", { ascending: true });
+  if (!activeRows || activeRows.length === 0) return [];
+
+  const results: { poll: Poll; response: PollResponse | null }[] = [];
+  for (const row of activeRows) {
+    const eligible = await isUserInAudience(client, userId, {
+      audience_type: row.audience_type,
+      audience_user_ids: row.audience_user_ids,
+      trip_id: row.trip_id,
+    });
+    if (!eligible) continue;
+    const poll = await loadPollWithQuestions(client, row.id);
+    if (!poll) continue;
+    const response = (await loadUserResponse(client, row.id, userId)) as PollResponse | null;
+    results.push({ poll, response });
+  }
+  return results;
 }
 
 /**

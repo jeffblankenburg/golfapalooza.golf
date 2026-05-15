@@ -165,6 +165,19 @@ textarea::placeholder {
   animation: pickem-pulse 2s ease-in-out infinite;
 }
 
+@keyframes poll-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(217, 70, 239, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(217, 70, 239, 0);
+  }
+}
+
+.animate-poll-pulse {
+  animation: poll-pulse 1.8s ease-in-out infinite;
+}
+
 /* Venmo button shimmer */
 @keyframes shimmer {
   0% {

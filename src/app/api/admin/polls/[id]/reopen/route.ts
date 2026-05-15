@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkIsAdmin } from "@/lib/permissions-server";
-import { findOverlappingPolls } from "@/lib/polls";
 
 /**
  * @swagger
@@ -53,20 +52,12 @@ export async function POST(
   }
 
   const newStart = now.toISOString();
-  const conflicts = await findOverlappingPolls(adminClient, newStart, ends_at, id);
-  if (conflicts.length > 0) {
-    return NextResponse.json(
-      { error: "Window overlaps another poll", conflicts },
-      { status: 409 }
-    );
-  }
-
   const { error } = await adminClient
     .from("polls")
     .update({ status: "active", starts_at: newStart, ends_at })
     .eq("id", id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 409 });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ status: "active", starts_at: newStart, ends_at });
 }

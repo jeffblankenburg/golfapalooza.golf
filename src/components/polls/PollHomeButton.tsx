@@ -1,38 +1,40 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { BottomDrawer } from "../admin/BottomDrawer";
 import { PollForm } from "./PollForm";
 import type { Poll, PollResponse } from "@/types/golf";
 
-export function PollHomeButton() {
-  const [poll, setPoll] = useState<Poll | null>(null);
-  const [response, setResponse] = useState<PollResponse | null>(null);
+interface PollHomeButtonProps {
+  initialPoll?: Poll | null;
+  initialResponse?: PollResponse | null;
+}
+
+export function PollHomeButton({ initialPoll = null, initialResponse = null }: PollHomeButtonProps = {}) {
+  // Seed from SSR so the button paints with the rest of the home page
+  // instead of flashing in after a /api/polls/active round-trip.
+  const [poll, setPoll] = useState<Poll | null>(initialPoll);
+  const [response, setResponse] = useState<PollResponse | null>(initialResponse);
   const [open, setOpen] = useState(false);
-  const [loaded, setLoaded] = useState(false);
 
+  // After the user submits, refetch THIS poll's response so the "voted"
+  // badge appears and the form prefills the next time the drawer opens.
+  // We don't refetch the whole active-polls list — sibling banners on the
+  // home page each manage their own state.
   const refresh = useCallback(async () => {
+    if (!poll) return;
     try {
-      const res = await fetch("/api/polls/active");
-      if (!res.ok) {
-        setPoll(null);
-        return;
-      }
+      const res = await fetch(`/api/polls/${poll.id}`);
+      if (!res.ok) return;
       const data = await res.json();
-      setPoll(data.poll);
-      setResponse(data.response);
+      if (data.poll) setPoll(data.poll);
+      setResponse(data.response ?? null);
     } catch {
-      setPoll(null);
-    } finally {
-      setLoaded(true);
+      // Network blip — keep showing what we have.
     }
-  }, []);
+  }, [poll]);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  if (!loaded || !poll) return null;
+  if (!poll) return null;
 
   const hasVoted = !!response;
 
@@ -40,10 +42,12 @@ export function PollHomeButton() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="w-full bg-white border-2 border-green-500 rounded-2xl px-4 py-3 shadow-sm active:scale-[0.99] transition-transform text-left"
+        className={`w-full bg-white border-2 border-fuchsia-500 rounded-2xl px-4 py-3 shadow-sm active:scale-[0.99] transition-transform text-left ${
+          hasVoted ? "" : "animate-poll-pulse"
+        }`}
       >
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-100 text-green-700 flex-shrink-0">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-fuchsia-100 text-fuchsia-700 flex-shrink-0">
             <svg
               className="w-5 h-5"
               fill="none"
@@ -60,7 +64,7 @@ export function PollHomeButton() {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <p className="text-[10px] font-bold text-green-700 uppercase tracking-wider">
+              <p className="text-[10px] font-bold text-fuchsia-700 uppercase tracking-wider">
                 Poll{hasVoted ? " · voted" : ""}
               </p>
             </div>

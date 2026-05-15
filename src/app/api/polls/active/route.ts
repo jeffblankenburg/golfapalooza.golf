@@ -2,15 +2,18 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveUserId } from "@/lib/simulator";
-import { loadPollWithQuestions, loadUserResponse } from "@/lib/polls";
-import { isUserInAudience } from "@/lib/audience";
+import { loadActivePollsForUser } from "@/lib/polls";
 
 /**
  * @swagger
  * /api/polls/active:
  *   get:
- *     summary: Get the currently active poll for the current user (or null)
+ *     summary: List currently-active polls visible to the current user
  *     tags: [Polls]
+ *     description: |
+ *       Returns every active poll the current user is eligible to see, each
+ *       with the user's existing response (if any). Multiple active polls
+ *       are allowed; the home page stacks up to ~3 banners.
  */
 export async function GET() {
   const supabase = await createClient();
@@ -23,26 +26,7 @@ export async function GET() {
 
   const effectiveUserId = await getEffectiveUserId(user.id);
   const adminClient = createAdminClient();
+  const polls = await loadActivePollsForUser(adminClient, effectiveUserId);
 
-  const { data: activePoll } = await adminClient
-    .from("polls")
-    .select(
-      "id, audience_type, audience_user_ids, trip_id"
-    )
-    .eq("status", "active")
-    .maybeSingle();
-
-  if (!activePoll) return NextResponse.json({ poll: null, response: null });
-
-  const eligible = await isUserInAudience(adminClient, effectiveUserId, {
-    audience_type: activePoll.audience_type,
-    audience_user_ids: activePoll.audience_user_ids,
-    trip_id: activePoll.trip_id,
-  });
-  if (!eligible) return NextResponse.json({ poll: null, response: null });
-
-  const poll = await loadPollWithQuestions(adminClient, activePoll.id);
-  const response = await loadUserResponse(adminClient, activePoll.id, effectiveUserId);
-
-  return NextResponse.json({ poll, response });
+  return NextResponse.json({ polls });
 }

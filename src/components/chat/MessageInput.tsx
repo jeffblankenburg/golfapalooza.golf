@@ -181,11 +181,16 @@ export function MessageInput({
       {/* App drawer — iMessage-style icon row */}
       {activePanel === "menu" && (
         <div className="flex items-center gap-4 px-4 py-3 border-b border-gray-100 bg-gray-50">
-          {/* Camera */}
+          {/* Camera — `capture` tells iOS/Android to open the camera UI
+              directly instead of the photo picker. */}
           <button
             onClick={() => {
               setActivePanel(null);
-              fileInputRef.current?.click();
+              if (fileInputRef.current) {
+                fileInputRef.current.setAttribute("capture", "environment");
+                fileInputRef.current.click();
+                fileInputRef.current.removeAttribute("capture");
+              }
             }}
             disabled={uploading}
             className="flex flex-col items-center gap-1 disabled:opacity-50"
@@ -199,16 +204,11 @@ export function MessageInput({
             <span className="text-[10px] text-gray-500 font-medium">Camera</span>
           </button>
 
-          {/* Photos */}
+          {/* Photos — no `capture` attribute, so the OS shows the gallery. */}
           <button
             onClick={() => {
               setActivePanel(null);
-              // Use file input with gallery
-              if (fileInputRef.current) {
-                fileInputRef.current.setAttribute("capture", "");
-                fileInputRef.current.click();
-                fileInputRef.current.removeAttribute("capture");
-              }
+              fileInputRef.current?.click();
             }}
             disabled={uploading}
             className="flex flex-col items-center gap-1 disabled:opacity-50"

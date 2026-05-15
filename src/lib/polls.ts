@@ -120,17 +120,23 @@ export async function loadPollResults(
     }
   }
 
-  // For attributed text answers, we need user_id per response
-  const userByResponse = new Map<string, { id: string; display_name: string }>();
+  // For attributed views we map response_id → user so we can attach voter
+  // lists to options (and names to text answers).
+  const userByResponse = new Map<
+    string,
+    { id: string; display_name: string; avatar_url: string | null }
+  >();
   if (attribution === "attributed") {
     const responseIds = (respondents || []).map((r) => r.id);
     if (responseIds.length > 0) {
       const { data: rows } = await client
         .from("poll_responses")
-        .select("id, user_id, users!inner(id, display_name)")
+        .select("id, user_id, users!inner(id, display_name, avatar_url)")
         .in("id", responseIds);
       for (const r of rows || []) {
-        const u = (r as unknown as { users: { id: string; display_name: string } }).users;
+        const u = (r as unknown as {
+          users: { id: string; display_name: string; avatar_url: string | null };
+        }).users;
         userByResponse.set(r.id, u);
       }
     }
@@ -161,15 +167,29 @@ export async function loadPollResults(
     }
 
     const counts = new Map<string, number>();
+    const votersByOption = new Map<
+      string,
+      { user_id: string; display_name: string; avatar_url: string | null }[]
+    >();
     for (const a of answers) {
-      if (a.option_id) {
-        counts.set(a.option_id, (counts.get(a.option_id) || 0) + 1);
+      if (!a.option_id) continue;
+      counts.set(a.option_id, (counts.get(a.option_id) || 0) + 1);
+      if (attribution === "attributed") {
+        const u = userByResponse.get(a.response_id);
+        if (u) {
+          const arr = votersByOption.get(a.option_id) || [];
+          arr.push({ user_id: u.id, display_name: u.display_name, avatar_url: u.avatar_url });
+          votersByOption.set(a.option_id, arr);
+        }
       }
     }
     const options: PollOptionResult[] = q.options.map((o) => ({
       option_id: o.id,
       option_text: o.option_text,
       count: counts.get(o.id) || 0,
+      ...(attribution === "attributed"
+        ? { voters: votersByOption.get(o.id) || [] }
+        : {}),
     }));
     return {
       question_id: q.id,

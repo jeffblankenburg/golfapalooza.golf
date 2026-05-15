@@ -329,10 +329,18 @@ export interface PollResponse {
   answers: PollAnswer[];
 }
 
+export interface PollVoter {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
 export interface PollOptionResult {
   option_id: string;
   option_text: string;
   count: number;
+  // Populated only on attributed (non-anonymous) admin views.
+  voters?: PollVoter[];
 }
 
 export interface PollTextAnswer {

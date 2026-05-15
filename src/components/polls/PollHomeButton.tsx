@@ -64,7 +64,7 @@ export function PollHomeButton() {
                 Poll{hasVoted ? " · voted" : ""}
               </p>
             </div>
-            <p className="text-sm font-semibold text-gray-900 truncate">
+            <p className="text-sm font-semibold text-gray-900">
               {poll.title}
             </p>
           </div>

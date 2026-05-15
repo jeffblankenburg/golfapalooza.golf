@@ -29,6 +29,7 @@ export function PollAdminResults({ results, isAnonymous }: PollAdminResultsProps
                 const total =
                   q.options!.reduce((s, oo) => s + oo.count, 0) || 0;
                 const pct = total > 0 ? (o.count / total) * 100 : 0;
+                const voters = !isAnonymous ? o.voters || [] : [];
                 return (
                   <div key={o.option_id}>
                     <div className="flex items-center justify-between text-xs text-gray-700 mb-0.5">
@@ -43,6 +44,32 @@ export function PollAdminResults({ results, isAnonymous }: PollAdminResultsProps
                         style={{ width: `${pct}%` }}
                       />
                     </div>
+                    {voters.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {voters.map((v) => (
+                          <span
+                            key={v.user_id}
+                            className="inline-flex items-center gap-1 pl-0.5 pr-2 py-0.5 rounded-full bg-gray-100 text-[11px] text-gray-700"
+                          >
+                            {v.avatar_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={v.avatar_url}
+                                alt=""
+                                className="w-4 h-4 rounded-full object-cover"
+                              />
+                            ) : (
+                              <span className="w-4 h-4 rounded-full bg-gray-300 flex items-center justify-center text-[9px] font-semibold text-gray-600">
+                                {v.display_name?.[0]?.toUpperCase() || "?"}
+                              </span>
+                            )}
+                            <span className="truncate max-w-[140px]">
+                              {v.display_name}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}

@@ -209,7 +209,11 @@ export default function HoleMapView({
 
       mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 
-      const bearing = green ? getBearing(tee, green) : 0;
+      const teeOk = Number.isFinite(tee?.[0]) && Number.isFinite(tee?.[1]);
+      const greenOk = !!green && Number.isFinite(green[0]) && Number.isFinite(green[1]);
+      if (!teeOk) return; // bail out — bad input, don't try to instantiate the map
+
+      const bearing = greenOk ? getBearing(tee, green!) : 0;
 
       const mapOptions: mapboxgl.MapOptions = {
         container: containerRef.current,
@@ -218,8 +222,8 @@ export default function HoleMapView({
         attributionControl: false,
       };
 
-      if (green) {
-        const bounds = new mapboxgl.LngLatBounds([tee[1], tee[0]], [green[1], green[0]]);
+      if (greenOk) {
+        const bounds = new mapboxgl.LngLatBounds([tee[1], tee[0]], [green![1], green![0]]);
         Object.assign(mapOptions, {
           bounds,
           fitBoundsOptions: {
@@ -249,6 +253,10 @@ export default function HoleMapView({
         applyAutoCameraRef.current = (origin) => {
           const g = greenRef.current;
           if (!g) return;
+          // Guard against stale refs / DB nulls coerced through non-null
+          // assertions upstream — bad coords blow up cameraForBounds.
+          if (!Number.isFinite(origin?.[0]) || !Number.isFinite(origin?.[1])) return;
+          if (!Number.isFinite(g[0]) || !Number.isFinite(g[1])) return;
           const bounds = new mapboxgl.LngLatBounds(
             [origin[1], origin[0]],
             [g[1], g[0]]

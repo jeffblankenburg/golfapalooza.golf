@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getEffectiveUserId, getEffectiveTripId } from "@/lib/simulator";
+import { getEffectiveUserId } from "@/lib/simulator";
 import { loadPollWithQuestions, loadUserResponse } from "@/lib/polls";
 import { isUserInAudience } from "@/lib/audience";
 
@@ -29,7 +29,7 @@ export async function GET() {
     .select(
       "id, audience_type, audience_user_ids, trip_id"
     )
-    .eq("id", (await getEffectiveTripId())!)
+    .eq("status", "active")
     .maybeSingle();
 
   if (!activePoll) return NextResponse.json({ poll: null, response: null });

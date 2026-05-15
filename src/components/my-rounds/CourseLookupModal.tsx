@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatCourseName } from "@/lib/utils/course-display";
+import { DragHandle } from "@/components/DragHandle";
 
 // Loading-state phrases. Cycled through randomly while the cascade runs.
 // Mostly golf, with a generous helping of Caddyshack / Happy Gilmore /
@@ -266,7 +267,7 @@ export default function CourseLookupModal({ initialName = "", onClose, onCourseR
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up max-h-full flex flex-col">
         <div className="px-6 pt-3 pb-3 border-b border-gray-100">
-          <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3" />
+          <DragHandle onClose={onClose} className="mb-3" />
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-gray-900">Add a New Course</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>

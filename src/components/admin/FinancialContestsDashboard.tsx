@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { ConfirmModal } from "./ConfirmModal";
 import { BTN_PRIMARY } from "@/lib/ui/buttons";
+import { DragHandle } from "@/components/DragHandle";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -1561,7 +1562,7 @@ export function FinancialContestsDashboard() {
           <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up max-h-[80vh] flex flex-col">
             {/* Header */}
             <div className="px-6 pt-5 pb-3 border-b border-gray-100 shrink-0">
-              <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+              <DragHandle onClose={() => { setShowContestsDrawer(false); resetContestForm(); }} className="mb-4" />
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold text-gray-900">
                   Manage Contests
@@ -2043,7 +2044,7 @@ export function FinancialContestsDashboard() {
           />
           <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up max-h-[85vh] flex flex-col">
             <div className="px-6 pt-5 pb-3 border-b border-gray-100 shrink-0">
-              <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+              <DragHandle onClose={() => setFullLedgerModal(null)} className="mb-4" />
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-bold text-gray-900">
@@ -2221,7 +2222,7 @@ export function FinancialContestsDashboard() {
           />
           <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up max-h-[60vh] flex flex-col">
             <div className="px-6 pt-5 pb-3 border-b border-gray-100 shrink-0">
-              <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+              <DragHandle onClose={() => setTxHistoryModal(null)} className="mb-4" />
               <h2 className="text-lg font-bold text-gray-900">Edit History</h2>
               <p className="text-sm text-gray-500 truncate">
                 {txHistoryModal.transaction.description}

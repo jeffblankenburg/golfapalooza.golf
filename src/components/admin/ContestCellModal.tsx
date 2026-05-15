@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ConfirmModal } from "./ConfirmModal";
+import { DragHandle } from "@/components/DragHandle";
 
 interface Transaction {
   id: string;
@@ -190,7 +191,7 @@ export function ContestCellModal({
       <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up max-h-[80vh] flex flex-col">
         {/* Header */}
         <div className="px-6 pt-5 pb-3 border-b border-gray-100 shrink-0">
-          <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+          <DragHandle onClose={onClose} className="mb-4" />
           <h2 className="text-lg font-bold text-gray-900">{userName}</h2>
           <p className="text-sm text-gray-500">{contestName}</p>
         </div>

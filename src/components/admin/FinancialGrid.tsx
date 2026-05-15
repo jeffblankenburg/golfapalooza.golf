@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { DragHandle } from "@/components/DragHandle";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -339,7 +340,7 @@ export function FinancialGrid() {
           />
           <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up max-h-[85vh] flex flex-col">
             <div className="px-6 pt-5 pb-3 border-b border-gray-100 shrink-0">
-              <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+              <DragHandle onClose={() => setUserLedgerModal(null)} className="mb-4" />
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-bold text-gray-900">{userLedgerModal.userName}</h2>

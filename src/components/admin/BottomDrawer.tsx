@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { DragHandle } from "@/components/DragHandle";
 
 interface BottomDrawerProps {
   open: boolean;
@@ -34,7 +35,7 @@ export function BottomDrawer({ open, onClose, title, subtitle, children }: Botto
       <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up max-h-[calc(100%-12px)] flex flex-col">
         {/* Handle bar */}
         <div className="px-6 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
-          <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+          <DragHandle onClose={onClose} className="mb-4" />
           <div className="flex items-start justify-between">
             {title ? (
               <div className="min-w-0 flex-1">

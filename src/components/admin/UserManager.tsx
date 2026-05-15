@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useImperativeHandle, type Ref } from "react";
 import { useRouter } from "next/navigation";
+import { DragHandle } from "@/components/DragHandle";
 
 interface User {
   id: string;
@@ -215,7 +216,7 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowCreate(false)} />
           <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up max-h-[calc(100%-12px)] flex flex-col">
             <div className="px-6 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
-              <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+              <DragHandle onClose={() => setShowCreate(false)} className="mb-4" />
               <h2 className="text-xl font-bold text-gray-900">New Loozer</h2>
               <p className="text-xs text-gray-500 mt-1">Create the basics — you can edit everything else after.</p>
             </div>

@@ -12,6 +12,7 @@ import {
 } from "@/lib/kgb-cup/match-logic";
 import { kgbCupMatchSchedule, type KgbScheduledSection } from "@/lib/kgb-cup/schedule";
 import { KgbCupScoreboard, KgbCupGroupResults } from "@/components/kgb-cup/KgbCupResultsView";
+import { DragHandle } from "@/components/DragHandle";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -155,7 +156,7 @@ function KgbCupLeaderboardPopup({
       <div className="fixed inset-0 z-[60] flex items-end justify-center">
         <div className="absolute inset-0 bg-black/50" onClick={onClose} />
         <div className="relative w-full max-w-lg bg-white rounded-t-3xl p-5 pb-6 animate-slide-up">
-          <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+          <DragHandle onClose={onClose} className="mb-4" />
           <div className="flex justify-center py-8">
             <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
           </div>
@@ -178,7 +179,7 @@ function KgbCupLeaderboardPopup({
     <div className="fixed inset-0 z-[60] flex items-end justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-white rounded-t-3xl p-5 pb-6 animate-slide-up max-h-[80vh] overflow-y-auto">
-        <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+        <DragHandle onClose={onClose} className="mb-4" />
 
         <KgbCupScoreboard
           team1={{ team_number: 1, team_name: team1?.team_name || "Team 1", team_color: t1Color }}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import { DragHandle } from "@/components/DragHandle";
 
 interface Nomination {
   id: string;
@@ -323,7 +324,7 @@ export function NominationManager() {
           />
           <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up">
             <div className="px-6 pt-5 pb-3 border-b border-gray-100">
-              <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+              <DragHandle onClose={() => setRejectModal(null)} className="mb-4" />
               <h2 className="text-xl font-bold text-gray-900">Reject Nomination</h2>
             </div>
             <div className="px-6 py-4">
@@ -368,7 +369,7 @@ export function NominationManager() {
           />
           <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up">
             <div className="px-6 pt-5 pb-3 border-b border-gray-100">
-              <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+              <DragHandle onClose={() => setApproveModal(null)} className="mb-4" />
               <h2 className="text-xl font-bold text-gray-900">Approve Nomination</h2>
             </div>
             <div className="px-6 py-4">

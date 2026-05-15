@@ -10,6 +10,7 @@ import {
 } from "@/lib/gallery/compress";
 import { logActivity } from "@/components/ActivityTracker";
 import { extractExifDate, extractVideoDate } from "@/lib/gallery/exif";
+import { DragHandle } from "@/components/DragHandle";
 
 interface GalleryUser {
   id: string;
@@ -305,7 +306,7 @@ export function MediaUploader({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex justify-center pt-3 pb-2">
-            <div className="w-10 h-1 bg-gray-300 rounded-full" />
+            <DragHandle onClose={onClose} className="" />
           </div>
 
           <div className="flex items-center justify-between px-4 pb-3">
@@ -373,7 +374,7 @@ export function MediaUploader({
       >
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-2">
-          <div className="w-10 h-1 bg-gray-300 rounded-full" />
+          <DragHandle onClose={onClose} className="" />
         </div>
 
         <div className="px-4 pb-24">

@@ -19,6 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { DragHandle } from "@/components/DragHandle";
 
 interface CostItem {
   id: string;
@@ -437,7 +438,7 @@ function CostItemModal({
       <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
       <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up max-h-full flex flex-col">
         <div className="px-6 pt-5 pb-3 border-b border-gray-100 shrink-0">
-          <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+          <DragHandle onClose={onCancel} className="mb-4" />
           <h2 className="text-xl font-bold text-gray-900">
             {isEdit ? "Edit cost item" : "New cost item"}
           </h2>

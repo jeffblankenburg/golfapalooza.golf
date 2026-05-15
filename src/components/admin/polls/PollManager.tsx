@@ -11,6 +11,7 @@ import {
   naiveDatetimeToUTC,
 } from "@/lib/utils/timezone";
 import type { Poll, PollResults, PollStatus } from "@/types/golf";
+import { DragHandle } from "@/components/DragHandle";
 
 interface User {
   id: string;
@@ -461,7 +462,7 @@ export function PollManager() {
           />
           <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up">
             <div className="px-6 pt-5 pb-3 border-b border-gray-100">
-              <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+              <DragHandle onClose={() => setConfirmAction(null)} className="mb-4" />
               <h2 className="text-xl font-bold text-gray-900">Reopen poll</h2>
               <p className="text-xs text-gray-500 mt-1">
                 &ldquo;{confirmAction.title}&rdquo; will become active again.

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { BTN_NEUTRAL } from "@/lib/ui/buttons";
+import { DragHandle } from "@/components/DragHandle";
 
 interface Comment {
   id: string;
@@ -132,7 +133,7 @@ export function MediaComments({
       >
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 bg-gray-300 rounded-full" />
+          <DragHandle onClose={onClose} className="" />
         </div>
 
         {/* Header */}

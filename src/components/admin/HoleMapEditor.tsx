@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { DragHandle } from "@/components/DragHandle";
 
 interface Coordinates {
   tee_latitude: number | null;
@@ -369,7 +370,7 @@ export default function HoleMapEditor({
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up flex flex-col" style={{ maxHeight: "90vh" }}>
         <div className="px-6 pt-5 pb-3 border-b border-gray-100 shrink-0">
-          <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+          <DragHandle onClose={onClose} className="mb-4" />
           <h2 className="text-xl font-bold text-gray-900">Hole {holeNumber} Map</h2>
           <p className="text-sm text-gray-500 mt-1">
             Tap a button, then tap the map to place the marker.

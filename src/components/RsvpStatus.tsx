@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { DragHandle } from "@/components/DragHandle";
 
 const likelihoodOptions = [
   { value: 99, label: "Attending", description: "99% - I'll be there" },
@@ -87,7 +88,7 @@ export function RsvpStatus({ likelihood }: { likelihood: number | null }) {
             onClick={() => setShowModal(false)}
           />
           <div className="relative w-full max-w-lg bg-white rounded-t-3xl p-6 pb-6 animate-slide-up max-h-[calc(100%-12px)] overflow-y-auto">
-            <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-6" />
+            <DragHandle onClose={() => setShowModal(false)} className="mb-6" />
             <h2 className="text-xl font-bold text-gray-900 text-center mb-6">
               How likely are you?
             </h2>

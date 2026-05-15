@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useImperativeHandle, type Ref } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import { DragHandle } from "@/components/DragHandle";
 
 interface Room {
   id: string;
@@ -336,7 +337,7 @@ export function FacilityManager({ ref }: { ref?: Ref<{ openAdd: () => void }> })
           <div className="absolute inset-0 bg-black/50" onClick={closeFacilityModal} />
           <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up max-h-[calc(100%-12px)] flex flex-col">
             <div className="px-6 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
-              <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+              <DragHandle onClose={closeFacilityModal} className="mb-4" />
               <h2 className="text-xl font-bold text-gray-900">
                 {editingFacility ? `Edit '${editingFacility.name}'` : "New Facility"}
               </h2>
@@ -457,7 +458,7 @@ export function FacilityManager({ ref }: { ref?: Ref<{ openAdd: () => void }> })
           <div className="absolute inset-0 bg-black/50" onClick={closeRoomModal} />
           <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up max-h-[calc(100%-12px)] flex flex-col">
             <div className="px-6 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
-              <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+              <DragHandle onClose={closeRoomModal} className="mb-4" />
               <h2 className="text-xl font-bold text-gray-900">
                 {editingRoom ? `Edit Room ${editingRoom.room_number}` : "New Room"}
               </h2>

@@ -6,6 +6,7 @@ import { BottomDrawer } from "@/components/admin/BottomDrawer";
 import { TEE_COLOR_OPTIONS, isHexColor, getContrastText, getTeeColorClasses } from "@/lib/tee-colors";
 import { BTN_DESTRUCTIVE } from "@/lib/ui/buttons";
 import dynamic from "next/dynamic";
+import { DragHandle } from "@/components/DragHandle";
 
 const HoleMapEditor = dynamic(() => import("@/components/admin/HoleMapEditor"), { ssr: false });
 
@@ -1461,7 +1462,7 @@ function ImageButton({
             onClick={() => setShowModal(false)}
           />
           <div className="relative w-full max-w-lg bg-white rounded-t-3xl p-6 pb-8 animate-slide-up max-h-[85vh] overflow-y-auto">
-            <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+            <DragHandle onClose={() => setShowModal(false)} className="mb-4" />
             <h3 className="text-lg font-bold text-gray-900">{label}</h3>
             <p className="text-sm text-gray-500 mb-4">{subtitle}</p>
             <img
@@ -1564,7 +1565,7 @@ function TeeColorModal({
     <div className="fixed inset-0 z-50 flex items-end justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-white rounded-t-3xl p-6 pb-8 animate-slide-up">
-        <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+        <DragHandle onClose={onClose} className="mb-4" />
         <h3 className="text-lg font-bold text-gray-900 mb-1">Tee Color</h3>
         <p className="text-sm text-gray-500 mb-5">Choose a preset or pick a custom color</p>
 

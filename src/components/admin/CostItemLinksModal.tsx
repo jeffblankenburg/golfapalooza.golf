@@ -8,6 +8,7 @@ import {
   groupByCategory,
   compareCostItems,
 } from "@/lib/cost-items/categories";
+import { DragHandle } from "@/components/DragHandle";
 
 interface CostItem {
   id: string;
@@ -226,7 +227,7 @@ export function CostItemLinksModal({
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full max-w-2xl bg-white rounded-t-3xl animate-slide-up max-h-full flex flex-col">
         <div className="px-6 pt-5 pb-3 border-b border-gray-100 shrink-0">
-          <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+          <DragHandle onClose={onClose} className="mb-4" />
           <h2 className="text-xl font-bold text-gray-900">{option.name} — Cost Items</h2>
           <p className="text-xs text-gray-500 mt-0.5">
             Pick the cost items that fund this option. The option&apos;s price will be the sum.

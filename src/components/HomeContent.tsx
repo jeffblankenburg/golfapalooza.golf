@@ -8,6 +8,7 @@ import { getTimezoneAbbreviation } from "@/lib/utils/timezone";
 import { FakeAdCarousel } from "@/components/FakeAdCarousel";
 import { BirthdayBanner } from "@/components/BirthdayBanner";
 import { PollHomeButton } from "@/components/polls/PollHomeButton";
+import { DragHandle } from "@/components/DragHandle";
 
 interface TripData {
   trip_name: string;
@@ -1001,7 +1002,7 @@ export function HomeContent({
             onClick={() => setShowModal(false)}
           />
           <div className="relative w-full max-w-lg bg-white rounded-t-3xl p-6 pb-6 animate-slide-up max-h-[calc(100%-12px)] overflow-y-auto">
-            <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-6" />
+            <DragHandle onClose={() => setShowModal(false)} className="mb-6" />
             <h2 className="text-xl font-bold text-gray-900 text-center mb-6">
               How likely are you?
             </h2>

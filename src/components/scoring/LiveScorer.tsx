@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { logActivity } from "@/components/ActivityTracker";
 import ScoringShell, { type HoleInfo } from "@/components/scoring/ScoringShell";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
+import { DragHandle } from "@/components/DragHandle";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -312,7 +313,7 @@ function LeaderboardPopup({
     <div className="fixed inset-0 z-[60] flex items-end justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-white rounded-t-3xl p-5 pb-6 animate-slide-up max-h-[70vh] overflow-y-auto">
-        <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+        <DragHandle onClose={onClose} className="mb-4" />
 
         {/* Tab switcher */}
         <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4">
@@ -576,7 +577,7 @@ function CompleteRoundModal({
     <div className="fixed inset-0 z-[70] flex items-end justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-white rounded-t-3xl p-5 pb-6 animate-slide-up max-h-[90vh] overflow-y-auto">
-        <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3" />
+        <DragHandle onClose={onClose} className="mb-3" />
 
         <h2 className="text-lg font-bold text-gray-900 mb-1">Complete Round</h2>
         <p className="text-sm text-gray-600 mb-4">

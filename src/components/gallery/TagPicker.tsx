@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DragHandle } from "@/components/DragHandle";
 
 interface GalleryUser {
   id: string;
@@ -91,7 +92,7 @@ export function TagPicker({
       >
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-2">
-          <div className="w-10 h-1 bg-gray-300 rounded-full" />
+          <DragHandle onClose={onClose} className="" />
         </div>
 
         {/* Header */}

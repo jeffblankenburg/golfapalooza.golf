@@ -14,6 +14,8 @@ interface RoundData {
   round_type: string;
   status: string;
   notes: string | null;
+  edited_at: string | null;
+  edited_by: string | null;
   course: { name: string; city: string | null; state: string | null } | null;
   tee: { tee_name: string; tee_color: string | null; course_rating: number; slope_rating: number; par: number } | null;
   round_players: {
@@ -55,7 +57,7 @@ export default function RoundDetailPage() {
   const router = useRouter();
   const roundId = params.id as string;
 
-  const [data, setData] = useState<{ round: RoundData | null; holes: HoleData[]; currentUserId: string | null } | null>(null);
+  const [data, setData] = useState<{ round: RoundData | null; holes: HoleData[]; currentUserId: string | null; isAdmin: boolean } | null>(null);
   const [expandedPlayers, setExpandedPlayers] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -68,6 +70,7 @@ export default function RoundDetailPage() {
         round: json.round,
         holes: json.holes || [],
         currentUserId: json.current_user_id || null,
+        isAdmin: !!json.is_admin,
       });
 
       // Default-expand the current user's card
@@ -86,6 +89,7 @@ export default function RoundDetailPage() {
   const round = data?.round ?? null;
   const holes = data?.holes ?? [];
   const currentUserId = data?.currentUserId;
+  const isAdmin = data?.isAdmin ?? false;
 
   function togglePlayer(playerId: string) {
     setExpandedPlayers((prev) => {
@@ -149,6 +153,7 @@ export default function RoundDetailPage() {
   const creatorUser = creatorPlayer?.user;
   const creatorName = Array.isArray(creatorUser) ? creatorUser[0]?.display_name : creatorUser?.display_name;
   const creatorIsMe = round.created_by === currentUserId;
+  const canEdit = (creatorIsMe || isAdmin) && round.status === "completed";
 
   return (
     <div className="px-4 py-6 max-w-lg mx-auto">
@@ -168,6 +173,11 @@ export default function RoundDetailPage() {
                 {round.round_type !== "18" && (
                   <span className="ml-1.5 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
                     {round.round_type === "9-front" ? "Front 9" : "Back 9"}
+                  </span>
+                )}
+                {round.edited_at && (
+                  <span className="ml-1.5 text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded" title={`Last edited ${new Date(round.edited_at).toLocaleString()}`}>
+                    Edited
                   </span>
                 )}
               </div>
@@ -301,6 +311,15 @@ export default function RoundDetailPage() {
           <div className="text-xs text-gray-500 mb-1">Notes</div>
           <div className="text-sm text-gray-700">{round.notes}</div>
         </div>
+      )}
+
+      {canEdit && (
+        <Link
+          href={`/my-rounds/rounds/${roundId}/edit`}
+          className="block w-full text-center py-3 mb-2 rounded-lg border border-gray-300 text-gray-700 font-semibold active:bg-gray-50"
+        >
+          Edit Round
+        </Link>
       )}
 
       {creatorIsMe && (

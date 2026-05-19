@@ -55,6 +55,8 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 | DELETE | `/api/rounds/{roundId}` | Delete a round |
 | PUT | `/api/rounds/{roundId}/scores` | Batch update hole scores |
 | POST | `/api/rounds/{roundId}/complete` | Complete round and calculate differentials |
+| GET | `/api/rounds/recent?limit={n}` | Cross-Loozer feed of recently completed player-rounds for the home page Recent Rounds card scroller. One row per (round, player); filters out system + financial-only users. Default limit 25, max 50. |
+| PUT | `/api/rounds/{roundId}/edit` | Post-completion edit for a saved round — body `{round_date?, player_tees?, player_scores?}`. Permission: round creator or admin. Updates date, per-player tee_id, and per-hole strokes/putts in one call, then recomputes gross/adjusted/differential for every affected player and triggers handicap recalc. Stamps `rounds.edited_at` + `edited_by`. |
 
 #### Handicap (`/api/handicap`)
 
@@ -177,7 +179,7 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 - `courses` - Cached golf courses; `source` ∈ ('manual','gcapi','ai'), `verified` flag, `lookup_key` for cross-user dedup
 - `course_tees` - Tee boxes with ratings (course_rating, slope_rating); `confidence` jsonb for AI-extracted ratings
 - `course_holes` - Hole details (par, handicap_index, yards)
-- `rounds` - Scoring sessions
+- `rounds` - Scoring sessions (`edited_at` + `edited_by` track post-completion edits made via `/api/rounds/{id}/edit`)
 - `round_players` - Players in a round (up to 4)
 - `round_scores` - Hole-by-hole scores
 - `player_handicaps` - Current handicap data
@@ -236,6 +238,7 @@ Located in `supabase/migrations/`:
 - `00148_phase_5_cleanup.sql` - Issue #125 Phase 5 (between trips). Destructive cleanup of legacy cost columns now that every consumer reads through `cost_items` (computeOptionCosts + getPickemEntryFee + loadPayoutSheet). Strips `cost` from `trip_options.choices` JSONB (one-shot UPDATE), drops `trip_options.cost`, drops `pickem_settings.entry_fee`. **Kept on purpose:** `payout_sheet_events.amount_per_participant` remains as a fallback for Lodge Mon / Lodge Tue rows that aggregate multiple cost_items per stayer (no single FK fits). The `scripts/audit-option-cost-coverage.mjs` confirmed every paid option on active + test trips was linked before this migration ran; the dropped values were already inert (overlaid by cost_items reads).
 - `00149_contests_declared_no_winner.sql` - Adds `contests.declared_no_winner BOOLEAN DEFAULT FALSE`. Distinguishes "explicitly nobody won" from "not yet decided" on daily contests (CTP front/back, Long Drive). Long Putt always has a winner; the flag is meaningful only for the three carry-eligible types. Drives the per-day pot carry chain implemented in `src/lib/winners/daily-pots.ts`: same-day fold (one CTP side void → other side takes both shares), cross-day carry ($5 rule splits Front/Back), and Saturday forfeit (next-event budget). The admin gesture lives in `DailyWinnersManager` as a "🚫 No winner (pot carries)" option in the winner dropdown; the API at `/api/admin/daily-winners` re-runs `materializeDailyContestChain` after every change so all downstream contest_winners.amount values stay in sync.
 - `00150_chat_images_bucket.sql` - Creates the `chat-images` Supabase Storage bucket for in-chat photo uploads. Public read so chat images render with plain `<img>` tags; authenticated insert so any signed-in Loozer can upload (path is `${room_id}/${timestamp}-${filename}`); owner-only update/delete so each uploader controls their own file. The `MessageInput` component has used this bucket name since shipping but the bucket itself wasn't provisioned until now.
+- `00154_rounds_edited.sql` - Editable scorecards (post-completion). Adds `rounds.edited_at TIMESTAMPTZ` + `edited_by UUID REFERENCES users(id) ON DELETE SET NULL`. Powers the "Edited" badge on round detail pages and audit-trails who made the last change. Set by `PUT /api/rounds/{id}/edit`. Per-hole audit isn't kept; the live `round_scores` row is authoritative.
 
 **IMPORTANT: Always create NEW migration files.** Never modify existing migrations that may have already been run. Use sequential numbering (00004, 00005, etc.) for new migrations. Each migration should be atomic and handle its own rollback safety (use `DROP ... IF EXISTS` before `CREATE`).
 

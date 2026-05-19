@@ -8,6 +8,7 @@ import { getTimezoneAbbreviation } from "@/lib/utils/timezone";
 import { FakeAdCarousel } from "@/components/FakeAdCarousel";
 import { BirthdayBanner } from "@/components/BirthdayBanner";
 import { PollHomeButton } from "@/components/polls/PollHomeButton";
+import { RecentRoundsFeed } from "@/components/RecentRoundsFeed";
 import { DragHandle } from "@/components/DragHandle";
 
 interface TripData {
@@ -446,6 +447,16 @@ export function HomeContent({
           <span className="text-base text-green-600">
             {daysLeft === 1 ? "day" : "days"} to go
           </span>
+        </div>
+      )}
+
+      {/* Active poll CTAs — one fuchsia banner per active poll the user can
+          see. Hidden entirely when there are no active polls. */}
+      {initialActivePolls.length > 0 && (
+        <div className="space-y-2">
+          {initialActivePolls.map(({ poll, response }) => (
+            <PollHomeButton key={poll.id} initialPoll={poll} initialResponse={response} />
+          ))}
         </div>
       )}
 
@@ -942,16 +953,6 @@ export function HomeContent({
         </Link>
       )}
 
-      {/* Active poll CTAs — one fuchsia banner per active poll the user can
-          see. Hidden entirely when there are no active polls. */}
-      {initialActivePolls.length > 0 && (
-        <div className="mt-3 space-y-2">
-          {initialActivePolls.map(({ poll, response }) => (
-            <PollHomeButton key={poll.id} initialPoll={poll} initialResponse={response} />
-          ))}
-        </div>
-      )}
-
       {/* Quick Links */}
       <div className="mt-3">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
@@ -996,6 +997,9 @@ export function HomeContent({
           })}
         </div>
       </div>
+
+      {/* Recent Rounds — last 25 player-rounds across all Loozers */}
+      <RecentRoundsFeed />
 
       {/* Fake Ads (humor banners) */}
       <FakeAdCarousel maxAds={3} />

@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect, Fragment } from "react";
 import ScoringShell, { type HoleInfo } from "@/components/scoring/ScoringShell";
 import { getScoreDescription } from "@/lib/golf/calculator";
+import { ConfirmModal } from "@/components/admin/ConfirmModal";
 
 interface Player {
   id: string;
@@ -128,6 +129,8 @@ export default function LiveScoringEntry({
   const [roundId, setRoundId] = useState<string | null>(existingRoundId || null);
   const [playerMap, setPlayerMap] = useState<Record<string, string>>(initialPlayerMap || {});
   const [ready, setReady] = useState(!!existingRoundId);
+  const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
+  const [completing, setCompleting] = useState(false);
 
   // Dirty tracking
   const dirtyRef = useRef<Map<string, { round_player_id: string; hole_number: number; strokes: number; putts?: number }>>(new Map());
@@ -311,20 +314,24 @@ export default function LiveScoringEntry({
   }
 
   async function handleComplete() {
-    // Flush any pending saves first
-    if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
-    await flushSaves();
+    if (completing) return;
+    setCompleting(true);
+    try {
+      if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
+      await flushSaves();
 
-    if (!roundId) return;
+      if (!roundId) return;
 
-    // Complete the round
-    await fetch(`/api/rounds/${roundId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "completed" }),
-    });
+      await fetch(`/api/rounds/${roundId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed" }),
+      });
 
-    onClose();
+      onClose();
+    } finally {
+      setCompleting(false);
+    }
   }
 
   const allComplete = initialPlayers.every(
@@ -343,6 +350,7 @@ export default function LiveScoringEntry({
   }
 
   return (
+    <>
     <ScoringShell
       holes={visibleHoles}
       onClose={onClose}
@@ -500,16 +508,37 @@ export default function LiveScoringEntry({
             })}
           </div>
 
-          {allComplete && (
-            <button
-              onClick={handleComplete}
-              className="w-full mt-2 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition-colors"
-            >
-              Complete Round
-            </button>
-          )}
+          {/* Reserved slot: always rendered so the score panel doesn't jump
+              when the final score flips allComplete=true. */}
+          <button
+            type="button"
+            onClick={() => setConfirmCompleteOpen(true)}
+            disabled={!allComplete}
+            aria-hidden={!allComplete}
+            tabIndex={allComplete ? 0 : -1}
+            className={`w-full mt-2 py-3 font-semibold rounded-xl transition-opacity ${
+              allComplete
+                ? "bg-green-600 text-white active:bg-green-700 opacity-100"
+                : "bg-green-600 text-white opacity-0 pointer-events-none"
+            }`}
+          >
+            Complete Round
+          </button>
         </div>
       )}
     />
+    <ConfirmModal
+      open={confirmCompleteOpen}
+      title="Complete round?"
+      message="Once you complete this round, it's saved to your history and counted toward your handicap. You can reopen it from the round detail page if you need to fix something."
+      confirmLabel={completing ? "Completing..." : "Complete round"}
+      cancelLabel="Keep editing"
+      onConfirm={async () => {
+        setConfirmCompleteOpen(false);
+        await handleComplete();
+      }}
+      onCancel={() => setConfirmCompleteOpen(false)}
+    />
+    </>
   );
 }

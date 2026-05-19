@@ -5,6 +5,7 @@ import { calculateDifferential, calculateAdjustedGrossScore, calculateCourseHand
 import { recalculateHandicap } from "@/lib/golf/handicap";
 import { resolveHolesForTee } from "@/lib/golf/composition-tees";
 import { getEffectiveUserId } from "@/lib/simulator";
+import { checkIsAdmin } from "@/lib/permissions-server";
 
 // GET - Fetch round with full details
 export async function GET(
@@ -78,7 +79,13 @@ export async function GET(
     }
   }
 
-  return NextResponse.json({ round, holes: holes || [], current_user_id: effectiveUserId });
+  const adminUser = await checkIsAdmin();
+  return NextResponse.json({
+    round,
+    holes: holes || [],
+    current_user_id: effectiveUserId,
+    is_admin: !!adminUser,
+  });
 }
 
 // PUT - Update round (metadata or complete it)

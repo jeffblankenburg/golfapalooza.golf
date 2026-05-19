@@ -54,8 +54,8 @@ export async function GET(request: Request) {
       )
     `)
     .eq("status", "completed")
-    .order("completed_at", { ascending: false, nullsFirst: false })
     .order("round_date", { ascending: false })
+    .order("completed_at", { ascending: false, nullsFirst: false })
     .limit(Math.min(limit * 2, 50));
 
   if (error) {

@@ -15,28 +15,22 @@ export async function GET() {
       .select("*, tagged_user:users!songs_tagged_user_id_fkey(id, display_name)")
       .order("sort_order", { ascending: true })
       .order("title", { ascending: true }),
-    adminClient
-      .from("song_plays")
-      .select("song_id"),
-    adminClient
-      .from("song_favorites")
-      .select("song_id"),
+    adminClient.rpc("song_play_counts"),
+    adminClient.rpc("song_favorite_counts"),
   ]);
 
   if (songsResult.error) {
     return NextResponse.json({ error: songsResult.error.message }, { status: 500 });
   }
 
-  // Count plays per song
   const playCounts = new Map<string, number>();
-  for (const row of playsResult.data || []) {
-    playCounts.set(row.song_id, (playCounts.get(row.song_id) || 0) + 1);
+  for (const row of (playsResult.data || []) as Array<{ song_id: string; play_count: number }>) {
+    playCounts.set(row.song_id, Number(row.play_count));
   }
 
-  // Count likes per song
   const likeCounts = new Map<string, number>();
-  for (const row of favoritesResult.data || []) {
-    likeCounts.set(row.song_id, (likeCounts.get(row.song_id) || 0) + 1);
+  for (const row of (favoritesResult.data || []) as Array<{ song_id: string; like_count: number }>) {
+    likeCounts.set(row.song_id, Number(row.like_count));
   }
 
   const songs = (songsResult.data || []).map((song) => ({

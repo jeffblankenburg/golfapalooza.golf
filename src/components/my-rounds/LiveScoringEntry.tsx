@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect, Fragment } from "react";
 import ScoringShell, { type HoleInfo } from "@/components/scoring/ScoringShell";
 import { getScoreDescription } from "@/lib/golf/calculator";
-import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import { DragHandle } from "@/components/DragHandle";
 
 interface Player {
   id: string;
@@ -527,18 +527,48 @@ export default function LiveScoringEntry({
         </div>
       )}
     />
-    <ConfirmModal
-      open={confirmCompleteOpen}
-      title="Complete round?"
-      message="Once you complete this round, it's saved to your history and counted toward your handicap. You can reopen it from the round detail page if you need to fix something."
-      confirmLabel={completing ? "Completing..." : "Complete round"}
-      cancelLabel="Keep editing"
-      onConfirm={async () => {
-        setConfirmCompleteOpen(false);
-        await handleComplete();
-      }}
-      onCancel={() => setConfirmCompleteOpen(false)}
-    />
+    {confirmCompleteOpen && (
+      // z-[55] sits above ScoringShell (z-50) and below HeaderBar/BottomNav (z-60).
+      // The shared ConfirmModal is z-35, which renders behind the full-screen shell.
+      <div className="fixed top-14 left-0 right-0 z-[55] flex items-end justify-center bottom-[calc(4rem+env(safe-area-inset-bottom))]">
+        <div
+          className="absolute inset-0 bg-black/50"
+          onClick={() => !completing && setConfirmCompleteOpen(false)}
+        />
+        <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up">
+          <div className="px-6 pt-5 pb-3 border-b border-gray-100">
+            <DragHandle
+              onClose={() => !completing && setConfirmCompleteOpen(false)}
+              className="mb-4"
+            />
+            <h2 className="text-xl font-bold text-gray-900">Complete round?</h2>
+          </div>
+          <div className="px-6 py-4 text-sm text-gray-600">
+            <p>
+              Once you complete this round, it&apos;s saved to your history and counted toward your handicap. You can reopen it from the round detail page if you need to fix something.
+            </p>
+          </div>
+          <div className="px-6 py-4 border-t border-gray-100 flex gap-2">
+            <button
+              onClick={async () => {
+                await handleComplete();
+              }}
+              disabled={completing}
+              className="flex-1 py-3 rounded-xl font-semibold text-[15px] bg-green-600 text-white active:opacity-80 disabled:opacity-60"
+            >
+              {completing ? "Completing..." : "Complete round"}
+            </button>
+            <button
+              onClick={() => setConfirmCompleteOpen(false)}
+              disabled={completing}
+              className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600 active:bg-gray-50 disabled:opacity-60"
+            >
+              Keep editing
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }

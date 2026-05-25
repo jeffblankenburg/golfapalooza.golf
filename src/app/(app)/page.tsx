@@ -69,6 +69,7 @@ export default async function HomePage() {
     pickemGamesResult,
     financialsResult,
     optionSettingsResult,
+    requiredOptionsResult,
     optionSelectionsResult,
     latestArticleResult,
     birthdaysResult,
@@ -107,8 +108,10 @@ export default async function HomePage() {
     queryClient.from("financial_transactions").select("type, amount").eq("user_id", effectiveUserId),
     // Options settings (deadline)
     supabase.from("trip_option_settings").select("selection_deadline, is_open").eq("trip_id", trip.id).maybeSingle(),
-    // User's option selections count
-    queryClient.from("user_option_selections").select("id", { count: "exact", head: true }).eq("trip_id", trip.id).eq("user_id", effectiveUserId),
+    // Required trip options — used to decide whether the user has "completed" their options
+    supabase.from("trip_options").select("id, option_type").eq("trip_id", trip.id).eq("is_required", true),
+    // User's option selections (id + value, not just count — needed to verify required-option completeness)
+    queryClient.from("user_option_selections").select("option_id, value").eq("trip_id", trip.id).eq("user_id", effectiveUserId),
     // Latest published article (within last 14 days)
     supabase
       .from("articles")
@@ -549,7 +552,21 @@ export default async function HomePage() {
   const optionsDeadline = optionSettings?.is_open && optionSettings.selection_deadline
     ? optionSettings.selection_deadline
     : null;
-  const hasSubmittedOptions = (optionSelectionsResult.count || 0) > 0;
+  // "Completed" mirrors the SelectionSummary admin page: every required option has a non-empty value.
+  const requiredOptions = (requiredOptionsResult.data || []) as { id: string; option_type: string }[];
+  const userSelectionMap = new Map<string, unknown>(
+    (optionSelectionsResult.data || []).map((s) => [s.option_id as string, s.value])
+  );
+  const hasCompletedOptions = requiredOptions.every((o) => {
+    const v = userSelectionMap.get(o.id);
+    if (v === null || v === undefined || v === false) return false;
+    if (Array.isArray(v) && v.length === 0) return false;
+    if (typeof v === "string" && v.trim() === "") return false;
+    if (o.option_type === "quantity") {
+      return v !== null && typeof v === "object" && !Array.isArray(v);
+    }
+    return true;
+  });
 
   // Check if pickem picks are urgent (within 3 hours of first game)
   const pickemFirstGame = (pickemGamesResult.data || []).find(
@@ -634,7 +651,7 @@ export default async function HomePage() {
       myWinnings={myWinnings}
       myBalance={myBalance}
       optionsDeadline={optionsDeadline}
-      hasSubmittedOptions={hasSubmittedOptions}
+      hasCompletedOptions={hasCompletedOptions}
       latestArticle={latestArticleResult.data ? (() => {
         const d = latestArticleResult.data;
         const img = Array.isArray(d.featured_image) ? d.featured_image[0] : d.featured_image;

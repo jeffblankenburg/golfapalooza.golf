@@ -272,7 +272,7 @@ export function HomeContent({
   myWinnings = null,
   myBalance = null,
   optionsDeadline = null,
-  hasSubmittedOptions = false,
+  hasCompletedOptions = false,
   latestArticle = null,
   hiddenQuickLinks = [],
   initialBirthdays = [],
@@ -303,7 +303,7 @@ export function HomeContent({
   myWinnings?: { total: number; breakdown: { prizeName: string; amount: number }[] } | null;
   myBalance?: { charges: number; payments: number; balance: number } | null;
   optionsDeadline?: string | null;
-  hasSubmittedOptions?: boolean;
+  hasCompletedOptions?: boolean;
   latestArticle?: { id: string; title: string; publishAt: string; imageUrl: string | null; preview: string | null; focalX?: number; focalY?: number } | null;
   hiddenQuickLinks?: string[];
   initialBirthdays?: { id: string; display_name: string; avatar_url: string | null; age: number }[];
@@ -867,8 +867,9 @@ export function HomeContent({
         </Link>
       )}
 
-      {/* Options Action Card */}
-      {optionsDeadline && (() => {
+      {/* Options Action Card — hidden once the user has answered every required option.
+          The "My Options" quick link below remains so they can still make changes. */}
+      {optionsDeadline && !hasCompletedOptions && (() => {
         const deadline = new Date(optionsDeadline);
         const formatted = deadline.toLocaleDateString("en-US", { month: "long", day: "numeric" });
         return (

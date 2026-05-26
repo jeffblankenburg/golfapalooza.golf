@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { DragHandle } from "@/components/DragHandle";
+import { CourseHelpDrawer } from "@/components/courses/CourseHelpDrawer";
+import { computeIdealDriveDefault } from "@/lib/courses/mapped-status";
 
 interface Coordinates {
   tee_latitude: number | null;
@@ -120,12 +122,25 @@ export default function HoleMapEditor({
   const teeMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const greenMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const driveMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const driveGhostRef = useRef<mapboxgl.Marker | null>(null);
   const greenFrontMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const greenBackMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const centerLineSourceRef = useRef<mapboxgl.GeoJSONSource | null>(null);
   const centerLineMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const placingRef = useRef(placing);
   placingRef.current = placing;
+
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  // Issue #133. When no ideal-drive point has been saved yet but we know
+  // the tee and green positions, render a "ghost" hint at the 250-yd
+  // default so the editor shows what `Place Drive` will land on.
+  const ghostDrive = !drive ? computeIdealDriveDefault(
+    tee?.[0] ?? null,
+    tee?.[1] ?? null,
+    green?.[0] ?? null,
+    green?.[1] ?? null,
+  ) : null;
 
   // Geocode if no coordinates
   useEffect(() => {
@@ -316,6 +331,44 @@ export default function HoleMapEditor({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geocodedCenter]);
 
+  // Issue #133. Ghost ideal-drive marker: a translucent hint at the 250-yd
+  // default landing zone whenever the user hasn't placed a real one but
+  // we have tee + green to compute against. Keeps in sync with whatever
+  // tee/green moves the user makes.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Tear down any existing ghost so we can redraw or skip.
+    driveGhostRef.current?.remove();
+    driveGhostRef.current = null;
+
+    if (drive || !ghostDrive) return;
+
+    let cancelled = false;
+    (async () => {
+      const mapboxgl = (await import("mapbox-gl")).default;
+      if (cancelled || !mapRef.current) return;
+      const el = document.createElement("div");
+      el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;opacity:0.6;">
+        <svg width="24" height="24" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="8" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="3 2"/>
+          <text x="12" y="15" font-size="10" font-weight="700" text-anchor="middle" fill="#f59e0b">?</text>
+        </svg>
+        <div style="margin-top:1px;background:rgba(245,158,11,0.85);color:white;font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;white-space:nowrap;">250y default</div>
+      </div>`;
+      driveGhostRef.current = new mapboxgl.Marker({ element: el, anchor: "center" })
+        .setLngLat([ghostDrive.lng, ghostDrive.lat])
+        .addTo(mapRef.current);
+    })();
+
+    return () => {
+      cancelled = true;
+      driveGhostRef.current?.remove();
+      driveGhostRef.current = null;
+    };
+  }, [ghostDrive, drive]);
+
   function handleSave() {
     onSave({
       tee_latitude: tee ? tee[0] : null,
@@ -349,14 +402,6 @@ export default function HoleMapEditor({
     handleClearCenterLine();
   }
 
-  function handleUndoCenterLinePoint() {
-    const next = centerLineRef.current.slice(0, -1);
-    centerLineRef.current = next;
-    setCenterLine(next);
-    centerLineSourceRef.current?.setData(lineFeature(next));
-    centerLineMarkersRef.current.pop()?.remove();
-  }
-
   function handleClearCenterLine() {
     centerLineRef.current = [];
     setCenterLine([]);
@@ -366,15 +411,27 @@ export default function HoleMapEditor({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+    <div className="fixed top-14 left-0 right-0 z-50 flex items-end justify-center bottom-[calc(4rem+env(safe-area-inset-bottom))]">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up flex flex-col" style={{ maxHeight: "90vh" }}>
         <div className="px-6 pt-5 pb-3 border-b border-gray-100 shrink-0">
           <DragHandle onClose={onClose} className="mb-4" />
-          <h2 className="text-xl font-bold text-gray-900">Hole {holeNumber} Map</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Tap a button, then tap the map to place the marker.
-          </p>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h2 className="text-xl font-bold text-gray-900">Hole {holeNumber} Map</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Tap a button, then tap the map to place the marker.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setHelpOpen(true)}
+              aria-label="How to map this hole"
+              className="shrink-0 w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 active:bg-gray-100"
+            >
+              <span className="text-base font-semibold">?</span>
+            </button>
+          </div>
         </div>
 
         <div className="px-6 py-3 border-b border-gray-100 shrink-0">
@@ -443,43 +500,10 @@ export default function HoleMapEditor({
               {placing === "green_back" ? "Tap map..." : greenBack ? "Move Back" : "Green Back"}
             </button>
           </div>
-          {/* Center line — multi-point polyline that traces the playable
-              corridor. Stays in placing mode after each click so the admin
-              can drop a sequence of points without re-tapping the button. */}
-          <div className="flex gap-2 mt-2">
-            <button
-              onClick={() => setPlacing(placing === "center_line" ? null : "center_line")}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                placing === "center_line"
-                  ? "bg-pink-600 text-white ring-2 ring-pink-300"
-                  : centerLine.length > 0
-                    ? "bg-pink-50 text-pink-700 border border-pink-200"
-                    : "bg-gray-100 text-gray-500"
-              }`}
-            >
-              {placing === "center_line"
-                ? `Tap to add (${centerLine.length})…`
-                : centerLine.length > 0
-                  ? `Edit Center Line (${centerLine.length})`
-                  : "Center Line"}
-            </button>
-            {placing === "center_line" && centerLine.length > 0 && (
-              <button
-                onClick={handleUndoCenterLinePoint}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 active:bg-gray-200"
-              >
-                Undo
-              </button>
-            )}
-            {centerLine.length > 0 && (
-              <button
-                onClick={handleClearCenterLine}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-300 text-gray-600 active:bg-gray-50"
-              >
-                Clear line
-              </button>
-            )}
-          </div>
+          {/* Center-line UI intentionally hidden — issue #133 follow-up.
+              Existing center_line data still round-trips through save and
+              renders on the map (the GeoJSON source/layer init below stays
+              in place). When we re-enable, restore the button block here. */}
           {(teeToGreen != null || teeToDrive != null || greenDepth != null) && (
             <div className="flex flex-wrap justify-center gap-3 text-xs text-gray-500 mt-2">
               {teeToGreen != null && <span>Tee→Green: {teeToGreen}y</span>}
@@ -515,6 +539,7 @@ export default function HoleMapEditor({
           )}
         </div>
       </div>
+      <CourseHelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }

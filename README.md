@@ -48,6 +48,14 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Push notification when someone adds you to a round, with a one-tap deep link into the live scorer (`round_invite` notification type).
 - Live scoring stays in sync across devices — when two players in the same group both have the round open, score edits propagate within ~1 second. Last-write-wins; in-progress local edits are protected from being overwritten by remote echoes. Header shows a Live/Connecting/Offline badge.
 
+### Course Library
+- `/courses` lists every course in the system with the active event's course featured on top.
+- Any Loozer can edit hole data, tees, GPS coordinates, and images on unlocked courses. Admins can lock courses (typically the active event course) to freeze them from community edits.
+- The map editor — the same satellite tool the admin tools have always had — is now available to every Loozer. A persistent help drawer explains the five mapped points (tee, green center, green front, green back, ideal drive) and what each one is for.
+- When no ideal-drive point is set, the map shows a 250-yard ghost marker toward the green so contributors can see the default that will apply.
+- Editing a course never changes stored round stats (gross / adjusted / differential / handicap are snapshotted at completion).
+- The home page's old "Course" tile is now "Courses"; `/course` redirects to the new library.
+
 ### USGA Handicap System
 - Automatic handicap index calculation using World Handicap System rules
 - Score differential computed on round completion

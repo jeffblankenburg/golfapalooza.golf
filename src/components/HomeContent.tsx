@@ -126,8 +126,8 @@ const allQuickLinks = [
     ),
   },
   {
-    href: "/course",
-    label: "Course",
+    href: "/courses",
+    label: "Courses",
     color: "bg-green-50 text-green-700",
     requiresContest: null,
     icon: (

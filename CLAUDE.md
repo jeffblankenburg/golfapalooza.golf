@@ -39,7 +39,14 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 |--------|----------|-------------|
 | GET | `/api/courses?q={query}` | Search courses by name or location |
 | GET | `/api/courses?lat={lat}&lng={lng}&radius={miles}` | Search cached courses by GPS coordinates (haversine, capped at 20). |
-| GET | `/api/courses/{courseId}` | Get course details with tees and holes |
+| GET | `/api/courses/list` | Issue #133. Returns every course with mapped-status totals, locked flag, last-played timestamp, and the active event's course id (for the featured card on `/courses`). Auth-only. |
+| GET | `/api/courses/{courseId}` | Get course details with tees and holes. Auth-only; includes `is_admin` flag for the client. |
+| PUT | `/api/courses/{courseId}` | Update course info (name/club/city/state/address/phone/website) + optional tee fields. Gated by `checkCourseEditAccess` — any signed-in user on unlocked courses, admins anywhere. Stamps `courses.updated_at` + `updated_by`. |
+| PATCH | `/api/courses/{courseId}` | Admin-only lock toggle. Body `{locked: boolean}`. |
+| PUT | `/api/courses/holes` | Issue #133. Bulk update hole `par`/`handicap_index`/`yards` (per-tee) and `hole_name` (mirrored across every tee on the same hole). Auth + lock-gated. Same payload shape as the old `/api/admin/course/holes`. |
+| PUT | `/api/courses/holes/coordinates` | Issue #133. Update a hole's GPS coordinates. Tee location is per-tee; green/drive/front/back/center-line propagate to every tee on the same hole. Auth + lock-gated. |
+| POST/DELETE | `/api/courses/holes/upload` | Issue #133. Upload (or remove) a hole's overhead/green image. Auth + lock-gated. |
+| POST/PUT/DELETE | `/api/courses/tees` | Issue #133. Create/update/delete tee boxes. Auth + lock-gated. Same payload shapes as the old admin endpoint. |
 | POST | `/api/courses/lookup` | Run the DB → GCAPI → AI cascade. Returns a draft scorecard for the user to confirm; 422 with prefill when cascade exhausted. Filters out drafts whose `lookup_key`/`external_id` already exist in our DB; if every candidate is already imported, returns `step: "all_imported"` with the existing rows so the user can still pick one. |
 | POST | `/api/courses/lookup/commit` | Persist a confirmed lookup draft as a real course + tees + holes. |
 | POST | `/api/courses/lookup/commit-bulk` | Persist multiple confirmed drafts in one call (multi-course clubs via "Import all"). Returns `{ courses, errors }`. |
@@ -243,6 +250,7 @@ Located in `supabase/migrations/`:
 - `00154_rounds_edited.sql` - Editable scorecards (post-completion). Adds `rounds.edited_at TIMESTAMPTZ` + `edited_by UUID REFERENCES users(id) ON DELETE SET NULL`. Powers the "Edited" badge on round detail pages and audit-trails who made the last change. Set by `PUT /api/rounds/{id}/edit`. Per-hole audit isn't kept; the live `round_scores` row is authoritative.
 - `00155_song_play_counts.sql` - Adds `song_play_counts()` and `song_favorite_counts()` SQL functions that return `(song_id, count)` aggregates. Used by `/api/admin/songs` instead of fetching every `song_plays`/`song_favorites` row and counting in JS — that approach silently truncated to 1000 rows (the PostgREST default) once `song_plays` crossed 1000. Both functions are `STABLE` and granted to `authenticated, service_role`.
 - `00156_realtime_rounds.sql` - Issue #132. Adds `round_scores`, `round_players`, and `rounds` to the `supabase_realtime` publication so the live scorer can subscribe to changes from other devices. Idempotent guards via `pg_publication_tables` so re-runs are safe.
+- `00157_course_edit_attribution.sql` - Issue #133. Adds `courses.updated_at TIMESTAMPTZ DEFAULT NOW()` and `courses.updated_by UUID REFERENCES users(id) ON DELETE SET NULL`. Stamped by the application on every course-write path (see `src/lib/courses/edit-access.ts::stampCourseEdit`). Existing rows backfilled to their `created_at` so the "Last edited" line on the new `/courses/{id}` page has a sensible default.
 
 **IMPORTANT: Always create NEW migration files.** Never modify existing migrations that may have already been run. Use sequential numbering (00004, 00005, etc.) for new migrations. Each migration should be atomic and handle its own rollback safety (use `DROP ... IF EXISTS` before `CREATE`).
 
@@ -441,6 +449,21 @@ Use these tags to group related endpoints:
 - `Handicap` - Handicap calculation and history
 - `Auth` - Authentication endpoints
 - `Admin` - Admin user management
+
+## Loozer-Editable Courses
+
+Issue #133: every signed-in Loozer can browse the full course library at `/courses` and edit hole data, tee boxes, GPS coordinates, and images on any course that isn't `locked`. Admins can edit any course and toggle the `locked` flag from the course detail page.
+
+Key pieces:
+- **`/courses` list page** (auth-only): featured active-event card on top, **+ Add new course** (reuses `CourseLookupModal`), then searchable list with per-row 🔒 lock + mapped-status badges.
+- **`/courses/{id}` detail page** mounts `CourseManager` in `mode="loozer"` with `viewerIsAdmin` passed through. The admin lock + verify widgets only render when the viewer is an admin.
+- **`CourseManager`** is now used in both contexts (`/admin/courses` and `/courses/[id]`) via a `mode` + `viewerIsAdmin` prop. Loads/writes flow through `/api/courses/[id]` (lock-aware) when a `courseId` prop is present.
+- **`HoleMapEditor`** gained a persistent **?** help-drawer trigger (`CourseHelpDrawer`) and a translucent **250-yard ghost marker** when no ideal-drive point has been saved. The ghost is purely visual — placing a real drive still requires the existing Place Drive button.
+- **`src/lib/courses/edit-access.ts`** centralizes the "is this course editable by this user?" check. Every public write endpoint calls `checkCourseEditAccess(courseId)` and then `stampCourseEdit(courseId, userId)` after a successful write.
+- **`src/lib/courses/mapped-status.ts`** is the pure helper that decides whether a (tee, hole) cell is fully mapped (all 5 GPS points set) and exposes a `computeIdealDriveDefault` math helper used by the ghost marker.
+- **Legacy admin endpoints** (`/api/admin/course/holes`, `/api/admin/course/holes/coordinates`, `/api/admin/course/holes/upload`, `/api/admin/course/tees`) are now thin re-exports of the public endpoints so the existing admin UI keeps working unchanged. One implementation, two route paths.
+- **Scorecard immutability**: editing a course **never** changes stored round stats (gross/adjusted/differential/handicap are snapshotted at completion). Per-hole *visual* labels on the round detail page (Birdie / Par / Bogey) are derived live against current `course_holes.par` though, so they will drift if par is corrected after the fact. This caveat is documented in the help drawer for users.
+- **`/course` (singular)** now redirects to `/courses` so old shared links still work.
 
 ## Co-Equal Round Ownership
 

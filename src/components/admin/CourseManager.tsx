@@ -67,7 +67,29 @@ interface CourseInfo {
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
-export function CourseManager({ courseId: propCourseId }: { courseId?: string } = {}) {
+export interface CourseManagerProps {
+  courseId?: string;
+  /**
+   * `admin` (default): the legacy admin tools usage. Shows the lock toggle,
+   * verify toggle, and other admin-only widgets.
+   * `loozer`: the new public /courses/[id] usage. Hides admin-only controls
+   * unless `viewerIsAdmin` is true (which the page passes through when an
+   * admin happens to be viewing).
+   */
+  mode?: "admin" | "loozer";
+  viewerIsAdmin?: boolean;
+}
+
+export function CourseManager({
+  courseId: propCourseId,
+  mode = "admin",
+  viewerIsAdmin = mode === "admin",
+}: CourseManagerProps = {}) {
+  // Loozer-context routes its loads through the public `/api/courses/[id]`
+  // endpoint (auth-only, lock-aware on writes). Admin-context keeps the
+  // legacy `/api/admin/course` path so the "load the active trip's course
+  // when no courseId is passed" affordance still works.
+  const loadBase = propCourseId ? `/api/courses/${propCourseId}` : "/api/admin/course";
   const [loading, setLoading] = useState(true);
   const [course, setCourse] = useState<CourseInfo | null>(null);
   const [tees, setTees] = useState<TeeData[]>([]);
@@ -126,9 +148,8 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
     setLoading(true);
     setError("");
     try {
-      let url = "/api/admin/course";
+      let url = loadBase;
       const params = new URLSearchParams();
-      if (propCourseId) params.set("course_id", propCourseId);
       if (teeId) params.set("tee_id", teeId);
       if (params.toString()) url += `?${params.toString()}`;
       const res = await fetch(url);
@@ -160,7 +181,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
     } finally {
       setLoading(false);
     }
-  }, [propCourseId]);
+  }, [propCourseId, loadBase]);
 
   useEffect(() => {
     loadCourse();
@@ -189,9 +210,7 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
     setSelectedTeeId(teeId);
     setEditingTee(null);
     try {
-      const params = new URLSearchParams({ tee_id: teeId });
-      if (propCourseId) params.set("course_id", propCourseId);
-      const res = await fetch(`/api/admin/course?${params.toString()}`);
+      const res = await fetch(`${loadBase}?tee_id=${teeId}`);
       const data = await res.json();
       if (data.holes) setHoles(data.holes);
     } catch {
@@ -230,11 +249,12 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
     if (!course) return;
     setInfoStatus("saving");
     try {
-      const res = await fetch("/api/admin/course", {
+      // Route through the public endpoint so the lock gate + attribution
+      // stamp apply regardless of whether the admin or Loozer page is open.
+      const res = await fetch(`/api/courses/${course.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          course_id: course.id,
           name: courseName,
           club_name: courseClubName.trim() || null,
           city: courseCity || null,
@@ -657,73 +677,77 @@ export function CourseManager({ courseId: propCourseId }: { courseId?: string } 
                 ? "Saved!"
                 : "Save Course Info"}
           </button>
-          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-            <div>
-              <div className="text-sm font-medium text-gray-700">
-                {course?.locked ? "Course locked" : "Course unlocked"}
+          {viewerIsAdmin && (
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <div>
+                <div className="text-sm font-medium text-gray-700">
+                  {course?.locked ? "Course locked" : "Course unlocked"}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {course?.locked ? "Only admins can edit" : "Any user can edit"}
+                </div>
               </div>
-              <div className="text-xs text-gray-500">
-                {course?.locked ? "Only admins can edit" : "Any user can edit"}
-              </div>
+              <button
+                onClick={async () => {
+                  if (!course) return;
+                  const res = await fetch(`/api/courses/${course.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ locked: !course.locked }),
+                  });
+                  if (res.ok) {
+                    setCourse({ ...course, locked: !course.locked });
+                  }
+                }}
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                  course?.locked
+                    ? "bg-green-600 text-white hover:bg-green-700"
+                    : "bg-amber-500 text-white hover:bg-amber-600"
+                }`}
+              >
+                {course?.locked ? "Unlock" : "Lock"}
+              </button>
             </div>
-            <button
-              onClick={async () => {
-                if (!course) return;
-                const res = await fetch(`/api/courses/${course.id}`, {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ locked: !course.locked }),
-                });
-                if (res.ok) {
-                  setCourse({ ...course, locked: !course.locked });
-                }
-              }}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                course?.locked
-                  ? "bg-green-600 text-white hover:bg-green-700"
-                  : "bg-amber-500 text-white hover:bg-amber-600"
-              }`}
-            >
-              {course?.locked ? "Unlock" : "Lock"}
-            </button>
-          </div>
-          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-            <div>
-              <div className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
-                {course?.verified ? "Verified" : "Unverified"}
-                {course && course.source !== "manual" && (
-                  <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${
-                    course.source === "ai" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
-                  }`}>{course.source}</span>
-                )}
+          )}
+          {viewerIsAdmin && (
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <div>
+                <div className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+                  {course?.verified ? "Verified" : "Unverified"}
+                  {course && course.source !== "manual" && (
+                    <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${
+                      course.source === "ai" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+                    }`}>{course.source}</span>
+                  )}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {course?.verified
+                    ? "An admin has spot-checked this course."
+                    : "Awaiting admin spot-check against the source."}
+                </div>
               </div>
-              <div className="text-xs text-gray-500">
-                {course?.verified
-                  ? "An admin has spot-checked this course."
-                  : "Awaiting admin spot-check against the source."}
-              </div>
+              <button
+                onClick={async () => {
+                  if (!course) return;
+                  const method = course.verified ? "DELETE" : "POST";
+                  const res = await fetch(`/api/admin/courses/${course.id}/verify`, { method });
+                  if (res.ok) {
+                    setCourse({ ...course, verified: !course.verified });
+                  } else {
+                    const data = await res.json().catch(() => ({}));
+                    setError(data.error || "Verify toggle failed");
+                  }
+                }}
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                  course?.verified
+                    ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    : "bg-green-600 text-white hover:bg-green-700"
+                }`}
+              >
+                {course?.verified ? "Mark unverified" : "Verify"}
+              </button>
             </div>
-            <button
-              onClick={async () => {
-                if (!course) return;
-                const method = course.verified ? "DELETE" : "POST";
-                const res = await fetch(`/api/admin/courses/${course.id}/verify`, { method });
-                if (res.ok) {
-                  setCourse({ ...course, verified: !course.verified });
-                } else {
-                  const data = await res.json().catch(() => ({}));
-                  setError(data.error || "Verify toggle failed");
-                }
-              }}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                course?.verified
-                  ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  : "bg-green-600 text-white hover:bg-green-700"
-              }`}
-            >
-              {course?.verified ? "Mark unverified" : "Verify"}
-            </button>
-          </div>
+          )}
         </div>
       </section>
 
@@ -1188,7 +1212,17 @@ function HoleRow({
   const isUploadingOverhead = uploadingKey === `${hole.id}-overhead`;
   const isUploadingGreen = uploadingKey === `${hole.id}-green`;
   const modalSubtitle = `${courseName} · ${teeName} · Hole ${hole.hole_number}`;
-  const hasCoordinates = hole.tee_latitude != null || hole.green_latitude != null;
+  // Issue #133. The map button only shows a checkmark when ALL FIVE GPS
+  // points are set on this (tee, hole) cell. Partial mapping displays a
+  // counter (e.g. "Map · 2/5") so contributors can see what's still
+  // missing at a glance.
+  const mappedPointCount =
+    (hole.tee_latitude != null && hole.tee_longitude != null ? 1 : 0) +
+    (hole.green_latitude != null && hole.green_longitude != null ? 1 : 0) +
+    (hole.green_front_latitude != null && hole.green_front_longitude != null ? 1 : 0) +
+    (hole.green_back_latitude != null && hole.green_back_longitude != null ? 1 : 0) +
+    (hole.drive_latitude != null && hole.drive_longitude != null ? 1 : 0);
+  const fullyMapped = mappedPointCount === 5;
   const trimmedName = (hole.hole_name ?? "").trim();
 
   const openNameDrawer = () => {
@@ -1291,19 +1325,31 @@ function HoleRow({
             onClick={() => setShowMap(true)}
             className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-lg text-xs active:bg-gray-50 transition-colors"
           >
-            {hasCoordinates ? (
+            {fullyMapped ? (
               <div className="w-4 h-4 rounded bg-green-100 flex items-center justify-center">
                 <svg className="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
             ) : (
-              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg
+                className={`w-4 h-4 ${mappedPointCount > 0 ? "text-amber-500" : "text-gray-400"}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             )}
-            <span className="text-gray-600">Map</span>
+            <span className="text-gray-600">
+              Map
+              {!fullyMapped && (
+                <span className={`ml-1 font-medium ${mappedPointCount > 0 ? "text-amber-600" : "text-gray-400"}`}>
+                  · {mappedPointCount}/5
+                </span>
+              )}
+            </span>
           </button>
         </div>
       )}

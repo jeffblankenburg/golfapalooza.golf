@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { calculateDifferential, calculateAdjustedGrossScore, calculateCourseHandicap } from "@/lib/golf/calculator";
 import { recalculateHandicap } from "@/lib/golf/handicap";
 import { getEffectiveUserId } from "@/lib/simulator";
+import { notifyPlayersAddedToRound } from "@/lib/rounds/notify";
 
 // GET - List user's rounds
 export async function GET() {
@@ -329,6 +330,17 @@ export async function POST(request: Request) {
       await Promise.all(
         [...playerUserIds].map((uid) => recalculateHandicap(supabase, uid))
       );
+    }
+
+    // Issue #131 — push the freshly-added players (except the actor) that
+    // they're on the roster. Best-effort; helper swallows errors so a flaky
+    // notification service never blocks round creation.
+    if (roundPlayers && roundPlayers.length > 0) {
+      await notifyPlayersAddedToRound({
+        roundId: round.id,
+        playerUserIds: roundPlayers.map((rp) => rp.user_id),
+        actorUserId: userId,
+      });
     }
 
     return NextResponse.json({ round, round_players: roundPlayers });

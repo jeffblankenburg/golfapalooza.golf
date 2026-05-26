@@ -44,6 +44,9 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - 18-hole, Front 9, and Back 9 round types
 - Full scorecard view with 9-hole and 18-hole totals
 - Putt tracking per hole with totals on round detail
+- Co-equal round ownership — every player in a round can edit scores, complete the round, add/remove other players, and delete the round (with confirmation). The original "creator" is shown as the attribution but no longer gates any action.
+- Push notification when someone adds you to a round, with a one-tap deep link into the live scorer (`round_invite` notification type).
+- Live scoring stays in sync across devices — when two players in the same group both have the round open, score edits propagate within ~1 second. Last-write-wins; in-progress local edits are protected from being overwritten by remote echoes. Header shows a Live/Connecting/Offline badge.
 
 ### USGA Handicap System
 - Automatic handicap index calculation using World Handicap System rules

@@ -6,6 +6,7 @@ import { recalculateHandicap } from "@/lib/golf/handicap";
 import { resolveHolesForTee } from "@/lib/golf/composition-tees";
 import { getEffectiveUserId } from "@/lib/simulator";
 import { checkIsAdmin } from "@/lib/permissions-server";
+import { canManageRound } from "@/lib/rounds/access";
 
 // GET - Fetch round with full details
 export async function GET(
@@ -100,6 +101,19 @@ export async function PUT(
   }
 
   const { id } = await params;
+  const effectiveUserId = await getEffectiveUserId(user.id);
+
+  // Co-equal ownership (issue #130): any player in the round, or an admin,
+  // can manage the round. Writes route through the admin client so simulator
+  // mode and non-creator scorers don't get silently no-op'd by RLS.
+  const access = await canManageRound(id, effectiveUserId);
+  if (!access.allowed) {
+    return NextResponse.json(
+      { error: access.reason === "not_found" ? "Round not found" : "Forbidden" },
+      { status: access.reason === "not_found" ? 404 : 403 },
+    );
+  }
+  const adminClient = createAdminClient();
 
   try {
     const body = await request.json();
@@ -114,7 +128,7 @@ export async function PUT(
       // recalculating handicaps. recalculateHandicap filters by
       // round.status = 'completed', so the just-completed round must already
       // be flagged in the DB to be counted in its own recalc.
-      const { error: completeError } = await supabase
+      const { error: completeError } = await adminClient
         .from("rounds")
         .update({ status: "completed", completed_at: new Date().toISOString() })
         .eq("id", id);
@@ -123,7 +137,7 @@ export async function PUT(
       }
 
       // Get the round and all player info
-      const { data: round } = await supabase
+      const { data: round } = await adminClient
         .from("rounds")
         .select("tee_id, created_by, round_type")
         .eq("id", id)
@@ -133,7 +147,7 @@ export async function PUT(
 
       if (round) {
         // Fetch all players and their tee data
-        const { data: allPlayers } = await supabase
+        const { data: allPlayers } = await adminClient
           .from("round_players")
           .select("id, user_id, tee_id, final_gross_score")
           .eq("round_id", id);
@@ -143,7 +157,7 @@ export async function PUT(
           const creator = (allPlayers || []).find((p) => p.user_id === round.created_by);
           if (creator) {
             creator.final_gross_score = final_gross_score;
-            await supabase
+            await adminClient
               .from("round_players")
               .update({ final_gross_score })
               .eq("id", creator.id);
@@ -153,14 +167,14 @@ export async function PUT(
         if (allPlayers) {
           // Fetch all tee data needed
           const teeIds = [...new Set(allPlayers.map((p) => p.tee_id).filter(Boolean))];
-          const { data: teesData } = await supabase
+          const { data: teesData } = await adminClient
             .from("course_tees")
             .select("id, course_rating, slope_rating, par")
             .in("id", teeIds);
           const teeMap = new Map((teesData || []).map((t) => [t.id, t]));
 
           // Fetch hole scores for all players in one query
-          const { data: allScores } = await supabase
+          const { data: allScores } = await adminClient
             .from("round_scores")
             .select("round_player_id, hole_number, strokes")
             .eq("round_id", id);
@@ -182,7 +196,7 @@ export async function PUT(
           )];
           const holeDataMap = new Map<string, { hole_number: number; par: number; handicap_index: number }[]>();
           if (teeIdsWithScores.length > 0) {
-            const { data: holes } = await supabase
+            const { data: holes } = await adminClient
               .from("course_holes")
               .select("tee_id, hole_number, par, handicap_index")
               .in("tee_id", teeIdsWithScores);
@@ -208,7 +222,7 @@ export async function PUT(
             const courseHoles = holeDataMap.get(p.tee_id);
             if (playerScores && courseHoles && playerScores.length >= 9) {
               // Get player's current handicap for NDB calculation (default 0 if none)
-              const { data: playerHcp } = await supabase
+              const { data: playerHcp } = await adminClient
                 .from("player_handicaps")
                 .select("handicap_index")
                 .eq("user_id", p.user_id)
@@ -246,7 +260,7 @@ export async function PUT(
                 )
               : null;
 
-            await supabase
+            await adminClient
               .from("round_players")
               .update({
                 final_adjusted_score: adjustedGrossScore,
@@ -259,7 +273,7 @@ export async function PUT(
 
           // Recalculate handicap for all players in the round
           await Promise.all(
-            [...playerUserIds].map((uid) => recalculateHandicap(supabase, uid))
+            [...playerUserIds].map((uid) => recalculateHandicap(adminClient, uid))
           );
         }
       }
@@ -268,7 +282,7 @@ export async function PUT(
     }
 
     if (Object.keys(updateData).length > 0) {
-      const { error } = await supabase
+      const { error } = await adminClient
         .from("rounds")
         .update(updateData)
         .eq("id", id);
@@ -284,7 +298,8 @@ export async function PUT(
   }
 }
 
-// DELETE - Delete a round
+// DELETE - Delete a round. Any player in the round (or admin) can delete;
+// the destructive ConfirmModal in the UI is the safety net (issue #130).
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -296,8 +311,20 @@ export async function DELETE(
   }
 
   const { id } = await params;
+  const effectiveUserId = await getEffectiveUserId(user.id);
 
-  const { error } = await supabase
+  const access = await canManageRound(id, effectiveUserId);
+  if (!access.allowed) {
+    // Treat "not found" as idempotent success so two devices racing to
+    // delete don't surface a scary error to whichever loses.
+    if (access.reason === "not_found") {
+      return NextResponse.json({ success: true, already_deleted: true });
+    }
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const adminClient = createAdminClient();
+  const { error } = await adminClient
     .from("rounds")
     .delete()
     .eq("id", id);

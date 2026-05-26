@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import ScorecardView from "@/components/my-rounds/ScorecardView";
+import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import { AddPlayerDrawer } from "@/components/my-rounds/AddPlayerDrawer";
 import { BTN_BACK, BTN_DESTRUCTIVE } from "@/lib/ui/buttons";
 
 interface RoundData {
@@ -61,6 +63,10 @@ export default function RoundDetailPage() {
   const [expandedPlayers, setExpandedPlayers] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [addPlayerOpen, setAddPlayerOpen] = useState(false);
+  const [removePlayer, setRemovePlayer] = useState<{ id: string; name: string } | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -105,9 +111,26 @@ export default function RoundDetailPage() {
 
   async function handleDelete() {
     setDeleting(true);
+    setConfirmDeleteOpen(false);
     await fetch(`/api/rounds/${roundId}`, { method: "DELETE" });
     router.push("/my-rounds");
     router.refresh();
+  }
+
+  async function handleRemovePlayer(playerId: string) {
+    setRemoving(true);
+    const res = await fetch(`/api/rounds/${roundId}/players/${playerId}`, { method: "DELETE" });
+    setRemoving(false);
+    setRemovePlayer(null);
+    if (!res.ok) return;
+    const json = await res.json().catch(() => null);
+    const removedSelf = json?.removed_user_id && json.removed_user_id === data?.currentUserId;
+    if (json?.round_deleted || removedSelf) {
+      router.push("/my-rounds");
+      router.refresh();
+      return;
+    }
+    setRefreshKey((k) => k + 1);
   }
 
   if (!data) {
@@ -152,8 +175,11 @@ export default function RoundDetailPage() {
   const creatorPlayer = players.find((p) => p.user_id === round.created_by);
   const creatorUser = creatorPlayer?.user;
   const creatorName = Array.isArray(creatorUser) ? creatorUser[0]?.display_name : creatorUser?.display_name;
-  const creatorIsMe = round.created_by === currentUserId;
-  const canEdit = (creatorIsMe || isAdmin) && round.status === "completed";
+  // Co-equal ownership (issue #130): any player in the round (or an admin)
+  // can edit, delete, and manage the roster.
+  const iAmPlayerInRound = !!players.find((p) => p.user_id === currentUserId);
+  const canManage = iAmPlayerInRound || isAdmin;
+  const canEdit = canManage && round.status === "completed";
 
   return (
     <div className="px-4 py-6 max-w-lg mx-auto">
@@ -201,6 +227,18 @@ export default function RoundDetailPage() {
       </div>
 
       {/* Player cards — effective user first */}
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-xs uppercase tracking-wide text-gray-500 font-medium">Players</h2>
+        {canManage && (
+          <button
+            type="button"
+            onClick={() => setAddPlayerOpen(true)}
+            className="text-xs font-semibold text-green-700 active:opacity-70"
+          >
+            + Add player
+          </button>
+        )}
+      </div>
       <div className="space-y-2 mb-6">
         {[...players].sort((a, b) => {
           if (a.user_id === currentUserId) return -1;
@@ -228,7 +266,22 @@ export default function RoundDetailPage() {
           }
 
           return (
-            <div key={player.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div key={player.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden relative">
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setRemovePlayer({ id: player.id, name: userName || "Player" });
+                  }}
+                  aria-label={`Remove ${userName || "player"} from round`}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-gray-400 active:bg-gray-100 active:text-gray-700 z-10"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
               <button
                 onClick={() => hasScores && togglePlayer(player.id)}
                 className={`w-full text-left p-4 ${hasScores ? "cursor-pointer" : "cursor-default"}`}
@@ -322,15 +375,66 @@ export default function RoundDetailPage() {
         </Link>
       )}
 
-      {creatorIsMe && (
+      {canManage && (
         <button
-          onClick={handleDelete}
+          onClick={() => setConfirmDeleteOpen(true)}
           disabled={deleting}
           className={`w-full disabled:opacity-50 ${BTN_DESTRUCTIVE}`}
         >
           {deleting ? "Deleting..." : "Delete Round"}
         </button>
       )}
+
+      <ConfirmModal
+        open={confirmDeleteOpen}
+        title="Delete this round?"
+        message={
+          <span>
+            This removes scores for <strong>everyone in the group</strong> and can&apos;t be undone.
+          </span>
+        }
+        confirmLabel={deleting ? "Deleting..." : "Delete round"}
+        cancelLabel="Keep round"
+        destructive
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDeleteOpen(false)}
+      />
+
+      <ConfirmModal
+        open={!!removePlayer}
+        title={
+          players.length <= 1
+            ? "Remove the last player?"
+            : `Remove ${removePlayer?.name || "player"}?`
+        }
+        message={
+          players.length <= 1 ? (
+            <span>
+              This is the last player. Removing them <strong>deletes the round</strong>.
+            </span>
+          ) : (
+            <span>
+              {removePlayer?.name || "Their"}&apos;s scores will be deleted from this round. The other players stay.
+            </span>
+          )
+        }
+        confirmLabel={removing ? "Removing..." : players.length <= 1 ? "Delete round" : "Remove player"}
+        cancelLabel="Cancel"
+        destructive
+        onConfirm={() => removePlayer && handleRemovePlayer(removePlayer.id)}
+        onCancel={() => !removing && setRemovePlayer(null)}
+      />
+
+      <AddPlayerDrawer
+        open={addPlayerOpen}
+        roundId={roundId}
+        excludedUserIds={players.map((p) => p.user_id)}
+        onClose={() => setAddPlayerOpen(false)}
+        onAdded={() => {
+          setAddPlayerOpen(false);
+          setRefreshKey((k) => k + 1);
+        }}
+      />
     </div>
   );
 }

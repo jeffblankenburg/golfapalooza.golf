@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect, Fragment } from "react";
 import ScoringShell, { type HoleInfo } from "@/components/scoring/ScoringShell";
 import { getScoreDescription } from "@/lib/golf/calculator";
 import { DragHandle } from "@/components/DragHandle";
+import { subscribeToRound } from "@/lib/realtime/round-channel";
 
 interface Player {
   id: string;
@@ -131,6 +132,8 @@ export default function LiveScoringEntry({
   const [ready, setReady] = useState(!!existingRoundId);
   const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
+  const [liveStatus, setLiveStatus] = useState<"live" | "connecting" | "offline">("connecting");
 
   // Dirty tracking
   const dirtyRef = useRef<Map<string, { round_player_id: string; hole_number: number; strokes: number; putts?: number }>>(new Map());
@@ -252,6 +255,94 @@ export default function LiveScoringEntry({
     };
   }, [roundId]);
 
+  // ── Realtime sync (issue #132) ─────────────────────────────────────────
+  // Subscribe to live changes on this round so two devices in the same
+  // group stay in lockstep. Last-write-wins: a hole that's currently dirty
+  // locally is NOT overwritten by remote echoes — our flush will win.
+
+  // Reverse lookup: round_player_id → userId, so we can map incoming
+  // score events back into the locally-keyed-by-userId state.
+  const playerMapRef = useRef(playerMap);
+  useEffect(() => {
+    playerMapRef.current = playerMap;
+  }, [playerMap]);
+
+  useEffect(() => {
+    if (!roundId) return;
+    const unsubscribe = subscribeToRound(roundId, {
+      onScoreChange: ({ kind, row, old }) => {
+        const ref = row ?? old;
+        if (!ref) return;
+        // If this hole is currently dirty locally, the user is actively
+        // editing it. Our debounce will flush and win — ignore the remote
+        // value (it's probably an echo of an older write anyway).
+        const dirtyKey = `${ref.round_player_id}-${ref.hole_number}`;
+        if (dirtyRef.current.has(dirtyKey)) return;
+
+        // Find the userId for this round_player_id.
+        const map = playerMapRef.current;
+        const userId = Object.keys(map).find((uid) => map[uid] === ref.round_player_id);
+        if (!userId) return;
+
+        if (kind === "DELETE") {
+          setScores((prev) => {
+            const next = { ...prev };
+            if (next[userId]) {
+              const nextPlayer = { ...next[userId] };
+              delete nextPlayer[ref.hole_number];
+              next[userId] = nextPlayer;
+            }
+            return next;
+          });
+          setPutts((prev) => {
+            const next = { ...prev };
+            if (next[userId]) {
+              const nextPlayer = { ...next[userId] };
+              delete nextPlayer[ref.hole_number];
+              next[userId] = nextPlayer;
+            }
+            return next;
+          });
+          return;
+        }
+
+        // INSERT / UPDATE: merge.
+        if (row) {
+          setScores((prev) => ({
+            ...prev,
+            [userId]: { ...(prev[userId] || {}), [row.hole_number]: row.strokes },
+          }));
+          if (row.putts != null) {
+            setPutts((prev) => ({
+              ...prev,
+              [userId]: { ...(prev[userId] || {}), [row.hole_number]: row.putts! },
+            }));
+          }
+        }
+      },
+      onRosterChange: () => {
+        // Roster changed (add or remove a player). Refetching the player
+        // list inside this component would require threading user names +
+        // tee data through the realtime payload. Simpler and reliable: ask
+        // the parent page to reload, which re-mounts us with fresh props.
+        if (typeof window !== "undefined") window.location.reload();
+      },
+      onRoundChange: ({ row }) => {
+        // Status flip → bail out of the live scorer. The parent page's
+        // onClose navigates to /my-rounds.
+        if (row?.status === "completed") {
+          onClose();
+        }
+      },
+      onStatusChange: (status) => {
+        if (status === "SUBSCRIBED") setLiveStatus("live");
+        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") setLiveStatus("offline");
+        else if (status === "CLOSED") setLiveStatus("connecting");
+      },
+    });
+    return unsubscribe;
+  }, [roundId, onClose]);
+
   function setScore(playerId: string, holeNumber: number, value: number) {
     setScores((prev) => ({
       ...prev,
@@ -316,19 +407,28 @@ export default function LiveScoringEntry({
   async function handleComplete() {
     if (completing) return;
     setCompleting(true);
+    setCompleteError(null);
     try {
       if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
       await flushSaves();
 
       if (!roundId) return;
 
-      await fetch(`/api/rounds/${roundId}`, {
+      const res = await fetch(`/api/rounds/${roundId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "completed" }),
       });
 
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setCompleteError(data?.error || `Failed to complete round (${res.status})`);
+        return;
+      }
+
       onClose();
+    } catch {
+      setCompleteError("Network error — please try again");
     } finally {
       setCompleting(false);
     }
@@ -358,12 +458,41 @@ export default function LiveScoringEntry({
       saveStatus={saveStatus}
       onHoleChange={(_idx, hole) => { currentHoleRef.current = hole; }}
       headerRight={
-        <span className="text-xs text-gray-500">
-          {initialPlayers.reduce((max, p) => {
-            const count = visibleHoles.filter((h) => scores[p.id]?.[h.hole_number] != null).length;
-            return Math.max(max, count);
-          }, 0)}/{visibleHoles.length}
-        </span>
+        <div className="flex items-center gap-2 text-xs">
+          <span
+            className={
+              liveStatus === "live"
+                ? "inline-flex items-center gap-1 text-green-600"
+                : liveStatus === "offline"
+                  ? "inline-flex items-center gap-1 text-red-500"
+                  : "inline-flex items-center gap-1 text-gray-400"
+            }
+            title={
+              liveStatus === "live"
+                ? "Live — changes from other devices appear automatically"
+                : liveStatus === "offline"
+                  ? "Disconnected — local edits will sync when reconnected"
+                  : "Connecting…"
+            }
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                liveStatus === "live"
+                  ? "bg-green-500"
+                  : liveStatus === "offline"
+                    ? "bg-red-500"
+                    : "bg-gray-400 animate-pulse"
+              }`}
+            />
+            {liveStatus === "live" ? "Live" : liveStatus === "offline" ? "Offline" : "Connecting"}
+          </span>
+          <span className="text-gray-500">
+            {initialPlayers.reduce((max, p) => {
+              const count = visibleHoles.filter((h) => scores[p.id]?.[h.hole_number] != null).length;
+              return Math.max(max, count);
+            }, 0)}/{visibleHoles.length}
+          </span>
+        </div>
       }
       renderScorecardRows={(holes) => {
         const hasBothNines = holes.length > 9 && holes[0]?.hole_number <= 9;
@@ -547,6 +676,9 @@ export default function LiveScoringEntry({
             <p>
               Once you complete this round, it&apos;s saved to your history and counted toward your handicap. You can reopen it from the round detail page if you need to fix something.
             </p>
+            {completeError && (
+              <p className="mt-3 text-sm text-red-600">{completeError}</p>
+            )}
           </div>
           <div className="px-6 py-4 border-t border-gray-100 flex gap-2">
             <button

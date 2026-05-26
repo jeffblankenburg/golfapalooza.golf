@@ -56,7 +56,9 @@ Interactive API documentation is available at `/api-docs` when the app is runnin
 | PUT | `/api/rounds/{roundId}/scores` | Batch update hole scores |
 | POST | `/api/rounds/{roundId}/complete` | Complete round and calculate differentials |
 | GET | `/api/rounds/recent?limit={n}` | Cross-Loozer feed of recently completed player-rounds for the home page Recent Rounds card scroller. One row per (round, player); filters out system + financial-only users. Default limit 25, max 50. |
-| PUT | `/api/rounds/{roundId}/edit` | Post-completion edit for a saved round — body `{round_date?, player_tees?, player_scores?}`. Permission: round creator or admin. Updates date, per-player tee_id, and per-hole strokes/putts in one call, then recomputes gross/adjusted/differential for every affected player and triggers handicap recalc. Stamps `rounds.edited_at` + `edited_by`. |
+| PUT | `/api/rounds/{roundId}/edit` | Post-completion edit for a saved round — body `{round_date?, player_tees?, player_scores?}`. Permission: any player in the round or admin (issue #130). Updates date, per-player tee_id, and per-hole strokes/putts in one call, then recomputes gross/adjusted/differential for every affected player and triggers handicap recalc. Stamps `rounds.edited_at` + `edited_by`. |
+| POST | `/api/rounds/{roundId}/players` | Add a Loozer to an existing round. Body `{user_id, tee_id?}`. Any player in the round or admin (#130). 409 if the user is already on the roster. |
+| DELETE | `/api/rounds/{roundId}/players/{playerId}` | Remove a player from a round (`playerId` is `round_players.id`). Cascades to the player's `round_scores`. If the removed player was the last one, the round is deleted too — response includes `round_deleted: true`. |
 
 #### Handicap (`/api/handicap`)
 
@@ -240,6 +242,7 @@ Located in `supabase/migrations/`:
 - `00150_chat_images_bucket.sql` - Creates the `chat-images` Supabase Storage bucket for in-chat photo uploads. Public read so chat images render with plain `<img>` tags; authenticated insert so any signed-in Loozer can upload (path is `${room_id}/${timestamp}-${filename}`); owner-only update/delete so each uploader controls their own file. The `MessageInput` component has used this bucket name since shipping but the bucket itself wasn't provisioned until now.
 - `00154_rounds_edited.sql` - Editable scorecards (post-completion). Adds `rounds.edited_at TIMESTAMPTZ` + `edited_by UUID REFERENCES users(id) ON DELETE SET NULL`. Powers the "Edited" badge on round detail pages and audit-trails who made the last change. Set by `PUT /api/rounds/{id}/edit`. Per-hole audit isn't kept; the live `round_scores` row is authoritative.
 - `00155_song_play_counts.sql` - Adds `song_play_counts()` and `song_favorite_counts()` SQL functions that return `(song_id, count)` aggregates. Used by `/api/admin/songs` instead of fetching every `song_plays`/`song_favorites` row and counting in JS — that approach silently truncated to 1000 rows (the PostgREST default) once `song_plays` crossed 1000. Both functions are `STABLE` and granted to `authenticated, service_role`.
+- `00156_realtime_rounds.sql` - Issue #132. Adds `round_scores`, `round_players`, and `rounds` to the `supabase_realtime` publication so the live scorer can subscribe to changes from other devices. Idempotent guards via `pg_publication_tables` so re-runs are safe.
 
 **IMPORTANT: Always create NEW migration files.** Never modify existing migrations that may have already been run. Use sequential numbering (00004, 00005, etc.) for new migrations. Each migration should be atomic and handle its own rollback safety (use `DROP ... IF EXISTS` before `CREATE`).
 
@@ -438,6 +441,35 @@ Use these tags to group related endpoints:
 - `Handicap` - Handicap calculation and history
 - `Auth` - Authentication endpoints
 - `Admin` - Admin user management
+
+## Co-Equal Round Ownership
+
+Issue #130: a round has no single "owner" once it's been created. Every player on the roster (and every app admin) has equal rights to:
+
+- edit hole scores while the round is in-progress or after it's completed (`/api/rounds/{id}/scores` and `/api/rounds/{id}/edit`)
+- complete the round on behalf of the group (`PUT /api/rounds/{id}`)
+- add or remove other players (`POST /api/rounds/{id}/players`, `DELETE /api/rounds/{id}/players/{playerId}`)
+- delete the round entirely (`DELETE /api/rounds/{id}`)
+
+`rounds.created_by` is preserved for attribution (the "Started by …" line on the detail page) but no API surface gates on it any more. The shared gate lives in `src/lib/rounds/access.ts` (`canManageRound(roundId, userId)`) and is called from every mutation route — it uses `getEffectiveUserId` so simulator mode is honored, and routes its writes through the admin client so RLS doesn't silently no-op against a non-creator scorer. Destructive actions (delete round, remove last player) gate behind a `ConfirmModal` on the detail page.
+
+## Live Scoring Realtime Sync
+
+Issue #132: when two devices in the same group both have the live scorer open, score edits sync between them within ~1 second. Implementation:
+
+- Migration `00156_realtime_rounds.sql` adds `round_scores`, `round_players`, and `rounds` to the `supabase_realtime` publication (idempotent — safe to re-run).
+- `src/lib/realtime/round-channel.ts` exposes `subscribeToRound(roundId, handlers)` returning an unsubscribe fn. Opens one channel per round and routes `postgres_changes` to three optional handlers: `onScoreChange`, `onRosterChange`, `onRoundChange`. Also reports `onStatusChange` for the Live/Connecting/Offline badge.
+- `LiveScoringEntry` subscribes on mount and:
+  - **Score events** → dirty-aware merge into local `scores`/`putts` state. If a hole is currently dirty in `dirtyRef`, the remote value is ignored — the local debounce will flush and win (last-write-wins is enforced by server timestamp).
+  - **Roster events** → `window.location.reload()` so the parent page refetches and remounts with fresh players. Heavy but correct; roster changes are rare.
+  - **Round status flip to `completed`** → calls `onClose()` so every connected device leaves the live page.
+- Subscription status drives a small **Live / Connecting / Offline** badge in the scoring shell header so the user knows whether their session is in sync.
+
+RLS already permits SELECT for any player in the round (`is_round_player(round_id)` on `round_scores`/`round_players` and `created_by OR is_round_player` on `rounds`), so Realtime subscriptions work without policy changes.
+
+## Round Invite Notifications
+
+Issue #131: every player added to a round (except the actor who took the action) receives a `round_invite` push notification with a deep link straight into the live scorer (`/my-rounds/rounds/{id}/live`). Fires from both `POST /api/rounds` (initial roster) and `POST /api/rounds/{id}/players` (mid-round add). The helper lives at `src/lib/rounds/notify.ts` — `notifyPlayersAddedToRound({roundId, playerUserIds, actorUserId})` — and is best-effort: it swallows errors so a flaky notification service never blocks round creation. Simulator suppression is inherited from `sendBulkNotifications`. The in-app `NotificationDrawer` and the service worker (`public/sw.js`) both route the click to `data.url` / `data.round_id`. No per-type preference toggle yet — add one alongside other notification preferences when that surface ships.
 
 ## Cross-Table State Consistency
 

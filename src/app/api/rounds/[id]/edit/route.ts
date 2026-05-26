@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveUserId } from "@/lib/simulator";
-import { checkIsAdmin } from "@/lib/permissions-server";
+import { canManageRound } from "@/lib/rounds/access";
 import { recalcAffectedPlayers } from "@/lib/golf/recalc";
 
 /**
@@ -12,8 +12,8 @@ import { recalcAffectedPlayers } from "@/lib/golf/recalc";
  *     summary: Edit a completed round (date, per-player tees, per-hole strokes/putts)
  *     tags: [Rounds]
  *     description: |
- *       Unified post-completion edit. Permission gate: the round's creator
- *       (the original scorer) or an admin. On success: recomputes gross /
+ *       Unified post-completion edit. Permission gate: any player in the
+ *       round, or an admin (issue #130). On success: recomputes gross /
  *       adjusted-gross / score_differential for every affected player and
  *       recalculates their handicap. Stamps rounds.edited_at + edited_by.
  *     responses:
@@ -66,11 +66,10 @@ export async function PUT(
     );
   }
 
-  const isCreator = roundRow.created_by === effectiveUserId;
-  const adminUser = isCreator ? null : await checkIsAdmin();
-  if (!isCreator && !adminUser) {
+  const access = await canManageRound(roundId, effectiveUserId);
+  if (!access.allowed) {
     return NextResponse.json(
-      { error: "Only the round's scorer or an admin can edit a completed round" },
+      { error: "Only players in this round or an admin can edit it" },
       { status: 403 },
     );
   }

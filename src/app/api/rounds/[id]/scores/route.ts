@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/simulator";
-import { checkIsAdmin } from "@/lib/permissions-server";
+import { canManageRound } from "@/lib/rounds/access";
 import { recalcAffectedPlayers } from "@/lib/golf/recalc";
 
 // GET - Get all scores for a round
@@ -59,11 +59,11 @@ export async function POST(
 
   const isCompletedRound = roundRow.status === "completed";
   if (isCompletedRound) {
-    const isCreator = roundRow.created_by === effectiveUserId;
-    const adminUser = isCreator ? null : await checkIsAdmin();
-    if (!isCreator && !adminUser) {
+    // Co-equal ownership (issue #130): any player or admin can post-edit.
+    const access = await canManageRound(roundId, effectiveUserId);
+    if (!access.allowed) {
       return NextResponse.json(
-        { error: "Only the round's scorer or an admin can edit a completed round" },
+        { error: "Only players in this round or an admin can edit it" },
         { status: 403 },
       );
     }

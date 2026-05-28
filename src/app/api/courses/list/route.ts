@@ -18,19 +18,49 @@ export async function GET() {
   }
 
   const admin = createAdminClient();
+
+  // PostgREST silently caps each SELECT at 1000 rows. With ~250 courses × 18
+  // holes × N tees, course_holes is already past 4500 and growing — without
+  // paging, courses that aren't in the first 1000-row window show as 0/0
+  // "Not mapped" even when their data is complete. Same trap that bit
+  // song_plays in migration 00155.
+  async function fetchAll<T>(
+    runPage: (from: number, to: number) => Promise<{ data: T[] | null; error: { message: string } | null }>,
+    pageSize = 1000,
+  ): Promise<{ data: T[]; error: { message: string } | null }> {
+    const out: T[] = [];
+    let from = 0;
+    for (;;) {
+      const { data, error } = await runPage(from, from + pageSize - 1);
+      if (error) return { data: out, error };
+      const page = data || [];
+      out.push(...page);
+      if (page.length < pageSize) return { data: out, error: null };
+      from += pageSize;
+    }
+  }
+
   const [tripId, coursesRes, holesRes, roundsRes] = await Promise.all([
     getEffectiveTripId(),
     admin
       .from("courses")
       .select("id, name, club_name, city, state, locked, updated_at, updated_by")
       .order("name", { ascending: true }),
-    admin
-      .from("course_holes")
-      .select("id, course_id, tee_id, hole_number, tee_latitude, tee_longitude, green_latitude, green_longitude, green_front_latitude, green_front_longitude, green_back_latitude, green_back_longitude, drive_latitude, drive_longitude"),
-    admin
-      .from("rounds")
-      .select("course_id, completed_at, round_date")
-      .eq("status", "completed"),
+    fetchAll<HoleCoordRow & { course_id: string }>(async (f, t) => {
+      const r = await admin
+        .from("course_holes")
+        .select("id, course_id, tee_id, hole_number, tee_latitude, tee_longitude, green_latitude, green_longitude, green_front_latitude, green_front_longitude, green_back_latitude, green_back_longitude, drive_latitude, drive_longitude")
+        .range(f, t);
+      return { data: r.data as Array<HoleCoordRow & { course_id: string }> | null, error: r.error };
+    }),
+    fetchAll<{ course_id: string; completed_at: string | null; round_date: string | null }>(async (f, t) => {
+      const r = await admin
+        .from("rounds")
+        .select("course_id, completed_at, round_date")
+        .eq("status", "completed")
+        .range(f, t);
+      return { data: r.data, error: r.error };
+    }),
   ]);
 
   if (coursesRes.error) {

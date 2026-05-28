@@ -67,6 +67,29 @@ interface CourseInfo {
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
+// Inline status indicator that replaces the click-to-save buttons. Stays
+// near-invisible during idle so the section header isn't visually noisy,
+// surfaces during saving/saved/error so the user knows things are persisting.
+function SaveStatusBadge({ status, onRetry }: { status: SaveStatus; onRetry?: () => void }) {
+  if (status === "idle") return null;
+  if (status === "saving") {
+    return <span className="text-[11px] font-medium text-gray-400">Saving…</span>;
+  }
+  if (status === "saved") {
+    return <span className="text-[11px] font-semibold text-green-600">Saved ✓</span>;
+  }
+  return (
+    <span className="text-[11px] font-semibold text-red-600 inline-flex items-center gap-1">
+      Couldn&apos;t save
+      {onRetry && (
+        <button type="button" onClick={onRetry} className="underline">
+          retry
+        </button>
+      )}
+    </span>
+  );
+}
+
 export interface CourseManagerProps {
   courseId?: string;
   /**
@@ -78,12 +101,17 @@ export interface CourseManagerProps {
    */
   mode?: "admin" | "loozer";
   viewerIsAdmin?: boolean;
+  /** Fired after any successful write (tee/holes/coords/info/upload) so the
+   * parent page can refresh dependent UI — most importantly the mapped-status
+   * badge in the page header, which would otherwise stay stale until reload. */
+  onCourseChanged?: () => void;
 }
 
 export function CourseManager({
   courseId: propCourseId,
   mode = "admin",
   viewerIsAdmin = mode === "admin",
+  onCourseChanged,
 }: CourseManagerProps = {}) {
   // Loozer-context routes its loads through the public `/api/courses/[id]`
   // endpoint (auth-only, lock-aware on writes). Admin-context keeps the
@@ -143,6 +171,49 @@ export function CourseManager({
     holeNumber: number;
     imageType: "overhead" | "green";
   } | null>(null);
+
+  // ── Auto-save infrastructure ─────────────────────────────────────────
+  // Each of Course Info / Tee Editor / Hole Details debounces its own save
+  // and shows a tiny status badge instead of a Save button. saversRef is
+  // refreshed on every render with the latest save closures so debounced
+  // timers always invoke fresh state.
+  type SaveKey = "info" | "tee" | "holes";
+  const debounceTimersRef = useRef<Partial<Record<SaveKey, ReturnType<typeof setTimeout>>>>({});
+  const saversRef = useRef<Partial<Record<SaveKey, () => void | Promise<void>>>>({});
+  const AUTOSAVE_DELAY = 800;
+
+  const scheduleSave = useCallback((key: SaveKey) => {
+    const timers = debounceTimersRef.current;
+    const existing = timers[key];
+    if (existing) clearTimeout(existing);
+    timers[key] = setTimeout(() => {
+      delete timers[key];
+      void saversRef.current[key]?.();
+    }, AUTOSAVE_DELAY);
+  }, []);
+
+  const flushSave = useCallback(async (key: SaveKey) => {
+    const timer = debounceTimersRef.current[key];
+    if (!timer) return;
+    clearTimeout(timer);
+    delete debounceTimersRef.current[key];
+    await saversRef.current[key]?.();
+  }, []);
+
+  // Flush every pending debounce on unmount so a quick navigate-away
+  // doesn't drop changes mid-debounce.
+  useEffect(() => {
+    const timers = debounceTimersRef.current;
+    const savers = saversRef.current;
+    return () => {
+      for (const key of Object.keys(timers) as SaveKey[]) {
+        clearTimeout(timers[key]);
+        // Fire-and-forget; setState calls inside the saver are no-ops on
+        // an unmounted component but the fetch still lands.
+        void savers[key]?.();
+      }
+    };
+  }, []);
 
   const loadCourse = useCallback(async (teeId?: string) => {
     setLoading(true);
@@ -207,6 +278,9 @@ export function CourseManager({
   }, [tees, selectedTeeId]);
 
   async function switchTee(teeId: string) {
+    // Flush pending auto-saves for the outgoing tee + its holes before we
+    // swap context, otherwise their debounced fire would target the new tee.
+    await Promise.all([flushSave("tee"), flushSave("holes")]);
     setSelectedTeeId(teeId);
     setEditingTee(null);
     try {
@@ -239,6 +313,7 @@ export function CourseManager({
       setInfoStatus("saved");
       setTimeout(() => setInfoStatus("idle"), 2000);
       loadCourse();
+      onCourseChanged?.();
     } catch {
       setError("Failed to create course");
       setInfoStatus("error");
@@ -272,6 +347,7 @@ export function CourseManager({
       }
       setInfoStatus("saved");
       setTimeout(() => setInfoStatus("idle"), 2000);
+      onCourseChanged?.();
     } catch {
       setError("Failed to save course info");
       setInfoStatus("error");
@@ -309,6 +385,7 @@ export function CourseManager({
       setNewTeePar("72");
       setTimeout(() => setTeeStatus("idle"), 2000);
       loadCourse(data.tee?.id);
+      onCourseChanged?.();
     } catch {
       setError("Failed to add tee");
       setTeeStatus("error");
@@ -338,9 +415,25 @@ export function CourseManager({
         return;
       }
       setTeeStatus("saved");
-      setEditingTee(null);
       setTimeout(() => setTeeStatus("idle"), 2000);
-      loadCourse(selectedTeeId || undefined);
+      // No loadCourse() here: a reload would flash the spinner over the form
+      // during auto-save. Patch the tee in `tees` so the picker chip shows
+      // the new name/par/rating without a refetch.
+      setTees((prev) =>
+        prev.map((t) =>
+          t.id === editingTee.id
+            ? {
+                ...t,
+                tee_name: editingTee.tee_name,
+                tee_color: editingTee.tee_color,
+                course_rating: editingTee.course_rating,
+                slope_rating: editingTee.slope_rating,
+                par: editingTee.par,
+              }
+            : t,
+        ),
+      );
+      onCourseChanged?.();
     } catch {
       setError("Failed to update tee");
       setTeeStatus("error");
@@ -372,6 +465,7 @@ export function CourseManager({
       setEditingTee(null);
       setTimeout(() => setTeeStatus("idle"), 2000);
       loadCourse(data.tee?.id);
+      onCourseChanged?.();
     } catch {
       setError("Failed to duplicate tee");
       setTeeStatus("error");
@@ -396,6 +490,7 @@ export function CourseManager({
             return;
           }
           loadCourse();
+          onCourseChanged?.();
         } catch {
           setError("Failed to delete tee");
         }
@@ -427,6 +522,7 @@ export function CourseManager({
       }
       setHolesStatus("saved");
       setTimeout(() => setHolesStatus("idle"), 2000);
+      onCourseChanged?.();
     } catch {
       setError("Failed to save holes");
       setHolesStatus("error");
@@ -447,6 +543,8 @@ export function CourseManager({
       const data = await res.json();
       if (data.error) {
         setError(data.error);
+      } else {
+        onCourseChanged?.();
       }
     } catch {
       setError("Failed to save hole name");
@@ -465,6 +563,7 @@ export function CourseManager({
       updated[index] = { ...updated[index], [field]: parseInt(value) || 0 };
     }
     setHoles(updated);
+    scheduleSave("holes");
   }
 
   function triggerUpload(
@@ -625,6 +724,11 @@ export function CourseManager({
     ? (teeGenderTab === "mens" ? mensTees : womensTees)
     : sortedTees;
 
+  // Keep the saver closures fresh for the debounced auto-save timers.
+  saversRef.current.info = saveCourseInfo;
+  saversRef.current.tee = updateTee;
+  saversRef.current.holes = saveHoles;
+
   return (
     <div className="space-y-6">
       {error && (
@@ -641,42 +745,32 @@ export function CourseManager({
 
       {/* Course Info Section */}
       <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between gap-3">
           <h2 className="text-sm font-semibold text-gray-700">Course Info</h2>
+          <SaveStatusBadge status={infoStatus} onRetry={saveCourseInfo} />
         </div>
         <div className="p-4 space-y-3">
           <Field
             label="Club Name"
             value={courseClubName}
-            onChange={setCourseClubName}
+            onChange={(v) => { setCourseClubName(v); scheduleSave("info"); }}
             placeholder="Norwood Hills Country Club (leave blank for single-course clubs)"
           />
           <Field
             label="Course Name"
             value={courseName}
-            onChange={setCourseName}
+            onChange={(v) => { setCourseName(v); scheduleSave("info"); }}
             placeholder="West Course"
           />
           <div className="grid grid-cols-2 gap-3">
-            <Field label="City" value={courseCity} onChange={setCourseCity} />
-            <Field label="State" value={courseState} onChange={setCourseState} />
+            <Field label="City" value={courseCity} onChange={(v) => { setCourseCity(v); scheduleSave("info"); }} />
+            <Field label="State" value={courseState} onChange={(v) => { setCourseState(v); scheduleSave("info"); }} />
           </div>
-          <Field label="Address" value={courseAddress} onChange={setCourseAddress} />
+          <Field label="Address" value={courseAddress} onChange={(v) => { setCourseAddress(v); scheduleSave("info"); }} />
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Phone" value={coursePhone} onChange={setCoursePhone} />
-            <Field label="Website" value={courseWebsite} onChange={setCourseWebsite} />
+            <Field label="Phone" value={coursePhone} onChange={(v) => { setCoursePhone(v); scheduleSave("info"); }} />
+            <Field label="Website" value={courseWebsite} onChange={(v) => { setCourseWebsite(v); scheduleSave("info"); }} />
           </div>
-          <button
-            onClick={saveCourseInfo}
-            disabled={infoStatus === "saving"}
-            className="w-full bg-green-600 text-white font-semibold py-2.5 rounded-xl active:scale-95 transition-transform disabled:opacity-50"
-          >
-            {infoStatus === "saving"
-              ? "Saving..."
-              : infoStatus === "saved"
-                ? "Saved!"
-                : "Save Course Info"}
-          </button>
           {viewerIsAdmin && (
             <div className="flex items-center justify-between pt-2 border-t border-gray-100">
               <div>
@@ -825,13 +919,15 @@ export function CourseManager({
                 <span
                   role="button"
                   tabIndex={0}
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     e.stopPropagation();
+                    await flushSave("tee");
                     setEditingTee({ ...tee });
                   }}
-                  onKeyDown={(e) => {
+                  onKeyDown={async (e) => {
                     if (e.key === "Enter") {
                       e.stopPropagation();
+                      await flushSave("tee");
                       setEditingTee({ ...tee });
                     }
                   }}
@@ -856,7 +952,8 @@ export function CourseManager({
           );
           })}
           <button
-            onClick={() => {
+            onClick={async () => {
+              await flushSave("tee");
               setShowAddTee(true);
               setEditingTee(null);
             }}
@@ -881,20 +978,28 @@ export function CourseManager({
         {/* Edit tee form */}
         {editingTee && (
           <div className="p-4 bg-green-50 border-b border-green-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                Editing {editingTee.tee_name || "tee"}
+              </span>
+              <SaveStatusBadge status={teeStatus} onRetry={updateTee} />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <Field
                 label="Tee Name"
                 value={editingTee.tee_name}
-                onChange={(v) =>
-                  setEditingTee({ ...editingTee, tee_name: v })
-                }
+                onChange={(v) => {
+                  setEditingTee({ ...editingTee, tee_name: v });
+                  scheduleSave("tee");
+                }}
               />
               <Field
                 label="Par"
                 value={editingTee.par.toString()}
-                onChange={(v) =>
-                  setEditingTee({ ...editingTee, par: parseInt(v) || 72 })
-                }
+                onChange={(v) => {
+                  setEditingTee({ ...editingTee, par: parseInt(v) || 72 });
+                  scheduleSave("tee");
+                }}
                 type="number"
               />
             </div>
@@ -902,42 +1007,52 @@ export function CourseManager({
               <Field
                 label="Rating"
                 value={editingTee.course_rating.toString()}
-                onChange={(v) =>
+                onChange={(v) => {
                   setEditingTee({
                     ...editingTee,
                     course_rating: parseFloat(v) || 72.0,
-                  })
-                }
+                  });
+                  scheduleSave("tee");
+                }}
                 type="number"
               />
               <Field
                 label="Slope"
                 value={editingTee.slope_rating.toString()}
-                onChange={(v) =>
+                onChange={(v) => {
                   setEditingTee({
                     ...editingTee,
                     slope_rating: parseInt(v) || 113,
-                  })
-                }
+                  });
+                  scheduleSave("tee");
+                }}
                 type="number"
               />
             </div>
             {!(editingTee.tee_color && editingTee.tee_color.includes("/")) && (
               <TeeColorPicker
                 value={editingTee.tee_color}
-                onChange={(v) => setEditingTee({ ...editingTee, tee_color: v })}
+                onChange={(v) => {
+                  setEditingTee({ ...editingTee, tee_color: v });
+                  scheduleSave("tee");
+                }}
               />
             )}
             <div className="flex gap-2">
               <button
-                onClick={updateTee}
-                disabled={teeStatus === "saving"}
-                className="flex-1 bg-green-600 text-white font-semibold py-2 rounded-xl active:scale-95 transition-transform disabled:opacity-50 text-sm"
+                onClick={async () => {
+                  await flushSave("tee");
+                  setEditingTee(null);
+                }}
+                className="flex-1 bg-green-600 text-white font-semibold py-2 rounded-xl active:scale-95 transition-transform text-sm"
               >
-                {teeStatus === "saving" ? "Saving..." : "Save Tee"}
+                Done
               </button>
               <button
-                onClick={() => duplicateTee(editingTee.id)}
+                onClick={async () => {
+                  await flushSave("tee");
+                  duplicateTee(editingTee.id);
+                }}
                 disabled={teeStatus === "saving"}
                 className="px-4 py-2 bg-blue-50 text-blue-600 font-semibold rounded-xl active:scale-95 transition-transform disabled:opacity-50 text-sm"
               >
@@ -951,12 +1066,6 @@ export function CourseManager({
                   Delete
                 </button>
               )}
-              <button
-                onClick={() => setEditingTee(null)}
-                className="px-4 py-2 bg-gray-100 text-gray-600 font-semibold rounded-xl active:scale-95 transition-transform text-sm"
-              >
-                Cancel
-              </button>
             </div>
           </div>
         )}
@@ -1051,17 +1160,7 @@ export function CourseManager({
               </span>
             )}
           </h2>
-          <button
-            onClick={saveHoles}
-            disabled={holesStatus === "saving"}
-            className="px-3 py-1 bg-green-600 text-white text-xs font-semibold rounded-lg disabled:opacity-50"
-          >
-            {holesStatus === "saving"
-              ? "Saving..."
-              : holesStatus === "saved"
-                ? "Saved!"
-                : "Save All"}
-          </button>
+          <SaveStatusBadge status={holesStatus} onRetry={saveHoles} />
         </div>
         <div className="divide-y divide-gray-100">
           {holes.map((hole, i) => {
@@ -1096,6 +1195,7 @@ export function CourseManager({
                 setHoles((prev) => prev.map((h) =>
                   h.id === holeId ? { ...h, ...coords } : h
                 ));
+                onCourseChanged?.();
               }}
               uploadingKey={uploadingHole}
               courseLatitude={course.latitude}

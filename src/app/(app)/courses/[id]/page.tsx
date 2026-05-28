@@ -136,7 +136,12 @@ export default function CoursePage() {
         </div>
       )}
 
-      <CourseManager courseId={courseId} mode="loozer" viewerIsAdmin={viewerIsAdmin} />
+      <CourseManager
+        courseId={courseId}
+        mode="loozer"
+        viewerIsAdmin={viewerIsAdmin}
+        onCourseChanged={loadMeta}
+      />
 
       <CourseHelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>

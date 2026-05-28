@@ -88,6 +88,20 @@ export default function CoursesPage() {
     load();
   }, [load]);
 
+  // Refetch when the tab regains focus so coming back from a /courses/[id]
+  // page where the user just edited GPS coords / tees shows the new totals.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", load);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", load);
+    };
+  }, [load]);
+
   const featured = useMemo(() => {
     if (!data?.active_event_course_id) return null;
     return data.courses.find((c) => c.id === data.active_event_course_id) || null;

@@ -498,9 +498,16 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
 
   // ── Helpers ──
 
+  // Lowest-handicap team plays at 0; everyone else gets the offset. Net and
+  // vs Par must derive from this adjusted value to match the public scorecards.
+  const lowestHC = teams.length > 0
+    ? Math.min(...teams.map((t) => t.team_handicap ?? 0))
+    : 0;
+
   function calcNetScore(team: Team): number | null {
     if (team.gross_score === null || team.gross_score === undefined) return null;
-    return team.gross_score - team.team_handicap;
+    const adjHC = Math.max(0, (team.team_handicap ?? 0) - lowestHC);
+    return team.gross_score - adjHC;
   }
 
   function calcScoreVsPar(team: Team): number | null {
@@ -710,11 +717,6 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
         )}
 
         {/* Teams */}
-        {(() => {
-          const lowestHC = teams.length > 0
-            ? Math.min(...teams.map((t) => t.team_handicap ?? 0))
-            : 0;
-          return (
         <div className="space-y-3">
           {teams.map((team, index) => {
             const scoreVsPar = calcScoreVsPar(team);
@@ -935,8 +937,6 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
             );
           })}
         </div>
-          );
-        })()}
 
         <ConfirmModal
           open={!!confirmModal}

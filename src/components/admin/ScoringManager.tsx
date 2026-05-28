@@ -858,7 +858,12 @@ function HoleScoringCards({
   const inn = calcNine(team.id, 10, 18);
   const tot = calcTotal(team.id);
   const par = totalPar();
-  const net = tot !== null ? tot - team.team_handicap : null;
+  // Lowest-handicap team plays at 0; Net derives from the offset value, matching the public scorecards.
+  const lowestHC = teams.length > 0
+    ? Math.min(...teams.map((t) => t.team_handicap ?? 0))
+    : 0;
+  const adjHC = Math.max(0, (team.team_handicap ?? 0) - lowestHC);
+  const net = tot !== null ? tot - adjHC : null;
   const skins = skinCounts.get(team.id) || 0;
 
   // Navigate score inputs with Enter key
@@ -1064,7 +1069,7 @@ function HoleScoringCards({
                   </td>
                   <td className="px-1 py-2 text-center text-gray-300">−</td>
                   <td className="px-2 py-2 text-center text-gray-500 font-medium">
-                    {team.team_handicap}
+                    {adjHC}
                   </td>
                   <td className="px-1 py-2 text-center text-gray-300">=</td>
                   <td className={`px-2 py-2 text-center font-bold text-sm ${totalColor(net, par)}`}>
@@ -1079,11 +1084,6 @@ function HoleScoringCards({
               </tbody>
             </table>
           </div>
-          {teams.length > 1 && (
-            <p className="px-3 py-1.5 text-[10px] text-gray-400 border-t border-gray-100">
-              HDCP shown is the raw value. On the public Scorecards view, all team handicaps are offset so the lowest-handicap team plays at 0.
-            </p>
-          )}
         </div>
       )}
 

@@ -320,11 +320,15 @@ export default function LiveScoringEntry({
           }
         }
       },
-      onRosterChange: () => {
-        // Roster changed (add or remove a player). Refetching the player
-        // list inside this component would require threading user names +
-        // tee data through the realtime payload. Simpler and reliable: ask
-        // the parent page to reload, which re-mounts us with fresh props.
+      onRosterChange: ({ kind }) => {
+        // Only INSERT/DELETE are actual roster changes that need a reload.
+        // UPDATE events on `round_players` fire constantly during scoring —
+        // the scores endpoint stamps `final_gross_score` after every save —
+        // and would otherwise reload the page on every keystroke (jumping
+        // the user back to hole 1). Anything we'd want to react to from a
+        // round_players UPDATE (e.g., a teammate changing their tee_id)
+        // isn't worth a page reload anyway.
+        if (kind !== "INSERT" && kind !== "DELETE") return;
         if (typeof window !== "undefined") window.location.reload();
       },
       onRoundChange: ({ row }) => {

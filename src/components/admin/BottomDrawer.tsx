@@ -27,7 +27,10 @@ export function BottomDrawer({ open, onClose, title, subtitle, children }: Botto
   if (!open) return null;
 
   return (
-    <div className="fixed top-14 bottom-0 left-0 right-0 z-35 flex items-end justify-center">
+    <div
+      data-pull-refresh="off"
+      className="fixed top-14 bottom-0 left-0 right-0 z-35 flex items-end justify-center"
+    >
       {/* Overlay — fills the constrained area */}
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 

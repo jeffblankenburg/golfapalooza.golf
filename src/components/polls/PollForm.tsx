@@ -177,11 +177,14 @@ export function PollForm({
     const m = new Map<string, number>(); // option_id -> percentage (0-100)
     const textCounts = new Map<string, number>(); // question_id -> response count
     if (!liveResults) return { options: m, textCounts };
+    const totalRespondents = liveResults.total_respondents;
     for (const q of liveResults.questions) {
       if (q.options) {
-        const total = q.options.reduce((s, o) => s + o.count, 0);
         for (const o of q.options) {
-          m.set(o.option_id, total > 0 ? (o.count / total) * 100 : 0);
+          m.set(
+            o.option_id,
+            totalRespondents > 0 ? (o.count / totalRespondents) * 100 : 0
+          );
         }
       }
       if (q.text_answers) {

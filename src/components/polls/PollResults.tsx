@@ -23,9 +23,10 @@ export function PollResultsView({ results, isAnonymous }: PollResultsViewProps) 
           {q.options && q.options.length > 0 && (
             <div className="space-y-1.5">
               {q.options.map((o) => {
-                const total =
-                  q.options!.reduce((s, oo) => s + oo.count, 0) || 0;
-                const pct = total > 0 ? (o.count / total) * 100 : 0;
+                const pct =
+                  results.total_respondents > 0
+                    ? (o.count / results.total_respondents) * 100
+                    : 0;
                 return (
                   <div key={o.option_id}>
                     <div className="flex items-center justify-between text-xs text-gray-700 mb-0.5">

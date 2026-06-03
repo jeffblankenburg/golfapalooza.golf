@@ -346,10 +346,12 @@ export default function ScoringShell({
 
       {/* Image/Map Area */}
       <div
-        className="flex-1 min-h-0 overflow-hidden bg-white relative touch-none"
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        className={`flex-1 min-h-0 overflow-hidden bg-white relative ${
+          activeView === "map" ? "" : "touch-none"
+        }`}
+        onTouchStart={activeView === "map" ? undefined : handleTouchStart}
+        onTouchMove={activeView === "map" ? undefined : handleTouchMove}
+        onTouchEnd={activeView === "map" ? undefined : handleTouchEnd}
       >
         {/* Save status overlay */}
         <div
@@ -398,7 +400,7 @@ export default function ScoringShell({
         <div
           className="w-full h-full relative"
           style={{
-            transform: scale > 1
+            transform: activeView !== "map" && scale > 1
               ? `scale(${scale}) translate(${offset.x / scale}px, ${offset.y / scale}px)`
               : undefined,
             transition: isSnapBack

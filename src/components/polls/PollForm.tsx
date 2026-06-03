@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import type { Poll, PollResponse, PollResults } from "@/types/golf";
-import { PollResultsView } from "./PollResults";
 
 interface PollFormProps {
   poll: Poll;
@@ -168,6 +167,30 @@ export function PollForm({
     return m;
   }, [answers]);
 
+  // Live percentages baked into each option row. Server only returns
+  // `liveResults` when poll.show_results_while_open AND the user has voted,
+  // so we don't need to re-check those conditions here.
+  const showLiveResults =
+    poll.status === "active" && poll.show_results_while_open && !!liveResults;
+
+  const pctByOption = useMemo(() => {
+    const m = new Map<string, number>(); // option_id -> percentage (0-100)
+    const textCounts = new Map<string, number>(); // question_id -> response count
+    if (!liveResults) return { options: m, textCounts };
+    for (const q of liveResults.questions) {
+      if (q.options) {
+        const total = q.options.reduce((s, o) => s + o.count, 0);
+        for (const o of q.options) {
+          m.set(o.option_id, total > 0 ? (o.count / total) * 100 : 0);
+        }
+      }
+      if (q.text_answers) {
+        textCounts.set(q.question_id, q.text_answers.length);
+      }
+    }
+    return { options: m, textCounts };
+  }, [liveResults]);
+
   return (
     <div className="px-4 py-4 space-y-4">
       {poll.description && (
@@ -196,20 +219,32 @@ export function PollForm({
               <div className="space-y-1.5">
                 {q.options.map((o) => {
                   const checked = a.option_id === o.id;
+                  const pct = showLiveResults
+                    ? pctByOption.options.get(o.id) ?? 0
+                    : null;
                   return (
                     <button
                       key={o.id}
                       onClick={() =>
                         setAnswer(q.id, { type: "single", option_id: o.id })
                       }
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                      className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors overflow-hidden ${
                         checked
                           ? "border-green-600 bg-green-50"
                           : "border-gray-200 bg-white"
                       }`}
                     >
+                      {pct !== null && (
+                        <div
+                          className={`absolute inset-y-0 left-0 ${
+                            checked ? "bg-green-200/70" : "bg-gray-100"
+                          }`}
+                          style={{ width: `${pct}%` }}
+                          aria-hidden
+                        />
+                      )}
                       <div
-                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                        className={`relative w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
                           checked ? "border-green-600" : "border-gray-300"
                         }`}
                       >
@@ -217,7 +252,14 @@ export function PollForm({
                           <div className="w-2.5 h-2.5 rounded-full bg-green-600" />
                         )}
                       </div>
-                      <span className="text-sm text-gray-800">{o.option_text}</span>
+                      <span className="relative text-sm text-gray-800 flex-1">
+                        {o.option_text}
+                      </span>
+                      {pct !== null && (
+                        <span className="relative text-xs font-semibold text-gray-700 tabular-nums">
+                          {pct.toFixed(0)}%
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -228,6 +270,9 @@ export function PollForm({
               <div className="space-y-1.5">
                 {q.options.map((o) => {
                   const checked = a.option_ids.has(o.id);
+                  const pct = showLiveResults
+                    ? pctByOption.options.get(o.id) ?? 0
+                    : null;
                   return (
                     <button
                       key={o.id}
@@ -237,14 +282,23 @@ export function PollForm({
                         else next.add(o.id);
                         setAnswer(q.id, { type: "multi", option_ids: next });
                       }}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                      className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors overflow-hidden ${
                         checked
                           ? "border-green-600 bg-green-50"
                           : "border-gray-200 bg-white"
                       }`}
                     >
+                      {pct !== null && (
+                        <div
+                          className={`absolute inset-y-0 left-0 ${
+                            checked ? "bg-green-200/70" : "bg-gray-100"
+                          }`}
+                          style={{ width: `${pct}%` }}
+                          aria-hidden
+                        />
+                      )}
                       <div
-                        className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                        className={`relative w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                           checked
                             ? "bg-green-600 border-green-600"
                             : "border-gray-300"
@@ -266,7 +320,14 @@ export function PollForm({
                           </svg>
                         )}
                       </div>
-                      <span className="text-sm text-gray-800">{o.option_text}</span>
+                      <span className="relative text-sm text-gray-800 flex-1">
+                        {o.option_text}
+                      </span>
+                      {pct !== null && (
+                        <span className="relative text-xs font-semibold text-gray-700 tabular-nums">
+                          {pct.toFixed(0)}%
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -285,9 +346,22 @@ export function PollForm({
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px] resize-none"
                   placeholder="Type your answer..."
                 />
-                <p className="text-[11px] text-gray-400 text-right">
-                  {charCounts.get(q.id) || 0} / {q.max_length ?? 500}
-                </p>
+                <div className="flex items-center justify-between">
+                  {showLiveResults ? (
+                    <p className="text-[11px] text-gray-500 italic">
+                      {pctByOption.textCounts.get(q.id) ?? 0}{" "}
+                      {(pctByOption.textCounts.get(q.id) ?? 0) === 1
+                        ? "response"
+                        : "responses"}{" "}
+                      so far
+                    </p>
+                  ) : (
+                    <span />
+                  )}
+                  <p className="text-[11px] text-gray-400 text-right">
+                    {charCounts.get(q.id) || 0} / {q.max_length ?? 500}
+                  </p>
+                </div>
               </div>
             )}
           </div>
@@ -328,19 +402,6 @@ export function PollForm({
           You can change your vote until the poll closes.
         </p>
       )}
-
-      {hasExistingVote &&
-        poll.show_results_while_open &&
-        poll.status === "active" &&
-        liveResults && (
-          <div className="pt-4 border-t border-gray-100">
-            <PollResultsView
-              results={liveResults}
-              isAnonymous={poll.is_anonymous}
-              mode="live"
-            />
-          </div>
-        )}
     </div>
   );
 }

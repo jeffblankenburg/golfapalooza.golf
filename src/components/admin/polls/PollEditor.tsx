@@ -79,6 +79,9 @@ export function PollEditor({
   const [sendNotification, setSendNotification] = useState(
     poll?.send_notification_on_launch ?? true
   );
+  const [showResultsWhileOpen, setShowResultsWhileOpen] = useState(
+    poll?.show_results_while_open ?? false
+  );
   const [questions, setQuestions] = useState<DraftQuestion[]>(
     poll?.questions?.length
       ? poll.questions.map((q) => ({
@@ -257,6 +260,7 @@ export function PollEditor({
     trip_id: audience === "event" ? activeTripId : null,
     is_anonymous: isAnonymous,
     send_notification_on_launch: sendNotification,
+    show_results_while_open: showResultsWhileOpen,
     questions: questions.map((q) => ({
       id: q.id,
       question_text: q.question_text.trim(),
@@ -606,6 +610,17 @@ export function PollEditor({
           />
           <span className="text-sm text-gray-700">
             Send a push notification when this poll launches
+          </span>
+        </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={showResultsWhileOpen}
+            onChange={(e) => setShowResultsWhileOpen(e.target.checked)}
+            className="w-4 h-4"
+          />
+          <span className="text-sm text-gray-700">
+            Show live results to voters after they submit
           </span>
         </label>
       </div>

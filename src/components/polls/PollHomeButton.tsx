@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { BottomDrawer } from "../admin/BottomDrawer";
 import { PollForm } from "./PollForm";
-import type { Poll, PollResponse } from "@/types/golf";
+import type { Poll, PollResponse, PollResults } from "@/types/golf";
 
 interface PollHomeButtonProps {
   initialPoll?: Poll | null;
@@ -15,6 +15,9 @@ export function PollHomeButton({ initialPoll = null, initialResponse = null }: P
   // instead of flashing in after a /api/polls/active round-trip.
   const [poll, setPoll] = useState<Poll | null>(initialPoll);
   const [response, setResponse] = useState<PollResponse | null>(initialResponse);
+  // Live results are fetched on drawer open + after every submit so the
+  // percentages stay fresh while the user has the drawer open.
+  const [results, setResults] = useState<PollResults | null>(null);
   const [open, setOpen] = useState(false);
 
   // After the user submits, refetch THIS poll's response so the "voted"
@@ -29,10 +32,18 @@ export function PollHomeButton({ initialPoll = null, initialResponse = null }: P
       const data = await res.json();
       if (data.poll) setPoll(data.poll);
       setResponse(data.response ?? null);
+      setResults(data.results ?? null);
     } catch {
       // Network blip — keep showing what we have.
     }
   }, [poll]);
+
+  const handleOpen = () => {
+    setOpen(true);
+    // Drawer opens immediately with SSR-seeded poll + response; results
+    // hydrate a beat later so the bars don't flash stale numbers.
+    refresh();
+  };
 
   if (!poll) return null;
 
@@ -41,7 +52,7 @@ export function PollHomeButton({ initialPoll = null, initialResponse = null }: P
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={handleOpen}
         className={`w-full bg-white border-2 border-fuchsia-500 rounded-2xl px-4 py-3 shadow-sm active:scale-[0.99] transition-transform text-left ${
           hasVoted ? "" : "animate-poll-pulse"
         }`}
@@ -92,8 +103,13 @@ export function PollHomeButton({ initialPoll = null, initialResponse = null }: P
         <PollForm
           poll={poll}
           initialResponse={response}
+          liveResults={results}
           onSubmitted={() => {
-            setOpen(false);
+            // When live results are enabled, keep the drawer open so the
+            // voter sees their bar update. Otherwise dismiss as before.
+            if (!(poll.show_results_while_open && poll.status === "active")) {
+              setOpen(false);
+            }
             refresh();
           }}
         />

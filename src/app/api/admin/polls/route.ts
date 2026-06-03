@@ -25,6 +25,7 @@ interface CreatePollBody {
   trip_id?: string | null;
   is_anonymous?: boolean;
   send_notification_on_launch?: boolean;
+  show_results_while_open?: boolean;
   questions: IncomingQuestion[];
 }
 
@@ -85,7 +86,7 @@ export async function GET() {
   const { data: polls, error } = await adminClient
     .from("polls")
     .select(
-      "id, title, description, audience_type, audience_user_ids, trip_id, is_anonymous, send_notification_on_launch, status, starts_at, ends_at, created_by, created_at, updated_at"
+      "id, title, description, audience_type, audience_user_ids, trip_id, is_anonymous, send_notification_on_launch, show_results_while_open, status, starts_at, ends_at, created_by, created_at, updated_at"
     )
     .order("created_at", { ascending: false });
 
@@ -156,6 +157,7 @@ export async function POST(request: NextRequest) {
       trip_id: body.audience_type === "event" ? body.trip_id : null,
       is_anonymous: body.is_anonymous ?? false,
       send_notification_on_launch: body.send_notification_on_launch ?? true,
+      show_results_while_open: body.show_results_while_open ?? false,
       status: "draft",
       created_by: admin.id,
     })

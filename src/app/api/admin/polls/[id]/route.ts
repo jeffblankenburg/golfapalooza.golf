@@ -32,6 +32,7 @@ interface UpdatePollBody {
   trip_id?: string | null;
   is_anonymous?: boolean;
   send_notification_on_launch?: boolean;
+  show_results_while_open?: boolean;
   starts_at?: string | null;
   ends_at?: string | null;
   questions?: IncomingQuestion[];
@@ -114,6 +115,9 @@ export async function PUT(
   if (body.is_anonymous !== undefined) update.is_anonymous = body.is_anonymous;
   if (body.send_notification_on_launch !== undefined) {
     update.send_notification_on_launch = body.send_notification_on_launch;
+  }
+  if (body.show_results_while_open !== undefined) {
+    update.show_results_while_open = body.show_results_while_open;
   }
 
   // Window edits: validate overlap. Allowed for draft/scheduled/active.

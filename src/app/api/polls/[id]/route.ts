@@ -49,6 +49,19 @@ export async function GET(
   if (poll.status === "closed") {
     // Players never see attribution, even on non-anonymous polls.
     results = await loadPollResults(adminClient, poll, "anonymous");
+  } else if (
+    poll.status === "active" &&
+    poll.show_results_while_open &&
+    response
+  ) {
+    // Live results: voters who've submitted see aggregate percentages.
+    // Strip text-answer content — only the count of responses is exposed.
+    results = await loadPollResults(adminClient, poll, "anonymous");
+    for (const q of results.questions) {
+      if (q.text_answers) {
+        q.text_answers = q.text_answers.map(() => ({ text: "" }));
+      }
+    }
   }
 
   return NextResponse.json({ poll, response, results });

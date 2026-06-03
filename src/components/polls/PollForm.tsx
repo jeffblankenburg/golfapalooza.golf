@@ -1,11 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Poll, PollResponse } from "@/types/golf";
+import type { Poll, PollResponse, PollResults } from "@/types/golf";
+import { PollResultsView } from "./PollResults";
 
 interface PollFormProps {
   poll: Poll;
   initialResponse: PollResponse | null;
+  // Live aggregate results to show inline after the user has voted, when
+  // poll.show_results_while_open is true. Null otherwise.
+  liveResults?: PollResults | null;
   onSubmitted: () => void;
 }
 
@@ -43,7 +47,12 @@ function buildInitialAnswers(poll: Poll, response: PollResponse | null): Map<str
   return map;
 }
 
-export function PollForm({ poll, initialResponse, onSubmitted }: PollFormProps) {
+export function PollForm({
+  poll,
+  initialResponse,
+  liveResults = null,
+  onSubmitted,
+}: PollFormProps) {
   const [answers, setAnswers] = useState<Map<string, AnswerState>>(() =>
     buildInitialAnswers(poll, initialResponse)
   );
@@ -319,6 +328,19 @@ export function PollForm({ poll, initialResponse, onSubmitted }: PollFormProps) 
           You can change your vote until the poll closes.
         </p>
       )}
+
+      {hasExistingVote &&
+        poll.show_results_while_open &&
+        poll.status === "active" &&
+        liveResults && (
+          <div className="pt-4 border-t border-gray-100">
+            <PollResultsView
+              results={liveResults}
+              isAnonymous={poll.is_anonymous}
+              mode="live"
+            />
+          </div>
+        )}
     </div>
   );
 }

@@ -5,12 +5,24 @@ import type { PollResults } from "@/types/golf";
 interface PollResultsViewProps {
   results: PollResults;
   isAnonymous: boolean;
+  // "live" hides text-answer content (only the count is shown) and labels
+  // the header "Live results". "final" renders the full closed-poll view.
+  mode?: "live" | "final";
 }
 
-export function PollResultsView({ results, isAnonymous }: PollResultsViewProps) {
+export function PollResultsView({
+  results,
+  isAnonymous,
+  mode = "final",
+}: PollResultsViewProps) {
+  const isLive = mode === "live";
+
   return (
     <div className="space-y-4">
       <p className="text-xs text-gray-500">
+        {isLive && (
+          <span className="font-semibold text-green-700">Live results · </span>
+        )}
         {results.total_respondents}{" "}
         {results.total_respondents === 1 ? "vote" : "votes"}
         {isAnonymous && " · anonymous"}
@@ -50,6 +62,12 @@ export function PollResultsView({ results, isAnonymous }: PollResultsViewProps) 
             <div className="space-y-1.5">
               {q.text_answers.length === 0 ? (
                 <p className="text-xs text-gray-400 italic">No responses</p>
+              ) : isLive ? (
+                <p className="text-xs text-gray-500 italic">
+                  {q.text_answers.length}{" "}
+                  {q.text_answers.length === 1 ? "response" : "responses"} so
+                  far — shown when the poll closes
+                </p>
               ) : (
                 q.text_answers.map((a, i) => (
                   <div

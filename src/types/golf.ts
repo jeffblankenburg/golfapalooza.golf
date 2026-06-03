@@ -305,6 +305,7 @@ export interface Poll {
   trip_id: string | null;
   is_anonymous: boolean;
   send_notification_on_launch: boolean;
+  show_results_while_open: boolean;
   status: PollStatus;
   starts_at: string | null;
   ends_at: string | null;

@@ -22,7 +22,7 @@ export async function loadPollWithQuestions(
   const { data: poll } = await client
     .from("polls")
     .select(
-      "id, title, description, audience_type, audience_user_ids, trip_id, is_anonymous, send_notification_on_launch, status, starts_at, ends_at, created_by, created_at, updated_at"
+      "id, title, description, audience_type, audience_user_ids, trip_id, is_anonymous, send_notification_on_launch, show_results_while_open, status, starts_at, ends_at, created_by, created_at, updated_at"
     )
     .eq("id", pollId)
     .maybeSingle();

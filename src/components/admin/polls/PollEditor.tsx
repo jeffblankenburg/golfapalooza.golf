@@ -363,6 +363,11 @@ export function PollEditor({
 
   const confirmMessage = () => {
     const label = audienceCount === 1 ? "1 Loozer" : `${audienceCount} Loozers`;
+    // Editing a poll that's already past the draft stage never goes
+    // through publish mode — the picker isn't even rendered.
+    if (isEditing && poll?.status !== "draft") {
+      return "Save changes to this poll?";
+    }
     if (publishMode === "draft") return "Save this poll as a draft?";
     if (publishMode === "now") return `Publish this poll to ${label} now?`;
     return `Schedule this poll for ${label}?`;
@@ -867,11 +872,13 @@ export function PollEditor({
         title="Confirm"
         message={confirmMessage()}
         confirmLabel={
-          publishMode === "now"
-            ? "Publish"
-            : publishMode === "schedule"
-              ? "Schedule"
-              : "Save"
+          isEditing && poll?.status !== "draft"
+            ? "Save"
+            : publishMode === "now"
+              ? "Publish"
+              : publishMode === "schedule"
+                ? "Schedule"
+                : "Save"
         }
         onConfirm={() => {
           setConfirm(false);

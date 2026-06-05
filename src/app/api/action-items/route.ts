@@ -7,7 +7,7 @@ import { getEffectiveUserId, getEffectiveTripId } from "@/lib/simulator";
  * @swagger
  * /api/action-items:
  *   get:
- *     summary: Get action items with completion status for current user
+ *     summary: Get action items with completion status for current user 
  *     tags: [Actions]
  *     responses:
  *       200:

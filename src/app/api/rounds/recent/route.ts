@@ -56,6 +56,7 @@ export async function GET(request: Request) {
     .eq("status", "completed")
     .order("round_date", { ascending: false })
     .order("completed_at", { ascending: false, nullsFirst: false })
+    .order("player_position", { referencedTable: "round_players", ascending: true })
     .limit(Math.min(limit * 2, 50));
 
   if (error) {

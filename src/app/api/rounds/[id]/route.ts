@@ -41,6 +41,7 @@ export async function GET(
       )
     `)
     .eq("id", id)
+    .order("player_position", { referencedTable: "round_players", ascending: true })
     .single();
 
   if (error) {

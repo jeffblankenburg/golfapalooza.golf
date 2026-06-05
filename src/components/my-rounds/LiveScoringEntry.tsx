@@ -129,6 +129,25 @@ export default function LiveScoringEntry({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [roundId, setRoundId] = useState<string | null>(existingRoundId || null);
   const [playerMap, setPlayerMap] = useState<Record<string, string>>(initialPlayerMap || {});
+  // Roster is local state (not the prop) so realtime INSERT/DELETE events can
+  // merge new/removed players in place without reloading the whole page.
+  const [players, setPlayers] = useState<Player[]>(initialPlayers);
+
+  // Suppress the global pull-to-refresh while live scoring is mounted. The
+  // listener in PullToRefresh.tsx fires on any touch ancestor that lacks the
+  // opt-out — HeaderBar above us is sticky z-[60] (not .fixed.z-50), so
+  // incidental thumb contact at the top of the screen was reloading the page
+  // mid-round. Body-level opt-out catches every touch path.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const prev = document.body.getAttribute("data-pull-refresh");
+    document.body.setAttribute("data-pull-refresh", "off");
+    return () => {
+      if (prev == null) document.body.removeAttribute("data-pull-refresh");
+      else document.body.setAttribute("data-pull-refresh", prev);
+    };
+  }, []);
+
   const [ready, setReady] = useState(!!existingRoundId);
   const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
   const [completing, setCompleting] = useState(false);
@@ -267,6 +286,74 @@ export default function LiveScoringEntry({
     playerMapRef.current = playerMap;
   }, [playerMap]);
 
+  // Stabilize callbacks for the realtime effect so it only re-subscribes when
+  // the roundId itself changes — otherwise every parent re-render churns the
+  // channel (parent passes a fresh `onClose` arrow each time).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+  const roundIdRef = useRef(roundId);
+  useEffect(() => {
+    roundIdRef.current = roundId;
+  }, [roundId]);
+
+  // Rebuild local roster from the server after a remote add/remove. Preserves
+  // existing per-player scores/putts (server state could be 1-2 saves behind
+  // our local edits) and adds empty maps for any newly arriving players.
+  const reloadRoster = useCallback(async () => {
+    const rid = roundIdRef.current;
+    if (!rid) return;
+    const res = await fetch(`/api/rounds/${rid}`);
+    if (!res.ok) return;
+    const json = await res.json();
+    const rps = (json.round?.round_players || []) as {
+      id: string;
+      user_id: string;
+      user: { display_name?: string } | { display_name?: string }[] | null;
+      player_tee: { tee_name?: string } | { tee_name?: string }[] | null;
+      tee_id?: string;
+    }[];
+
+    const nextPlayers: Player[] = rps.map((rp) => {
+      const user = Array.isArray(rp.user) ? rp.user[0] : rp.user;
+      const tee = Array.isArray(rp.player_tee) ? rp.player_tee[0] : rp.player_tee;
+      return {
+        id: rp.user_id,
+        name: user?.display_name || "Player",
+        teeName: tee?.tee_name,
+        teeId: rp.tee_id,
+        roundPlayerId: rp.id,
+      };
+    });
+    const nextMap: Record<string, string> = {};
+    for (const rp of rps) nextMap[rp.user_id] = rp.id;
+    const validUserIds = new Set(rps.map((r) => r.user_id));
+
+    setPlayers(nextPlayers);
+    setPlayerMap(nextMap);
+    setScores((prev) => {
+      const next: typeof prev = {};
+      for (const uid of Object.keys(prev)) {
+        if (validUserIds.has(uid)) next[uid] = prev[uid];
+      }
+      for (const uid of validUserIds) {
+        if (!next[uid]) next[uid] = {};
+      }
+      return next;
+    });
+    setPutts((prev) => {
+      const next: typeof prev = {};
+      for (const uid of Object.keys(prev)) {
+        if (validUserIds.has(uid)) next[uid] = prev[uid];
+      }
+      for (const uid of validUserIds) {
+        if (!next[uid]) next[uid] = {};
+      }
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     if (!roundId) return;
     const unsubscribe = subscribeToRound(roundId, {
@@ -321,21 +408,19 @@ export default function LiveScoringEntry({
         }
       },
       onRosterChange: ({ kind }) => {
-        // Only INSERT/DELETE are actual roster changes that need a reload.
-        // UPDATE events on `round_players` fire constantly during scoring —
-        // the scores endpoint stamps `final_gross_score` after every save —
-        // and would otherwise reload the page on every keystroke (jumping
-        // the user back to hole 1). Anything we'd want to react to from a
-        // round_players UPDATE (e.g., a teammate changing their tee_id)
-        // isn't worth a page reload anyway.
+        // UPDATE on round_players fires constantly during scoring (the scores
+        // endpoint stamps `final_gross_score` after every save), so ignore.
+        // INSERT/DELETE → someone joined or left the round; merge into local
+        // state without a full reload (which would jump back to hole 1 and
+        // wipe any in-flight edits not yet flushed).
         if (kind !== "INSERT" && kind !== "DELETE") return;
-        if (typeof window !== "undefined") window.location.reload();
+        reloadRoster();
       },
       onRoundChange: ({ row }) => {
         // Status flip → bail out of the live scorer. The parent page's
         // onClose navigates to /my-rounds.
         if (row?.status === "completed") {
-          onClose();
+          onCloseRef.current();
         }
       },
       onStatusChange: (status) => {
@@ -345,7 +430,10 @@ export default function LiveScoringEntry({
       },
     });
     return unsubscribe;
-  }, [roundId, onClose]);
+    // onClose accessed via onCloseRef so it isn't a dep; reloadRoster is
+    // stable (empty-deps useCallback). Re-subscribing only on roundId
+    // prevents the channel from churning on every parent re-render.
+  }, [roundId, reloadRoster]);
 
   function setScore(playerId: string, holeNumber: number, value: number) {
     setScores((prev) => ({
@@ -438,7 +526,7 @@ export default function LiveScoringEntry({
     }
   }
 
-  const allComplete = initialPlayers.every(
+  const allComplete = players.every(
     (p) => visibleHoles.every((h) => scores[p.id]?.[h.hole_number] != null)
   );
 
@@ -460,7 +548,26 @@ export default function LiveScoringEntry({
       onClose={onClose}
       teeColor={teeColor}
       saveStatus={saveStatus}
-      onHoleChange={(_idx, hole) => { currentHoleRef.current = hole; }}
+      // Restore the hole the user was on if iOS reloaded the page. Stored
+      // per-round so concurrent rounds don't clobber each other.
+      startingHole={(() => {
+        if (typeof window === "undefined" || !roundId) return undefined;
+        try {
+          const raw = sessionStorage.getItem(`ls_hole_${roundId}`);
+          const n = raw ? parseInt(raw, 10) : NaN;
+          return Number.isFinite(n) ? n : undefined;
+        } catch {
+          return undefined;
+        }
+      })()}
+      onHoleChange={(_idx, hole) => {
+        currentHoleRef.current = hole;
+        if (typeof window !== "undefined" && roundId) {
+          try {
+            sessionStorage.setItem(`ls_hole_${roundId}`, String(hole.hole_number));
+          } catch { /* ignore */ }
+        }
+      }}
       headerRight={
         <div className="flex items-center gap-2 text-xs">
           <span
@@ -491,7 +598,7 @@ export default function LiveScoringEntry({
             {liveStatus === "live" ? "Live" : liveStatus === "offline" ? "Offline" : "Connecting"}
           </span>
           <span className="text-gray-500">
-            {initialPlayers.reduce((max, p) => {
+            {players.reduce((max, p) => {
               const count = visibleHoles.filter((h) => scores[p.id]?.[h.hole_number] != null).length;
               return Math.max(max, count);
             }, 0)}/{visibleHoles.length}
@@ -524,7 +631,7 @@ export default function LiveScoringEntry({
                 {holes.reduce((s, h) => s + h.par, 0)}
               </td>
             </tr>
-            {initialPlayers.map((p) => {
+            {players.map((p) => {
               const total = holes.reduce((s, h) => s + (scores[p.id]?.[h.hole_number] ?? 0), 0);
               const front9Total = front9.reduce((s, h) => s + (scores[p.id]?.[h.hole_number] ?? 0), 0);
               const back9Total = back9.reduce((s, h) => s + (scores[p.id]?.[h.hole_number] ?? 0), 0);
@@ -567,7 +674,7 @@ export default function LiveScoringEntry({
       renderScorePanel={(hole) => (
         <div className="px-3 pt-2 pb-1">
           <div className="space-y-1.5">
-            {initialPlayers.map((p) => {
+            {players.map((p) => {
               const current = scores[p.id]?.[hole.hole_number];
               const hasValue = current !== undefined;
               const description = hasValue ? getScoreDescription(current, hole.par) : null;

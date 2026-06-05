@@ -91,7 +91,47 @@ export default function ScoringShell({
     : 0;
 
   const [currentHoleIndex, setCurrentHoleIndex] = useState(initialIndex);
-  const [imageView, setImageView] = useState<ImageView>("map");
+
+  // UI state that should survive a page reload (iOS Safari aggressively
+  // reclaims renderer memory on this page; without persistence the user
+  // would lose every UI preference on every reload). Stored in
+  // sessionStorage so it scopes per-tab and clears on tab close.
+  function loadStored<T>(key: string, fallback: T, parse: (v: string) => T): T {
+    if (typeof sessionStorage === "undefined") return fallback;
+    try {
+      const raw = sessionStorage.getItem(key);
+      return raw == null ? fallback : parse(raw);
+    } catch {
+      return fallback;
+    }
+  }
+  function saveStored(key: string, value: string) {
+    if (typeof sessionStorage === "undefined") return;
+    try { sessionStorage.setItem(key, value); } catch { /* ignore */ }
+  }
+
+  const [imageView, setImageView] = useState<ImageView>(() =>
+    loadStored<ImageView>("scoring_image_view", "map", (v) =>
+      v === "map" || v === "overhead" || v === "green" ? v : "map"
+    )
+  );
+
+  // Drawer state: both default open; tap or vertical-drag the handle to toggle.
+  // Map area is flex-1, so collapsing either drawer hands its space to the map.
+  const [scorecardOpen, setScorecardOpen] = useState(() =>
+    loadStored("scoring_scorecard_open", true, (v) => v === "true")
+  );
+  const [scorePanelOpen, setScorePanelOpen] = useState(() =>
+    loadStored("scoring_score_panel_open", true, (v) => v === "true")
+  );
+
+  useEffect(() => { saveStored("scoring_image_view", imageView); }, [imageView]);
+  useEffect(() => { saveStored("scoring_scorecard_open", String(scorecardOpen)); }, [scorecardOpen]);
+  useEffect(() => { saveStored("scoring_score_panel_open", String(scorePanelOpen)); }, [scorePanelOpen]);
+  const dragStartYRef = useRef<number | null>(null);
+  // Set after a touchend that exceeded the drag threshold, so the synthesized
+  // click that follows on touch devices doesn't also toggle the drawer.
+  const suppressNextClickRef = useRef(false);
 
   // Swipe + pinch state
   const [isAnimating, setIsAnimating] = useState(false);
@@ -225,6 +265,45 @@ export default function ScoringShell({
 
   if (!hole) return null;
 
+  // Drawer handle: tap-to-toggle is primary; a vertical drag past 24px in the
+  // "open" direction snaps the drawer open, in the "close" direction snaps it
+  // closed. A drag in the wrong direction (or under the threshold) falls
+  // through to the synthesized click, which toggles.
+  function bindHandle(
+    open: boolean,
+    setOpen: (v: boolean) => void,
+    side: "top" | "bottom"
+  ) {
+    return {
+      onClick: () => {
+        if (suppressNextClickRef.current) {
+          suppressNextClickRef.current = false;
+          return;
+        }
+        setOpen(!open);
+      },
+      onTouchStart: (e: React.TouchEvent) => {
+        dragStartYRef.current = e.touches[0].clientY;
+      },
+      onTouchEnd: (e: React.TouchEvent) => {
+        const start = dragStartYRef.current;
+        dragStartYRef.current = null;
+        if (start == null) return;
+        const dy = e.changedTouches[0].clientY - start;
+        if (Math.abs(dy) < 24) return;
+        // Past threshold: it's a drag, not a tap. Mark the next synthesized
+        // click for suppression regardless of whether the direction matches.
+        // Safety timer in case the click event never fires (touch ended off
+        // the button) so the flag doesn't latch and break the next tap.
+        suppressNextClickRef.current = true;
+        setTimeout(() => { suppressNextClickRef.current = false; }, 300);
+        // Top drawer opens on drag-down; bottom drawer opens on drag-up.
+        const wantsOpen = side === "top" ? dy > 0 : dy < 0;
+        if (wantsOpen !== open) setOpen(wantsOpen);
+      },
+    };
+  }
+
   return (
     <div
       className="fixed top-14 left-0 right-0 z-50 bg-white flex flex-col"
@@ -328,11 +407,24 @@ export default function ScoringShell({
               <th className="px-0 py-1 text-center font-bold text-gray-400 border-l border-gray-200">Tot</th>
             </tr>
           </thead>
-          <tbody>
-            {renderScorecardRows(holes, hole.hole_number, goToHole)}
-          </tbody>
+          {scorecardOpen && (
+            <tbody>
+              {renderScorecardRows(holes, hole.hole_number, goToHole)}
+            </tbody>
+          )}
         </table>
       </div>
+
+      {/* Scorecard drawer handle — tap or drag down/up to toggle. The hole
+          numbers above remain visible and tappable in both states. */}
+      <button
+        type="button"
+        aria-label={scorecardOpen ? "Collapse scorecard" : "Expand scorecard"}
+        {...bindHandle(scorecardOpen, setScorecardOpen, "top")}
+        className="w-full py-1.5 flex justify-center bg-white border-b border-gray-100 shrink-0 active:bg-gray-50"
+      >
+        <span className="block w-10 h-1 bg-gray-300 rounded-full" />
+      </button>
 
       {/* Status banners */}
       {statusBanner}
@@ -478,12 +570,36 @@ export default function ScoringShell({
       {/* Course strip */}
       {courseStrip}
 
-      {/* Bottom scoring panel */}
-      <div
-        className="shrink min-h-0 bg-white border-t border-gray-200 overflow-y-auto"
-        style={{ paddingBottom: "max(0.5rem, calc(0.5rem + env(safe-area-inset-bottom)))", maxHeight: "45vh" }}
-      >
-        {renderScorePanel(hole, currentHoleIndex)}
+      {/* Score panel drawer */}
+      <div className="shrink-0 bg-white border-t border-gray-200">
+        <button
+          type="button"
+          aria-label={scorePanelOpen ? "Collapse score entry" : "Expand score entry"}
+          {...bindHandle(scorePanelOpen, setScorePanelOpen, "bottom")}
+          className="w-full py-2 flex justify-center active:bg-gray-50"
+        >
+          <span className="block w-10 h-1 bg-gray-300 rounded-full" />
+        </button>
+        {scorePanelOpen ? (
+          <div
+            className="overflow-y-auto"
+            style={{
+              paddingBottom: "max(0.5rem, calc(0.5rem + env(safe-area-inset-bottom)))",
+              maxHeight: "45vh",
+            }}
+          >
+            {renderScorePanel(hole, currentHoleIndex)}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setScorePanelOpen(true)}
+            className="w-full text-center text-xs font-medium text-gray-500 active:text-gray-700"
+            style={{ paddingTop: "0.25rem", paddingBottom: "max(0.75rem, calc(0.5rem + env(safe-area-inset-bottom)))" }}
+          >
+            Tap to enter scores
+          </button>
+        )}
       </div>
     </div>
   );

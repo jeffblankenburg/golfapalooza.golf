@@ -14,7 +14,7 @@ export async function GET() {
   }
 
   try {
-    const simulating = await isSimulating();
+    const simulating = await isSimulating(); 
     const effectiveUserId = await getEffectiveUserId(user.id);
     const queryClient = simulating ? createAdminClient() : supabase;
 

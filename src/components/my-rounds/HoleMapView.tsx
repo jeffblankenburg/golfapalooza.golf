@@ -149,6 +149,7 @@ export default function HoleMapView({
   const userMarkerRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const driveMarkerRef = useRef<any>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   // Auto-target state: one-way gates (tee → tracking → green). Reset per hole.
   // Manual drag flips manualOverrideRef true; each gate transition clears it.
@@ -242,6 +243,18 @@ export default function HoleMapView({
 
       const map = new mapboxgl.Map(mapOptions);
       mapRef.current = map;
+
+      // Mapbox's built-in trackResize watches the window, not flex-layout
+      // changes inside the page. When the surrounding drawers collapse and
+      // the map container grows, we have to tell Mapbox explicitly or its
+      // canvas stays at its old pixel size and the camera stops filling
+      // the visible area.
+      resizeObserverRef.current?.disconnect();
+      const ro = new ResizeObserver(() => {
+        mapRef.current?.resize();
+      });
+      ro.observe(containerRef.current);
+      resizeObserverRef.current = ro;
 
       map.on("load", () => {
         if (cancelled) return;
@@ -390,10 +403,16 @@ export default function HoleMapView({
           return { yards, labelEl, labelMarker };
         }
 
-        // Draggable target crosshair + first/second dotted segments
+        // Draggable target crosshair + first/second dotted segments.
+        // The transparent <rect pointer-events="all"> below is load-bearing on
+        // touch devices: without it, SVG default hit-testing only fires on
+        // the thin orange strokes, and finger taps in the empty crosshair
+        // center pass through to the map (which then pans instead of letting
+        // Mapbox start the marker drag).
         if (initialDrive && green) {
           const driveEl = document.createElement("div");
           driveEl.innerHTML = `<svg width="44" height="44" viewBox="0 0 44 44">
+            <rect width="44" height="44" fill="none" pointer-events="all"/>
             <circle cx="22" cy="22" r="16" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-dasharray="2 3" opacity="0.85"/>
             <circle cx="22" cy="22" r="10" fill="none" stroke="#f59e0b" stroke-width="2.5"/>
             <line x1="22" y1="2" x2="22" y2="9" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
@@ -403,6 +422,7 @@ export default function HoleMapView({
             <circle cx="22" cy="22" r="2.5" fill="#f59e0b"/>
           </svg>`;
           driveEl.style.cursor = "grab";
+          driveEl.style.touchAction = "none";
           driveEl.style.filter = "drop-shadow(0 1px 2px rgba(0,0,0,0.55))";
 
           const driveMarker = new mapboxgl.Marker({ element: driveEl, anchor: "center", draggable: true })
@@ -514,6 +534,8 @@ export default function HoleMapView({
 
     return () => {
       cancelled = true;
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
       userMarkerRef.current?.remove?.();
       userMarkerRef.current = null;
       driveMarkerRef.current = null;

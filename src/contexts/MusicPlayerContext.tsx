@@ -32,7 +32,13 @@ interface MusicPlayerState {
   volume: number;
   isShuffled: boolean;
   favoritesOnly: boolean;
+  // `isVisible` = the music drawer is mounted on screen in any form
+  // (collapsed mini-player or expanded full-screen). Flipped true the
+  // first time a song plays OR when the user opens the drawer manually.
   isVisible: boolean;
+  // Drawer expanded full-screen (true) vs. collapsed as the mini-player
+  // strip above the bottom nav (false).
+  isDrawerExpanded: boolean;
 }
 
 interface MusicPlayerActions {
@@ -48,6 +54,9 @@ interface MusicPlayerActions {
   toggleFavoritesOnly: () => void;
   toggleFavorite: (songId: string) => void;
   dismiss: () => void;
+  expandDrawer: () => void;
+  collapseDrawer: () => void;
+  toggleDrawer: () => void;
 }
 
 type MusicPlayerContextType = MusicPlayerState & MusicPlayerActions;
@@ -99,6 +108,7 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
   const [shuffleOrder, setShuffleOrder] = useState<number[]>([]);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [isDrawerExpanded, setIsDrawerExpanded] = useState(false);
 
   // Whether we should auto-resume after songs load
   const shouldAutoResumeRef = useRef(loadStoredBool(STORAGE_KEY_PLAYING, false));
@@ -405,8 +415,73 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
     pause();
     cancelPlayTimer();
     setIsVisible(false);
+    setIsDrawerExpanded(false);
     localStorage.setItem(STORAGE_KEY_PLAYING, "false");
   }, [pause, cancelPlayTimer]);
+
+  // Drawer controls. `expandDrawer` flips `isVisible` true so the music UI
+  // becomes available from anywhere (e.g., the user taps the music icon
+  // before any song has been queued). Each open broadcasts to other
+  // universal drawers (e.g., chat) so only one full-screen surface is
+  // active at a time — same z-layer otherwise stacks them invisibly.
+  function broadcastOpen() {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("ui:drawer-open", { detail: { name: "music" } }));
+    }
+  }
+  const expandDrawer = useCallback(() => {
+    setIsVisible(true);
+    setIsDrawerExpanded(true);
+    broadcastOpen();
+  }, []);
+  const collapseDrawer = useCallback(() => {
+    setIsDrawerExpanded(false);
+  }, []);
+  // Mirror expanded state in a ref so toggleDrawer can branch without
+  // putting side effects inside a setState updater (updaters must be pure).
+  const isDrawerExpandedRef = useRef(isDrawerExpanded);
+  useEffect(() => { isDrawerExpandedRef.current = isDrawerExpanded; }, [isDrawerExpanded]);
+  const toggleDrawer = useCallback(() => {
+    const willOpen = !isDrawerExpandedRef.current;
+    setIsDrawerExpanded(willOpen);
+    if (willOpen) {
+      setIsVisible(true);
+      broadcastOpen();
+    }
+  }, []);
+
+  // Collapse when another universal drawer (chat, etc.) takes the screen.
+  // Music keeps playing; we just step out of the way visually.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ name?: string }>).detail;
+      if (detail?.name && detail.name !== "music") setIsDrawerExpanded(false);
+    };
+    window.addEventListener("ui:drawer-open", handler);
+    return () => window.removeEventListener("ui:drawer-open", handler);
+  }, []);
+
+  // Auto-load the song catalog once on mount so the universal drawer works
+  // from any page — no need to visit /music first to hydrate the context.
+  // /music's server fetch still wins (passes initialSongs into loadSongs)
+  // because that runs after mount and overwrites with fresher data.
+  useEffect(() => {
+    if (songsRef.current.length > 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/songs");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const list = (data.songs || []) as Song[];
+        if (list.length > 0 && songsRef.current.length === 0) loadSongs(list);
+      } catch { /* offline / spectator — fine */ }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Event listeners on audio element ───────────────────────────────────
 
@@ -498,6 +573,7 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
         isShuffled,
         favoritesOnly,
         isVisible,
+        isDrawerExpanded,
         loadSongs,
         play,
         pause,
@@ -510,6 +586,9 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
         toggleFavoritesOnly,
         toggleFavorite,
         dismiss,
+        expandDrawer,
+        collapseDrawer,
+        toggleDrawer,
       }}
     >
       <audio ref={audioRef} preload="auto" />

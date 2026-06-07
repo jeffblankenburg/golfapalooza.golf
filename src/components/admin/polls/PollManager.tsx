@@ -415,6 +415,7 @@ export function PollManager() {
             <PollAdminResults
               results={resultsData}
               isAnonymous={resultsPoll.is_anonymous}
+              pollTitle={resultsPoll.title}
             />
           </div>
         )}

@@ -54,11 +54,23 @@ function timeAgo(date: string): string {
 export function ChatRoomList({
   currentUserId,
   users,
+  onRoomSelect,
 }: {
   currentUserId: string;
   users: User[];
+  // When provided (e.g., rendered inside the universal ChatDrawer), tapping
+  // a room calls this instead of navigating to /chat/[roomId]. Falls back
+  // to router.push when omitted so the full-page /chat route still works.
+  onRoomSelect?: (roomId: string) => void;
 }) {
   const router = useRouter();
+  const goToRoom = useCallback(
+    (roomId: string) => {
+      if (onRoomSelect) onRoomSelect(roomId);
+      else router.push(`/chat/${roomId}`);
+    },
+    [onRoomSelect, router],
+  );
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCompose, setShowCompose] = useState(false);
@@ -205,7 +217,7 @@ export function ChatRoomList({
 
     // If there's an exact match, navigate to it
     if (matchingRooms.length > 0) {
-      router.push(`/chat/${matchingRooms[0].id}`);
+      goToRoom(matchingRooms[0].id);
       return;
     }
 
@@ -220,7 +232,7 @@ export function ChatRoomList({
       });
       const data = await res.json();
       if (data.room?.id) {
-        router.push(`/chat/${data.room.id}`);
+        goToRoom(data.room.id);
       }
     } finally {
       setCreating(false);
@@ -286,7 +298,7 @@ export function ChatRoomList({
               onClick={() => {
                 if (longPressTriggered.current) return;
                 logActivity("chat_open", `/chat/${room.id}`, { room_id: room.id, room_type: room.type });
-                router.push(`/chat/${room.id}`);
+                goToRoom(room.id);
               }}
               onTouchStart={() => handleLongPressStart(room)}
               onTouchEnd={handleLongPressEnd}
@@ -469,7 +481,7 @@ export function ChatRoomList({
                       <button
                         key={room.id}
                         onClick={() => {
-                          router.push(`/chat/${room.id}`);
+                          goToRoom(room.id);
                           closeCompose();
                         }}
                         className="flex items-center gap-3 w-full px-4 py-2.5 text-left active:bg-gray-50"
@@ -503,7 +515,7 @@ export function ChatRoomList({
                       <button
                         key={room.id}
                         onClick={() => {
-                          router.push(`/chat/${room.id}`);
+                          goToRoom(room.id);
                           closeCompose();
                         }}
                         className="flex items-center gap-3 w-full px-4 py-2.5 text-left active:bg-gray-50"

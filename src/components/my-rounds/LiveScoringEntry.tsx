@@ -605,6 +605,7 @@ export default function LiveScoringEntry({
           </span>
         </div>
       }
+      scorecardLeadHeader="#"
       renderScorecardRows={(holes) => {
         const hasBothNines = holes.length > 9 && holes[0]?.hole_number <= 9;
         const front9 = hasBothNines ? holes.filter((h) => h.hole_number <= 9) : [];
@@ -612,6 +613,7 @@ export default function LiveScoringEntry({
         return (
           <>
             <tr className="border-t border-gray-100">
+              <td className="px-1 py-0.5 text-center text-gray-400 font-bold border-r border-gray-200">Par</td>
               {holes.map((h) => (
                 <Fragment key={h.hole_number}>
                   {h.hole_number === 10 && hasBothNines && (
@@ -631,6 +633,21 @@ export default function LiveScoringEntry({
                 {holes.reduce((s, h) => s + h.par, 0)}
               </td>
             </tr>
+            <tr className="border-t border-gray-100">
+              <td className="px-1 py-0.5 text-center text-gray-300 font-bold border-r border-gray-200">Hcp</td>
+              {holes.map((h) => (
+                <Fragment key={h.hole_number}>
+                  {h.hole_number === 10 && hasBothNines && (
+                    <td className="px-0 py-0.5 text-center text-gray-300 border-l border-r border-gray-200" />
+                  )}
+                  <td className="px-0 py-0.5 text-center text-gray-300">{h.handicap_index}</td>
+                </Fragment>
+              ))}
+              {hasBothNines && (
+                <td className="px-0 py-0.5 text-center text-gray-300 border-l border-r border-gray-200" />
+              )}
+              <td className="px-0 py-0.5 text-center text-gray-300 border-l border-gray-200" />
+            </tr>
             {players.map((p) => {
               const total = holes.reduce((s, h) => s + (scores[p.id]?.[h.hole_number] ?? 0), 0);
               const front9Total = front9.reduce((s, h) => s + (scores[p.id]?.[h.hole_number] ?? 0), 0);
@@ -638,8 +655,12 @@ export default function LiveScoringEntry({
               const hasAny = holes.some((h) => scores[p.id]?.[h.hole_number] != null);
               const hasAnyFront = front9.some((h) => scores[p.id]?.[h.hole_number] != null);
               const hasAnyBack = back9.some((h) => scores[p.id]?.[h.hole_number] != null);
+              const initial = (p.name?.trim()?.[0] || "?").toUpperCase();
               return (
                 <tr key={p.id} className="border-t border-gray-100">
+                  <td className="px-1 py-0.5 text-center font-bold text-gray-700 border-r border-gray-200">
+                    {initial}
+                  </td>
                   {holes.map((h) => (
                     <Fragment key={h.hole_number}>
                       {h.hole_number === 10 && hasBothNines && (

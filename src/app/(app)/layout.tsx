@@ -4,7 +4,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { BottomNav } from "@/components/BottomNav";
 import { HeaderBar } from "@/components/HeaderBar";
 import { SimulatorBanner } from "@/components/SimulatorBanner";
-import { MusicPlayerProvider } from "@/components/MusicPlayerProvider";
 import { AppShell } from "@/components/AppShell";
 import { RouteProgress } from "@/components/RouteProgress";
 import { getSimDate, getSimUserId, getEffectiveUserId, isSimulating, isSimulatingTrip } from "@/lib/simulator";
@@ -103,26 +102,24 @@ export default async function AppLayout({
   const showBanner = realIsAdmin && (simDate || simUserId || simTripActive);
 
   return (
-    <MusicPlayerProvider>
-      <AppShell>
-        <RouteProgress />
-        {showBanner && (
-          <SimulatorBanner
-            simDate={simDate}
-            simUserName={simUserName}
-            simTripActive={simTripActive}
-          />
-        )}
-        <HeaderBar
-          initialUnreadCount={unreadCount || 0}
-          initialChatUnreadCount={chatUnreadCount}
-          userId={effectiveUserId}
-          displayName={profile?.display_name || ""}
-          avatarUrl={profile?.avatar_url || null}
+    <AppShell>
+      <RouteProgress />
+      {showBanner && (
+        <SimulatorBanner
+          simDate={simDate}
+          simUserName={simUserName}
+          simTripActive={simTripActive}
         />
-        <main>{children}</main>
-        <BottomNav isAdmin={isAdmin || hasAnyPermission(simulating ? (profile?.permissions as Record<string, boolean> | null) : realPermissions)} />
-      </AppShell>
-    </MusicPlayerProvider>
+      )}
+      <HeaderBar
+        initialUnreadCount={unreadCount || 0}
+        initialChatUnreadCount={chatUnreadCount}
+        userId={effectiveUserId}
+        displayName={profile?.display_name || ""}
+        avatarUrl={profile?.avatar_url || null}
+      />
+      <main>{children}</main>
+      <BottomNav isAdmin={isAdmin || hasAnyPermission(simulating ? (profile?.permissions as Record<string, boolean> | null) : realPermissions)} />
+    </AppShell>
   );
 }

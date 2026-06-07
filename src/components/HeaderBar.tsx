@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import { NotificationDrawer } from "./NotificationDrawer";
 import { isPushSupported, getPermissionStatus, subscribeToPush } from "@/lib/notifications/push-client";
 import { syncBadge } from "@/lib/notifications/badge";
+import { useMusicPlayerOptional } from "@/contexts/MusicPlayerContext";
+import { useChatDrawerOptional } from "@/contexts/ChatDrawerContext";
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -32,6 +34,16 @@ export function HeaderBar({
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
   const [chatUnreadCount, setChatUnreadCount] = useState(initialChatUnreadCount);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  // Music drawer trigger — replaces the old `<Link href="/music">` so the
+  // drawer opens in place instead of navigating away. Optional so HeaderBar
+  // works on layouts without MusicPlayerProvider (e.g., /admin).
+  const musicPlayer = useMusicPlayerOptional();
+  const toggleMusicDrawer = musicPlayer?.toggleDrawer;
+  const musicIsPlaying = musicPlayer?.isPlaying ?? false;
+  // Chat drawer trigger — same pattern.
+  const chatDrawer = useChatDrawerOptional();
+  const toggleChatDrawer = chatDrawer?.toggleDrawer;
   const pushChecked = useRef(false);
 
   // Auto-subscribe to push on mount if permission already granted
@@ -207,29 +219,33 @@ export function HeaderBar({
 
           {/* Left: Chat + Gallery icons */}
           <div className="flex items-center -ml-1">
-            <Link
-              href="/chat"
-              className="relative flex items-center justify-center w-10 h-10"
-            >
-              <svg
-                className="w-6 h-6 text-gray-700"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            {toggleChatDrawer ? (
+              <button
+                type="button"
+                onClick={toggleChatDrawer}
+                aria-label="Open chat"
+                className="relative flex items-center justify-center w-10 h-10"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                />
-              </svg>
-              {chatUnreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
-                  {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
-                </span>
-              )}
-            </Link>
+                <svg
+                  className="w-6 h-6 text-gray-700"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                  />
+                </svg>
+                {chatUnreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                    {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                  </span>
+                )}
+              </button>
+            ) : null}
             <Link
               href="/gallery"
               className="relative flex items-center justify-center w-10 h-10"
@@ -248,24 +264,34 @@ export function HeaderBar({
                 />
               </svg>
             </Link>
-            <Link
-              href="/music"
-              className="relative flex items-center justify-center w-10 h-10"
-            >
-              <svg
-                className="w-6 h-6 text-gray-700"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            {toggleMusicDrawer && (
+              <button
+                type="button"
+                onClick={toggleMusicDrawer}
+                aria-label="Open music"
+                className="relative flex items-center justify-center w-10 h-10"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
-                />
-              </svg>
-            </Link>
+                <svg
+                  className="w-6 h-6 text-gray-700"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                  />
+                </svg>
+                {musicIsPlaying && (
+                  <span
+                    className="absolute top-1.5 right-1.5 block w-2 h-2 rounded-full bg-green-500"
+                    aria-hidden
+                  />
+                )}
+              </button>
+            )}
           </div>
 
           {/* Right: Bell + Profile */}

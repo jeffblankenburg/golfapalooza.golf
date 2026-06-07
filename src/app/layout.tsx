@@ -5,6 +5,9 @@ import { PullToRefresh } from "@/components/PullToRefresh";
 import { ActivityTracker } from "@/components/ActivityTracker";
 import { SplashFader } from "@/components/SplashFader";
 import { WakeLockKeeper } from "@/components/WakeLockKeeper";
+import { MusicPlayerProvider } from "@/components/MusicPlayerProvider";
+import { ChatDrawerProvider } from "@/contexts/ChatDrawerContext";
+import { ChatDrawer } from "@/components/chat/ChatDrawer";
 
 const SPLASH_CSS = `
 #app-splash {
@@ -150,7 +153,15 @@ export default function RootLayout({
         <PullToRefresh />
         <ActivityTracker />
         <WakeLockKeeper />
-        {children}
+        {/* Universal music player + chat drawer — single instances cover
+            every layout so playback continues and the chat surface is
+            reachable wherever their icons show. */}
+        <MusicPlayerProvider>
+          <ChatDrawerProvider>
+            {children}
+            <ChatDrawer />
+          </ChatDrawerProvider>
+        </MusicPlayerProvider>
       </body>
     </html>
   );

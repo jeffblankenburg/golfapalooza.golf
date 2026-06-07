@@ -43,6 +43,8 @@ export function ChatRoom({
   currentUserRole = "member",
   createdBy,
   members: initialMembers = [],
+  onBack,
+  revealedAt,
 }: {
   roomId: string;
   roomName: string;
@@ -54,8 +56,19 @@ export function ChatRoom({
   currentUserRole?: string;
   createdBy?: string | null;
   members?: ChatMember[];
+  // When provided (e.g., rendered inside ChatDrawer), back/leave actions
+  // call this instead of router.push("/chat"). Falls back to navigation.
+  onBack?: () => void;
+  // Bumped by the parent every time the component is "revealed" again
+  // (e.g., drawer reopened with this room mounted). Triggers a fresh
+  // scroll-to-newest so the user always sees the latest message.
+  revealedAt?: number;
 }) {
   const router = useRouter();
+  const goBack = useCallback(() => {
+    if (onBack) onBack();
+    else router.push("/chat");
+  }, [onBack, router]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -76,6 +89,20 @@ export function ChatRoom({
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, []);
+
+  // Snap to the newest message every time the drawer reveals this room.
+  // Force-overrides `shouldScrollRef` (which may have been turned off by
+  // the user scrolling up earlier) since opening the chat should always
+  // show the latest content.
+  useEffect(() => {
+    if (revealedAt == null) return;
+    shouldScrollRef.current = true;
+    // Wait a tick so any pending layout (e.g., drawer transform) settles.
+    const t = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+    }, 50);
+    return () => clearTimeout(t);
+  }, [revealedAt]);
 
   // Fetch initial messages
   useEffect(() => {
@@ -351,7 +378,7 @@ export function ChatRoom({
       {/* Chat header */}
       <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-200 bg-white">
         <button
-          onClick={() => router.push("/chat")}
+          onClick={goBack}
           className="flex items-center justify-center w-10 h-10 -ml-2"
         >
           <svg className="w-6 h-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -469,7 +496,7 @@ export function ChatRoom({
           onClose={() => setShowSettings(false)}
           onRename={handleRename}
           onMembersChanged={handleMembersChanged}
-          onLeft={() => router.push("/chat")}
+          onLeft={goBack}
         />
       )}
     </div>

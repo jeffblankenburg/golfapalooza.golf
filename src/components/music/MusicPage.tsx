@@ -43,12 +43,9 @@ export function MusicPage({ initialSongs, headerAction }: { initialSongs: Song[]
     }
   }, [initialSongs, loadSongs, songs.length]);
 
-  // Lock the page to the top whenever the user lands on the music player.
-  // We deliberately do not auto-scroll the playlist as songs advance — the
-  // player UI sits at the top and that's where the user wants to stay.
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "auto" });
-  }, []);
+  // Note: no longer auto-scrolls the document — MusicPage now renders inside
+  // the universal MusicDrawer, which provides its own scroll container that
+  // already starts at the top when expanded.
 
   const currentSong = songs[currentIndex] || null;
 

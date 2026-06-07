@@ -1,20 +1,48 @@
 "use client";
 
+import { useState } from "react";
 import type { PollResults } from "@/types/golf";
+import { exportPollResultsToExcel } from "@/lib/poll-export";
 
 interface PollAdminResultsProps {
   results: PollResults;
   isAnonymous: boolean;
+  pollTitle: string;
 }
 
-export function PollAdminResults({ results, isAnonymous }: PollAdminResultsProps) {
+export function PollAdminResults({ results, isAnonymous, pollTitle }: PollAdminResultsProps) {
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      await exportPollResultsToExcel({ pollTitle, results, isAnonymous });
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <p className="text-xs text-gray-500">
-        {results.total_respondents}{" "}
-        {results.total_respondents === 1 ? "response" : "responses"}
-        {isAnonymous && " · anonymous"}
-      </p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-gray-500">
+          {results.total_respondents}{" "}
+          {results.total_respondents === 1 ? "response" : "responses"}
+          {isAnonymous && " · anonymous"}
+        </p>
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={exporting || results.total_respondents === 0}
+          className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-md active:bg-green-100 disabled:opacity-50"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          {exporting ? "Exporting…" : "Excel"}
+        </button>
+      </div>
 
       {results.questions.map((q) => (
         <div
@@ -25,10 +53,13 @@ export function PollAdminResults({ results, isAnonymous }: PollAdminResultsProps
 
           {q.options && q.options.length > 0 && (
             <div className="space-y-1.5">
-              {q.options.map((o) => {
-                const total =
-                  q.options!.reduce((s, oo) => s + oo.count, 0) || 0;
-                const pct = total > 0 ? (o.count / total) * 100 : 0;
+              {[...q.options]
+                .sort((a, b) => b.count - a.count)
+                .map((o) => {
+                const pct =
+                  results.total_respondents > 0
+                    ? (o.count / results.total_respondents) * 100
+                    : 0;
                 const voters = !isAnonymous ? o.voters || [] : [];
                 return (
                   <div key={o.option_id}>

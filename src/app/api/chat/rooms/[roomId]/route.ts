@@ -43,7 +43,8 @@ export async function GET(
       | { id: string; display_name: string; avatar_url: string | null }[]
       | null;
   };
-  function flatUser(m: RawMember) {
+  function flatUser(m: RawMember | undefined) {
+    if (!m) return null;
     return Array.isArray(m.user) ? m.user[0] : m.user;
   }
   const rawMembers = (room.members as RawMember[] | null) || [];

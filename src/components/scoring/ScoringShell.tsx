@@ -120,9 +120,6 @@ export default function ScoringShell({
 
   if (!hole) return null;
 
-  const dotColor = isCompositionTee ? hole.source_tee_color || hole.tee_color : roundTeeColor;
-  const dotHex = dotColor ? TEE_HEX_COLORS[dotColor] || null : null;
-
   return (
     <div
       className="fixed top-14 left-0 right-0 z-50 bg-white flex flex-col"
@@ -139,20 +136,12 @@ export default function ScoringShell({
           </svg>
         </button>
 
-        <div className="flex items-center gap-3 text-sm text-gray-500">
-          {dotHex && (
-            <span
-              className="w-3 h-3 rounded-full shrink-0"
-              style={{ backgroundColor: dotHex, border: dotHex === "#f3f4f6" ? "1px solid #9ca3af" : undefined }}
-            />
-          )}
-          <span className="font-bold text-gray-900">Hole {hole.hole_number}</span>
-          <span className="w-px h-4 bg-gray-200" />
-          <span>Par <span className="font-bold text-gray-900">{hole.par}</span></span>
-          <span className="w-px h-4 bg-gray-200" />
-          <span><span className="font-bold text-gray-900">{hole.yards}</span> yds</span>
-          <span className="w-px h-4 bg-gray-200" />
-          <span>Hcp <span className="font-bold text-gray-900">{hole.handicap_index}</span></span>
+        <div className="flex items-center gap-2 text-sm text-gray-500 min-w-0">
+          <span className="font-bold text-gray-900 shrink-0">Hole {hole.hole_number}</span>
+          <span className="w-px h-4 bg-gray-200 shrink-0" />
+          <span className="shrink-0">Par <span className="font-bold text-gray-900">{hole.par}</span></span>
+          <span className="w-px h-4 bg-gray-200 shrink-0" />
+          <span className="shrink-0"><span className="font-bold text-gray-900">{hole.yards}</span> yds</span>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">

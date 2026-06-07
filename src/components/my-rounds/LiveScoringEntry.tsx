@@ -5,13 +5,45 @@ import ScoringShell, { type HoleInfo } from "@/components/scoring/ScoringShell";
 import { getScoreDescription } from "@/lib/golf/calculator";
 import { DragHandle } from "@/components/DragHandle";
 import { subscribeToRound } from "@/lib/realtime/round-channel";
+import { TEE_HEX_COLORS } from "@/lib/utils/tee-colors";
 
 interface Player {
   id: string;
   name: string;
   teeName?: string;
+  teeColor?: string | null;
   teeId?: string;
   roundPlayerId?: string; // set after round is created
+}
+
+// Compute swatch styles for the leading scorecard cell: filled colored badge.
+// White tee gets a thin border so the badge doesn't disappear against the cell.
+// Composition tees ("Black/Blue") get the gradient only as a fallback when no
+// per-hole color is available — callers should pass the current hole's
+// `source_tee_color` so the badge reflects which tee the player is actually
+// playing on this hole.
+function teeBadgeStyle(teeColor?: string | null): { background: string; color: string; border?: string } {
+  if (!teeColor) return { background: "#e5e7eb", color: "#374151" };
+  if (teeColor.includes("/")) {
+    const parts = teeColor.split("/").map((c) => c.trim());
+    const hexes = parts.map((c) => TEE_HEX_COLORS[c] || "#9ca3af");
+    return {
+      background: `linear-gradient(135deg, ${hexes[0]} 50%, ${hexes[1] || hexes[0]} 50%)`,
+      color: "#ffffff",
+      border: hexes.includes("#f3f4f6") ? "1px solid #9ca3af" : undefined,
+    };
+  }
+  const hex = TEE_HEX_COLORS[teeColor] || "#9ca3af";
+  if (hex === "#f3f4f6") return { background: hex, color: "#374151", border: "1px solid #9ca3af" };
+  return { background: hex, color: "#ffffff" };
+}
+
+// Per-hole tee color for a player: if their assignment is a composition
+// ("Black/Blue"), use the current hole's resolved `source_tee_color`. Otherwise
+// the player's assignment is already a single color.
+function effectiveTeeColor(playerTeeColor: string | null | undefined, currentHole: HoleInfo | undefined): string | null | undefined {
+  if (!playerTeeColor?.includes("/")) return playerTeeColor;
+  return currentHole?.source_tee_color || playerTeeColor;
 }
 
 interface LiveScoringEntryProps {
@@ -606,10 +638,11 @@ export default function LiveScoringEntry({
         </div>
       }
       scorecardLeadHeader="#"
-      renderScorecardRows={(holes) => {
+      renderScorecardRows={(holes, currentHoleNumber) => {
         const hasBothNines = holes.length > 9 && holes[0]?.hole_number <= 9;
         const front9 = hasBothNines ? holes.filter((h) => h.hole_number <= 9) : [];
         const back9 = hasBothNines ? holes.filter((h) => h.hole_number > 9) : [];
+        const currentHole = holes.find((h) => h.hole_number === currentHoleNumber);
         return (
           <>
             <tr className="border-t border-gray-100">
@@ -656,10 +689,17 @@ export default function LiveScoringEntry({
               const hasAnyFront = front9.some((h) => scores[p.id]?.[h.hole_number] != null);
               const hasAnyBack = back9.some((h) => scores[p.id]?.[h.hole_number] != null);
               const initial = (p.name?.trim()?.[0] || "?").toUpperCase();
+              const badge = teeBadgeStyle(effectiveTeeColor(p.teeColor, currentHole));
               return (
                 <tr key={p.id} className="border-t border-gray-100">
-                  <td className="px-1 py-0.5 text-center font-bold text-gray-700 border-r border-gray-200">
-                    {initial}
+                  <td className="px-1 py-0.5 text-center border-r border-gray-200">
+                    <span
+                      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold leading-none"
+                      style={badge}
+                      title={p.teeName || undefined}
+                    >
+                      {initial}
+                    </span>
                   </td>
                   {holes.map((h) => (
                     <Fragment key={h.hole_number}>

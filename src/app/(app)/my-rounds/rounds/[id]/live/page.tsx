@@ -27,7 +27,7 @@ export default function LiveScoringResumePage() {
   const [data, setData] = useState<{
     round: RoundData;
     holes: HoleInfo[];
-    players: { id: string; name: string; teeName?: string; roundPlayerId: string }[];
+    players: { id: string; name: string; teeName?: string; teeColor?: string | null; roundPlayerId: string }[];
     initialScores: Record<string, Record<number, number>>;
     initialPutts: Record<string, Record<number, number>>;
     initialPlayerMap: Record<string, string>;
@@ -59,6 +59,7 @@ export default function LiveScoringResumePage() {
           id: rp.user_id,
           name: user?.display_name || "Player",
           teeName: tee?.tee_name,
+          teeColor: tee?.tee_color ?? null,
           roundPlayerId: rp.id,
         };
       });

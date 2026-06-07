@@ -1036,6 +1036,7 @@ export default function RoundForm() {
       id,
       name: getPlayerName(id),
       teeName: getPlayerTee(id)?.tee_name,
+      teeColor: getPlayerTee(id)?.tee_color ?? null,
       teeId: playerTees[id] || selectedTee?.id,
     }));
 

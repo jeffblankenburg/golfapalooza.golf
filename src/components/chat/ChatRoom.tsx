@@ -100,22 +100,85 @@ export function ChatRoom({
     if (shouldScrollRef.current) snapToBottom(true);
   }, [snapToBottom]);
 
+  // Fetch the latest window of messages and merge by id. Used as a resync
+  // fallback when the realtime channel may have missed events (iOS kills
+  // PWA WebSockets when backgrounded, the network blipped, or the channel
+  // never made it to SUBSCRIBED).
+  const resyncMessages = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/chat/rooms/${roomId}/messages?limit=50`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const fetched = ((data.messages || []) as Message[]).slice().reverse();
+      if (fetched.length === 0) return;
+      let didAddNew = false;
+      setMessages((prev) => {
+        const byId = new Map(prev.map((m) => [m.id, m]));
+        for (const m of fetched) {
+          if (!byId.has(m.id)) didAddNew = true;
+          byId.set(m.id, m);
+        }
+        return Array.from(byId.values()).sort(
+          (a, b) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        );
+      });
+      if (didAddNew) {
+        const container = scrollContainerRef.current;
+        if (container) {
+          const isNearBottom =
+            container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+          if (isNearBottom) {
+            shouldScrollRef.current = true;
+            requestAnimationFrame(() => snapToBottom(false));
+          }
+        }
+      }
+    } catch {
+      // Best-effort — the next realtime event or resync trigger will retry.
+    }
+  }, [roomId, snapToBottom]);
+
   // Snap to the newest message every time the drawer reveals this room.
   // Force-overrides `shouldScrollRef` (which may have been turned off by
   // the user scrolling up earlier) since opening the chat should always
   // show the latest content. The drawer's translate-y transition is
   // 300ms, so we snap twice — once on the next frame for snappiness,
   // and again after the transition lands in case layout shifted.
+  // Also refetch — if the realtime channel was dead while the drawer was
+  // closed (iOS kills PWA WebSockets when backgrounded), the local state
+  // is stale.
   useEffect(() => {
     if (revealedAt == null) return;
     shouldScrollRef.current = true;
-    const raf = requestAnimationFrame(() => snapToBottom(false));
+    const raf = requestAnimationFrame(() => {
+      snapToBottom(false);
+      void resyncMessages();
+    });
     const t = setTimeout(() => snapToBottom(false), 350);
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(t);
     };
-  }, [revealedAt, snapToBottom]);
+  }, [revealedAt, snapToBottom, resyncMessages]);
+
+  // Resync whenever the tab becomes visible again or the network comes
+  // back online. The realtime WebSocket can die silently in either case
+  // — particularly on iOS PWAs that get backgrounded — and there's no
+  // built-in reconnect that catches up missed inserts.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void resyncMessages();
+    };
+    const onOnline = () => void resyncMessages();
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onOnline);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onOnline);
+    };
+  }, [resyncMessages]);
 
   // Fetch initial messages
   useEffect(() => {
@@ -203,7 +266,12 @@ export function ChatRoom({
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        // On (re)subscribe, Supabase does NOT replay missed inserts. Pull
+        // the latest window so anything that landed while the socket was
+        // down shows up.
+        if (status === "SUBSCRIBED") void resyncMessages();
+      });
 
     // Reactions
     const reactionsChannel = supabase
@@ -251,7 +319,7 @@ export function ChatRoom({
       supabase.removeChannel(reactionsChannel);
       supabase.removeChannel(presenceChannel);
     };
-  }, [roomId, currentUserId, scrollToBottom]);
+  }, [roomId, currentUserId, scrollToBottom, resyncMessages]);
 
   // Load more messages
   const loadMore = async () => {

@@ -129,7 +129,7 @@ export function ChatDrawer() {
 
   return (
     <div
-      className={`fixed top-14 inset-x-0 bottom-0 z-[55] bg-white transition-transform duration-300 ease-out flex flex-col ${
+      className={`fixed top-14 inset-x-0 bottom-0 z-[55] bg-white transition-transform duration-300 ease-out flex flex-col overscroll-none ${
         isOpen ? "translate-y-0" : "translate-y-full pointer-events-none"
       }`}
       aria-hidden={!isOpen}
@@ -149,7 +149,7 @@ export function ChatDrawer() {
           opens. Room view is layered above when a room is selected. */}
       <div className="flex-1 min-h-0 relative">
         <div
-          className={`absolute inset-0 overflow-y-auto ${currentRoomId == null ? "" : "hidden"}`}
+          className={`absolute inset-0 overflow-y-auto overscroll-contain ${currentRoomId == null ? "" : "hidden"}`}
         >
           {listError ? (
             <div className="p-6 text-center text-sm text-red-600">{listError}</div>
@@ -165,7 +165,7 @@ export function ChatDrawer() {
         </div>
 
         {currentRoomId != null && (
-          <div className="absolute inset-0 overflow-y-auto">
+          <div className="absolute inset-0 overflow-y-auto overscroll-contain">
             {roomError ? (
               <div className="p-6 text-center text-sm text-red-600">
                 {roomError}

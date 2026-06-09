@@ -84,25 +84,38 @@ export function ChatRoom({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const presenceChannelRef = useRef<any>(null);
 
-  const scrollToBottom = useCallback(() => {
-    if (shouldScrollRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
+  // Snap the scroll container itself to its bottom. scrollIntoView on a
+  // 0-height end-marker proved unreliable inside the drawer's nested
+  // scroll containers during the open transition — set scrollTop directly.
+  const snapToBottom = useCallback((smooth = false) => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: smooth ? "smooth" : "auto",
+    });
   }, []);
+
+  const scrollToBottom = useCallback(() => {
+    if (shouldScrollRef.current) snapToBottom(true);
+  }, [snapToBottom]);
 
   // Snap to the newest message every time the drawer reveals this room.
   // Force-overrides `shouldScrollRef` (which may have been turned off by
   // the user scrolling up earlier) since opening the chat should always
-  // show the latest content.
+  // show the latest content. The drawer's translate-y transition is
+  // 300ms, so we snap twice — once on the next frame for snappiness,
+  // and again after the transition lands in case layout shifted.
   useEffect(() => {
     if (revealedAt == null) return;
     shouldScrollRef.current = true;
-    // Wait a tick so any pending layout (e.g., drawer transform) settles.
-    const t = setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
-    }, 50);
-    return () => clearTimeout(t);
-  }, [revealedAt]);
+    const raf = requestAnimationFrame(() => snapToBottom(false));
+    const t = setTimeout(() => snapToBottom(false), 350);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t);
+    };
+  }, [revealedAt, snapToBottom]);
 
   // Fetch initial messages
   useEffect(() => {
@@ -112,14 +125,14 @@ export function ChatRoom({
         setMessages((data.messages || []).reverse());
         setHasMore((data.messages || []).length >= 50);
         setLoading(false);
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView();
-        }, 50);
+        requestAnimationFrame(() => snapToBottom(false));
+        // Late settle for images/avatars that affect message heights.
+        setTimeout(() => snapToBottom(false), 350);
       })
       .catch(() => {
         setLoading(false);
       });
-  }, [roomId]);
+  }, [roomId, snapToBottom]);
 
   // Mark as read when entering and when new messages arrive
   useEffect(() => {
@@ -409,7 +422,7 @@ export function ChatRoom({
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto overscroll-contain px-3 py-2"
+        className="flex-1 overflow-y-auto overscroll-contain px-3 py-2 touch-pan-y"
       >
         {loadingMore && (
           <div className="flex justify-center py-2">

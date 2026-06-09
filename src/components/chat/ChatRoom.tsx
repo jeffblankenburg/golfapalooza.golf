@@ -454,7 +454,7 @@ export function ChatRoom({
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)]">
+    <div className="flex flex-col h-full">
       {/* Chat header */}
       <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-200 bg-white">
         <button

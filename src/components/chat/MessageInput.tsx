@@ -154,7 +154,7 @@ export function MessageInput({
   const hasContent = text.trim().length > 0;
 
   return (
-    <div className="border-t border-gray-200 bg-white pb-safe">
+    <div className="border-t border-gray-200 bg-white">
       {/* Reply preview */}
       {replyTo && (
         <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border-b border-gray-100">

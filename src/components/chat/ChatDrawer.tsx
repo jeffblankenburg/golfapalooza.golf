@@ -130,7 +130,7 @@ export function ChatDrawer() {
   return (
     <div
       data-pull-refresh="off"
-      className={`fixed top-14 inset-x-0 bottom-0 z-[55] bg-white transition-transform duration-300 ease-out flex flex-col ${
+      className={`fixed top-14 inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] z-[55] bg-white transition-transform duration-300 ease-out flex flex-col ${
         isOpen ? "translate-y-0" : "translate-y-full pointer-events-none"
       }`}
       aria-hidden={!isOpen}

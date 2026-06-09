@@ -489,7 +489,7 @@ export function ChatRoom({
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto overscroll-contain px-3 py-2 touch-pan-y"
+        className="flex-1 overflow-y-auto overscroll-contain px-3 py-2"
       >
         {loadingMore && (
           <div className="flex justify-center py-2">

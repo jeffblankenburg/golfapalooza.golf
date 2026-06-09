@@ -119,45 +119,18 @@ export function ChatDrawer() {
     return () => { cancelled = true; };
   }, [isOpen, currentRoomId, roomData?.id]);
 
-  // Lock background scroll while open. `overflow: hidden` alone is not
-  // enough on iOS Safari + Chrome Android PWAs — the document itself
-  // stays technically scrollable, so the browser's pull-to-refresh
-  // gesture still fires when the chat's inner scroll bounces past its
-  // top edge. Pinning body to `position: fixed` with the stored scrollY
-  // makes the document genuinely unscrollable, which kills PTR at the
-  // source. Restore scroll position on close.
+  // Lock background scroll while open.
   useEffect(() => {
     if (!isOpen) return;
-    const scrollY = window.scrollY;
-    const body = document.body;
-    const prev = {
-      position: body.style.position,
-      top: body.style.top,
-      left: body.style.left,
-      right: body.style.right,
-      width: body.style.width,
-      overflow: body.style.overflow,
-    };
-    body.style.position = "fixed";
-    body.style.top = `-${scrollY}px`;
-    body.style.left = "0";
-    body.style.right = "0";
-    body.style.width = "100%";
-    body.style.overflow = "hidden";
-    return () => {
-      body.style.position = prev.position;
-      body.style.top = prev.top;
-      body.style.left = prev.left;
-      body.style.right = prev.right;
-      body.style.width = prev.width;
-      body.style.overflow = prev.overflow;
-      window.scrollTo(0, scrollY);
-    };
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
   }, [isOpen]);
 
   return (
     <div
-      className={`fixed top-14 inset-x-0 bottom-0 z-[55] bg-white transition-transform duration-300 ease-out flex flex-col overscroll-none ${
+      data-pull-refresh="off"
+      className={`fixed top-14 inset-x-0 bottom-0 z-[55] bg-white transition-transform duration-300 ease-out flex flex-col ${
         isOpen ? "translate-y-0" : "translate-y-full pointer-events-none"
       }`}
       aria-hidden={!isOpen}
@@ -177,7 +150,7 @@ export function ChatDrawer() {
           opens. Room view is layered above when a room is selected. */}
       <div className="flex-1 min-h-0 relative">
         <div
-          className={`absolute inset-0 overflow-y-auto overscroll-contain ${currentRoomId == null ? "" : "hidden"}`}
+          className={`absolute inset-0 overflow-y-auto ${currentRoomId == null ? "" : "hidden"}`}
         >
           {listError ? (
             <div className="p-6 text-center text-sm text-red-600">{listError}</div>
@@ -193,7 +166,7 @@ export function ChatDrawer() {
         </div>
 
         {currentRoomId != null && (
-          <div className="absolute inset-0 overflow-y-auto overscroll-contain">
+          <div className="absolute inset-0 overflow-y-auto">
             {roomError ? (
               <div className="p-6 text-center text-sm text-red-600">
                 {roomError}

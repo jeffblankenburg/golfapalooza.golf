@@ -124,15 +124,14 @@ export function ChatRoom({
         );
       });
       if (didAddNew) {
-        const container = scrollContainerRef.current;
-        if (container) {
-          const isNearBottom =
-            container.scrollHeight - container.scrollTop - container.clientHeight < 150;
-          if (isNearBottom) {
-            shouldScrollRef.current = true;
-            requestAnimationFrame(() => snapToBottom(false));
-          }
-        }
+        // Resyncs fire on drawer reveal, tab visibility, network reconnect,
+        // and channel (re)subscribe — all "catch me up" moments. Scroll
+        // unconditionally so the user sees what they missed. (The in-the-
+        // moment realtime INSERT handler still respects scroll position
+        // so it doesn't yank you down while you're reading history.)
+        shouldScrollRef.current = true;
+        requestAnimationFrame(() => snapToBottom(true));
+        setTimeout(() => snapToBottom(true), 350);
       }
     } catch {
       // Best-effort — the next realtime event or resync trigger will retry.

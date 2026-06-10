@@ -333,7 +333,7 @@ export function ChatRoomList({
               {/* Content */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <span className={`text-[15px] truncate ${room.unreadCount > 0 ? "font-semibold text-gray-900" : "font-medium text-gray-900"}`}>
+                  <span className={`text-[0.9375rem] truncate ${room.unreadCount > 0 ? "font-semibold text-gray-900" : "font-medium text-gray-900"}`}>
                     {room.name}
                   </span>
                   <div className="flex items-center gap-1 flex-shrink-0 ml-2">
@@ -389,7 +389,7 @@ export function ChatRoomList({
                 <svg className="w-5 h-5 text-gray-500" fill={actionRoom.is_pinned ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />
                 </svg>
-                <span className="text-[15px] text-gray-900">
+                <span className="text-[0.9375rem] text-gray-900">
                   {actionRoom.is_pinned ? "Unpin Chat" : "Pin Chat"}
                 </span>
               </button>
@@ -400,7 +400,7 @@ export function ChatRoomList({
                 <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
-                <span className="text-[15px] text-red-600">Delete Chat</span>
+                <span className="text-[0.9375rem] text-red-600">Delete Chat</span>
               </button>
               {actionRoom.type === "group" && (
                 <button
@@ -410,14 +410,14 @@ export function ChatRoomList({
                   <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                   </svg>
-                  <span className="text-[15px] text-red-600">Leave Group</span>
+                  <span className="text-[0.9375rem] text-red-600">Leave Group</span>
                 </button>
               )}
             </div>
             <div className="px-4 pb-4">
               <button
                 onClick={() => setActionRoom(null)}
-                className="w-full py-3 rounded-xl bg-gray-100 text-[15px] font-medium text-gray-700 active:bg-gray-200"
+                className="w-full py-3 rounded-xl bg-gray-100 text-[0.9375rem] font-medium text-gray-700 active:bg-gray-200"
               >
                 Cancel
               </button>
@@ -448,12 +448,12 @@ export function ChatRoomList({
 
             {/* To: field with selected user chips */}
             <div className="flex items-center gap-2 px-4 py-2 border-y border-gray-100 flex-wrap">
-              <span className="text-[15px] text-gray-400 flex-shrink-0">To:</span>
+              <span className="text-[0.9375rem] text-gray-400 flex-shrink-0">To:</span>
               {selectedUsers.map((u) => (
                 <button
                   key={u.id}
                   onClick={() => removeUser(u.id)}
-                  className="flex items-center gap-1 bg-green-100 text-green-800 px-2.5 py-1 rounded-full text-[13px] font-medium active:bg-green-200"
+                  className="flex items-center gap-1 bg-green-100 text-green-800 px-2.5 py-1 rounded-full text-[0.8125rem] font-medium active:bg-green-200"
                 >
                   {u.display_name}
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -467,7 +467,7 @@ export function ChatRoomList({
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={selectedUsers.length === 0 ? "Search Loozers" : "Add more..."}
                 autoFocus
-                className="flex-1 min-w-[80px] text-[15px] bg-transparent outline-none placeholder-gray-300"
+                className="flex-1 min-w-[80px] text-[0.9375rem] bg-transparent outline-none placeholder-gray-300"
               />
             </div>
 
@@ -476,7 +476,7 @@ export function ChatRoomList({
               <div className="border-b border-gray-100">
                 {matchingRooms.length > 0 && (
                   <div>
-                    <p className="px-4 pt-2 pb-1 text-[11px] text-gray-400 font-medium uppercase tracking-wide">Existing Conversation</p>
+                    <p className="px-4 pt-2 pb-1 text-[0.6875rem] text-gray-400 font-medium uppercase tracking-wide">Existing Conversation</p>
                     {matchingRooms.map((room) => (
                       <button
                         key={room.id}
@@ -498,8 +498,8 @@ export function ChatRoomList({
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[15px] font-medium text-gray-900 truncate">{room.name}</p>
-                          <p className="text-[12px] text-green-600">Open existing conversation</p>
+                          <p className="text-[0.9375rem] font-medium text-gray-900 truncate">{room.name}</p>
+                          <p className="text-xs text-green-600">Open existing conversation</p>
                         </div>
                         <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -510,7 +510,7 @@ export function ChatRoomList({
                 )}
                 {suggestedRooms.length > 0 && (
                   <div>
-                    <p className="px-4 pt-2 pb-1 text-[11px] text-gray-400 font-medium uppercase tracking-wide">Similar Groups</p>
+                    <p className="px-4 pt-2 pb-1 text-[0.6875rem] text-gray-400 font-medium uppercase tracking-wide">Similar Groups</p>
                     {suggestedRooms.map((room) => (
                       <button
                         key={room.id}
@@ -526,8 +526,8 @@ export function ChatRoomList({
                           </svg>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[15px] font-medium text-gray-900 truncate">{room.name}</p>
-                          <p className="text-[12px] text-gray-400">Also includes these Loozers</p>
+                          <p className="text-[0.9375rem] font-medium text-gray-900 truncate">{room.name}</p>
+                          <p className="text-xs text-gray-400">Also includes these Loozers</p>
                         </div>
                         <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -556,7 +556,7 @@ export function ChatRoomList({
                       </span>
                     </div>
                   )}
-                  <span className="flex-1 text-[15px] font-medium text-gray-900">{u.display_name}</span>
+                  <span className="flex-1 text-[0.9375rem] font-medium text-gray-900">{u.display_name}</span>
                 </button>
               ))}
               {filteredUsers.length === 0 && (
@@ -570,7 +570,7 @@ export function ChatRoomList({
                 <button
                   onClick={startConversation}
                   disabled={creating}
-                  className="w-full bg-green-600 text-white py-3 rounded-xl font-semibold text-[15px] active:bg-green-700 disabled:bg-gray-300"
+                  className="w-full bg-green-600 text-white py-3 rounded-xl font-semibold text-[0.9375rem] active:bg-green-700 disabled:bg-gray-300"
                 >
                   {creating
                     ? "Creating..."

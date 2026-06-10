@@ -308,7 +308,7 @@ export function RoomManager({ tripId: propTripId }: { tripId?: string } = {}) {
                                 {occ!.avatar_url ? (
                                   <img src={occ!.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                                 ) : (
-                                  <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                                  <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                                     {(occ!.display_name || "?")[0].toUpperCase()}
                                   </span>
                                 )}

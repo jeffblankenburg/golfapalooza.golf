@@ -374,7 +374,7 @@ export function UserDetail({
                 value={formData.phone}
                 onChange={handlePhoneChange}
                 placeholder="(555) 123-4567"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base"
               />
             </div>
           )}
@@ -386,7 +386,7 @@ export function UserDetail({
               value={formData.displayName}
               onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
               placeholder="Nickname"
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base"
               required
             />
           </div>
@@ -400,7 +400,7 @@ export function UserDetail({
                   value={formData.fullName}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                   placeholder="John Smith"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base"
                 />
               </div>
               <div>
@@ -410,7 +410,7 @@ export function UserDetail({
                   value={formData.birthday}
                   onChange={(e) => setFormData({ ...formData, birthday: e.target.value })}
                   style={{ backgroundColor: "transparent" }}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base"
                 />
               </div>
               <div className="grid grid-cols-[1fr_auto] gap-3">
@@ -422,7 +422,7 @@ export function UserDetail({
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                     maxLength={100}
                     placeholder="e.g. Columbus"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base"
                   />
                 </div>
                 <div>
@@ -431,7 +431,7 @@ export function UserDetail({
                     value={formData.state}
                     onChange={(e) => setFormData({ ...formData, state: e.target.value })}
                     style={{ backgroundColor: "transparent" }}
-                    className="w-24 px-3 py-3 border border-gray-300 rounded-xl text-[16px]"
+                    className="w-24 px-3 py-3 border border-gray-300 rounded-xl text-base"
                   >
                     <option value="">—</option>
                     {US_STATES.map((s) => (
@@ -445,7 +445,7 @@ export function UserDetail({
                   <span>Handicap Index (optional)</span>
                   {user.handicap_source && user.handicap_index !== null && (
                     <span
-                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide ${
+                      className={`px-1.5 py-0.5 rounded text-[0.625rem] font-bold tracking-wide ${
                         user.handicap_source === "computed"
                           ? "bg-green-100 text-green-700"
                           : "bg-gray-100 text-gray-600"
@@ -464,7 +464,7 @@ export function UserDetail({
                   value={formData.handicapIndex}
                   onChange={(e) => setFormData({ ...formData, handicapIndex: e.target.value })}
                   placeholder="e.g. 12.4"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -477,7 +477,7 @@ export function UserDetail({
                     value={formData.eightBagAverage}
                     onChange={(e) => setFormData({ ...formData, eightBagAverage: e.target.value })}
                     placeholder="e.g. 82.5"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base"
                   />
                 </div>
                 <div>
@@ -489,7 +489,7 @@ export function UserDetail({
                     value={formData.avgScrambleScore}
                     onChange={(e) => setFormData({ ...formData, avgScrambleScore: e.target.value })}
                     placeholder="e.g. 72.3"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base"
                   />
                 </div>
               </div>
@@ -558,7 +558,7 @@ export function UserDetail({
                           }}
                           onFocus={() => setShowSponsorPicker(true)}
                           placeholder="Search Loozers…"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base"
                         />
                         {showSponsorPicker && (
                           <div className="mt-2 max-h-56 overflow-y-auto border border-gray-200 rounded-xl bg-white">
@@ -581,7 +581,7 @@ export function UserDetail({
                                   <img src={u.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
                                 ) : (
                                   <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                                    <span className="text-[10px] font-semibold text-gray-500">
+                                    <span className="text-[0.625rem] font-semibold text-gray-500">
                                       {u.display_name?.[0]?.toUpperCase() || "?"}
                                     </span>
                                   </div>
@@ -603,7 +603,7 @@ export function UserDetail({
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold text-[15px] disabled:bg-gray-300 active:bg-green-700"
+              className="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold text-[0.9375rem] disabled:bg-gray-300 active:bg-green-700"
             >
               {saving ? "Saving..." : savedFlash ? "Saved ✓" : "Save"}
             </button>
@@ -656,7 +656,7 @@ export function UserDetail({
           <button
             type="submit"
             disabled={saving}
-            className="w-full bg-green-600 text-white py-3 rounded-xl font-semibold text-[15px] disabled:bg-gray-300 active:bg-green-700"
+            className="w-full bg-green-600 text-white py-3 rounded-xl font-semibold text-[0.9375rem] disabled:bg-gray-300 active:bg-green-700"
           >
             {saving ? "Saving..." : savedFlash ? "Saved ✓" : "Save Permissions"}
           </button>

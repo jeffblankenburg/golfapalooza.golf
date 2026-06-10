@@ -205,7 +205,7 @@ export function HistoryUserMatcher() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search workbook names or users…"
-          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-[16px]"
+          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-base"
         />
       </div>
 
@@ -232,7 +232,7 @@ export function HistoryUserMatcher() {
                   <p className="text-xs text-gray-500 truncate">
                     {l.firstName} {l.lastName}
                   </p>
-                  <p className="text-[10px] text-gray-400 mt-1 truncate">
+                  <p className="text-[0.625rem] text-gray-400 mt-1 truncate">
                     {l.sheetsAppearedIn.join(" · ")}
                   </p>
                 </div>
@@ -300,7 +300,7 @@ function Stat({
   return (
     <div>
       <p className={`text-xl font-bold ${colors[tone]}`}>{value}</p>
-      <p className="text-[10px] uppercase tracking-wide text-gray-500">{label}</p>
+      <p className="text-[0.625rem] uppercase tracking-wide text-gray-500">{label}</p>
     </div>
   );
 }
@@ -308,18 +308,18 @@ function Stat({
 function StatusBadge({ matched, suggested }: { matched: boolean; suggested: boolean }) {
   if (matched)
     return (
-      <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-800 font-medium">
+      <span className="text-[0.625rem] px-1.5 py-0.5 rounded bg-green-100 text-green-800 font-medium">
         matched
       </span>
     );
   if (suggested)
     return (
-      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">
+      <span className="text-[0.625rem] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">
         suggested
       </span>
     );
   return (
-    <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium">
+    <span className="text-[0.625rem] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-medium">
       unmatched
     </span>
   );

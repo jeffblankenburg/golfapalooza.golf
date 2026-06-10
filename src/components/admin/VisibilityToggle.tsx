@@ -39,7 +39,7 @@ export function VisibilityToggle({
       onClick={click}
       onKeyDown={(e) => e.stopPropagation()}
       disabled={busy}
-      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors disabled:opacity-50 ${
+      className={`px-2.5 py-1 rounded-full text-[0.6875rem] font-semibold transition-colors disabled:opacity-50 ${
         isPublished
           ? "bg-green-100 text-green-700 active:bg-green-200"
           : "bg-gray-100 text-gray-600 active:bg-gray-200"

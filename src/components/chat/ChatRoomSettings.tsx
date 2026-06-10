@@ -242,7 +242,7 @@ export function ChatRoomSettings({
                       )}
                     </span>
                     {m.role === "creator" && (
-                      <span className="text-[11px] text-green-600 font-medium">Creator</span>
+                      <span className="text-[0.6875rem] text-green-600 font-medium">Creator</span>
                     )}
                   </div>
                   {isCreator && m.id !== currentUserId && (

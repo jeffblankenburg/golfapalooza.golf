@@ -574,7 +574,7 @@ export function ScoringManager({ tripId, contestId: externalContestId, onVerifie
         <button
           onClick={() => handleVerify(team.id, "unverify")}
           disabled={verifying === team.id}
-          className="px-2 py-1 text-[10px] font-medium text-gray-500 bg-white rounded-lg active:bg-gray-100 disabled:opacity-50"
+          className="px-2 py-1 text-[0.625rem] font-medium text-gray-500 bg-white rounded-lg active:bg-gray-100 disabled:opacity-50"
         >
           {verifying === team.id ? "..." : "Unverify"}
         </button>
@@ -585,7 +585,7 @@ export function ScoringManager({ tripId, contestId: externalContestId, onVerifie
         <button
           onClick={() => handleVerify(team.id, "verify")}
           disabled={verifying === team.id || !complete}
-          className="px-2 py-1 text-[10px] font-medium text-white bg-green-600 rounded-lg active:bg-green-700 disabled:opacity-50"
+          className="px-2 py-1 text-[0.625rem] font-medium text-white bg-green-600 rounded-lg active:bg-green-700 disabled:opacity-50"
         >
           {verifying === team.id ? "..." : "Verify"}
         </button>
@@ -907,7 +907,7 @@ function HoleScoringCards({
                   <span className="text-xs font-bold text-gray-500">Hole {hole.hole_number}</span>
                   <span className="text-xs text-gray-400">Par {hole.par}</span>
                   {hole.yards > 0 && <span className="text-xs text-gray-400">{hole.yards}y</span>}
-                  {wonSkin && <span className="text-[10px] font-bold text-green-600">SKIN</span>}
+                  {wonSkin && <span className="text-[0.625rem] font-bold text-green-600">SKIN</span>}
                 </div>
                 <div className="flex items-center gap-2">
                   {strokes !== undefined && (
@@ -961,13 +961,13 @@ function HoleScoringCards({
                         <>
                           <span className="flex items-center gap-1.5" aria-hidden={!isOnGreen}>
                             <span className="w-4 h-4 inline-block" />
-                            <span className={`text-[10px] font-semibold uppercase tracking-wide ${isOnGreen ? "text-green-600" : "text-transparent"}`}>
+                            <span className={`text-[0.625rem] font-semibold uppercase tracking-wide ${isOnGreen ? "text-green-600" : "text-transparent"}`}>
                               Green
                             </span>
                           </span>
                           <span className="flex items-center gap-1.5" aria-hidden={!isHoledOut}>
                             <span className="w-4 h-4 inline-block" />
-                            <span className={`text-[10px] font-semibold uppercase tracking-wide ${isHoledOut ? "text-blue-600" : "text-transparent"}`}>
+                            <span className={`text-[0.625rem] font-semibold uppercase tracking-wide ${isHoledOut ? "text-blue-600" : "text-transparent"}`}>
                               Holed
                             </span>
                           </span>
@@ -982,7 +982,7 @@ function HoleScoringCards({
                               onChange={(e) => onOnGreenChange(team.id, hole.hole_number, member.user_id, e.target.checked)}
                               className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                             />
-                            <span className="text-[10px] text-gray-400 uppercase tracking-wide">Green</span>
+                            <span className="text-[0.625rem] text-gray-400 uppercase tracking-wide">Green</span>
                           </label>
 
                           <label className="flex items-center gap-1.5 cursor-pointer">
@@ -994,7 +994,7 @@ function HoleScoringCards({
                               onChange={() => onHoledOutChange(team.id, hole.hole_number, isHoledOut ? null : member.user_id)}
                               className="w-4 h-4 border-gray-300 text-green-600 focus:ring-green-500"
                             />
-                            <span className="text-[10px] text-gray-400 uppercase tracking-wide">Holed</span>
+                            <span className="text-[0.625rem] text-gray-400 uppercase tracking-wide">Holed</span>
                           </label>
                         </>
                       )}
@@ -1007,7 +1007,7 @@ function HoleScoringCards({
                     <span className="flex-1" />
                     <button
                       onClick={() => onHoledOutChange(team.id, hole.hole_number, null)}
-                      className="text-[10px] text-gray-400 underline"
+                      className="text-[0.625rem] text-gray-400 underline"
                     >
                       Clear holed out
                     </button>

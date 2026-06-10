@@ -529,10 +529,14 @@ export function HomeContent({
       {/* Participants Card (after RSVP) */}
       {trip && hasRsvpd && participants.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="flex items-center">
+          {/* Stacked vertically — side-by-side broke at xlarge font scale
+              because flex-wrap can't kick in when one child has flex-1
+              basis 0 (the layout algorithm thinks they fit even though
+              the content overflows visually). */}
+          <div className="flex flex-col">
             <button
               onClick={() => setParticipantsExpanded(!participantsExpanded)}
-              className="flex-1 flex items-center justify-between px-4 py-3 active:bg-gray-50 transition-colors"
+              className="flex items-center justify-between px-4 py-3 active:bg-gray-50 transition-colors"
             >
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -547,14 +551,14 @@ export function HomeContent({
             </button>
             <button
               onClick={openModal}
-              className="relative flex items-center gap-1.5 text-sm text-green-600 px-4 py-3 active:bg-gray-50 transition-colors border-l border-gray-100"
+              className="relative flex items-center gap-1.5 text-sm text-green-600 px-4 py-3 active:bg-gray-50 transition-colors border-t border-gray-100"
             >
               <span>{likelihoodOptions.find(o => o.value === currentLikelihood)?.label}</span>
               <span className="text-green-600/60">{currentLikelihood}%</span>
               <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
               </svg>
-              <span className="absolute left-0 right-0 bottom-0.5 text-center text-[8px] font-semibold tracking-wider text-gray-400 pointer-events-none">
+              <span className="absolute left-0 right-0 bottom-0.5 text-center text-[0.5rem] font-semibold tracking-wider text-gray-400 pointer-events-none">
                 YOUR RESPONSE
               </span>
             </button>
@@ -592,13 +596,13 @@ export function HomeContent({
                             {p.avatarUrl ? (
                               <img src={p.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
                             ) : (
-                              <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[9px] font-bold">
+                              <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5625rem] font-bold">
                                 {(p.displayName || "?")[0].toUpperCase()}
                               </span>
                             )}
                             <span>{p.displayName}</span>
                             {dateLabel && (
-                              <span className="text-[10px] text-gray-400 tabular-nums">{dateLabel}</span>
+                              <span className="text-[0.625rem] text-gray-400 tabular-nums">{dateLabel}</span>
                             )}
                           </Link>
                         );
@@ -730,18 +734,23 @@ export function HomeContent({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
-          <div className="flex-1">
-            <p className="font-semibold text-gray-900">
-              {nextScheduleItem.title}
+          <div className="flex-1 min-w-0">
+            {/* Title + time pill in a flex row that wraps when the title
+                doesn't leave room — at xlarge font scale the inline-span
+                pattern wrapped mid-title and looked broken. */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <p className="font-semibold text-gray-900">
+                {nextScheduleItem.title}
+              </p>
               {nextScheduleItem.time && (
-                <span className="ml-2 text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                <span className="text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full whitespace-nowrap">
                   {new Date(`1970-01-01T${nextScheduleItem.time}`).toLocaleTimeString("en-US", {
                     hour: "numeric",
                     minute: "2-digit",
                   })}
                 </span>
               )}
-            </p>
+            </div>
             {nextScheduleItem.location && (
               <p className="text-sm text-gray-500">{nextScheduleItem.location}</p>
             )}
@@ -773,13 +782,13 @@ export function HomeContent({
                   {g.avatarUrl ? (
                     <img src={g.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
                   ) : (
-                    <span className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 text-[9px] font-bold">
+                    <span className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 text-[0.5625rem] font-bold">
                       {(g.displayName || "?")[0].toUpperCase()}
                     </span>
                   )}
                   {g.displayName}
                   {g.sharePct < 100 && (
-                    <span className="text-[10px] text-gray-400 font-medium">{g.sharePct}%</span>
+                    <span className="text-[0.625rem] text-gray-400 font-medium">{g.sharePct}%</span>
                   )}
                 </span>
               ))}
@@ -814,7 +823,7 @@ export function HomeContent({
             {myWinnings.breakdown.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1">
                 {myWinnings.breakdown.map((b, i) => (
-                  <span key={i} className="text-[10px] text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full">
+                  <span key={i} className="text-[0.625rem] text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full">
                     {b.prizeName}: ${b.amount.toFixed(0)}
                   </span>
                 ))}
@@ -959,7 +968,10 @@ export function HomeContent({
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
           Quick Links
         </h2>
-        <div className="flex flex-wrap justify-center gap-3">
+        {/* Grid (not flex-wrap) so the 3 columns survive xlarge font
+            scaling — flex-wrap reflowed because gap-3 grew with rem and
+            pushed total width past the container. */}
+        <div className="grid grid-cols-3 gap-3">
           {quickLinks.map((link) => {
             const isCalcuttaLive = link.href === "/calcutta" && calcuttaAuctionActive;
             const isPickemUrgent = link.href === "/pickem" && pickemUrgent;
@@ -975,7 +987,6 @@ export function HomeContent({
                     ? "bg-amber-50 border-amber-300 shadow-md animate-pickem-pulse"
                     : "bg-white border-gray-200"
                 }`}
-                style={{ width: "calc(33.333% - 8px)" }}
               >
                 <div
                   className={`flex items-center justify-center w-12 h-12 rounded-full ${link.color} mb-2`}
@@ -988,10 +999,10 @@ export function HomeContent({
                   {link.label}
                 </span>
                 {isCalcuttaLive && (
-                  <span className="text-[10px] font-black text-purple-600 uppercase tracking-wider animate-pulse">LIVE</span>
+                  <span className="text-[0.625rem] font-black text-purple-600 uppercase tracking-wider animate-pulse">LIVE</span>
                 )}
                 {isPickemUrgent && (
-                  <span className="text-[10px] font-black text-amber-600 uppercase tracking-wider animate-pulse">MAKE PICKS</span>
+                  <span className="text-[0.625rem] font-black text-amber-600 uppercase tracking-wider animate-pulse">MAKE PICKS</span>
                 )}
               </Link>
             );

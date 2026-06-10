@@ -373,7 +373,7 @@ export function ContestTeeAssigner({ contestId }: { contestId: string }) {
                         <button
                           key={tee.id}
                           onClick={() => setHoleTee(holeNum, tee.id)}
-                          className={`w-7 h-7 rounded-lg text-[10px] font-bold flex items-center justify-center transition-all ${
+                          className={`w-7 h-7 rounded-lg text-[0.625rem] font-bold flex items-center justify-center transition-all ${
                             colors.isCustom ? "" : colors.bg
                           } ${colors.text} ${
                             isSelected

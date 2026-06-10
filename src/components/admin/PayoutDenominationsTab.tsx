@@ -155,7 +155,7 @@ export function PayoutDenominationsTab() {
 
       {/* Denomination toggles */}
       <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 print:hidden">
-        <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">
+        <div className="text-[0.625rem] uppercase tracking-wider text-gray-500 mb-1.5">
           Include denominations
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -200,7 +200,7 @@ export function PayoutDenominationsTab() {
                   <div className="font-medium text-gray-900">{row.label}</div>
                   <StrategyHint row={row} />
                   {!row.is_payout && (
-                    <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] uppercase tracking-wide">
+                    <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[0.625rem] uppercase tracking-wide">
                       pass-through
                     </span>
                   )}
@@ -212,7 +212,7 @@ export function PayoutDenominationsTab() {
                 <td className="px-3 py-2 border-b border-gray-100 text-right font-bold tabular-nums">
                   {fmt(billedTotal)}
                   {billedTotal !== row.total && (
-                    <div className="text-[10px] font-normal text-gray-400">
+                    <div className="text-[0.625rem] font-normal text-gray-400">
                       from {fmt(row.total)}
                     </div>
                   )}
@@ -227,7 +227,7 @@ export function PayoutDenominationsTab() {
                         .map(([denom, count]) => (
                           <span
                             key={denom}
-                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-green-50 text-green-700 text-[11px] font-semibold tabular-nums border border-green-200"
+                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-green-50 text-green-700 text-[0.6875rem] font-semibold tabular-nums border border-green-200"
                           >
                             {count}×${denom}
                           </span>
@@ -319,17 +319,17 @@ function StrategyHint({ row }: { row: Row }) {
     const perFirst = first / DEFAULT_TEAM_SIZE;
     const perSecond = second / DEFAULT_TEAM_SIZE;
     return (
-      <div className="text-[10px] text-gray-400 mt-0.5">
+      <div className="text-[0.625rem] text-gray-400 mt-0.5">
         1st {fmt(first)} ÷ {DEFAULT_TEAM_SIZE} = {fmt(perFirst)}/ea · 2nd {fmt(second)} ÷ {DEFAULT_TEAM_SIZE} = {fmt(perSecond)}/ea
       </div>
     );
   }
   if (kind === "scramble_skins") {
-    return <div className="text-[10px] text-gray-400 mt-0.5">small-bill mix (half $5, half $10) for unpredictable shares</div>;
+    return <div className="text-[0.625rem] text-gray-400 mt-0.5">small-bill mix (half $5, half $10) for unpredictable shares</div>;
   }
   if (kind === "ctp" || kind === "long_drive" || kind === "long_putt") {
     if (row.day_count > 1) {
-      return <div className="text-[10px] text-gray-400 mt-0.5">{fmt(row.total / row.day_count)} per day × {row.day_count}</div>;
+      return <div className="text-[0.625rem] text-gray-400 mt-0.5">{fmt(row.total / row.day_count)} per day × {row.day_count}</div>;
     }
   }
   return null;

@@ -144,7 +144,7 @@ export function HistoryAttendanceImporter() {
           {lastApplied.errors.length > 0 && (
             <details className="mt-2">
               <summary className="text-xs text-red-700 cursor-pointer">Show errors</summary>
-              <pre className="text-[11px] mt-2 whitespace-pre-wrap">
+              <pre className="text-[0.6875rem] mt-2 whitespace-pre-wrap">
                 {JSON.stringify(lastApplied.errors, null, 2)}
               </pre>
             </details>
@@ -172,7 +172,7 @@ export function HistoryAttendanceImporter() {
             {unmatched.map((name) => (
               <span
                 key={name}
-                className="text-[11px] bg-white border border-amber-300 text-amber-800 rounded px-2 py-0.5"
+                className="text-[0.6875rem] bg-white border border-amber-300 text-amber-800 rounded px-2 py-0.5"
               >
                 {name}
               </span>
@@ -221,7 +221,7 @@ function Stat({
   return (
     <div>
       <p className={`text-xl font-bold ${colors[tone]}`}>{value}</p>
-      <p className="text-[10px] uppercase tracking-wide text-gray-500">{label}</p>
+      <p className="text-[0.625rem] uppercase tracking-wide text-gray-500">{label}</p>
     </div>
   );
 }

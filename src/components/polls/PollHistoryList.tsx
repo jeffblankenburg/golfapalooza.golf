@@ -68,7 +68,7 @@ export function PollHistoryList() {
               {p.description}
             </p>
           )}
-          <p className="text-[11px] text-gray-400 mt-1">
+          <p className="text-[0.6875rem] text-gray-400 mt-1">
             Closed{" "}
             {p.ends_at &&
               new Date(p.ends_at).toLocaleDateString(undefined, {

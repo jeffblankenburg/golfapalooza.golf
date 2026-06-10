@@ -98,7 +98,7 @@ export default function LoginPage() {
               onChange={handlePhoneChange}
               placeholder="(555) 123-4567"
               autoFocus
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent text-[16px] text-gray-900 bg-white placeholder-gray-400"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent text-base text-gray-900 bg-white placeholder-gray-400"
               autoComplete="tel"
             />
           </div>

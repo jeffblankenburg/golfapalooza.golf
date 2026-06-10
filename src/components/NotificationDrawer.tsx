@@ -272,7 +272,7 @@ export function NotificationDrawer({
                         <p className={`text-sm ${!notification.read ? "font-semibold" : "font-medium"} text-gray-900 line-clamp-1`}>
                           {notification.title}
                         </p>
-                        <span className="text-[11px] text-gray-400 flex-shrink-0">
+                        <span className="text-[0.6875rem] text-gray-400 flex-shrink-0">
                           {timeAgo(notification.created_at)}
                         </span>
                       </div>

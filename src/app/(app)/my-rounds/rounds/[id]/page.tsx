@@ -294,7 +294,7 @@ export default function RoundDetailPage() {
                           {userName || "Player"}
                         </span>
                         {isMe && (
-                          <span className="text-[10px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded-full font-medium">You</span>
+                          <span className="text-[0.625rem] bg-green-50 text-green-600 px-1.5 py-0.5 rounded-full font-medium">You</span>
                         )}
                       </div>
                       {(player.score_differential != null || playerScores.some((s) => s.putts != null)) && (
@@ -339,7 +339,7 @@ export default function RoundDetailPage() {
               {isExpanded && hasScores && (
                 <div className="px-4 pb-4 border-t border-gray-100 pt-3">
                   <ScorecardView holes={holes} scores={scoresMap} putts={hasPutts ? puttsMap : undefined} roundType={round.round_type} />
-                  <div className="mt-3 pt-2 border-t border-gray-100 text-[11px] text-gray-400 italic">
+                  <div className="mt-3 pt-2 border-t border-gray-100 text-[0.6875rem] text-gray-400 italic">
                     Attested by {creatorName || "unknown"} on{" "}
                     {new Date(round.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
                   </div>

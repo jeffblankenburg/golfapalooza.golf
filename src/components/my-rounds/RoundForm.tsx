@@ -381,7 +381,7 @@ export default function RoundForm() {
                     i + 1
                   )}
                 </button>
-                <div className={`text-[10px] mt-1 font-medium ${
+                <div className={`text-[0.625rem] mt-1 font-medium ${
                   canTap ? "text-green-600 cursor-pointer" : isCurrent ? "text-green-700" : "text-gray-400"
                 }`}
                   onClick={handleTap}
@@ -806,7 +806,7 @@ export default function RoundForm() {
               <div className="flex gap-1 border-b border-gray-200">
                 <button
                   onClick={() => setTeeTab("mens")}
-                  className={`px-2.5 py-1 text-[11px] font-semibold border-b-2 -mb-px ${
+                  className={`px-2.5 py-1 text-[0.6875rem] font-semibold border-b-2 -mb-px ${
                     teeTab === "mens" ? "border-green-600 text-green-700" : "border-transparent text-gray-500"
                   }`}
                 >
@@ -814,7 +814,7 @@ export default function RoundForm() {
                 </button>
                 <button
                   onClick={() => setTeeTab("womens")}
-                  className={`px-2.5 py-1 text-[11px] font-semibold border-b-2 -mb-px ${
+                  className={`px-2.5 py-1 text-[0.6875rem] font-semibold border-b-2 -mb-px ${
                     teeTab === "womens" ? "border-green-600 text-green-700" : "border-transparent text-gray-500"
                   }`}
                 >
@@ -824,7 +824,7 @@ export default function RoundForm() {
             )}
 
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+              <div className="text-[0.625rem] font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
                 All players
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -979,7 +979,7 @@ export default function RoundForm() {
                         {scoreNum - par > 0 ? "+" : ""}{scoreNum - par}
                       </div>
                       {diff != null && (
-                        <div className="text-[10px] text-gray-400">Diff {diff.toFixed(1)}</div>
+                        <div className="text-[0.625rem] text-gray-400">Diff {diff.toFixed(1)}</div>
                       )}
                     </div>
                   )}

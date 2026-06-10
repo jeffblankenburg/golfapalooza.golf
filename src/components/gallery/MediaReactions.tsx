@@ -80,7 +80,7 @@ export function MediaReactions({
             >
               <span className="text-2xl">{emoji}</span>
               {reaction && reaction.count > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] bg-green-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] bg-green-600 text-white text-[0.625rem] font-bold rounded-full flex items-center justify-center px-1">
                   {reaction.count}
                 </span>
               )}

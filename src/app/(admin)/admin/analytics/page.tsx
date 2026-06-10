@@ -440,7 +440,7 @@ function MiniStat({ label, value, color }: { label: string; value: number; color
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-3 text-center">
       <p className={`text-lg font-bold ${color}`}>{value}</p>
-      <p className="text-[10px] text-gray-500">{label}</p>
+      <p className="text-[0.625rem] text-gray-500">{label}</p>
     </div>
   );
 }
@@ -496,7 +496,7 @@ function LoozerStatsTable({
 
   return (
     <div>
-      <div className="flex items-center gap-2 px-2 pb-1.5 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+      <div className="flex items-center gap-2 px-2 pb-1.5 text-[0.625rem] font-semibold text-gray-500 uppercase tracking-wide">
         <div className="w-8 shrink-0" />
         <div className="flex-1" />
         {SORT_COLUMNS.map((c) => {
@@ -511,7 +511,7 @@ function LoozerStatsTable({
             >
               <span>{c.label}</span>
               {active && (
-                <span className="text-[8px]">{sort.dir === "desc" ? "▼" : "▲"}</span>
+                <span className="text-[0.5rem]">{sort.dir === "desc" ? "▼" : "▲"}</span>
               )}
             </button>
           );
@@ -697,8 +697,8 @@ function DailyChart({
           })}
         </div>
         <div className="flex justify-between mt-1">
-          <span className="text-[10px] text-gray-400">{formatShortDate(days[0].day)}</span>
-          <span className="text-[10px] text-gray-400">{formatShortDate(days[days.length - 1].day)}</span>
+          <span className="text-[0.625rem] text-gray-400">{formatShortDate(days[0].day)}</span>
+          <span className="text-[0.625rem] text-gray-400">{formatShortDate(days[days.length - 1].day)}</span>
         </div>
       </div>
     </section>

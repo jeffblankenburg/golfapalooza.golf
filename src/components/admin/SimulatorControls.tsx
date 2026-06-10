@@ -394,7 +394,7 @@ export function SimulatorControls({
                             />
                             <span className="flex-1">{MODULE_LABELS[m]}</span>
                             {!impl && (
-                              <span className="text-[9px] uppercase font-bold text-gray-400">
+                              <span className="text-[0.5625rem] uppercase font-bold text-gray-400">
                                 soon
                               </span>
                             )}
@@ -435,7 +435,7 @@ export function SimulatorControls({
                         );
                       })}
                       {generatorResults.some((r) => r.warnings.length > 0) && (
-                        <details className="text-[10px] text-gray-500 pt-1">
+                        <details className="text-[0.625rem] text-gray-500 pt-1">
                           <summary className="cursor-pointer">Warnings</summary>
                           {generatorResults
                             .flatMap((r) => r.warnings.map((w) => `${r.module}: ${w}`))
@@ -524,14 +524,14 @@ export function SimulatorControls({
               type="date"
               value={simDate}
               onChange={(e) => setSimDate(e.target.value)}
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-base"
             />
             <input
               type="time"
               value={simTime}
               onChange={(e) => setSimTime(e.target.value)}
               placeholder="00:00"
-              className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+              className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-base"
             />
           </div>
 
@@ -549,7 +549,7 @@ export function SimulatorControls({
                 >
                   Day {dayNum}
                   <br />
-                  <span className="text-[10px] font-normal">
+                  <span className="text-[0.625rem] font-normal">
                     {formatDateLabel(tripStartDate, dayNum)}
                   </span>
                 </button>
@@ -613,7 +613,7 @@ export function SimulatorControls({
           <select
             value={simUserId}
             onChange={(e) => setSimUserId(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px] bg-white"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base bg-white"
           >
             <option value="">Select a user...</option>
             {users.map((u) => (

@@ -159,12 +159,12 @@ export function AccoladesManager({ tripId }: { tripId: string }) {
             autoFocus
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base bg-white"
           />
           <select
             value={userId}
             onChange={(e) => setUserId(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base bg-white"
             style={{ backgroundColor: "white" }}
           >
             <option value="">Select recipient...</option>

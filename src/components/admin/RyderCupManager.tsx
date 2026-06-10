@@ -536,7 +536,7 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
   // ── Player avatar helper ──
 
   function Avatar({ player, size = "sm" }: { player: { display_name: string; avatar_url: string | null }; size?: "sm" | "xs" }) {
-    const sizeClasses = size === "xs" ? "w-4 h-4 text-[8px]" : "w-5 h-5 text-[9px]";
+    const sizeClasses = size === "xs" ? "w-4 h-4 text-[0.5rem]" : "w-5 h-5 text-[0.5625rem]";
     if (player.avatar_url) {
       return <img src={player.avatar_url} alt="" className={`${sizeClasses} rounded-full object-cover`} />;
     }
@@ -586,7 +586,7 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
                   : "bg-gray-100 text-gray-500 hover:bg-gray-200"
               }`}
             >
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[0.625rem] font-bold ${
                 step === s.num ? "bg-white/20 text-white" : "bg-gray-200 text-gray-500"
               }`}>
                 {s.num}
@@ -768,7 +768,7 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
           {/* Unassigned players banner (not on any team yet) */}
           {unassigned.length > 0 && (
             <div className="bg-amber-50 rounded-xl border border-amber-200 p-3 mb-4">
-              <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wide mb-1.5">
+              <p className="text-[0.625rem] font-semibold text-amber-700 uppercase tracking-wide mb-1.5">
                 Not on a team ({unassigned.length}) — assign in Step 1 first
               </p>
               <div className="flex flex-wrap gap-1">
@@ -796,7 +796,7 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
                   <h3 className="text-sm font-semibold text-gray-700 mb-2">
                     {team.team_name || `Team ${team.team_number}`}
                     {poolPairs.length > 0 && (
-                      <span className="text-[10px] font-normal text-gray-400 ml-1">
+                      <span className="text-[0.625rem] font-normal text-gray-400 ml-1">
                         ({poolPairs.length} unplaced)
                       </span>
                     )}
@@ -815,7 +815,7 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
                           className="bg-white rounded-xl border border-gray-200 shadow-sm p-3"
                         >
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] font-semibold text-gray-400 uppercase">
+                            <span className="text-[0.625rem] font-semibold text-gray-400 uppercase">
                               Pair {idx + 1}
                             </span>
                             <button
@@ -1015,12 +1015,12 @@ function PairSlot({
   if (player) {
     return (
       <div className="flex items-center gap-2 py-1">
-        <span className="text-[10px] font-bold text-gray-400 w-3">{label}</span>
+        <span className="text-[0.625rem] font-bold text-gray-400 w-3">{label}</span>
         <div className="flex items-center gap-1.5 flex-1">
           {player.avatar_url ? (
             <img src={player.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
           ) : (
-            <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+            <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
               {(player.display_name || "?")[0].toUpperCase()}
             </span>
           )}
@@ -1043,15 +1043,15 @@ function PairSlot({
     return (
       <div className="py-1">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-[10px] font-bold text-gray-400 w-3">{label}</span>
-          <span className="text-[10px] text-green-600 font-medium flex-1">Select a player:</span>
-          <button onClick={onCancel} className="text-[10px] text-gray-400">
+          <span className="text-[0.625rem] font-bold text-gray-400 w-3">{label}</span>
+          <span className="text-[0.625rem] text-green-600 font-medium flex-1">Select a player:</span>
+          <button onClick={onCancel} className="text-[0.625rem] text-gray-400">
             Cancel
           </button>
         </div>
         <div className="space-y-0.5 ml-5">
           {availablePlayers.length === 0 ? (
-            <p className="text-[10px] text-gray-400 italic">No available players</p>
+            <p className="text-[0.625rem] text-gray-400 italic">No available players</p>
           ) : (
             [...availablePlayers].sort((a, b) => (a.player_a?.display_name || "").localeCompare(b.player_a?.display_name || "")).map((pp) => {
               const p = pp.player_a!;
@@ -1065,7 +1065,7 @@ function PairSlot({
                   {p.avatar_url ? (
                     <img src={p.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                   ) : (
-                    <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                    <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                       {(p.display_name || "?")[0].toUpperCase()}
                     </span>
                   )}
@@ -1081,7 +1081,7 @@ function PairSlot({
 
   return (
     <div className="flex items-center gap-2 py-1">
-      <span className={`text-[10px] font-bold w-3 ${optional ? "text-gray-300" : "text-gray-400"}`}>{label}</span>
+      <span className={`text-[0.625rem] font-bold w-3 ${optional ? "text-gray-300" : "text-gray-400"}`}>{label}</span>
       <button
         onClick={onTapEmpty}
         disabled={saving !== null}

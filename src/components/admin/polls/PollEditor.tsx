@@ -384,7 +384,7 @@ export function PollEditor({
           placeholder="Poll title (shown on home button)"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
         />
       </div>
 
@@ -397,7 +397,7 @@ export function PollEditor({
           rows={2}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px] resize-none"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base resize-none"
         />
       </div>
 
@@ -472,7 +472,7 @@ export function PollEditor({
                             {listUsers.map((u) => (
                               <span
                                 key={u.id}
-                                className="text-[11px] font-medium text-gray-700 bg-gray-50 rounded-full px-2 py-0.5"
+                                className="text-[0.6875rem] font-medium text-gray-700 bg-gray-50 rounded-full px-2 py-0.5"
                               >
                                 {u.display_name}
                               </span>
@@ -655,7 +655,7 @@ export function PollEditor({
                 onChange={(e) =>
                   updateQuestion(qIdx, { question_text: e.target.value })
                 }
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-[15px]"
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-[0.9375rem]"
               />
               {questions.length > 1 && (
                 <button
@@ -800,7 +800,7 @@ export function PollEditor({
                 type="datetime-local"
                 value={startsAt}
                 onChange={(e) => setStartsAt(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
               />
             </div>
           )}
@@ -813,7 +813,7 @@ export function PollEditor({
                 type="datetime-local"
                 value={endsAt}
                 onChange={(e) => setEndsAt(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
               />
             </div>
           )}

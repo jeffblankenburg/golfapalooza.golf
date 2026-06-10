@@ -8,6 +8,7 @@ import { AppShell } from "@/components/AppShell";
 import { RouteProgress } from "@/components/RouteProgress";
 import { getSimDate, getSimUserId, getEffectiveUserId, isSimulating, isSimulatingTrip } from "@/lib/simulator";
 import { hasAnyPermission } from "@/lib/permissions";
+import { fontScaleToPercent, type FontScale } from "@/lib/font-scale";
 
 export default async function AppLayout({
   children,
@@ -25,7 +26,7 @@ export default async function AppLayout({
   // Single users query (replaces two separate queries)
   const { data: realProfile } = await supabase
     .from("users")
-    .select("is_admin, display_name, avatar_url, permissions")
+    .select("is_admin, display_name, avatar_url, permissions, font_scale")
     .eq("id", user.id)
     .single();
 
@@ -101,8 +102,20 @@ export default async function AppLayout({
   const simUserName = simulating ? (profile?.display_name || null) : null;
   const showBanner = realIsAdmin && (simDate || simUserId || simTripActive);
 
+  const fontScalePercent = fontScaleToPercent(
+    (realProfile?.font_scale as FontScale | null | undefined) ?? null,
+  );
+
   return (
     <AppShell>
+      {/* Issue #138. Server-rendered root font-size override drives every
+          rem-based text size in the app. Injected inside body so there's
+          no flash — the page paints at the user's scale. */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `html { font-size: ${fontScalePercent}; }`,
+        }}
+      />
       <RouteProgress />
       {showBanner && (
         <SimulatorBanner

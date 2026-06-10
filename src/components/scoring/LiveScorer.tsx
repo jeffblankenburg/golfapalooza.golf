@@ -62,7 +62,7 @@ interface BspitwEntry {
 }
 
 function ScorecardCell({ score, par }: { score: number | undefined; par: number }) {
-  if (score == null) return <span className="text-[10px] text-gray-300">·</span>;
+  if (score == null) return <span className="text-[0.625rem] text-gray-300">·</span>;
   const diff = score - par;
   // Eagle or better: double circle
   if (diff <= -2) {
@@ -70,7 +70,7 @@ function ScorecardCell({ score, par }: { score: number | undefined; par: number 
       <div className="relative w-[22px] h-[22px] flex items-center justify-center mx-auto">
         <div className="absolute inset-0 rounded-full border-[1.5px] border-green-600" />
         <div className="absolute inset-[3px] rounded-full border-[1.5px] border-green-600" />
-        <span className="relative z-10 text-[10px] font-bold text-green-700">{score}</span>
+        <span className="relative z-10 text-[0.625rem] font-bold text-green-700">{score}</span>
       </div>
     );
   }
@@ -79,20 +79,20 @@ function ScorecardCell({ score, par }: { score: number | undefined; par: number 
     return (
       <div className="relative w-[18px] h-[18px] flex items-center justify-center mx-auto">
         <div className="absolute inset-0 rounded-full border-[1.5px] border-green-600" />
-        <span className="relative z-10 text-[10px] font-bold text-green-700">{score}</span>
+        <span className="relative z-10 text-[0.625rem] font-bold text-green-700">{score}</span>
       </div>
     );
   }
   // Par: plain
   if (diff === 0) {
-    return <span className="text-[10px] font-bold text-gray-900">{score}</span>;
+    return <span className="text-[0.625rem] font-bold text-gray-900">{score}</span>;
   }
   // Bogey: single square
   if (diff === 1) {
     return (
       <div className="relative w-[18px] h-[18px] flex items-center justify-center mx-auto">
         <div className="absolute inset-0 rounded-sm border-[1.5px] border-gray-900" />
-        <span className="relative z-10 text-[10px] font-bold text-gray-900">{score}</span>
+        <span className="relative z-10 text-[0.625rem] font-bold text-gray-900">{score}</span>
       </div>
     );
   }
@@ -101,7 +101,7 @@ function ScorecardCell({ score, par }: { score: number | undefined; par: number 
     <div className="relative w-[22px] h-[22px] flex items-center justify-center mx-auto">
       <div className="absolute inset-0 rounded-sm border-[1.5px] border-gray-900" />
       <div className="absolute inset-[3px] rounded-sm border-[1.5px] border-gray-900" />
-      <span className="relative z-10 text-[10px] font-bold text-gray-900">{score}</span>
+      <span className="relative z-10 text-[0.625rem] font-bold text-gray-900">{score}</span>
     </div>
   );
 }
@@ -134,25 +134,25 @@ function MiniScorecard({
           return (
             <div key={i}>
               <div className="grid gap-1" style={{ gridTemplateColumns: `36px repeat(${chunk.length}, 26px) 36px` }}>
-                <div className="text-[10px] font-semibold text-gray-400 uppercase">Hole</div>
+                <div className="text-[0.625rem] font-semibold text-gray-400 uppercase">Hole</div>
                 {chunk.map((h) => (
-                  <div key={h.hole_number} className="text-[10px] text-center text-gray-500 tabular-nums">
+                  <div key={h.hole_number} className="text-[0.625rem] text-center text-gray-500 tabular-nums">
                     {h.hole_number}
                   </div>
                 ))}
-                <div className="text-[10px] text-center font-semibold text-gray-400 uppercase">{totalLabel}</div>
+                <div className="text-[0.625rem] text-center font-semibold text-gray-400 uppercase">{totalLabel}</div>
 
-                <div className="text-[10px] font-semibold text-gray-400 uppercase">Par</div>
+                <div className="text-[0.625rem] font-semibold text-gray-400 uppercase">Par</div>
                 {chunk.map((h) => (
-                  <div key={h.hole_number} className="text-[11px] text-center text-gray-400 tabular-nums">
+                  <div key={h.hole_number} className="text-[0.6875rem] text-center text-gray-400 tabular-nums">
                     {h.par}
                   </div>
                 ))}
-                <div className="text-[11px] text-center text-gray-400 tabular-nums">
+                <div className="text-[0.6875rem] text-center text-gray-400 tabular-nums">
                   {chunk.reduce((s, h) => s + h.par, 0)}
                 </div>
 
-                <div className="text-[10px] font-semibold text-gray-500 uppercase">Score</div>
+                <div className="text-[0.625rem] font-semibold text-gray-500 uppercase">Score</div>
                 {chunk.map((h) => (
                   <div key={h.hole_number} className="text-center flex items-center justify-center min-h-[22px]">
                     <ScorecardCell score={scores[h.hole_number]} par={h.par} />
@@ -161,7 +161,7 @@ function MiniScorecard({
                 <div className="text-sm text-center font-semibold text-gray-700 tabular-nums">
                   {subStrokes > 0 ? subStrokes : "·"}
                   {subStrokes > 0 && subPlayedPar > 0 && (
-                    <span className={`block text-[9px] font-normal ${
+                    <span className={`block text-[0.5625rem] font-normal ${
                       subStrokes - subPlayedPar < 0
                         ? "text-green-600"
                         : subStrokes - subPlayedPar > 0
@@ -382,14 +382,14 @@ function LeaderboardPopup({
                       <p className="text-xs text-gray-400 flex items-center gap-1.5">
                         <span>thru {entry.holes_completed}</span>
                         {entry.verified_at ? (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-px rounded-full bg-green-100 text-green-700 text-[10px] font-semibold">
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-px rounded-full bg-green-100 text-green-700 text-[0.625rem] font-semibold">
                             <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                             </svg>
                             Verified
                           </span>
                         ) : entry.holes_completed >= 18 ? (
-                          <span className="px-1.5 py-px rounded-full bg-amber-100 text-amber-700 text-[10px] font-semibold">
+                          <span className="px-1.5 py-px rounded-full bg-amber-100 text-amber-700 text-[0.625rem] font-semibold">
                             Unverified
                           </span>
                         ) : null}
@@ -445,7 +445,7 @@ function LeaderboardPopup({
                     <p className="text-sm font-medium text-gray-900 truncate">
                       {entry.display_name}
                     </p>
-                    <p className="text-[11px] text-gray-400">
+                    <p className="text-[0.6875rem] text-gray-400">
                       Score {entry.under_par_points} · Bonus {entry.on_green_points + entry.holed_out_points}
                     </p>
                   </div>
@@ -525,20 +525,20 @@ function CompleteRoundModal({
     const gridCols = `40px repeat(${list.length}, 1fr) 36px`;
     return (
       <div className="mb-3 overflow-x-auto">
-        <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">{label}</p>
+        <p className="text-[0.625rem] uppercase tracking-wide text-gray-400 mb-1">{label}</p>
         <div className="border border-gray-200 rounded-lg overflow-hidden min-w-max">
           {/* Hole row */}
           <div
             className="grid items-center py-1.5 px-2 bg-gray-50 border-b border-gray-200"
             style={{ gridTemplateColumns: gridCols }}
           >
-            <div className="text-[10px] font-semibold text-gray-400 uppercase">Hole</div>
+            <div className="text-[0.625rem] font-semibold text-gray-400 uppercase">Hole</div>
             {list.map((h) => (
-              <div key={`h-${h.hole_number}`} className="text-[11px] text-center text-gray-500 tabular-nums">
+              <div key={`h-${h.hole_number}`} className="text-[0.6875rem] text-center text-gray-500 tabular-nums">
                 {h.hole_number}
               </div>
             ))}
-            <div className="text-[10px] text-center font-semibold text-gray-400 uppercase">Tot</div>
+            <div className="text-[0.625rem] text-center font-semibold text-gray-400 uppercase">Tot</div>
           </div>
 
           {/* Par row */}
@@ -546,13 +546,13 @@ function CompleteRoundModal({
             className="grid items-center py-1.5 px-2 border-b border-gray-200"
             style={{ gridTemplateColumns: gridCols }}
           >
-            <div className="text-[10px] font-semibold text-gray-400 uppercase">Par</div>
+            <div className="text-[0.625rem] font-semibold text-gray-400 uppercase">Par</div>
             {list.map((h) => (
-              <div key={`p-${h.hole_number}`} className="text-[11px] text-center text-gray-400 tabular-nums">
+              <div key={`p-${h.hole_number}`} className="text-[0.6875rem] text-center text-gray-400 tabular-nums">
                 {h.par}
               </div>
             ))}
-            <div className="text-[11px] text-center text-gray-400 tabular-nums">{sumPar(list)}</div>
+            <div className="text-[0.6875rem] text-center text-gray-400 tabular-nums">{sumPar(list)}</div>
           </div>
 
           {/* Score row */}
@@ -560,13 +560,13 @@ function CompleteRoundModal({
             className="grid items-center py-1.5 px-2"
             style={{ gridTemplateColumns: gridCols }}
           >
-            <div className="text-[10px] font-semibold text-gray-500 uppercase">Score</div>
+            <div className="text-[0.625rem] font-semibold text-gray-500 uppercase">Score</div>
             {list.map((h) => (
               <div key={`s-${h.hole_number}`} className="flex items-center justify-center min-h-[22px]">
                 <ScorecardCell score={scores[h.hole_number]} par={h.par} />
               </div>
             ))}
-            <div className="text-[12px] text-center font-bold text-gray-900 tabular-nums">{sumScore(list)}</div>
+            <div className="text-xs text-center font-bold text-gray-900 tabular-nums">{sumScore(list)}</div>
           </div>
         </div>
       </div>
@@ -592,11 +592,11 @@ function CompleteRoundModal({
         {/* Totals */}
         <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
           <div className="rounded-xl bg-gray-50 px-3 py-2">
-            <p className="text-[10px] uppercase tracking-wide text-gray-400">Gross</p>
+            <p className="text-[0.625rem] uppercase tracking-wide text-gray-400">Gross</p>
             <p className="text-xl font-bold text-gray-900 tabular-nums">{grossScore}</p>
           </div>
           <div className="rounded-xl bg-gray-50 px-3 py-2">
-            <p className="text-[10px] uppercase tracking-wide text-gray-400">vs Par</p>
+            <p className="text-[0.625rem] uppercase tracking-wide text-gray-400">vs Par</p>
             <p
               className={`text-xl font-bold tabular-nums ${
                 relPar < 0 ? "text-green-700" : relPar > 0 ? "text-red-600" : "text-gray-900"
@@ -606,23 +606,23 @@ function CompleteRoundModal({
             </p>
           </div>
           <div className="rounded-xl bg-gray-50 px-3 py-2">
-            <p className="text-[10px] uppercase tracking-wide text-gray-400">Team Handicap</p>
+            <p className="text-[0.625rem] uppercase tracking-wide text-gray-400">Team Handicap</p>
             <p className="text-xl font-bold text-gray-900 tabular-nums">{teamHandicap}</p>
           </div>
           <div className="rounded-xl bg-gray-50 px-3 py-2">
-            <p className="text-[10px] uppercase tracking-wide text-gray-400">Net</p>
+            <p className="text-[0.625rem] uppercase tracking-wide text-gray-400">Net</p>
             <p className="text-xl font-bold text-gray-900 tabular-nums">{netScore}</p>
           </div>
         </div>
 
         {/* Per-player BSPITW summary */}
-        <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">
+        <p className="text-[0.625rem] uppercase tracking-wide text-gray-400 mb-1">
           BSPITW Points
         </p>
         <div className="rounded-xl border border-gray-200 overflow-hidden mb-5">
           <table className="w-full text-sm tabular-nums">
             <thead>
-              <tr className="bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500">
+              <tr className="bg-gray-50 text-[0.625rem] uppercase tracking-wide text-gray-500">
                 <th className="text-left px-3 py-1.5">Player</th>
                 <th className="text-center px-2 py-1.5">Score</th>
                 <th className="text-center px-2 py-1.5">On Green</th>
@@ -1223,7 +1223,7 @@ export function LiveScorer({
                   if (played === 0) {
                     return (
                       <div className="text-right shrink-0">
-                        <div className="text-[10px] uppercase tracking-wide text-gray-400">Round</div>
+                        <div className="text-[0.625rem] uppercase tracking-wide text-gray-400">Round</div>
                         <div className="text-2xl font-bold text-gray-900 tabular-nums">E</div>
                       </div>
                     );
@@ -1231,7 +1231,7 @@ export function LiveScorer({
                   const rel = strokes - parPlayed;
                   return (
                     <div className="text-right shrink-0">
-                      <div className="text-[10px] uppercase tracking-wide text-gray-400">Round</div>
+                      <div className="text-[0.625rem] uppercase tracking-wide text-gray-400">Round</div>
                       <div
                         className={`text-2xl font-bold tabular-nums ${
                           rel < 0
@@ -1253,7 +1253,7 @@ export function LiveScorer({
                 <div className="flex items-start gap-4">
                   {/* On Green */}
                   <div className="flex-1">
-                    <p className="text-[10px] text-amber-600 font-medium uppercase tracking-wide mb-1">
+                    <p className="text-[0.625rem] text-amber-600 font-medium uppercase tracking-wide mb-1">
                       On Green
                     </p>
                     <div className="flex flex-wrap gap-1.5">
@@ -1279,7 +1279,7 @@ export function LiveScorer({
                   </div>
                   {/* Holed Out */}
                   <div className="flex-1">
-                    <p className="text-[10px] text-amber-600 font-medium uppercase tracking-wide mb-1">
+                    <p className="text-[0.625rem] text-amber-600 font-medium uppercase tracking-wide mb-1">
                       Holed Out
                     </p>
                     <div className="flex flex-wrap gap-1.5">

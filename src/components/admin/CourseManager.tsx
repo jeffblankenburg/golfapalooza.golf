@@ -73,13 +73,13 @@ type SaveStatus = "idle" | "saving" | "saved" | "error";
 function SaveStatusBadge({ status, onRetry }: { status: SaveStatus; onRetry?: () => void }) {
   if (status === "idle") return null;
   if (status === "saving") {
-    return <span className="text-[11px] font-medium text-gray-400">Saving…</span>;
+    return <span className="text-[0.6875rem] font-medium text-gray-400">Saving…</span>;
   }
   if (status === "saved") {
-    return <span className="text-[11px] font-semibold text-green-600">Saved ✓</span>;
+    return <span className="text-[0.6875rem] font-semibold text-green-600">Saved ✓</span>;
   }
   return (
-    <span className="text-[11px] font-semibold text-red-600 inline-flex items-center gap-1">
+    <span className="text-[0.6875rem] font-semibold text-red-600 inline-flex items-center gap-1">
       Couldn&apos;t save
       {onRetry && (
         <button type="button" onClick={onRetry} className="underline">
@@ -809,7 +809,7 @@ export function CourseManager({
                 <div className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
                   {course?.verified ? "Verified" : "Unverified"}
                   {course && course.source !== "manual" && (
-                    <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${
+                    <span className={`text-[0.5625rem] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${
                       course.source === "ai" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
                     }`}>{course.source}</span>
                   )}
@@ -1370,7 +1370,7 @@ function HoleRow({
           )}
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="text-[10px] text-gray-400 uppercase">Par</label>
+              <label className="text-[0.625rem] text-gray-400 uppercase">Par</label>
               <input
                 type="number"
                 tabIndex={holeIndex + 1}
@@ -1380,7 +1380,7 @@ function HoleRow({
               />
             </div>
             <div>
-              <label className="text-[10px] text-gray-400 uppercase">Hdcp</label>
+              <label className="text-[0.625rem] text-gray-400 uppercase">Hdcp</label>
               <input
                 type="number"
                 tabIndex={totalHoles + holeIndex + 1}
@@ -1390,7 +1390,7 @@ function HoleRow({
               />
             </div>
             <div>
-              <label className="text-[10px] text-gray-400 uppercase">Yards</label>
+              <label className="text-[0.625rem] text-gray-400 uppercase">Yards</label>
               <input
                 type="number"
                 tabIndex={totalHoles * 2 + holeIndex + 1}
@@ -1937,7 +1937,7 @@ function CompositionTeeEditor({
           <div className="grid grid-cols-2 gap-x-4 gap-y-2">
             {[{ label: "Front 9", holes: Array.from({ length: 9 }, (_, i) => i + 1) }, { label: "Back 9", holes: Array.from({ length: 9 }, (_, i) => i + 10) }].map((col, colIdx) => (
               <div key={colIdx} className="space-y-2">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">{col.label}</p>
+                <p className="text-[0.625rem] font-semibold text-gray-400 uppercase tracking-wide">{col.label}</p>
                 {col.holes.map((holeNum) => (
                   <div key={holeNum} className="flex items-center gap-2">
                     <span className="text-xs font-bold text-gray-500 w-5 text-right">{holeNum}</span>

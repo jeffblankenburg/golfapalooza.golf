@@ -505,7 +505,7 @@ export function TeeTimeManager({ tripId, dayNumber, contestType }: { tripId: str
                       {m.avatar_url ? (
                         <img src={m.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                       ) : (
-                        <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                        <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                           {(m.display_name || "?")[0].toUpperCase()}
                         </span>
                       )}
@@ -547,7 +547,7 @@ export function TeeTimeManager({ tripId, dayNumber, contestType }: { tripId: str
                         {m.avatar_url ? (
                           <img src={m.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                         ) : (
-                          <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                          <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                             {(m.display_name || "?")[0].toUpperCase()}
                           </span>
                         )}
@@ -584,7 +584,7 @@ export function TeeTimeManager({ tripId, dayNumber, contestType }: { tripId: str
                   {player.avatar_url ? (
                     <img src={player.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                   ) : (
-                    <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                    <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                       {(player.display_name || "?")[0].toUpperCase()}
                     </span>
                   )}
@@ -634,7 +634,7 @@ export function TeeTimeManager({ tripId, dayNumber, contestType }: { tripId: str
                               {member.avatar_url ? (
                                 <img src={member.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                               ) : (
-                                <span className="w-4 h-4 rounded-full bg-green-200 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                                <span className="w-4 h-4 rounded-full bg-green-200 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                                   {(member.display_name || "?")[0].toUpperCase()}
                                 </span>
                               )}
@@ -665,7 +665,7 @@ export function TeeTimeManager({ tripId, dayNumber, contestType }: { tripId: str
                                     {m.avatar_url ? (
                                       <img src={m.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                                     ) : (
-                                      <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                                      <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                                         {(m.display_name || "?")[0].toUpperCase()}
                                       </span>
                                     )}
@@ -717,7 +717,7 @@ export function TeeTimeManager({ tripId, dayNumber, contestType }: { tripId: str
                             {player.avatar_url ? (
                               <img src={player.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                             ) : (
-                              <span className="w-4 h-4 rounded-full bg-green-200 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                              <span className="w-4 h-4 rounded-full bg-green-200 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                                 {(player.display_name || "?")[0].toUpperCase()}
                               </span>
                             )}
@@ -744,7 +744,7 @@ export function TeeTimeManager({ tripId, dayNumber, contestType }: { tripId: str
                             {player.avatar_url ? (
                               <img src={player.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                             ) : (
-                              <span className="w-4 h-4 rounded-full bg-green-200 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                              <span className="w-4 h-4 rounded-full bg-green-200 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                                 {(player.display_name || "?")[0].toUpperCase()}
                               </span>
                             )}
@@ -776,7 +776,7 @@ export function TeeTimeManager({ tripId, dayNumber, contestType }: { tripId: str
                                 {player.avatar_url ? (
                                   <img src={player.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
                                 ) : (
-                                  <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[9px] font-bold">
+                                  <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5625rem] font-bold">
                                     {(player.display_name || "?")[0].toUpperCase()}
                                   </span>
                                 )}
@@ -806,7 +806,7 @@ export function TeeTimeManager({ tripId, dayNumber, contestType }: { tripId: str
                 {/* Tee Time & Starting Hole */}
                 <div className="px-4 py-2.5 border-t border-gray-100 flex items-center gap-3">
                   <div className="flex-1">
-                    <label className="block text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">
+                    <label className="block text-[0.625rem] text-gray-400 uppercase tracking-wide mb-0.5">
                       Tee Time
                     </label>
                     <input
@@ -826,7 +826,7 @@ export function TeeTimeManager({ tripId, dayNumber, contestType }: { tripId: str
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="block text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">
+                    <label className="block text-[0.625rem] text-gray-400 uppercase tracking-wide mb-0.5">
                       Starting Hole
                     </label>
                     <input

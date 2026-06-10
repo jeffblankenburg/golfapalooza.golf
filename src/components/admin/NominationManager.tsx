@@ -345,13 +345,13 @@ export function NominationManager() {
               <button
                 onClick={submitReject}
                 disabled={processing}
-                className="flex-1 py-3 bg-red-600 text-white rounded-xl font-semibold text-[15px] active:opacity-80 disabled:opacity-50"
+                className="flex-1 py-3 bg-red-600 text-white rounded-xl font-semibold text-[0.9375rem] active:opacity-80 disabled:opacity-50"
               >
                 {processing ? "Rejecting..." : "Reject"}
               </button>
               <button
                 onClick={() => setRejectModal(null)}
-                className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600 active:bg-gray-50"
+                className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[0.9375rem] text-gray-600 active:bg-gray-50"
               >
                 Cancel
               </button>
@@ -397,13 +397,13 @@ export function NominationManager() {
               <button
                 onClick={submitApprove}
                 disabled={processing}
-                className="flex-1 py-3 bg-green-600 text-white rounded-xl font-semibold text-[15px] active:opacity-80 disabled:opacity-50"
+                className="flex-1 py-3 bg-green-600 text-white rounded-xl font-semibold text-[0.9375rem] active:opacity-80 disabled:opacity-50"
               >
                 {processing ? "Approving..." : "Approve & Send"}
               </button>
               <button
                 onClick={() => setApproveModal(null)}
-                className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600 active:bg-gray-50"
+                className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[0.9375rem] text-gray-600 active:bg-gray-50"
               >
                 Cancel
               </button>

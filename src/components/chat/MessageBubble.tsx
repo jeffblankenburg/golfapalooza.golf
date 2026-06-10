@@ -155,7 +155,7 @@ export function MessageBubble({
       <div className={`max-w-[75%] ${isSent ? "items-end" : "items-start"}`}>
         {/* Sender name for group chats */}
         {showSender && message.sender && (
-          <p className="text-[11px] text-gray-500 font-medium ml-3 mb-0.5">
+          <p className="text-[0.6875rem] text-gray-500 font-medium ml-3 mb-0.5">
             <Link href={`/loozers/${message.sender.id}`} className="hover:underline">
               {message.sender.display_name}
             </Link>
@@ -170,12 +170,12 @@ export function MessageBubble({
             <div className={`rounded-2xl px-3 py-1.5 max-w-full ${
               isSent ? "bg-green-600/40" : "bg-gray-300/60"
             }`}>
-              <p className={`text-[11px] font-semibold ${
+              <p className={`text-[0.6875rem] font-semibold ${
                 isSent ? "text-green-100" : "text-gray-600"
               }`}>
                 {message.reply_to.sender?.display_name || "Unknown"}
               </p>
-              <p className={`text-[12px] truncate ${
+              <p className={`text-xs truncate ${
                 isSent ? "text-green-200/80" : "text-gray-500"
               }`}>
                 {message.reply_to.content || "Image"}
@@ -222,7 +222,7 @@ export function MessageBubble({
 
           {/* Text content */}
           {message.content && (
-            <p className="text-[15px] leading-snug whitespace-pre-wrap break-words">
+            <p className="text-[0.9375rem] leading-snug whitespace-pre-wrap break-words">
               <Linkify text={message.content} isSent={isSent} />
             </p>
           )}
@@ -230,7 +230,7 @@ export function MessageBubble({
           {/* Timestamp on last in group */}
           {isLastInGroup && (
             <p
-              className={`text-[10px] mt-0.5 ${
+              className={`text-[0.625rem] mt-0.5 ${
                 isSent ? "text-green-200" : "text-gray-400"
               }`}
             >

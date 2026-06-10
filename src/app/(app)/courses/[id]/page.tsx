@@ -92,7 +92,7 @@ export default function CoursePage() {
               <h1 className="text-lg font-semibold text-gray-900 leading-snug">{meta.name}</h1>
               {subtitle && <div className="text-sm text-gray-500 mt-0.5">{subtitle}</div>}
               {meta.updated_at && (
-                <div className="text-[11px] text-gray-400 mt-2">
+                <div className="text-[0.6875rem] text-gray-400 mt-2">
                   Last edited{editorByName ? ` by ${editorByName}` : ""} on{" "}
                   {new Date(meta.updated_at).toLocaleDateString("en-US", {
                     month: "short", day: "numeric", year: "numeric",
@@ -102,7 +102,7 @@ export default function CoursePage() {
             </div>
             <div className="flex flex-col items-end gap-1 shrink-0">
               {meta.locked && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-600 rounded-md">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[0.625rem] font-medium bg-gray-100 text-gray-600 rounded-md">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>

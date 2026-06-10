@@ -16,7 +16,7 @@ interface ScorecardViewProps {
 
 function ScoreCell({ score, par }: { score: number | undefined; par: number }) {
   if (score == null) {
-    return <span className="text-[10px] text-gray-400">·</span>;
+    return <span className="text-[0.625rem] text-gray-400">·</span>;
   }
 
   const diff = score - par;
@@ -27,7 +27,7 @@ function ScoreCell({ score, par }: { score: number | undefined; par: number }) {
       <div className="relative w-[22px] h-[22px] flex items-center justify-center mx-auto">
         <div className="absolute inset-0 rounded-full border-[1.5px] border-green-600" />
         <div className="absolute inset-[3px] rounded-full border-[1.5px] border-green-600" />
-        <span className="relative z-10 text-[10px] font-bold text-green-700">{score}</span>
+        <span className="relative z-10 text-[0.625rem] font-bold text-green-700">{score}</span>
       </div>
     );
   }
@@ -37,14 +37,14 @@ function ScoreCell({ score, par }: { score: number | undefined; par: number }) {
     return (
       <div className="relative w-[18px] h-[18px] flex items-center justify-center mx-auto">
         <div className="absolute inset-0 rounded-full border-[1.5px] border-green-600" />
-        <span className="relative z-10 text-[10px] font-bold text-green-700">{score}</span>
+        <span className="relative z-10 text-[0.625rem] font-bold text-green-700">{score}</span>
       </div>
     );
   }
 
   // Par: plain text
   if (diff === 0) {
-    return <span className="text-[10px] font-bold text-gray-900">{score}</span>;
+    return <span className="text-[0.625rem] font-bold text-gray-900">{score}</span>;
   }
 
   // Bogey: single square
@@ -52,7 +52,7 @@ function ScoreCell({ score, par }: { score: number | undefined; par: number }) {
     return (
       <div className="relative w-[18px] h-[18px] flex items-center justify-center mx-auto">
         <div className="absolute inset-0 rounded-sm border-[1.5px] border-gray-900" />
-        <span className="relative z-10 text-[10px] font-bold text-gray-900">{score}</span>
+        <span className="relative z-10 text-[0.625rem] font-bold text-gray-900">{score}</span>
       </div>
     );
   }
@@ -62,7 +62,7 @@ function ScoreCell({ score, par }: { score: number | undefined; par: number }) {
     <div className="relative w-[22px] h-[22px] flex items-center justify-center mx-auto">
       <div className="absolute inset-0 rounded-sm border-[1.5px] border-gray-900" />
       <div className="absolute inset-[3px] rounded-sm border-[1.5px] border-gray-900" />
-      <span className="relative z-10 text-[10px] font-bold text-gray-900">{score}</span>
+      <span className="relative z-10 text-[0.625rem] font-bold text-gray-900">{score}</span>
     </div>
   );
 }

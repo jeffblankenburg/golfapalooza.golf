@@ -336,7 +336,7 @@ function HoleGrid({
     const totalStrokes = rowHoles.reduce((s, h) => s + (scores[h.hole_number]?.strokes ?? 0), 0);
     return (
       <div className="mb-3">
-        <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">{label}</p>
+        <p className="text-[0.625rem] text-gray-400 uppercase tracking-wide mb-1">{label}</p>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
@@ -385,12 +385,12 @@ function HoleGrid({
                 {rowHoles.map((h) => {
                   const s = scores[h.hole_number];
                   return (
-                    <td key={h.hole_number} className="text-center py-1 text-gray-500 text-[11px]">
+                    <td key={h.hole_number} className="text-center py-1 text-gray-500 text-[0.6875rem]">
                       {s?.putts ?? "·"}
                     </td>
                   );
                 })}
-                <td className="text-center py-1 text-gray-500 border-l border-gray-200 tabular-nums text-[11px]">
+                <td className="text-center py-1 text-gray-500 border-l border-gray-200 tabular-nums text-[0.6875rem]">
                   {rowHoles.reduce((s, h) => s + (scores[h.hole_number]?.putts ?? 0), 0) || "–"}
                 </td>
               </tr>
@@ -512,7 +512,7 @@ function Stepper({
           <button
             type="button"
             onClick={onClear}
-            className="text-[11px] text-gray-500 underline active:text-gray-700"
+            className="text-[0.6875rem] text-gray-500 underline active:text-gray-700"
           >
             Clear
           </button>

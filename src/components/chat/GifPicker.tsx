@@ -100,7 +100,7 @@ export function GifPicker({ onSelect }: { onSelect: (gifUrl: string) => void }) 
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search GIFs"
             autoFocus
-            className="flex-1 text-[15px] bg-transparent outline-none placeholder-gray-400"
+            className="flex-1 text-[0.9375rem] bg-transparent outline-none placeholder-gray-400"
           />
           {query && (
             <button onClick={() => setQuery("")} className="text-gray-400">
@@ -153,7 +153,7 @@ export function GifPicker({ onSelect }: { onSelect: (gifUrl: string) => void }) 
 
       {/* GIPHY attribution */}
       <div className="px-3 py-1.5 border-t border-gray-100 flex justify-center">
-        <span className="text-[10px] text-gray-400 font-medium tracking-wide">Powered by GIPHY</span>
+        <span className="text-[0.625rem] text-gray-400 font-medium tracking-wide">Powered by GIPHY</span>
       </div>
     </div>
   );

@@ -195,7 +195,7 @@ export function RosterManager({ tripId: propTripId, onCountChange }: { tripId?: 
             </span>
             {user.likelihood !== null && (
               <span
-                className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                className={`text-[0.6875rem] font-semibold px-2 py-0.5 rounded-full ${
                   user.likelihood >= 99
                     ? "bg-green-100 text-green-800"
                     : user.likelihood >= 75

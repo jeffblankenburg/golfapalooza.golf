@@ -275,7 +275,7 @@ export function CostItemLinksModal({
             type="button"
             onClick={handleSave}
             disabled={saving || loading}
-            className={`flex-1 py-3 rounded-xl font-semibold text-[15px] active:opacity-80 ${
+            className={`flex-1 py-3 rounded-xl font-semibold text-[0.9375rem] active:opacity-80 ${
               saving || loading ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "bg-green-600 text-white"
             }`}
           >
@@ -285,7 +285,7 @@ export function CostItemLinksModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600 active:bg-gray-50"
+            className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[0.9375rem] text-gray-600 active:bg-gray-50"
           >
             Cancel
           </button>
@@ -311,7 +311,7 @@ function CheckboxLinksSection({
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between">
-        <span className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+        <span className="text-[0.625rem] uppercase tracking-wider text-gray-500 font-semibold">
           Linked cost items
         </span>
         <div className="text-lg font-bold text-green-700 tabular-nums leading-none">{fmt(total)}</div>
@@ -391,7 +391,7 @@ function GroupedItemList({
         const label = cat === UNCATEGORIZED_KEY ? UNCATEGORIZED_LABEL : CATEGORY_LABELS[cat] || cat;
         return (
           <div key={cat}>
-            <div className="px-3 py-1 bg-gray-50 border-b border-gray-100 text-[10px] uppercase tracking-wider text-gray-500 font-semibold sticky top-0">
+            <div className="px-3 py-1 bg-gray-50 border-b border-gray-100 text-[0.625rem] uppercase tracking-wider text-gray-500 font-semibold sticky top-0">
               {label}
             </div>
             <div className="divide-y divide-gray-100">
@@ -421,7 +421,7 @@ function GroupedItemList({
                     <div className="flex-1 min-w-0">
                       <div className="text-sm text-gray-900 truncate">{it.name}</div>
                       {linkedElsewhere && (
-                        <div className="text-[10px] text-gray-400">linked to another option</div>
+                        <div className="text-[0.625rem] text-gray-400">linked to another option</div>
                       )}
                     </div>
                     <span className="text-sm font-semibold text-gray-700 tabular-nums shrink-0">{fmt(Number(it.cost))}</span>

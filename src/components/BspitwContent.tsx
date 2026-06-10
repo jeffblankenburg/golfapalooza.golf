@@ -259,7 +259,7 @@ export function BspitwContent({
                     {entry.avatar_url ? (
                       <img src={entry.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
                     ) : (
-                      <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold flex-shrink-0">
+                      <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold flex-shrink-0">
                         {(entry.display_name || "?")[0].toUpperCase()}
                       </span>
                     )}
@@ -268,7 +268,7 @@ export function BspitwContent({
                         {entry.display_name}
                       </span>
                       {entry.owner_name && (
-                        <span className="text-[10px] text-gray-400 truncate block">
+                        <span className="text-[0.625rem] text-gray-400 truncate block">
                           Owner: {entry.owner_name}
                         </span>
                       )}
@@ -292,9 +292,9 @@ export function BspitwContent({
                           }
                           return (
                             <div key={d} className="px-1 py-2 text-center text-xs text-gray-600">
-                              <sup className="mr-0.5 text-[9px] font-semibold text-green-600">{dayPts.on_green}</sup>
+                              <sup className="mr-0.5 text-[0.5625rem] font-semibold text-green-600">{dayPts.on_green}</sup>
                               {dayPts.total}
-                              <sup className="ml-0.5 text-[9px] font-semibold text-amber-600">{dayPts.holed_out}</sup>
+                              <sup className="ml-0.5 text-[0.5625rem] font-semibold text-amber-600">{dayPts.holed_out}</sup>
                             </div>
                           );
                         }
@@ -311,9 +311,9 @@ export function BspitwContent({
                       <div className="px-1 py-2 text-center text-sm font-bold text-gray-900">
                         {view === "total" ? (
                           <>
-                            <sup className="mr-0.5 text-[9px] font-semibold text-green-600">{entry.on_green_points}</sup>
+                            <sup className="mr-0.5 text-[0.5625rem] font-semibold text-green-600">{entry.on_green_points}</sup>
                             {entry.total_points}
-                            <sup className="ml-0.5 text-[9px] font-semibold text-amber-600">{entry.holed_out_points}</sup>
+                            <sup className="ml-0.5 text-[0.5625rem] font-semibold text-amber-600">{entry.holed_out_points}</sup>
                           </>
                         ) : (
                           getTotalValue(entry, view)

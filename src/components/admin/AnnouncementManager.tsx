@@ -486,7 +486,7 @@ export function AnnouncementManager() {
                 setAudience(tab.key);
                 setRecipientListOpen(false);
               }}
-              className={`py-2.5 text-[13px] font-semibold whitespace-nowrap transition-colors relative ${
+              className={`py-2.5 text-[0.8125rem] font-semibold whitespace-nowrap transition-colors relative ${
                 audience === tab.key
                   ? "text-green-700"
                   : "text-gray-400"
@@ -695,14 +695,14 @@ export function AnnouncementManager() {
             autoFocus
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
           />
           <textarea
             placeholder="Body (optional)"
             rows={3}
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px] resize-none"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base resize-none"
           />
 
           {/* Timing */}
@@ -741,7 +741,7 @@ export function AnnouncementManager() {
                 value={scheduledFor}
                 onChange={(e) => setScheduledFor(e.target.value)}
                 min={new Date().toISOString().slice(0, 16)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
               />
               <p className="text-xs text-gray-400 mt-1">
                 Times are in {getTimezoneAbbreviation(tripTimezone)}
@@ -752,7 +752,7 @@ export function AnnouncementManager() {
           <button
             onClick={() => setShowConfirm(true)}
             disabled={!canSend || sending}
-            className="w-full bg-green-600 text-white rounded-xl py-3 font-semibold text-[15px] active:opacity-80 disabled:opacity-50"
+            className="w-full bg-green-600 text-white rounded-xl py-3 font-semibold text-[0.9375rem] active:opacity-80 disabled:opacity-50"
           >
             {sending
               ? editingId

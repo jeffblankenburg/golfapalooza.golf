@@ -378,7 +378,7 @@ export default function AdminPage() {
             handleDuplicate(event);
           }}
           disabled={isDuplicating}
-          className="absolute top-2 right-10 px-2 py-1 rounded-md text-[10px] font-semibold uppercase tracking-wide text-gray-600 bg-gray-50 border border-gray-200 active:bg-gray-100 disabled:opacity-50"
+          className="absolute top-2 right-10 px-2 py-1 rounded-md text-[0.625rem] font-semibold uppercase tracking-wide text-gray-600 bg-gray-50 border border-gray-200 active:bg-gray-100 disabled:opacity-50"
           title={`Duplicate "${event.trip_name} ${event.trip_year}" structure into a new archived event`}
         >
           {isDuplicating ? "…" : "Duplicate"}
@@ -467,7 +467,7 @@ export default function AdminPage() {
                 onChange={(e) =>
                   setNewTrip({ ...newTrip, trip_name: e.target.value })
                 }
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
               />
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -478,7 +478,7 @@ export default function AdminPage() {
                     onChange={(e) =>
                       setNewTrip({ ...newTrip, start_date: e.target.value })
                     }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
                   />
                 </div>
                 <div>
@@ -489,7 +489,7 @@ export default function AdminPage() {
                     onChange={(e) =>
                       setNewTrip({ ...newTrip, end_date: e.target.value })
                     }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
                   />
                 </div>
               </div>
@@ -506,7 +506,7 @@ export default function AdminPage() {
                   onChange={(e) =>
                     setNewTrip({ ...newTrip, timezone: e.target.value })
                   }
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
                 >
                   {US_TIMEZONE_OPTIONS.map((tz) => (
                     <option key={tz.value} value={tz.value}>{tz.label}</option>

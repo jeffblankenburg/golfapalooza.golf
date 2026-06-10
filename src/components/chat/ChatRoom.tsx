@@ -466,7 +466,7 @@ export function ChatRoom({
           </svg>
         </button>
         <div className="flex-1 min-w-0">
-          <h2 className="text-[17px] font-semibold text-gray-900 truncate">
+          <h2 className="text-[1.0625rem] font-semibold text-gray-900 truncate">
             {displayName}
           </h2>
           {roomType === "group" && (
@@ -528,7 +528,7 @@ export function ChatRoom({
                 <div key={message.id}>
                   {showTimestamp && (
                     <div className="text-center py-2">
-                      <span className="text-[11px] text-gray-400 font-medium">
+                      <span className="text-[0.6875rem] text-gray-400 font-medium">
                         {formatTimestamp(message.created_at)}
                       </span>
                     </div>

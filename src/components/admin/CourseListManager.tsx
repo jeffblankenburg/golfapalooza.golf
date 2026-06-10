@@ -145,7 +145,7 @@ export function CourseListManager() {
               autoFocus
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px] bg-white"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base bg-white"
             />
             <div className="flex gap-2">
               <input
@@ -153,14 +153,14 @@ export function CourseListManager() {
                 placeholder="City"
                 value={newCity}
                 onChange={(e) => setNewCity(e.target.value)}
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-[16px] bg-white"
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-base bg-white"
               />
               <input
                 type="text"
                 placeholder="State"
                 value={newState}
                 onChange={(e) => setNewState(e.target.value)}
-                className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-[16px] bg-white"
+                className="w-20 border border-gray-300 rounded-lg px-3 py-2 text-base bg-white"
               />
             </div>
             <div className="flex gap-2">
@@ -202,12 +202,12 @@ export function CourseListManager() {
                     </svg>
                   )}
                   {course.source !== "manual" && (
-                    <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${
+                    <span className={`text-[0.5625rem] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${
                       course.source === "ai" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
                     }`}>{course.source}</span>
                   )}
                   {!course.verified && (
-                    <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">unverified</span>
+                    <span className="text-[0.5625rem] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">unverified</span>
                   )}
                 </div>
                 <div className="text-xs text-gray-500">

@@ -229,7 +229,7 @@ export function PollManager() {
                           {p.description}
                         </p>
                       )}
-                      <div className="flex flex-wrap gap-2 mt-1.5 text-[11px] text-gray-500">
+                      <div className="flex flex-wrap gap-2 mt-1.5 text-[0.6875rem] text-gray-500">
                         <span
                           className={`px-1.5 py-0.5 rounded-full font-medium ${statusBadgeColors[p.status]}`}
                         >
@@ -477,7 +477,7 @@ export function PollManager() {
                 type="datetime-local"
                 value={reopenEndsAt}
                 onChange={(e) => setReopenEndsAt(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
               />
               {actionError && (
                 <p className="text-xs text-red-600">{actionError}</p>
@@ -486,7 +486,7 @@ export function PollManager() {
             <div className="px-6 py-4 border-t border-gray-100 flex gap-2">
               <button
                 onClick={() => handleReopenAction(confirmAction.pollId)}
-                className="flex-1 py-3 rounded-xl font-semibold text-[15px] bg-green-600 text-white"
+                className="flex-1 py-3 rounded-xl font-semibold text-[0.9375rem] bg-green-600 text-white"
               >
                 Reopen
               </button>
@@ -496,7 +496,7 @@ export function PollManager() {
                   setActionError(null);
                   setReopenEndsAt("");
                 }}
-                className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600"
+                className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[0.9375rem] text-gray-600"
               >
                 Cancel
               </button>

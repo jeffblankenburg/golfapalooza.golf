@@ -103,21 +103,21 @@ export function CourseScorecard({ course, closeHref = "/" }: { course: CourseDat
           {rowHoles.map((h) => (
             <Fragment key={`yds-${h.hole_number}`}>
               {h.hole_number === 10 && hasBothNines && (
-                <td className="px-0 py-0.5 text-center text-[9px] text-gray-400 border-l border-r border-gray-200">
+                <td className="px-0 py-0.5 text-center text-[0.5625rem] text-gray-400 border-l border-r border-gray-200">
                   {front9Yds || ""}
                 </td>
               )}
-              <td className="px-0 py-0.5 text-center text-[9px] text-gray-400">
+              <td className="px-0 py-0.5 text-center text-[0.5625rem] text-gray-400">
                 {h.yards ?? "—"}
               </td>
             </Fragment>
           ))}
           {hasBothNines && (
-            <td className="px-0 py-0.5 text-center text-[9px] text-gray-400 border-l border-r border-gray-200">
+            <td className="px-0 py-0.5 text-center text-[0.5625rem] text-gray-400 border-l border-r border-gray-200">
               {back9Yds || ""}
             </td>
           )}
-          <td className="px-0 py-0.5 text-center text-[9px] text-gray-400 border-l border-gray-200">
+          <td className="px-0 py-0.5 text-center text-[0.5625rem] text-gray-400 border-l border-gray-200">
             {totalYds || ""}
           </td>
         </tr>
@@ -165,7 +165,7 @@ export function CourseScorecard({ course, closeHref = "/" }: { course: CourseDat
       ) : null}
 
       {selectedTee && (
-        <div className="flex items-center gap-3 text-[11px] text-gray-500">
+        <div className="flex items-center gap-3 text-[0.6875rem] text-gray-500">
           <span>Rating <span className="font-semibold text-gray-700">{selectedTee.rating}</span></span>
           <span>Slope <span className="font-semibold text-gray-700">{selectedTee.slope}</span></span>
           <span>Par <span className="font-semibold text-gray-700">{selectedTee.par}</span></span>

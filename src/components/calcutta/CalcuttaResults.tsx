@@ -230,15 +230,19 @@ export function CalcuttaResults({ contestId, userId, headerAction }: { contestId
   }
 
   // ─── Loozers stats table ───
-  const loozersGridCols = "1fr 2.5rem 2.5rem 2.5rem 2.5rem";
+  // Name column gets a hard floor so it never truncates to "A..."; the
+  // wrapper scrolls horizontally when (xlarge font scale + 5 columns +
+  // padding) exceeds the viewport.
+  const loozersGridCols = "minmax(8rem, 1fr) 2.5rem 2.5rem 2.5rem 2.5rem";
   const loozersTable = (
-    <div className="space-y-1">
+    <div className="overflow-x-auto -mx-2">
+      <div className="space-y-1 min-w-[22rem] px-2">
       <div className="grid gap-1 px-2 pb-1" style={{ gridTemplateColumns: loozersGridCols }}>
-        <span className="text-[10px] font-bold text-gray-400 uppercase">Name</span>
-        <span className="text-[10px] font-bold text-gray-400 uppercase text-center">Age</span>
-        <span className="text-[10px] font-bold text-gray-400 uppercase text-center">HCP</span>
-        <span className="text-[10px] font-bold text-gray-400 uppercase text-center">8 Bag</span>
-        <span className="text-[10px] font-bold text-gray-400 uppercase text-center">Avg</span>
+        <span className="text-[0.625rem] font-bold text-gray-400 uppercase">Name</span>
+        <span className="text-[0.625rem] font-bold text-gray-400 uppercase text-center">Age</span>
+        <span className="text-[0.625rem] font-bold text-gray-400 uppercase text-center">HCP</span>
+        <span className="text-[0.625rem] font-bold text-gray-400 uppercase text-center">8 Bag</span>
+        <span className="text-[0.625rem] font-bold text-gray-400 uppercase text-center">Avg</span>
       </div>
       {[...participants]
         .sort((a, b) => (a.user?.display_name || "").localeCompare(b.user?.display_name || ""))
@@ -255,7 +259,7 @@ export function CalcuttaResults({ contestId, userId, headerAction }: { contestId
                 {p.user?.avatar_url ? (
                   <img src={p.user.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
                 ) : (
-                  <span className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 text-[10px] font-bold flex-shrink-0">
+                  <span className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 text-[0.625rem] font-bold flex-shrink-0">
                     {(p.user?.display_name || "?")[0].toUpperCase()}
                   </span>
                 )}
@@ -270,6 +274,7 @@ export function CalcuttaResults({ contestId, userId, headerAction }: { contestId
             </div>
           );
         })}
+      </div>
     </div>
   );
 
@@ -628,7 +633,7 @@ export function CalcuttaResults({ contestId, userId, headerAction }: { contestId
             {randyAvatar ? (
               <img src={randyAvatar} alt="" className="w-4 h-4 rounded-full object-cover" />
             ) : (
-              <span className="w-4 h-4 rounded-full bg-green-700 text-white text-[8px] font-bold flex items-center justify-center">R</span>
+              <span className="w-4 h-4 rounded-full bg-green-700 text-white text-[0.5rem] font-bold flex items-center justify-center">R</span>
             )}
             Randy Watson
           </Link>
@@ -834,7 +839,7 @@ export function CalcuttaResults({ contestId, userId, headerAction }: { contestId
                               isMe ? "bg-blue-600 text-white" : "bg-white border border-gray-200"
                             }`}
                           >
-                            <p className={`text-[10px] font-bold uppercase ${isMe ? "text-blue-200" : "text-gray-400"}`}>
+                            <p className={`text-[0.625rem] font-bold uppercase ${isMe ? "text-blue-200" : "text-gray-400"}`}>
                               {ordinal(s.place)}
                             </p>
                             <p className="text-xs font-bold uppercase truncate">{s.display_name.slice(0, 8)}</p>

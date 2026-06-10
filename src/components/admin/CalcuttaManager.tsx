@@ -658,7 +658,7 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
                             {o.avatar_url ? (
                               <img src={o.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
                             ) : (
-                              <span className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center text-[9px] font-bold text-purple-700">
+                              <span className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center text-[0.5625rem] font-bold text-purple-700">
                                 {(o.display_name || "?")[0].toUpperCase()}
                               </span>
                             )}
@@ -1011,7 +1011,7 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
                     {p.user?.avatar_url ? (
                       <img src={p.user.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
                     ) : (
-                      <span className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 text-[10px] font-bold">
+                      <span className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 text-[0.625rem] font-bold">
                         {(p.user?.display_name || "?")[0].toUpperCase()}
                       </span>
                     )}
@@ -1040,7 +1040,7 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
                           <span className="text-gray-300">·</span>
                           <span>${Number(o.amount_paid).toFixed(0)}</span>
                           {o.is_buyback && (
-                            <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1 py-0.5 rounded">
+                            <span className="text-[0.625rem] font-semibold text-blue-600 bg-blue-50 px-1 py-0.5 rounded">
                               BUYBACK
                             </span>
                           )}
@@ -1050,7 +1050,7 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
                         <button
                           onClick={(e) => { e.stopPropagation(); handleBuyback(p.id); }}
                           disabled={saving}
-                          className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                          className="text-[0.6875rem] font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50"
                         >
                           + {p.user?.display_name} buys 50%
                         </button>
@@ -1059,7 +1059,7 @@ export function CalcuttaManager({ tripId }: { tripId: string }) {
                         <button
                           onClick={(e) => { e.stopPropagation(); handleUndoBuyback(p.id); }}
                           disabled={saving}
-                          className="text-[11px] font-semibold text-red-500 hover:text-red-700 disabled:opacity-50"
+                          className="text-[0.6875rem] font-semibold text-red-500 hover:text-red-700 disabled:opacity-50"
                         >
                           Remove buyback
                         </button>

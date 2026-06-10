@@ -239,14 +239,14 @@ export function ItineraryManager({ tripId: propTripId }: { tripId?: string } = {
         autoFocus
         value={form.title}
         onChange={(e) => setForm({ ...form, title: e.target.value })}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base bg-white"
       />
       <input
         type="text"
         placeholder="Location"
         value={form.location}
         onChange={(e) => setForm({ ...form, location: e.target.value })}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base bg-white"
       />
       <div className="grid grid-cols-2 gap-3">
         {isPreEvent && (
@@ -256,7 +256,7 @@ export function ItineraryManager({ tripId: propTripId }: { tripId?: string } = {
               type="date"
               value={form.start_date}
               onChange={(e) => setForm({ ...form, start_date: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base bg-white"
               style={{ backgroundColor: "white" }}
             />
           </div>
@@ -267,7 +267,7 @@ export function ItineraryManager({ tripId: propTripId }: { tripId?: string } = {
             type="time"
             value={form.start_time}
             onChange={(e) => setForm({ ...form, start_time: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base bg-white"
             style={{ backgroundColor: "white" }}
           />
         </div>
@@ -278,7 +278,7 @@ export function ItineraryManager({ tripId: propTripId }: { tripId?: string } = {
               type="date"
               value={form.end_date}
               onChange={(e) => setForm({ ...form, end_date: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base bg-white"
               style={{ backgroundColor: "white" }}
             />
           </div>
@@ -289,7 +289,7 @@ export function ItineraryManager({ tripId: propTripId }: { tripId?: string } = {
             type="time"
             value={form.end_time}
             onChange={(e) => setForm({ ...form, end_time: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base bg-white"
             style={{ backgroundColor: "white" }}
           />
         </div>
@@ -300,7 +300,7 @@ export function ItineraryManager({ tripId: propTripId }: { tripId?: string } = {
           type="number"
           value={form.sort_order}
           onChange={(e) => setForm({ ...form, sort_order: parseInt(e.target.value) || 0 })}
-          className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
+          className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-base bg-white"
         />
       </div>
       <div className="flex gap-2">

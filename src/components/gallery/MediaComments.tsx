@@ -168,7 +168,7 @@ export function MediaComments({
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <span className="text-[10px] font-semibold">
+                  <span className="text-[0.625rem] font-semibold">
                     {getInitials(c.sender?.display_name || "?")}
                   </span>
                 )}
@@ -178,7 +178,7 @@ export function MediaComments({
                   <span className="text-sm font-semibold text-gray-900">
                     {c.sender?.display_name}
                   </span>
-                  <span className="text-[11px] text-gray-400">
+                  <span className="text-[0.6875rem] text-gray-400">
                     {formatTime(c.created_at)}
                   </span>
                 </div>
@@ -204,7 +204,7 @@ export function MediaComments({
             }}
             placeholder="Add a comment..."
             autoFocus
-            className="flex-1 px-3 py-2 text-[16px] border border-gray-300 rounded-full focus:border-green-600 focus:ring-1 focus:ring-green-600 outline-none"
+            className="flex-1 px-3 py-2 text-base border border-gray-300 rounded-full focus:border-green-600 focus:ring-1 focus:ring-green-600 outline-none"
           />
           <button
             onClick={handleSend}

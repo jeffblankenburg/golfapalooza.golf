@@ -147,7 +147,7 @@ export function HistoryVerifier() {
             ))}
           </tbody>
         </table>
-        <p className="px-3 py-2 text-[11px] text-gray-500 bg-gray-50 border-t border-gray-100">
+        <p className="px-3 py-2 text-[0.6875rem] text-gray-500 bg-gray-50 border-t border-gray-100">
           Imported is doubled for Cornhole 2s when comparing to Summary (Summary credits both teammates; Awards sheet stores one row per team).
         </p>
       </div>
@@ -169,7 +169,7 @@ export function HistoryVerifier() {
           <p className="text-center text-sm text-green-700 py-6">All matched users tally cleanly. ✓</p>
         ) : (
           <table className="w-full text-xs">
-            <thead className="text-[10px] uppercase text-gray-500">
+            <thead className="text-[0.625rem] uppercase text-gray-500">
               <tr>
                 <th className="px-2 py-1.5 text-left">Loozer</th>
                 {CATEGORIES.map((c) => (
@@ -227,7 +227,7 @@ function Stat({
   return (
     <div>
       <p className={`text-xl font-bold ${colors[tone]}`}>{value}</p>
-      <p className="text-[10px] uppercase tracking-wide text-gray-500">{label}</p>
+      <p className="text-[0.625rem] uppercase tracking-wide text-gray-500">{label}</p>
     </div>
   );
 }

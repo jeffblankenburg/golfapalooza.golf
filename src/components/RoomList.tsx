@@ -186,8 +186,8 @@ export function RoomList({
                         <span className="text-sm font-semibold text-gray-500">{room.room_number}</span>
                         {(room.handicapped || room.pet_friendly) && (
                           <div className="flex gap-0.5 mt-0.5">
-                            {room.handicapped && <span className="text-[10px]" title="Handicap Accessible">♿</span>}
-                            {room.pet_friendly && <span className="text-[10px]" title="Pet Friendly">🐾</span>}
+                            {room.handicapped && <span className="text-[0.625rem]" title="Handicap Accessible">♿</span>}
+                            {room.pet_friendly && <span className="text-[0.625rem]" title="Pet Friendly">🐾</span>}
                           </div>
                         )}
                       </div>
@@ -265,12 +265,12 @@ export function RoomList({
                       {(room.handicapped || room.pet_friendly) && (
                         <div className="flex gap-0.5">
                           {room.handicapped && (
-                            <span className="text-[10px]" title="Handicap Accessible">
+                            <span className="text-[0.625rem]" title="Handicap Accessible">
                               ♿
                             </span>
                           )}
                           {room.pet_friendly && (
-                            <span className="text-[10px]" title="Pet Friendly">
+                            <span className="text-[0.625rem]" title="Pet Friendly">
                               🐾
                             </span>
                           )}

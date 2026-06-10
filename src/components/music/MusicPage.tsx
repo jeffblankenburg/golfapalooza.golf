@@ -220,7 +220,7 @@ export function MusicPage({ initialSongs, headerAction }: { initialSongs: Song[]
             placeholder="Search songs..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-[16px]"
+            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-base"
           />
         </div>
 

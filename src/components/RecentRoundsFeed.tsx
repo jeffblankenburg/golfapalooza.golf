@@ -111,7 +111,7 @@ export function RecentRoundsFeed() {
                     <p className="text-sm font-semibold text-gray-900 truncate">
                       {r.player.display_name}
                     </p>
-                    <p className="text-[11px] text-gray-500 truncate flex items-center gap-1">
+                    <p className="text-[0.6875rem] text-gray-500 truncate flex items-center gap-1">
                       <span
                         className={`w-2 h-2 rounded-full inline-block flex-shrink-0 ${teeDot.className || ""}`}
                         style={teeDot.style}
@@ -131,7 +131,7 @@ export function RecentRoundsFeed() {
                   </div>
 
                   {/* Date */}
-                  <span className="text-[11px] text-gray-400 flex-shrink-0 w-10 text-right tabular-nums">
+                  <span className="text-[0.6875rem] text-gray-400 flex-shrink-0 w-10 text-right tabular-nums">
                     {formatRelDate(r.completed_at, r.round_date)}
                   </span>
                 </Link>

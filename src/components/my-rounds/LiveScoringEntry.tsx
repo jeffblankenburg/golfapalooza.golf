@@ -75,14 +75,14 @@ function scoreColorClass(strokes: number | undefined, par: number): string {
 }
 
 function MiniScoreCell({ score, par }: { score: number | undefined; par: number }) {
-  if (score == null) return <span className="text-[10px] text-gray-300">·</span>;
+  if (score == null) return <span className="text-[0.625rem] text-gray-300">·</span>;
   const diff = score - par;
   if (diff <= -2) {
     return (
       <div className="relative w-[16px] h-[16px] flex items-center justify-center mx-auto">
         <div className="absolute inset-0 rounded-full border-[1px] border-green-600" />
         <div className="absolute inset-[2px] rounded-full border-[1px] border-green-600" />
-        <span className="relative z-10 text-[9px] font-bold text-green-700">{score}</span>
+        <span className="relative z-10 text-[0.5625rem] font-bold text-green-700">{score}</span>
       </div>
     );
   }
@@ -90,16 +90,16 @@ function MiniScoreCell({ score, par }: { score: number | undefined; par: number 
     return (
       <div className="relative w-[14px] h-[14px] flex items-center justify-center mx-auto">
         <div className="absolute inset-0 rounded-full border-[1px] border-green-600" />
-        <span className="relative z-10 text-[9px] font-bold text-green-700">{score}</span>
+        <span className="relative z-10 text-[0.5625rem] font-bold text-green-700">{score}</span>
       </div>
     );
   }
-  if (diff === 0) return <span className="text-[10px] font-bold text-gray-900">{score}</span>;
+  if (diff === 0) return <span className="text-[0.625rem] font-bold text-gray-900">{score}</span>;
   if (diff === 1) {
     return (
       <div className="relative w-[14px] h-[14px] flex items-center justify-center mx-auto">
         <div className="absolute inset-0 rounded-sm border-[1px] border-gray-900" />
-        <span className="relative z-10 text-[9px] font-bold text-gray-900">{score}</span>
+        <span className="relative z-10 text-[0.5625rem] font-bold text-gray-900">{score}</span>
       </div>
     );
   }
@@ -107,7 +107,7 @@ function MiniScoreCell({ score, par }: { score: number | undefined; par: number 
     <div className="relative w-[16px] h-[16px] flex items-center justify-center mx-auto">
       <div className="absolute inset-0 rounded-sm border-[1px] border-gray-900" />
       <div className="absolute inset-[2px] rounded-sm border-[1px] border-gray-900" />
-      <span className="relative z-10 text-[9px] font-bold text-gray-900">{score}</span>
+      <span className="relative z-10 text-[0.5625rem] font-bold text-gray-900">{score}</span>
     </div>
   );
 }
@@ -694,7 +694,7 @@ export default function LiveScoringEntry({
                 <tr key={p.id} className="border-t border-gray-100">
                   <td className="px-1 py-0.5 text-center border-r border-gray-200">
                     <span
-                      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold leading-none"
+                      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[0.625rem] font-bold leading-none"
                       style={badge}
                       title={p.teeName || undefined}
                     >
@@ -747,59 +747,62 @@ export default function LiveScoringEntry({
 
               return (
                 <div key={p.id} className="flex items-center bg-gray-50 rounded-lg px-3 py-1.5">
-                  {/* Player info */}
-                  <div className="w-14 min-w-0 shrink-0">
+                  {/* Player info — pixel-fixed widths/gaps below keep the
+                      stepper controls on-screen at xlarge font scale;
+                      rem-based widths grew enough to push putts off the
+                      right edge. */}
+                  <div className="w-[56px] min-w-0 shrink-0">
                     <div className="text-xs font-semibold text-gray-700 truncate">{p.name}</div>
-                    {p.teeName && <div className="text-[10px] text-gray-400 truncate">{p.teeName}</div>}
+                    {p.teeName && <div className="text-[0.625rem] text-gray-400 truncate">{p.teeName}</div>}
                   </div>
                   {/* Running total */}
-                  <div className="w-10 shrink-0 flex items-center justify-center">
+                  <div className="w-[40px] shrink-0 flex items-center justify-center">
                     <span className="text-2xl font-bold tabular-nums text-gray-900">
                       {holesPlayed > 0 ? roundTotal : ""}
                     </span>
                   </div>
                   <div className="flex-1" />
                   {/* Strokes */}
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-[6px] shrink-0">
                     <button
                       onClick={() => decrement(p.id, hole.par, hole.hole_number)}
                       disabled={hasValue && current <= 1}
-                      className="w-9 h-9 flex items-center justify-center rounded-full bg-green-600 text-white text-lg font-bold disabled:opacity-30 active:bg-green-700"
+                      className="w-[36px] h-[36px] flex items-center justify-center rounded-full bg-green-600 text-white text-lg font-bold disabled:opacity-30 active:bg-green-700"
                     >
                       −
                     </button>
-                    <div className="w-9 flex flex-col items-center leading-none">
+                    <div className="w-[36px] flex flex-col items-center leading-none">
                       <span className={`text-2xl font-bold tabular-nums ${scoreColorClass(current, hole.par)}`}>
                         {hasValue ? current : "·"}
                       </span>
-                      <span className="text-[7px] text-gray-400 uppercase -mt-0.5">Strokes</span>
+                      <span className="text-[0.4375rem] text-gray-400 uppercase -mt-0.5">Strokes</span>
                     </div>
                     <button
                       onClick={() => increment(p.id, hole.par, hole.hole_number)}
-                      className="w-9 h-9 flex items-center justify-center rounded-full bg-green-600 text-white text-lg font-bold active:bg-green-700"
+                      className="w-[36px] h-[36px] flex items-center justify-center rounded-full bg-green-600 text-white text-lg font-bold active:bg-green-700"
                     >
                       +
                     </button>
                   </div>
                   {/* Putts */}
-                  <div className="w-px h-7 bg-gray-200 shrink-0 mx-2" />
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="w-px h-7 bg-gray-200 shrink-0 mx-[8px]" />
+                  <div className="flex items-center gap-[4px] shrink-0">
                     <button
                       onClick={() => setPuttCount(p.id, hole.hole_number, currentPutts === undefined ? 0 : Math.max(0, currentPutts - 1))}
                       disabled={currentPutts !== undefined && currentPutts <= 0}
-                      className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-200 text-gray-600 text-xs font-bold disabled:opacity-30 active:bg-gray-300"
+                      className="w-[28px] h-[28px] flex items-center justify-center rounded-full bg-gray-200 text-gray-600 text-xs font-bold disabled:opacity-30 active:bg-gray-300"
                     >
                       −
                     </button>
-                    <div className="w-5 flex flex-col items-center leading-none">
+                    <div className="w-[20px] flex flex-col items-center leading-none">
                       <span className="text-base font-bold tabular-nums text-gray-700">
                         {currentPutts ?? "·"}
                       </span>
-                      <span className="text-[7px] text-gray-400 uppercase -mt-0.5">Putts</span>
+                      <span className="text-[0.4375rem] text-gray-400 uppercase -mt-0.5">Putts</span>
                     </div>
                     <button
                       onClick={() => setPuttCount(p.id, hole.hole_number, currentPutts === undefined ? 1 : Math.min(10, currentPutts + 1))}
-                      className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-200 text-gray-600 text-xs font-bold active:bg-gray-300"
+                      className="w-[28px] h-[28px] flex items-center justify-center rounded-full bg-gray-200 text-gray-600 text-xs font-bold active:bg-gray-300"
                     >
                       +
                     </button>
@@ -858,14 +861,14 @@ export default function LiveScoringEntry({
                 await handleComplete();
               }}
               disabled={completing}
-              className="flex-1 py-3 rounded-xl font-semibold text-[15px] bg-green-600 text-white active:opacity-80 disabled:opacity-60"
+              className="flex-1 py-3 rounded-xl font-semibold text-[0.9375rem] bg-green-600 text-white active:opacity-80 disabled:opacity-60"
             >
               {completing ? "Completing..." : "Complete round"}
             </button>
             <button
               onClick={() => setConfirmCompleteOpen(false)}
               disabled={completing}
-              className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600 active:bg-gray-50 disabled:opacity-60"
+              className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[0.9375rem] text-gray-600 active:bg-gray-50 disabled:opacity-60"
             >
               Keep editing
             </button>

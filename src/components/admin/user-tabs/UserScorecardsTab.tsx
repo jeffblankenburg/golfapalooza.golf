@@ -26,14 +26,14 @@ interface Scorecard {
 }
 
 function ScoreCell({ score, par }: { score: number | undefined; par: number }) {
-  if (score == null) return <span className="text-[10px] text-gray-400">·</span>;
+  if (score == null) return <span className="text-[0.625rem] text-gray-400">·</span>;
   const diff = score - par;
   if (diff <= -2) {
     return (
       <div className="relative w-[22px] h-[22px] flex items-center justify-center mx-auto">
         <div className="absolute inset-0 rounded-full border-[1.5px] border-green-600" />
         <div className="absolute inset-[3px] rounded-full border-[1.5px] border-green-600" />
-        <span className="relative z-10 text-[10px] font-bold text-green-700">{score}</span>
+        <span className="relative z-10 text-[0.625rem] font-bold text-green-700">{score}</span>
       </div>
     );
   }
@@ -41,18 +41,18 @@ function ScoreCell({ score, par }: { score: number | undefined; par: number }) {
     return (
       <div className="relative w-[18px] h-[18px] flex items-center justify-center mx-auto">
         <div className="absolute inset-0 rounded-full border-[1.5px] border-green-600" />
-        <span className="relative z-10 text-[10px] font-bold text-green-700">{score}</span>
+        <span className="relative z-10 text-[0.625rem] font-bold text-green-700">{score}</span>
       </div>
     );
   }
   if (diff === 0) {
-    return <span className="text-[10px] font-bold text-gray-900">{score}</span>;
+    return <span className="text-[0.625rem] font-bold text-gray-900">{score}</span>;
   }
   if (diff === 1) {
     return (
       <div className="relative w-[18px] h-[18px] flex items-center justify-center mx-auto">
         <div className="absolute inset-0 rounded-sm border-[1.5px] border-gray-900" />
-        <span className="relative z-10 text-[10px] font-bold text-gray-900">{score}</span>
+        <span className="relative z-10 text-[0.625rem] font-bold text-gray-900">{score}</span>
       </div>
     );
   }
@@ -60,7 +60,7 @@ function ScoreCell({ score, par }: { score: number | undefined; par: number }) {
     <div className="relative w-[22px] h-[22px] flex items-center justify-center mx-auto">
       <div className="absolute inset-0 rounded-sm border-[1.5px] border-gray-900" />
       <div className="absolute inset-[3px] rounded-sm border-[1.5px] border-gray-900" />
-      <span className="relative z-10 text-[10px] font-bold text-gray-900">{score}</span>
+      <span className="relative z-10 text-[0.625rem] font-bold text-gray-900">{score}</span>
     </div>
   );
 }
@@ -79,7 +79,7 @@ function NineTable({
   const scoreTotal = nineHoles.reduce((sum, h) => sum + (scores[h.hole_number] || 0), 0);
   return (
     <div className="mb-3">
-      <div className="text-[11px] font-semibold text-gray-500 mb-1">{label}</div>
+      <div className="text-[0.6875rem] font-semibold text-gray-500 mb-1">{label}</div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
@@ -147,7 +147,7 @@ function ScorecardAccordion({ card }: { card: Scorecard }) {
       >
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-gray-900 truncate">{card.course_name}</p>
-          <p className="text-[11px] text-gray-500 truncate">
+          <p className="text-[0.6875rem] text-gray-500 truncate">
             {dateLabel}
             {card.tee_name ? ` · ${card.tee_name}` : ""}
             {card.round_type !== "18" ? ` · ${card.round_type === "9-front" ? "Front 9" : "Back 9"}` : ""}
@@ -159,7 +159,7 @@ function ScorecardAccordion({ card }: { card: Scorecard }) {
           </p>
           {toPar != null && (
             <p
-              className={`text-[10px] font-semibold ${
+              className={`text-[0.625rem] font-semibold ${
                 toPar < 0 ? "text-green-700" : toPar === 0 ? "text-gray-500" : "text-gray-700"
               }`}
             >
@@ -182,7 +182,7 @@ function ScorecardAccordion({ card }: { card: Scorecard }) {
       {open && (
         <div className="px-3 pb-3 pt-1 border-t border-gray-100">
           {card.holes.length === 0 ? (
-            <p className="text-[11px] text-gray-400 italic py-2">No hole-by-hole data for this round.</p>
+            <p className="text-[0.6875rem] text-gray-400 italic py-2">No hole-by-hole data for this round.</p>
           ) : (
             <>
               {showFront && <NineTable nineHoles={front} scores={card.scores} label="Front 9" />}
@@ -190,7 +190,7 @@ function ScorecardAccordion({ card }: { card: Scorecard }) {
             </>
           )}
           {card.score_differential != null && (
-            <p className="text-[10px] text-gray-500 mt-1">
+            <p className="text-[0.625rem] text-gray-500 mt-1">
               Differential: <span className="font-semibold text-gray-700">{card.score_differential.toFixed(1)}</span>
               {card.final_adjusted_score != null && (
                 <> · Adjusted: <span className="font-semibold text-gray-700">{card.final_adjusted_score}</span></>

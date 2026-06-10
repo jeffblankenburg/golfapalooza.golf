@@ -418,17 +418,17 @@ function ItemRow({
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="font-medium text-gray-900 text-sm">{row.label}</span>
           {!row.is_payout && (
-            <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[9px] font-semibold uppercase tracking-wide">
+            <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[0.5625rem] font-semibold uppercase tracking-wide">
               pass-through
             </span>
           )}
           {linked && (
-            <span className="px-1.5 py-0.5 rounded bg-green-50 text-green-700 text-[9px] font-semibold uppercase tracking-wide" title={`Linked to: ${linked.name}`}>
+            <span className="px-1.5 py-0.5 rounded bg-green-50 text-green-700 text-[0.5625rem] font-semibold uppercase tracking-wide" title={`Linked to: ${linked.name}`}>
               linked
             </span>
           )}
         </div>
-        <div className="text-[10px] text-gray-400 mt-0.5 tabular-nums">
+        <div className="text-[0.625rem] text-gray-400 mt-0.5 tabular-nums">
           {row.participant_count} × {fmt(row.amount_per_participant)}
         </div>
       </div>
@@ -629,7 +629,7 @@ function PayoutEventModal({
 
         <div className="px-6 py-4 space-y-4 overflow-y-auto">
           <label className="flex flex-col">
-            <span className="text-gray-500 uppercase tracking-wide text-[10px] mb-0.5">Label</span>
+            <span className="text-gray-500 uppercase tracking-wide text-[0.625rem] mb-0.5">Label</span>
             <input
               type="text"
               value={label}
@@ -644,7 +644,7 @@ function PayoutEventModal({
               (via cost item links), who wins (via contest_type + day),
               and seeds the payout splits. */}
           <label className="flex flex-col">
-            <span className="text-gray-500 uppercase tracking-wide text-[10px] mb-0.5">Contest</span>
+            <span className="text-gray-500 uppercase tracking-wide text-[0.625rem] mb-0.5">Contest</span>
             <select
               value={contestId ?? ""}
               onChange={(e) => setContestId(e.target.value || null)}
@@ -659,13 +659,13 @@ function PayoutEventModal({
                 ))}
             </select>
             {linkedContest && (
-              <span className="text-[10px] text-gray-400 mt-1">
+              <span className="text-[0.625rem] text-gray-400 mt-1">
                 Type: {linkedContest.contest_type}.
                 Edits to cost item and payout splits below save to this contest.
               </span>
             )}
             {!linkedContest && (
-              <span className="text-[10px] text-gray-400 mt-1">
+              <span className="text-[0.625rem] text-gray-400 mt-1">
                 No contest = pass-through cash (e.g. Lodge nights). Configure who pays
                 and how it&apos;s distributed manually below.
               </span>
@@ -673,7 +673,7 @@ function PayoutEventModal({
           </label>
 
           <label className="flex flex-col">
-            <span className="text-gray-500 uppercase tracking-wide text-[10px] mb-0.5">Cost item</span>
+            <span className="text-gray-500 uppercase tracking-wide text-[0.625rem] mb-0.5">Cost item</span>
             <select
               value={costItemId ?? ""}
               onChange={(e) => setCostItemId(e.target.value || null)}
@@ -690,7 +690,7 @@ function PayoutEventModal({
                 ))}
             </select>
             {linkedCostItem && (
-              <span className="text-[10px] text-gray-400 mt-1">
+              <span className="text-[0.625rem] text-gray-400 mt-1">
                 $/Person comes from this cost item ({fmt(Number(linkedCostItem.cost))}). Edit on the Cost Items page.
               </span>
             )}
@@ -701,7 +701,7 @@ function PayoutEventModal({
               the cost item's option/choice links. */}
           {!linkedContest && (
             <div className="space-y-2">
-              <span className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">Who pays / participates</span>
+              <span className="text-[0.625rem] uppercase tracking-wider text-gray-500 font-semibold">Who pays / participates</span>
               <select
                 value={participantSource}
                 onChange={(e) => changeParticipantSource(e.target.value as Source)}
@@ -741,7 +741,7 @@ function PayoutEventModal({
           )}
 
           <label className="flex flex-col">
-            <span className="text-gray-500 uppercase tracking-wide text-[10px] mb-0.5">Notes</span>
+            <span className="text-gray-500 uppercase tracking-wide text-[0.625rem] mb-0.5">Notes</span>
             <input
               type="text"
               value={notes}
@@ -796,7 +796,7 @@ function PayoutEventModal({
             type="button"
             onClick={handleSave}
             disabled={!canSave}
-            className={`flex-1 py-3 rounded-xl font-semibold text-[15px] active:opacity-80 ${
+            className={`flex-1 py-3 rounded-xl font-semibold text-[0.9375rem] active:opacity-80 ${
               canSave ? "bg-green-600 text-white" : "bg-gray-200 text-gray-400 cursor-not-allowed"
             }`}
           >
@@ -806,7 +806,7 @@ function PayoutEventModal({
             type="button"
             onClick={onCancel}
             disabled={saving}
-            className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600 active:bg-gray-50"
+            className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[0.9375rem] text-gray-600 active:bg-gray-50"
           >
             Cancel
           </button>
@@ -836,7 +836,7 @@ function PayoutSplitsEditor({
 
   return (
     <div className="space-y-2">
-      <span className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+      <span className="text-[0.625rem] uppercase tracking-wider text-gray-500 font-semibold">
         Payout splits
       </span>
       <div className="space-y-1.5">
@@ -894,12 +894,12 @@ function PayoutSplitsEditor({
       <button
         type="button"
         onClick={addSplit}
-        className="text-[11px] text-green-700 font-medium active:opacity-70"
+        className="text-[0.6875rem] text-green-700 font-medium active:opacity-70"
       >
         + Add place
       </button>
       {splits.length > 0 && (
-        <div className="text-[10px] text-gray-400 leading-snug">
+        <div className="text-[0.625rem] text-gray-400 leading-snug">
           Place numbers indicate finishing position (1 = winner, 2 = runner-up, …).{" "}
           Splits are applied in order: flat amounts and percentages take their cut first,
           then <em>Remainder</em> absorbs whatever&apos;s left.

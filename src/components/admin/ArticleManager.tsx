@@ -337,7 +337,7 @@ export function ArticleManager({ tripId, currentUserId }: { tripId: string; curr
                       <span className="text-sm font-semibold text-gray-900 truncate">
                         {article.title}
                       </span>
-                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0 ${status.color}`}>
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[0.625rem] font-medium flex-shrink-0 ${status.color}`}>
                         {status.text}
                       </span>
                     </div>
@@ -350,7 +350,7 @@ export function ArticleManager({ tripId, currentUserId }: { tripId: string; curr
                           : `Created ${new Date(article.created_at).toLocaleDateString()}`}
                       </span>
                       {viewCounts[article.id] > 0 && (
-                        <span className="inline-flex items-center gap-0.5 text-[10px] text-blue-600 font-medium">
+                        <span className="inline-flex items-center gap-0.5 text-[0.625rem] text-blue-600 font-medium">
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />

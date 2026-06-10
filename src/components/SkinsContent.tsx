@@ -47,7 +47,7 @@ function ScoreNotation({ score, par }: { score: number | null; par: number | nul
       <div className="relative flex items-center justify-center w-[22px] h-[22px] mx-auto">
         <div className="absolute inset-0 rounded-full border-[1.5px] border-green-600" />
         <div className="absolute inset-[3px] rounded-full border-[1.5px] border-green-600" />
-        <span className="relative z-10 text-[10px] leading-none font-bold text-green-700">{score}</span>
+        <span className="relative z-10 text-[0.625rem] leading-none font-bold text-green-700">{score}</span>
       </div>
     );
   }
@@ -57,7 +57,7 @@ function ScoreNotation({ score, par }: { score: number | null; par: number | nul
     return (
       <div className="relative flex items-center justify-center w-[18px] h-[18px] mx-auto">
         <div className="absolute inset-0 rounded-full border-[1.5px] border-green-600" />
-        <span className="relative z-10 text-[10px] leading-none font-bold text-green-700">{score}</span>
+        <span className="relative z-10 text-[0.625rem] leading-none font-bold text-green-700">{score}</span>
       </div>
     );
   }
@@ -67,7 +67,7 @@ function ScoreNotation({ score, par }: { score: number | null; par: number | nul
     return (
       <div className="relative flex items-center justify-center w-[18px] h-[18px] mx-auto">
         <div className="absolute inset-0 rounded-sm border-[1.5px] border-gray-900" />
-        <span className="relative z-10 text-[10px] leading-none font-bold text-gray-900">{score}</span>
+        <span className="relative z-10 text-[0.625rem] leading-none font-bold text-gray-900">{score}</span>
       </div>
     );
   }
@@ -78,7 +78,7 @@ function ScoreNotation({ score, par }: { score: number | null; par: number | nul
       <div className="relative flex items-center justify-center w-[22px] h-[22px] mx-auto">
         <div className="absolute inset-0 rounded-sm border-[1.5px] border-gray-900" />
         <div className="absolute inset-[3px] rounded-sm border-[1.5px] border-gray-900" />
-        <span className="relative z-10 text-[10px] leading-none font-bold text-gray-900">{score}</span>
+        <span className="relative z-10 text-[0.625rem] leading-none font-bold text-gray-900">{score}</span>
       </div>
     );
   }
@@ -168,7 +168,7 @@ export function SkinsContent({
         return (
           <div className="space-y-2">
             <div className="bg-lime-50 rounded-2xl border border-lime-200 px-4 py-5 text-center">
-              <p className="text-[10px] uppercase tracking-wider text-lime-700 font-semibold">
+              <p className="text-[0.625rem] uppercase tracking-wider text-lime-700 font-semibold">
                 Prize Pool
               </p>
               <p className="text-3xl font-bold text-lime-700 tabular-nums mt-1">
@@ -190,7 +190,7 @@ export function SkinsContent({
         return (
           <div className="space-y-3">
             <div className="bg-lime-50 rounded-2xl border border-lime-200 px-4 py-5 text-center">
-              <p className="text-[10px] uppercase tracking-wider text-lime-700 font-semibold">
+              <p className="text-[0.625rem] uppercase tracking-wider text-lime-700 font-semibold">
                 Prize Pool
               </p>
               <p className="text-3xl font-bold text-lime-700 tabular-nums mt-1">
@@ -217,7 +217,7 @@ export function SkinsContent({
                           {m.avatar_url ? (
                             <img src={m.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                           ) : (
-                            <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                            <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                               {(m.display_name || "?")[0].toUpperCase()}
                             </span>
                           )}
@@ -229,7 +229,7 @@ export function SkinsContent({
                       <span className={`text-2xl font-bold ${team.skins > 0 ? "text-lime-600" : "text-gray-300"}`}>
                         {team.skins}
                       </span>
-                      <span className="text-[10px] text-gray-400 uppercase ml-1">
+                      <span className="text-[0.625rem] text-gray-400 uppercase ml-1">
                         skin{team.skins !== 1 ? "s" : ""}
                       </span>
                     </div>
@@ -242,7 +242,7 @@ export function SkinsContent({
                         {team.winningHoles.length > 0 && (
                           <div className="inline-grid gap-0 border border-lime-200 rounded-lg overflow-hidden" style={{ gridTemplateColumns: `repeat(${team.winningHoles.length}, minmax(28px, 1fr))` }}>
                             {team.winningHoles.map((wh) => (
-                              <div key={wh.hole} className="text-center text-[10px] font-semibold text-lime-700 bg-lime-50 px-1 py-0.5 border-b border-lime-200">
+                              <div key={wh.hole} className="text-center text-[0.625rem] font-semibold text-lime-700 bg-lime-50 px-1 py-0.5 border-b border-lime-200">
                                 {wh.hole}
                               </div>
                             ))}
@@ -265,7 +265,7 @@ export function SkinsContent({
                             const max = Math.max(...amounts);
                             const label = min === max ? `$${min} ea` : `$${min}–$${max} ea`;
                             return (
-                              <div className="text-[10px] text-gray-500 mt-0.5 tabular-nums">
+                              <div className="text-[0.625rem] text-gray-500 mt-0.5 tabular-nums">
                                 {label}
                               </div>
                             );

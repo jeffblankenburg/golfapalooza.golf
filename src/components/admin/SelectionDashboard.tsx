@@ -838,7 +838,7 @@ export function SelectionDashboard({
               >
                 <div>{opt.name}</div>
                 {opt.cost ? (
-                  <div className="text-[10px] text-gray-400 font-normal normal-case">
+                  <div className="text-[0.625rem] text-gray-400 font-normal normal-case">
                     (${opt.cost})
                   </div>
                 ) : null}

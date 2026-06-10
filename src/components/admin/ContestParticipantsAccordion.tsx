@@ -199,7 +199,7 @@ export function ContestParticipantsAccordion({
                   {p.avatar_url ? (
                     <img src={p.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
                   ) : (
-                    <span className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[10px] font-bold flex-shrink-0">
+                    <span className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.625rem] font-bold flex-shrink-0">
                       {(p.display_name || "?")[0].toUpperCase()}
                     </span>
                   )}

@@ -294,7 +294,7 @@ export function CornholeDoublesManager({ tripId }: { tripId: string }) {
                   {player.avatar_url ? (
                     <img src={player.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                   ) : (
-                    <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                    <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                       {(getName(player) || "?")[0].toUpperCase()}
                     </span>
                   )}
@@ -363,7 +363,7 @@ export function CornholeDoublesManager({ tripId }: { tripId: string }) {
                       {member.avatar_url ? (
                         <img src={member.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                       ) : (
-                        <span className="w-4 h-4 rounded-full bg-green-200 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                        <span className="w-4 h-4 rounded-full bg-green-200 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                           {(getName(member) || "?")[0].toUpperCase()}
                         </span>
                       )}

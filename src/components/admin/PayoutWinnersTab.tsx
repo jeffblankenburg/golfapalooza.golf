@@ -196,7 +196,7 @@ export function PayoutWinnersTab() {
                   className="px-2 py-2 text-center font-semibold text-gray-600 uppercase tracking-wider min-w-[80px] border-r border-gray-100"
                 >
                   <div>{ev.label}</div>
-                  <div className="text-[10px] font-normal text-gray-400 normal-case tabular-nums">
+                  <div className="text-[0.625rem] font-normal text-gray-400 normal-case tabular-nums">
                     {fmt(ev.total)}
                   </div>
                 </th>
@@ -224,7 +224,7 @@ export function PayoutWinnersTab() {
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={l.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
                         ) : (
-                          <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[9px] font-bold">
+                          <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5625rem] font-bold">
                             {l.display_name[0].toUpperCase()}
                           </span>
                         )}
@@ -260,7 +260,7 @@ export function PayoutWinnersTab() {
                     <td className="px-2 py-1.5 text-right tabular-nums">
                       <div className="font-bold text-gray-900">{fmt(rt?.total ?? 0)}</div>
                       {rt && rt.unpaid > 0 && rt.unpaid !== rt.total && (
-                        <div className="text-[10px] text-amber-600">{fmt(rt.unpaid)} owed</div>
+                        <div className="text-[0.625rem] text-amber-600">{fmt(rt.unpaid)} owed</div>
                       )}
                     </td>
                   </tr>

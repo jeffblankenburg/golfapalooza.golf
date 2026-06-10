@@ -190,13 +190,13 @@ export function ContestManager({ tripId }: { tripId: string }) {
             autoFocus
             value={newContestName}
             onChange={(e) => setNewContestName(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px] mb-2"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base mb-2"
           />
           <div className="flex gap-2 mb-2">
             <select
               value={newContestType}
               onChange={(e) => setNewContestType(e.target.value)}
-              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-base"
               style={{ backgroundColor: "transparent" }}
             >
               {CONTEST_TYPE_OPTIONS.map(([value, label]) => (
@@ -206,7 +206,7 @@ export function ContestManager({ tripId }: { tripId: string }) {
             <select
               value={newContestDay}
               onChange={(e) => setNewContestDay(e.target.value)}
-              className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+              className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-base"
               style={{ backgroundColor: "transparent" }}
             >
               <option value="">No day</option>
@@ -282,12 +282,12 @@ export function ContestManager({ tripId }: { tripId: string }) {
                 setContests((prev) => prev.map((c) => c.id === selectedContest.id ? { ...c, name } : c));
               }}
               onBlur={() => updateContest(selectedContest, { name: selectedContest.name })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
             />
             <select
               value={selectedContest.contest_type}
               onChange={(e) => updateContest(selectedContest, { contest_type: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
               style={{ backgroundColor: "transparent" }}
             >
               {CONTEST_TYPE_OPTIONS.map(([value, label]) => (

@@ -697,19 +697,19 @@ export default function HoleMapView({
       {loaded && distances && (
         <div className="absolute top-2 left-2 z-10 flex gap-1.5 pointer-events-none">
           <div className="bg-black/75 backdrop-blur-sm text-white rounded-lg px-3 py-1.5 text-center shadow-lg">
-            <div className="text-[9px] font-bold tracking-widest text-amber-300 uppercase leading-none">
+            <div className="text-[0.5625rem] font-bold tracking-widest text-amber-300 uppercase leading-none">
               Target
             </div>
             <div className="text-base font-extrabold leading-tight tabular-nums mt-0.5">
               {distances.userToTarget}
-              <span className="text-[10px] font-semibold ml-0.5 opacity-75">y</span>
+              <span className="text-[0.625rem] font-semibold ml-0.5 opacity-75">y</span>
             </div>
           </div>
 
           {showFMB ? (
             <div className="bg-black/75 backdrop-blur-sm text-white rounded-lg px-3 py-1.5 flex gap-3 shadow-lg">
               <div className="text-center">
-                <div className="text-[9px] font-bold tracking-widest text-green-300 uppercase leading-none">
+                <div className="text-[0.5625rem] font-bold tracking-widest text-green-300 uppercase leading-none">
                   F
                 </div>
                 <div className="text-base font-extrabold leading-tight tabular-nums mt-0.5">
@@ -717,7 +717,7 @@ export default function HoleMapView({
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-[9px] font-bold tracking-widest text-green-300 uppercase leading-none">
+                <div className="text-[0.5625rem] font-bold tracking-widest text-green-300 uppercase leading-none">
                   M
                 </div>
                 <div className="text-base font-extrabold leading-tight tabular-nums mt-0.5">
@@ -725,7 +725,7 @@ export default function HoleMapView({
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-[9px] font-bold tracking-widest text-green-300 uppercase leading-none">
+                <div className="text-[0.5625rem] font-bold tracking-widest text-green-300 uppercase leading-none">
                   B
                 </div>
                 <div className="text-base font-extrabold leading-tight tabular-nums mt-0.5">
@@ -735,12 +735,12 @@ export default function HoleMapView({
             </div>
           ) : (
             <div className="bg-black/75 backdrop-blur-sm text-white rounded-lg px-3 py-1.5 text-center shadow-lg">
-              <div className="text-[9px] font-bold tracking-widest text-green-300 uppercase leading-none">
+              <div className="text-[0.5625rem] font-bold tracking-widest text-green-300 uppercase leading-none">
                 Green
               </div>
               <div className="text-base font-extrabold leading-tight tabular-nums mt-0.5">
                 {distances.userToGreen}
-                <span className="text-[10px] font-semibold ml-0.5 opacity-75">y</span>
+                <span className="text-[0.625rem] font-semibold ml-0.5 opacity-75">y</span>
               </div>
             </div>
           )}
@@ -754,7 +754,7 @@ export default function HoleMapView({
             setGpsError(null);
             setGpsEnabled((v) => !v);
           }}
-          className={`absolute top-2 right-2 z-10 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold shadow ${
+          className={`absolute top-2 right-2 z-10 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[0.6875rem] font-semibold shadow ${
             gpsEnabled
               ? "bg-blue-600 text-white"
               : "bg-black/60 text-white active:bg-black/75"
@@ -768,13 +768,13 @@ export default function HoleMapView({
       )}
 
       {loaded && gpsEnabled && userPos && (
-        <div className="absolute bottom-2 left-2 z-10 bg-black/55 text-blue-100 text-[10px] font-semibold px-2 py-0.5 rounded">
+        <div className="absolute bottom-2 left-2 z-10 bg-black/55 text-blue-100 text-[0.625rem] font-semibold px-2 py-0.5 rounded">
           ±{Math.round(userPos.accuracy)}m
         </div>
       )}
 
       {gpsError && (
-        <div className="absolute bottom-2 left-2 right-2 z-10 bg-red-600/90 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-lg">
+        <div className="absolute bottom-2 left-2 right-2 z-10 bg-red-600/90 text-white text-[0.6875rem] font-medium px-2.5 py-1.5 rounded-lg">
           {gpsError}
         </div>
       )}

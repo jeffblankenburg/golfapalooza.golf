@@ -346,12 +346,12 @@ export function PollForm({
                   onChange={(e) =>
                     setAnswer(q.id, { type: "text", text: e.target.value })
                   }
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px] resize-none"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base resize-none"
                   placeholder="Type your answer..."
                 />
                 <div className="flex items-center justify-between">
                   {showLiveResults ? (
-                    <p className="text-[11px] text-gray-500 italic">
+                    <p className="text-[0.6875rem] text-gray-500 italic">
                       {pctByOption.textCounts.get(q.id) ?? 0}{" "}
                       {(pctByOption.textCounts.get(q.id) ?? 0) === 1
                         ? "response"
@@ -361,7 +361,7 @@ export function PollForm({
                   ) : (
                     <span />
                   )}
-                  <p className="text-[11px] text-gray-400 text-right">
+                  <p className="text-[0.6875rem] text-gray-400 text-right">
                     {charCounts.get(q.id) || 0} / {q.max_length ?? 500}
                   </p>
                 </div>
@@ -401,7 +401,7 @@ export function PollForm({
       </div>
 
       {hasExistingVote && (
-        <p className="text-[11px] text-gray-400 text-center">
+        <p className="text-[0.6875rem] text-gray-400 text-center">
           You can change your vote until the poll closes.
         </p>
       )}

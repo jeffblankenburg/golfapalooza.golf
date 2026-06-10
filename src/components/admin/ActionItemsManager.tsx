@@ -155,7 +155,7 @@ export function ActionItemsManager({ tripId: propTripId }: { tripId?: string } =
               autoFocus
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px] mb-2 bg-white"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base mb-2 bg-white"
             />
             <textarea
               placeholder="Description (optional)"
@@ -164,7 +164,7 @@ export function ActionItemsManager({ tripId: propTripId }: { tripId?: string } =
                 setForm({ ...form, description: e.target.value })
               }
               rows={2}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px] mb-2 bg-white"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base mb-2 bg-white"
               style={{ backgroundColor: "white" }}
             />
             <div className="flex gap-2 mb-2">
@@ -178,7 +178,7 @@ export function ActionItemsManager({ tripId: propTripId }: { tripId?: string } =
                   onChange={(e) =>
                     setForm({ ...form, deadline: e.target.value })
                   }
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px] bg-white"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base bg-white"
                 />
               </div>
               <div className="w-20">
@@ -194,7 +194,7 @@ export function ActionItemsManager({ tripId: propTripId }: { tripId?: string } =
                       sort_order: parseInt(e.target.value) || 0,
                     })
                   }
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px] bg-white"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base bg-white"
                 />
               </div>
             </div>
@@ -203,7 +203,7 @@ export function ActionItemsManager({ tripId: propTripId }: { tripId?: string } =
               placeholder="Link (optional, e.g. /profile)"
               value={form.link}
               onChange={(e) => setForm({ ...form, link: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px] mb-3 bg-white"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base mb-3 bg-white"
             />
             <div className="flex gap-2">
               <button

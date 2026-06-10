@@ -80,7 +80,7 @@ export function KgbCupScoreboard({
             style={{ left: "50%" }}
             title={`First to ${clinch}`}
           >
-            <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] text-yellow-600 font-bold whitespace-nowrap">{clinch}</span>
+            <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[0.5625rem] text-yellow-600 font-bold whitespace-nowrap">{clinch}</span>
           </div>
         )}
       </div>
@@ -99,7 +99,7 @@ export function KgbCupScoreboard({
       </p>
 
       {verified && (
-        <span className="inline-flex items-center gap-0.5 mt-2 px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-semibold">
+        <span className="inline-flex items-center gap-0.5 mt-2 px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 text-[0.625rem] font-semibold">
           <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
           </svg>
@@ -193,7 +193,7 @@ function GroupCard({
             return (
               <div key={section}>
                 <div className="px-4 py-1.5 bg-gray-50">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                  <p className="text-[0.625rem] font-semibold text-gray-400 uppercase tracking-wide">
                     {sectionLabel} (Holes {firstHole}-{lastHole})
                   </p>
                 </div>
@@ -307,7 +307,7 @@ function MatchRow({
           {statusText}
         </p>
         {match.sectionWinner !== "incomplete" && (
-          <p className="text-[10px] text-gray-400 mt-0.5">
+          <p className="text-[0.625rem] text-gray-400 mt-0.5">
             {match.team1Points} - {match.team2Points} pts
           </p>
         )}

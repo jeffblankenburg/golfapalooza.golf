@@ -102,7 +102,7 @@ export function UserSongsTab({ userId }: { userId: string }) {
       </p>
 
       {/* Column headers */}
-      <div className="flex items-center gap-3 px-3 py-2 border-b border-gray-200 bg-gray-50 rounded-t-xl text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+      <div className="flex items-center gap-3 px-3 py-2 border-b border-gray-200 bg-gray-50 rounded-t-xl text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-500">
         <div className="w-9 flex-shrink-0" />
         <button
           type="button"

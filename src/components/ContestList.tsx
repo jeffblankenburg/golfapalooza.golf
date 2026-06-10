@@ -222,7 +222,7 @@ function ScrambleContent({
                         {m.avatar_url ? (
                           <img src={m.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                         ) : (
-                          <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                          <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                             {(m.display_name || "?")[0].toUpperCase()}
                           </span>
                         )}
@@ -254,7 +254,7 @@ function ScrambleContent({
                   ) : (
                     <div className="text-lg font-bold text-gray-200">—</div>
                   )}
-                  <div className="text-[10px] text-gray-400 uppercase">pts</div>
+                  <div className="text-[0.625rem] text-gray-400 uppercase">pts</div>
                 </div>
               </div>
             </div>
@@ -283,7 +283,7 @@ function ScrambleContent({
                   <p className="text-sm text-gray-300">TBD</p>
                 )}
                 {group.starting_hole && (
-                  <p className="text-[10px] text-gray-400 mt-0.5">
+                  <p className="text-[0.625rem] text-gray-400 mt-0.5">
                     Hole {group.starting_hole}
                   </p>
                 )}
@@ -295,7 +295,7 @@ function ScrambleContent({
                       {m.avatar_url ? (
                         <img src={m.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                       ) : (
-                        <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                        <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                           {(m.display_name || "?")[0].toUpperCase()}
                         </span>
                       )}
@@ -326,7 +326,7 @@ function ScrambleContent({
                   {m.avatar_url ? (
                     <img src={m.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                   ) : (
-                    <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                    <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                       {(m.display_name || "?")[0].toUpperCase()}
                     </span>
                   )}
@@ -390,7 +390,7 @@ function KgbCupScoreBanner({ contestId, kgbData }: { contestId: string; kgbData:
             <p className="text-2xl font-black" style={{ color: t2Color }}>{t2Points}</p>
           </div>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1">
+        <p className="text-[0.625rem] text-gray-400 mt-1">
           {completed} of {total} sections · Tap for details
           {kgbData.verified && (
             <span className="inline-flex items-center gap-0.5 ml-1 text-green-600 font-semibold">
@@ -506,7 +506,7 @@ function ParticipantListContent({ detail }: { detail: ContestDetailData }) {
             {p.avatar_url ? (
               <img src={p.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
             ) : (
-              <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[9px] font-bold">
+              <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5625rem] font-bold">
                 {(p.display_name || "?")[0].toUpperCase()}
               </span>
             )}

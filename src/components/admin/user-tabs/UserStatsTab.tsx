@@ -42,7 +42,7 @@ function StatRow({ label, value, sub }: { label: string; value: string | number;
       <span className="text-xs text-gray-500">{label}</span>
       <span className="text-sm font-semibold text-gray-900">
         {value}
-        {sub != null && <span className="ml-1.5 text-[11px] font-normal text-gray-400">{sub}</span>}
+        {sub != null && <span className="ml-1.5 text-[0.6875rem] font-normal text-gray-400">{sub}</span>}
       </span>
     </div>
   );
@@ -51,7 +51,7 @@ function StatRow({ label, value, sub }: { label: string; value: string | number;
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5">{title}</h3>
+      <h3 className="text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-500 mb-1.5">{title}</h3>
       <div className="bg-white border border-gray-200 rounded-xl px-3 py-1">{children}</div>
     </div>
   );

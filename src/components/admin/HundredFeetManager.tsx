@@ -366,7 +366,7 @@ export function HundredFeetManager({ tripId }: { tripId: string }) {
               </svg>
             )}
             {saveStatus === "error" && (
-              <span className="text-[10px] text-red-500 font-medium">Error</span>
+              <span className="text-[0.625rem] text-red-500 font-medium">Error</span>
             )}
           </div>
           <svg
@@ -452,7 +452,7 @@ export function HundredFeetManager({ tripId }: { tripId: string }) {
                         {p.avatar_url ? (
                           <img src={p.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
                         ) : (
-                          <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold flex-shrink-0">
+                          <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold flex-shrink-0">
                             {(p.display_name || "?")[0].toUpperCase()}
                           </span>
                         )}
@@ -512,7 +512,7 @@ export function HundredFeetManager({ tripId }: { tripId: string }) {
 
           {/* Header */}
           <div
-            className="grid gap-0 bg-gray-50 text-[10px] font-semibold text-gray-500 uppercase select-none border-b border-gray-100"
+            className="grid gap-0 bg-gray-50 text-[0.625rem] font-semibold text-gray-500 uppercase select-none border-b border-gray-100"
             style={{ gridTemplateColumns: `1.5rem 1fr repeat(${DAYS.length}, 3.5rem) 3.5rem` }}
           >
             <div
@@ -560,7 +560,7 @@ export function HundredFeetManager({ tripId }: { tripId: string }) {
                   {entry.avatar_url ? (
                     <img src={entry.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
                   ) : (
-                    <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold flex-shrink-0">
+                    <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold flex-shrink-0">
                       {(entry.display_name || "?")[0].toUpperCase()}
                     </span>
                   )}

@@ -585,10 +585,10 @@ export function KgbCupLiveScorer({
         <div className="px-2 py-1">
         {/* Handicap + Name + strokes */}
         <div className="flex items-center gap-1 mb-0.5">
-          <span className="text-[9px] text-gray-400 font-medium flex-shrink-0">({side.handicap})</span>
-          <span className="text-[11px] font-semibold text-gray-700 truncate">{side.label}</span>
+          <span className="text-[0.5625rem] text-gray-400 font-medium flex-shrink-0">({side.handicap})</span>
+          <span className="text-[0.6875rem] font-semibold text-gray-700 truncate">{side.label}</span>
           {side.strokes > 0 && (
-            <span className="text-[9px] text-indigo-600 font-bold flex-shrink-0">
+            <span className="text-[0.5625rem] text-indigo-600 font-bold flex-shrink-0">
               +{side.strokes}
             </span>
           )}
@@ -766,7 +766,7 @@ export function KgbCupLiveScorer({
                   )}
 
                   <div className="flex items-center px-0.5">
-                    <span className="text-[9px] text-gray-300 font-medium">vs</span>
+                    <span className="text-[0.5625rem] text-gray-300 font-medium">vs</span>
                   </div>
 
                   {renderScorerCell(

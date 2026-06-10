@@ -401,12 +401,12 @@ export function SongManager() {
             autoFocus
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
           />
           <select
             value={taggedUserId}
             onChange={(e) => setTaggedUserId(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
             style={{ backgroundColor: "transparent" }}
           >
             <option value="">No tagged Loozer</option>
@@ -462,7 +462,7 @@ export function SongManager() {
                 onChange={(e) => setLyrics(e.target.value)}
                 placeholder="Song lyrics..."
                 rows={4}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
               />
             )}
           </div>
@@ -485,7 +485,7 @@ export function SongManager() {
       )}
 
       {/* Sortable column header */}
-      <div className="flex items-center gap-2 px-4 py-1.5 -mx-4 border-y border-gray-100 bg-gray-50/50 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+      <div className="flex items-center gap-2 px-4 py-1.5 -mx-4 border-y border-gray-100 bg-gray-50/50 text-[0.625rem] uppercase tracking-wider text-gray-500 font-semibold">
         <SortHeader
           label="#"
           active={sortBy === "sort_order"}
@@ -705,7 +705,7 @@ export function SongManager() {
                 type="text"
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
               />
             </div>
             <div>
@@ -713,7 +713,7 @@ export function SongManager() {
               <select
                 value={editTaggedUserId}
                 onChange={(e) => setEditTaggedUserId(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
                 style={{ backgroundColor: "transparent" }}
               >
                 <option value="">No tagged Loozer</option>
@@ -757,7 +757,7 @@ export function SongManager() {
                   onChange={(e) => setEditLyrics(e.target.value)}
                   placeholder="Song lyrics..."
                   rows={6}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[16px]"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
                 />
               )}
             </div>
@@ -854,7 +854,7 @@ function ListenerColumn({
 }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1">
+      <div className="text-[0.625rem] uppercase tracking-wider text-gray-500 font-semibold mb-1">
         {title} <span className="text-gray-400 normal-case font-normal">({items.length})</span>
       </div>
       {items.length === 0 ? (
@@ -866,7 +866,7 @@ function ListenerColumn({
               {it.avatar ? (
                 <img src={it.avatar} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
               ) : (
-                <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[9px] font-semibold text-gray-500 flex-shrink-0">
+                <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[0.5625rem] font-semibold text-gray-500 flex-shrink-0">
                   {it.name.charAt(0).toUpperCase()}
                 </div>
               )}

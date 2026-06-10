@@ -598,7 +598,7 @@ export function OptionBuilder({ tripId }: { tripId: string }) {
           const catIcons = OPTION_ICONS.filter((i) => i.category === cat);
           return (
             <div key={cat}>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1">{cat}</p>
+              <p className="text-[0.625rem] font-bold uppercase tracking-wider text-gray-400 mb-1">{cat}</p>
               <div className="flex flex-wrap gap-1">
                 {catIcons.map((icon) => (
                   <button
@@ -1443,7 +1443,7 @@ function SortableOptionRow({
           )}
         </div>
         {option.depends_on_option_id ? (
-          <div className="text-[11px] text-gray-400 mt-0.5 truncate">
+          <div className="text-[0.6875rem] text-gray-400 mt-0.5 truncate">
             Requires {allOptions.find((o) => o.id === option.depends_on_option_id)?.name || "..."}
           </div>
         ) : (option.description || choiceSummary) ? (

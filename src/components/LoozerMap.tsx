@@ -487,10 +487,10 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
                     getInitials(l.display_name)
                   )}
                 </div>
-                <span className="text-[10px] font-medium text-gray-900 leading-tight text-center max-w-[64px] truncate">
+                <span className="text-[0.625rem] font-medium text-gray-900 leading-tight text-center max-w-[64px] truncate">
                   {l.display_name.split(" ")[0]}
                 </span>
-                <span className="text-[10px] text-gray-500">{formatDistance(l.distance)}</span>
+                <span className="text-[0.625rem] text-gray-500">{formatDistance(l.distance)}</span>
               </button>
             ))}
           </div>

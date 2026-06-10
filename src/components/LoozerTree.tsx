@@ -115,14 +115,14 @@ function LoozerNode({ data }: NodeProps<Node<LoozerNodeData>>) {
             <span className="text-sm font-bold">{getInitial(loozer.display_name)}</span>
           )}
         </div>
-        <span className="flex-1 min-w-0 text-[12px] font-semibold text-gray-900 leading-tight whitespace-nowrap overflow-hidden text-ellipsis">
+        <span className="flex-1 min-w-0 text-xs font-semibold text-gray-900 leading-tight whitespace-nowrap overflow-hidden text-ellipsis">
           {label}
         </span>
         {loozer.events_attended != null && loozer.events_attended > 0 && (
           <span
             title={`${loozer.events_attended} event${loozer.events_attended === 1 ? "" : "s"} attended`}
             aria-label={`${loozer.events_attended} event${loozer.events_attended === 1 ? "" : "s"} attended`}
-            className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-green-600 rounded-full flex-shrink-0"
+            className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[0.625rem] font-bold text-white bg-green-600 rounded-full flex-shrink-0"
           >
             {loozer.events_attended}
           </span>

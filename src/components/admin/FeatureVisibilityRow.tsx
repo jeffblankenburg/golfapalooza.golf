@@ -92,7 +92,7 @@ export function FeatureVisibilityRow({
         <div className="flex items-center gap-2">
           <p className="font-medium text-gray-900 text-sm">{meta.label}</p>
           <span
-            className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${
+            className={`text-[0.625rem] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${
               effectivelyVisible
                 ? "bg-green-100 text-green-700"
                 : "bg-gray-200 text-gray-500"

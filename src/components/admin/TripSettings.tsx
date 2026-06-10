@@ -252,7 +252,7 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
               type="text"
               value={trip.trip_name}
               onChange={(e) => setTrip({ ...trip, trip_name: e.target.value })}
-              className="w-full text-right text-[16px] text-gray-900 bg-transparent outline-none"
+              className="w-full text-right text-base text-gray-900 bg-transparent outline-none"
             />
           </Field>
           <Field label="Trip Year">
@@ -262,7 +262,7 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
               onChange={(e) =>
                 setTrip({ ...trip, trip_year: parseInt(e.target.value) || 0 })
               }
-              className="w-full text-right text-[16px] text-gray-900 bg-transparent outline-none"
+              className="w-full text-right text-base text-gray-900 bg-transparent outline-none"
             />
           </Field>
           <Field label="Start Date">
@@ -270,7 +270,7 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
               type="date"
               value={trip.start_date}
               onChange={(e) => setTrip({ ...trip, start_date: e.target.value })}
-              className="w-full text-right text-[16px] text-gray-900 bg-transparent outline-none"
+              className="w-full text-right text-base text-gray-900 bg-transparent outline-none"
               style={{ backgroundColor: "transparent" }}
             />
           </Field>
@@ -278,7 +278,7 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
             <select
               value={trip.timezone || "America/New_York"}
               onChange={(e) => setTrip({ ...trip, timezone: e.target.value })}
-              className="w-full text-right text-[16px] text-gray-900 bg-transparent outline-none"
+              className="w-full text-right text-base text-gray-900 bg-transparent outline-none"
               style={{ backgroundColor: "transparent" }}
             >
               {US_TIMEZONE_OPTIONS.map((tz) => (
@@ -296,7 +296,7 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
                 onChange={(e) =>
                   setTrip({ ...trip, tee_time_reminder_minutes: parseInt(e.target.value) || 0 })
                 }
-                className="w-16 text-right text-[16px] text-gray-900 bg-transparent outline-none"
+                className="w-16 text-right text-base text-gray-900 bg-transparent outline-none"
               />
               <span className="text-sm text-gray-500">min before</span>
             </div>
@@ -319,7 +319,7 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
               value={trip.location || ""}
               onChange={(e) => setTrip({ ...trip, location: e.target.value })}
               placeholder="e.g. Myrtle Beach, SC"
-              className="w-full text-right text-[16px] text-gray-900 bg-transparent outline-none placeholder:text-gray-300"
+              className="w-full text-right text-base text-gray-900 bg-transparent outline-none placeholder:text-gray-300"
             />
           </Field>
           <Field label="Hotel">
@@ -328,7 +328,7 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
               value={trip.hotel_name || ""}
               onChange={(e) => setTrip({ ...trip, hotel_name: e.target.value })}
               placeholder="Hotel name"
-              className="w-full text-right text-[16px] text-gray-900 bg-transparent outline-none placeholder:text-gray-300"
+              className="w-full text-right text-base text-gray-900 bg-transparent outline-none placeholder:text-gray-300"
             />
           </Field>
           <div className="px-4 py-3">
@@ -338,7 +338,7 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
               onChange={(e) => setTrip({ ...trip, hotel_address: e.target.value })}
               placeholder="Full address"
               rows={2}
-              className="w-full text-[16px] text-gray-900 bg-transparent outline-none resize-none placeholder:text-gray-300"
+              className="w-full text-base text-gray-900 bg-transparent outline-none resize-none placeholder:text-gray-300"
               style={{ backgroundColor: "transparent" }}
             />
           </div>
@@ -358,7 +358,7 @@ export function TripSettings({ tripId: propTripId, hideEventList }: { tripId?: s
             onChange={(e) => setTrip({ ...trip, notes: e.target.value })}
             placeholder="Trip notes, reminders, etc."
             rows={4}
-            className="w-full text-[16px] text-gray-900 bg-transparent outline-none resize-none placeholder:text-gray-300"
+            className="w-full text-base text-gray-900 bg-transparent outline-none resize-none placeholder:text-gray-300"
             style={{ backgroundColor: "transparent" }}
           />
         </div>
@@ -504,7 +504,7 @@ function AllEventsList({
             autoFocus
             value={newTrip.trip_name}
             onChange={(e) => setNewTrip({ ...newTrip, trip_name: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base bg-white"
           />
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -513,7 +513,7 @@ function AllEventsList({
                 type="date"
                 value={newTrip.start_date}
                 onChange={(e) => setNewTrip({ ...newTrip, start_date: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base bg-white"
                 style={{ backgroundColor: "white" }}
               />
             </div>
@@ -523,7 +523,7 @@ function AllEventsList({
                 type="date"
                 value={newTrip.end_date}
                 onChange={(e) => setNewTrip({ ...newTrip, end_date: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base bg-white"
                 style={{ backgroundColor: "white" }}
               />
             </div>
@@ -539,7 +539,7 @@ function AllEventsList({
             <select
               value={newTrip.status}
               onChange={(e) => setNewTrip({ ...newTrip, status: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base bg-white"
               style={{ backgroundColor: "white" }}
             >
               <option value="active">Active</option>
@@ -551,7 +551,7 @@ function AllEventsList({
             <select
               value={newTrip.timezone}
               onChange={(e) => setNewTrip({ ...newTrip, timezone: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-[16px] bg-white"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base bg-white"
               style={{ backgroundColor: "white" }}
             >
               {US_TIMEZONE_OPTIONS.map((tz) => (

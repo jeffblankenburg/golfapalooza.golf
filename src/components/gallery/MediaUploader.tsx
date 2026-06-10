@@ -343,7 +343,7 @@ export function MediaUploader({
                   {user.avatar_url ? (
                     <img src={user.avatar_url} alt={user.display_name} className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-[11px] font-semibold">{getInitials(user.display_name)}</span>
+                    <span className="text-[0.6875rem] font-semibold">{getInitials(user.display_name)}</span>
                   )}
                 </div>
                 <span className="text-sm font-medium text-gray-900">{user.display_name}</span>
@@ -415,7 +415,7 @@ export function MediaUploader({
             onChange={(e) => setCaption(e.target.value)}
             placeholder="Add a caption..."
             autoFocus
-            className="w-full px-4 py-3 text-[16px] border border-gray-300 rounded-xl mb-3 focus:border-green-600 focus:ring-1 focus:ring-green-600 outline-none"
+            className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl mb-3 focus:border-green-600 focus:ring-1 focus:ring-green-600 outline-none"
           />
 
           {/* Tag Loozers button */}
@@ -444,13 +444,13 @@ export function MediaUploader({
                       {u.avatar_url ? (
                         <img src={u.avatar_url} alt={u.display_name} className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-[8px] font-semibold">{getInitials(u.display_name)}</span>
+                        <span className="text-[0.5rem] font-semibold">{getInitials(u.display_name)}</span>
                       )}
                     </div>
                   );
                 })}
                 {taggedUserIds.size > 5 && (
-                  <div className="w-6 h-6 rounded-full bg-gray-400 text-white flex items-center justify-center border-2 border-white text-[8px] font-semibold">
+                  <div className="w-6 h-6 rounded-full bg-gray-400 text-white flex items-center justify-center border-2 border-white text-[0.5rem] font-semibold">
                     +{taggedUserIds.size - 5}
                   </div>
                 )}

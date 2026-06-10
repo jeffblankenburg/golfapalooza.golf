@@ -78,7 +78,7 @@ export function SongArtworkPicker({
                     loading="lazy"
                   />
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-1.5">
-                    <p className="text-[10px] text-white font-medium leading-tight truncate">
+                    <p className="text-[0.625rem] text-white font-medium leading-tight truncate">
                       {song.title}
                     </p>
                   </div>

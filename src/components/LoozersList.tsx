@@ -307,7 +307,7 @@ export function LoozersList({
                     <span
                       title={`${loozer.events_attended} event${loozer.events_attended === 1 ? "" : "s"} attended`}
                       aria-label={`${loozer.events_attended} event${loozer.events_attended === 1 ? "" : "s"} attended`}
-                      className="absolute -bottom-0.5 -right-0.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-bold text-white bg-green-600 rounded-full border-2 border-white"
+                      className="absolute -bottom-0.5 -right-0.5 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[0.6875rem] font-bold text-white bg-green-600 rounded-full border-2 border-white"
                     >
                       {loozer.events_attended}
                     </span>

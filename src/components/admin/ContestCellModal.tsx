@@ -307,7 +307,7 @@ export function ContestCellModal({
                             {new Date(tx.created_at).toLocaleDateString()}
                           </span>
                           <span
-                            className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                            className={`inline-block px-1.5 py-0.5 rounded text-[0.625rem] font-medium ${
                               tx.type === "charge"
                                 ? "bg-red-100 text-red-700"
                                 : "bg-green-100 text-green-700"

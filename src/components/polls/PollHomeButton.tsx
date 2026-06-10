@@ -75,7 +75,7 @@ export function PollHomeButton({ initialPoll = null, initialResponse = null }: P
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <p className="text-[10px] font-bold text-fuchsia-700 uppercase tracking-wider">
+              <p className="text-[0.625rem] font-bold text-fuchsia-700 uppercase tracking-wider">
                 Poll{hasVoted ? " · voted" : ""}
               </p>
             </div>

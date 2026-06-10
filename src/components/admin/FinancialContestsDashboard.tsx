@@ -90,7 +90,7 @@ function SourceChip({ source }: { source: string }) {
   const config = SOURCE_LABELS[source] ?? { label: source, className: "bg-gray-100 text-gray-600" };
   return (
     <span
-      className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${config.className}`}
+      className={`inline-block px-1.5 py-0.5 rounded text-[0.625rem] font-medium ${config.className}`}
     >
       {config.label}
     </span>
@@ -139,7 +139,7 @@ function VersionCard({
         <div className="flex-1 min-w-0 text-xs text-gray-600 space-y-1">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span
-              className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${actionChip.className}`}
+              className={`inline-block px-1.5 py-0.5 rounded text-[0.625rem] font-medium ${actionChip.className}`}
             >
               {actionChip.label}
             </span>
@@ -163,7 +163,7 @@ function VersionCard({
               {notes}
             </div>
           )}
-          <div className="text-[11px] text-gray-400 whitespace-nowrap pt-0.5">
+          <div className="text-[0.6875rem] text-gray-400 whitespace-nowrap pt-0.5">
             {new Date(timestamp).toLocaleString()}
           </div>
         </div>
@@ -175,7 +175,7 @@ function VersionCard({
             {fmt(amount)}
           </div>
           {author && (
-            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">
+            <span className="inline-block px-1.5 py-0.5 rounded text-[0.625rem] font-medium bg-gray-100 text-gray-600">
               {author}
             </span>
           )}
@@ -212,7 +212,7 @@ function ChargeTypePill({
     >
       <div className="text-sm font-semibold leading-tight">{label}</div>
       <div
-        className={`text-[11px] leading-tight ${
+        className={`text-[0.6875rem] leading-tight ${
           selected ? "text-white/80" : "text-gray-500"
         }`}
       >
@@ -225,7 +225,7 @@ function ChargeTypePill({
 function ResponsibleChip({ name }: { name?: string | null }) {
   if (!name) return null;
   return (
-    <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">
+    <span className="inline-block px-1.5 py-0.5 rounded text-[0.625rem] font-medium bg-gray-100 text-gray-600">
       {name}
     </span>
   );
@@ -839,7 +839,7 @@ export function FinancialContestsDashboard() {
               <div className="text-lg font-bold text-green-700 truncate">
                 {fmt(totalCharges)}
               </div>
-              <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">
+              <div className="text-[0.625rem] text-gray-500 uppercase tracking-wider mt-0.5">
                 Charges
               </div>
             </div>
@@ -847,7 +847,7 @@ export function FinancialContestsDashboard() {
               <div className="text-lg font-bold text-blue-700 truncate">
                 {fmt(totalPayments)}
               </div>
-              <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">
+              <div className="text-[0.625rem] text-gray-500 uppercase tracking-wider mt-0.5">
                 Collected
               </div>
             </div>
@@ -855,7 +855,7 @@ export function FinancialContestsDashboard() {
               <div className="text-lg font-bold text-red-700 truncate">
                 {fmt(totalOutstanding)}
               </div>
-              <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">
+              <div className="text-[0.625rem] text-gray-500 uppercase tracking-wider mt-0.5">
                 Outstanding
               </div>
             </div>
@@ -1131,12 +1131,12 @@ export function FinancialContestsDashboard() {
                                       </button>
                                     )}
                                     {tx.contest_name && (
-                                      <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
+                                      <span className="inline-block px-1.5 py-0.5 rounded text-[0.625rem] font-medium bg-purple-100 text-purple-700">
                                         {tx.contest_name}
                                       </span>
                                     )}
                                     {tx.trip_name && (
-                                      <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">
+                                      <span className="inline-block px-1.5 py-0.5 rounded text-[0.625rem] font-medium bg-amber-100 text-amber-700">
                                         {tx.trip_name}
                                       </span>
                                     )}
@@ -1962,7 +1962,7 @@ export function FinancialContestsDashboard() {
                                                     }))
                                                   }
                                                   disabled={qty <= 1}
-                                                  className="w-5 h-5 flex items-center justify-center rounded-full border border-gray-300 text-gray-500 text-[10px] font-bold disabled:opacity-30 active:bg-gray-100"
+                                                  className="w-5 h-5 flex items-center justify-center rounded-full border border-gray-300 text-gray-500 text-[0.625rem] font-bold disabled:opacity-30 active:bg-gray-100"
                                                 >
                                                   -
                                                 </button>
@@ -1977,12 +1977,12 @@ export function FinancialContestsDashboard() {
                                                       [u.user_id]: (prev[u.user_id] || 1) + 1,
                                                     }))
                                                   }
-                                                  className="w-5 h-5 flex items-center justify-center rounded-full border border-gray-300 text-gray-500 text-[10px] font-bold active:bg-gray-100"
+                                                  className="w-5 h-5 flex items-center justify-center rounded-full border border-gray-300 text-gray-500 text-[0.625rem] font-bold active:bg-gray-100"
                                                 >
                                                   +
                                                 </button>
                                                 {c.entry_fee > 0 && (
-                                                  <span className="text-[10px] text-gray-400 ml-1 whitespace-nowrap">
+                                                  <span className="text-[0.625rem] text-gray-400 ml-1 whitespace-nowrap">
                                                     {fmt(c.entry_fee * qty)}
                                                   </span>
                                                 )}
@@ -2067,7 +2067,7 @@ export function FinancialContestsDashboard() {
               <div className="mt-3 space-y-2">
                 <div className="flex gap-2">
                   <div className="flex-1">
-                    <label className="text-[10px] text-gray-500 uppercase">From</label>
+                    <label className="text-[0.625rem] text-gray-500 uppercase">From</label>
                     <input
                       type="date"
                       value={ledgerDateFrom}
@@ -2076,7 +2076,7 @@ export function FinancialContestsDashboard() {
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="text-[10px] text-gray-500 uppercase">To</label>
+                    <label className="text-[0.625rem] text-gray-500 uppercase">To</label>
                     <input
                       type="date"
                       value={ledgerDateTo}
@@ -2116,17 +2116,17 @@ export function FinancialContestsDashboard() {
                     <div className="flex gap-2 mb-3">
                       <div className="flex-1 bg-red-50 rounded-xl px-2 py-1.5 text-center">
                         <div className="text-xs font-bold text-red-700">{fmt(totalCharges)}</div>
-                        <div className="text-[9px] text-gray-500 uppercase">Charges</div>
+                        <div className="text-[0.5625rem] text-gray-500 uppercase">Charges</div>
                       </div>
                       <div className="flex-1 bg-green-50 rounded-xl px-2 py-1.5 text-center">
                         <div className="text-xs font-bold text-green-700">{fmt(totalPayments)}</div>
-                        <div className="text-[9px] text-gray-500 uppercase">Payments</div>
+                        <div className="text-[0.5625rem] text-gray-500 uppercase">Payments</div>
                       </div>
                       <div className="flex-1 bg-gray-50 rounded-xl px-2 py-1.5 text-center">
                         <div className={`text-xs font-bold ${netBalance < 0 ? "text-red-600" : netBalance > 0 ? "text-green-600" : "text-gray-500"}`}>
                           {fmt(netBalance)}
                         </div>
-                        <div className="text-[9px] text-gray-500 uppercase">Balance</div>
+                        <div className="text-[0.5625rem] text-gray-500 uppercase">Balance</div>
                       </div>
                     </div>
 
@@ -2134,7 +2134,7 @@ export function FinancialContestsDashboard() {
                     <button
                       type="button"
                       onClick={() => setLedgerSortDir((d) => d === "desc" ? "asc" : "desc")}
-                      className="text-[10px] text-gray-500 mb-2 flex items-center gap-1"
+                      className="text-[0.625rem] text-gray-500 mb-2 flex items-center gap-1"
                     >
                       Date {ledgerSortDir === "desc" ? "▼ Newest" : "▲ Oldest"} first
                     </button>
@@ -2174,12 +2174,12 @@ export function FinancialContestsDashboard() {
                                   </button>
                                 )}
                                 {tx.contest_name && (
-                                  <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
+                                  <span className="inline-block px-1.5 py-0.5 rounded text-[0.625rem] font-medium bg-purple-100 text-purple-700">
                                     {tx.contest_name}
                                   </span>
                                 )}
                                 {tx.trip_name && (
-                                  <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">
+                                  <span className="inline-block px-1.5 py-0.5 rounded text-[0.625rem] font-medium bg-amber-100 text-amber-700">
                                     {tx.trip_name}
                                   </span>
                                 )}
@@ -2202,7 +2202,7 @@ export function FinancialContestsDashboard() {
                         ))}
                       </div>
                     )}
-                    <p className="text-[10px] text-gray-400 text-center mt-2">
+                    <p className="text-[0.625rem] text-gray-400 text-center mt-2">
                       {filteredFullLedger.length} transaction{filteredFullLedger.length !== 1 ? "s" : ""}
                     </p>
                   </>
@@ -2336,7 +2336,7 @@ export function FinancialContestsDashboard() {
                   orphanRows.length > 0 || deleteContestImpact.orphan_other.count > 0;
                 return (
                   <>
-                    <div className="rounded-xl bg-gray-50 border border-gray-200 divide-y divide-gray-200 text-[13px]">
+                    <div className="rounded-xl bg-gray-50 border border-gray-200 divide-y divide-gray-200 text-[0.8125rem]">
                       <ImpactRow
                         label="Participants removed"
                         count={deleteContestImpact.participant_count}

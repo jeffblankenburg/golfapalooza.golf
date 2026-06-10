@@ -239,7 +239,7 @@ function BracketSection({
               return (
                 <div
                   key={round}
-                  className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider text-center"
+                  className="text-[0.625rem] font-semibold text-gray-400 uppercase tracking-wider text-center"
                   style={{
                     width: COL_W,
                     marginLeft: ri > 0 ? CONN_W : 0,
@@ -296,7 +296,7 @@ function BracketSection({
                           <button
                             onClick={() => onSeriesReset(match.id)}
                             style={{ position: "absolute", top: MATCH_H + 2, left: 0, right: 0 }}
-                            className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-md py-0.5 active:bg-amber-100"
+                            className="text-[0.625rem] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-md py-0.5 active:bg-amber-100"
                           >
                             Reset series
                           </button>
@@ -573,7 +573,7 @@ function SlotRow({
       onClick={onClick}
     >
       {seed !== null && (
-        <span className="text-[10px] text-gray-400 w-4 text-right flex-shrink-0">
+        <span className="text-[0.625rem] text-gray-400 w-4 text-right flex-shrink-0">
           {seed}
         </span>
       )}
@@ -583,7 +583,7 @@ function SlotRow({
         {name || "TBD"}
       </span>
       {score !== null && score !== undefined && (
-        <span className="text-[11px] font-semibold tabular-nums w-4 text-right flex-shrink-0">
+        <span className="text-[0.6875rem] font-semibold tabular-nums w-4 text-right flex-shrink-0">
           {score}
         </span>
       )}

@@ -255,7 +255,7 @@ export default function MyFinancials({ userId }: { userId: string }) {
                 {sheikerAvatar ? (
                   <img src={sheikerAvatar} alt="" className="w-4 h-4 rounded-full object-cover" />
                 ) : (
-                  <span className="w-4 h-4 rounded-full bg-green-700 text-white text-[8px] font-bold flex items-center justify-center">S</span>
+                  <span className="w-4 h-4 rounded-full bg-green-700 text-white text-[0.5rem] font-bold flex items-center justify-center">S</span>
                 )}
                 Sheiker
               </Link>
@@ -348,7 +348,7 @@ export default function MyFinancials({ userId }: { userId: string }) {
                     </p>
                     {cat && (
                       <span
-                        className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${cat.className}`}
+                        className={`text-[0.625rem] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${cat.className}`}
                       >
                         {cat.label}
                       </span>
@@ -359,12 +359,12 @@ export default function MyFinancials({ userId }: { userId: string }) {
                       {formatDate(t.created_at)}
                     </p>
                     {t.contest_name && (
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 bg-purple-100 text-purple-700">
+                      <span className="text-[0.625rem] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 bg-purple-100 text-purple-700">
                         {t.contest_name}
                       </span>
                     )}
                     {t.trip_name && (
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 bg-amber-100 text-amber-800">
+                      <span className="text-[0.625rem] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 bg-amber-100 text-amber-800">
                         {t.trip_name}{t.trip_year ? ` ${t.trip_year}` : ""}
                       </span>
                     )}

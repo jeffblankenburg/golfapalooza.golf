@@ -152,7 +152,7 @@ export default function ScoringShell({
       {/* Mini Scorecard — always expanded (no drawer) */}
       <div className="overflow-x-auto border-t border-gray-200 bg-white shrink-0">
         <table
-          className="w-full text-[10px]"
+          className="w-full text-[0.625rem]"
           style={{
             tableLayout: "fixed",
             minWidth: `${(holes.length + (holes.length > 9 ? 3 : 1) + (scorecardLeadHeader !== undefined ? 1 : 0)) * 34}px`,

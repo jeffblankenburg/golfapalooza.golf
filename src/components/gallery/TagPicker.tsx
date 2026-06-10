@@ -114,7 +114,7 @@ export function TagPicker({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search..."
             autoFocus
-            className="w-full px-3 py-2 text-[16px] border border-gray-300 rounded-lg focus:border-green-600 focus:ring-1 focus:ring-green-600 outline-none"
+            className="w-full px-3 py-2 text-base border border-gray-300 rounded-lg focus:border-green-600 focus:ring-1 focus:ring-green-600 outline-none"
           />
         </div>
 
@@ -150,7 +150,7 @@ export function TagPicker({
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <span className="text-[11px] font-semibold">
+                  <span className="text-[0.6875rem] font-semibold">
                     {getInitials(user.display_name)}
                   </span>
                 )}

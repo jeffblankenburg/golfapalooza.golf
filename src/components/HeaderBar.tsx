@@ -240,7 +240,7 @@ export function HeaderBar({
                   />
                 </svg>
                 {chatUnreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                  <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[0.625rem] font-bold text-white bg-red-500 rounded-full">
                     {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
                   </span>
                 )}
@@ -315,7 +315,7 @@ export function HeaderBar({
                 />
               </svg>
               {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[0.625rem] font-bold text-white bg-red-500 rounded-full">
                   {unreadCount > 99 ? "99+" : unreadCount}
                 </span>
               )}
@@ -333,7 +333,7 @@ export function HeaderBar({
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <span className="text-[11px] font-semibold leading-none">
+                <span className="text-[0.6875rem] font-semibold leading-none">
                   {getInitials(displayName)}
                 </span>
               )}

@@ -257,7 +257,7 @@ export function FinancialDashboard({ tripId }: { tripId: string }) {
             <div className="text-lg font-bold text-green-700 truncate">
               {fmt(totals.total_charges)}
             </div>
-            <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">
+            <div className="text-[0.625rem] text-gray-500 uppercase tracking-wider mt-0.5">
               Charges
             </div>
           </div>
@@ -265,7 +265,7 @@ export function FinancialDashboard({ tripId }: { tripId: string }) {
             <div className="text-lg font-bold text-blue-700 truncate">
               {fmt(totals.total_payments)}
             </div>
-            <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">
+            <div className="text-[0.625rem] text-gray-500 uppercase tracking-wider mt-0.5">
               Collected
             </div>
           </div>
@@ -273,7 +273,7 @@ export function FinancialDashboard({ tripId }: { tripId: string }) {
             <div className="text-lg font-bold text-red-700 truncate">
               {fmt(totals.total_outstanding)}
             </div>
-            <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">
+            <div className="text-[0.625rem] text-gray-500 uppercase tracking-wider mt-0.5">
               Outstanding
             </div>
           </div>
@@ -360,7 +360,7 @@ export function FinancialDashboard({ tripId }: { tripId: string }) {
                         Charges: {fmt(l.trip_charges)} | Paid:{" "}
                         {fmt(l.trip_payments)}
                       </div>
-                      <div className="text-[11px] text-gray-400">
+                      <div className="text-[0.6875rem] text-gray-400">
                         Lifetime: {fmt(l.lifetime_balance)}
                       </div>
                     </div>
@@ -496,7 +496,7 @@ export function FinancialDashboard({ tripId }: { tripId: string }) {
                                       {new Date(tx.created_at).toLocaleDateString()}
                                     </span>
                                     <span
-                                      className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                      className={`inline-block px-1.5 py-0.5 rounded text-[0.625rem] font-medium ${
                                         tx.type === "charge"
                                           ? "bg-red-100 text-red-700"
                                           : "bg-green-100 text-green-700"
@@ -505,7 +505,7 @@ export function FinancialDashboard({ tripId }: { tripId: string }) {
                                       {tx.type}
                                     </span>
                                     <span
-                                      className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                      className={`inline-block px-1.5 py-0.5 rounded text-[0.625rem] font-medium ${
                                         tx.source === "manual"
                                           ? "bg-gray-100 text-gray-600"
                                           : "bg-blue-100 text-blue-700"

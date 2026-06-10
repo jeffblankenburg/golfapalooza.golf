@@ -115,7 +115,7 @@ export function BottomNav({ isAdmin }: { isAdmin: boolean }) {
               }`}
             >
               {item.icon}
-              <span className="text-[9px] mt-0.5 font-medium">{item.label}</span>
+              <span className="text-[0.5625rem] mt-0.5 font-medium">{item.label}</span>
             </Link>
           );
         })}

@@ -27,7 +27,7 @@ function Card({ href, title, description, icon, disabled, badge }: CardProps) {
         <div className="flex items-center gap-2">
           <h2 className="text-base font-semibold text-gray-900">{title}</h2>
           {badge && (
-            <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] uppercase tracking-wide font-medium">
+            <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[0.625rem] uppercase tracking-wide font-medium">
               {badge}
             </span>
           )}

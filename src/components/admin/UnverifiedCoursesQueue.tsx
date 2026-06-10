@@ -96,7 +96,7 @@ export default function UnverifiedCoursesQueue() {
                     <Link href={`/admin/courses?course=${c.id}`} className="text-sm font-semibold text-gray-900 hover:underline">
                       {formatCourseName(c)}
                     </Link>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wider ${
+                    <span className={`text-[0.625rem] px-1.5 py-0.5 rounded uppercase font-bold tracking-wider ${
                       c.source === "ai" ? "bg-purple-100 text-purple-700" :
                       c.source === "gcapi" ? "bg-blue-100 text-blue-700" :
                       "bg-gray-100 text-gray-700"

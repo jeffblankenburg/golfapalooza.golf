@@ -202,12 +202,12 @@ export default function AnalyticsPage() {
                   const pct = max > 0 ? (d.events / max) * 100 : 0;
                   return (
                     <div key={d.day} className="flex-1 flex flex-col items-center gap-1">
-                      <span className="text-[9px] text-gray-400">{d.events}</span>
+                      <span className="text-[0.5625rem] text-gray-400">{d.events}</span>
                       <div
                         className="w-full bg-green-500 rounded-t"
                         style={{ height: `${Math.max(pct, 4)}%` }}
                       />
-                      <span className="text-[9px] text-gray-400">
+                      <span className="text-[0.5625rem] text-gray-400">
                         {new Date(d.day + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" })}
                       </span>
                     </div>
@@ -239,11 +239,11 @@ export default function AnalyticsPage() {
                 })}
               </div>
               <div className="flex justify-between mt-1">
-                <span className="text-[9px] text-gray-400">12am</span>
-                <span className="text-[9px] text-gray-400">6am</span>
-                <span className="text-[9px] text-gray-400">12pm</span>
-                <span className="text-[9px] text-gray-400">6pm</span>
-                <span className="text-[9px] text-gray-400">12am</span>
+                <span className="text-[0.5625rem] text-gray-400">12am</span>
+                <span className="text-[0.5625rem] text-gray-400">6am</span>
+                <span className="text-[0.5625rem] text-gray-400">12pm</span>
+                <span className="text-[0.5625rem] text-gray-400">6pm</span>
+                <span className="text-[0.5625rem] text-gray-400">12am</span>
               </div>
             </div>
           )}
@@ -262,7 +262,7 @@ export default function AnalyticsPage() {
                       className={`w-full text-left ${filterType === e.event_type ? "ring-2 ring-green-500 rounded-lg" : ""}`}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className={`inline-block px-2 py-0.5 text-[10px] font-medium rounded-full ${eventTypeBadge(e.event_type)}`}>
+                        <span className={`inline-block px-2 py-0.5 text-[0.625rem] font-medium rounded-full ${eventTypeBadge(e.event_type)}`}>
                           {e.event_type}
                         </span>
                         <span className="text-xs text-gray-500">{e.total}</span>
@@ -379,7 +379,7 @@ export default function AnalyticsPage() {
                       <span className="text-sm font-medium text-gray-900">
                         {event.users?.display_name || "Unknown"}
                       </span>
-                      <span className={`inline-block px-2 py-0.5 text-[10px] font-medium rounded-full ${eventTypeBadge(event.event_type)}`}>
+                      <span className={`inline-block px-2 py-0.5 text-[0.625rem] font-medium rounded-full ${eventTypeBadge(event.event_type)}`}>
                         {event.event_type}
                       </span>
                       <span className="text-xs text-gray-400 ml-auto shrink-0">{formatTime(event.created_at)}</span>
@@ -405,7 +405,7 @@ function StatMini({ label, value, color }: { label: string; value: number; color
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-3 text-center">
       <p className={`text-lg font-bold ${color}`}>{value}</p>
-      <p className="text-[10px] text-gray-500">{label}</p>
+      <p className="text-[0.625rem] text-gray-500">{label}</p>
     </div>
   );
 }

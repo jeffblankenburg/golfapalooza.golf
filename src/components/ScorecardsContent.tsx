@@ -97,7 +97,7 @@ function ScoreCell({
           <div className="relative flex items-center justify-center w-[22px] h-[22px]">
             <div className="absolute inset-0 rounded-full border-[1.5px] border-green-600" />
             <div className="absolute inset-[3px] rounded-full border-[1.5px] border-green-600" />
-            <span className="relative z-10 text-[10px] leading-none font-bold text-green-700">{score}</span>
+            <span className="relative z-10 text-[0.625rem] leading-none font-bold text-green-700">{score}</span>
             {strokeDot}
           </div>
         </div>
@@ -111,7 +111,7 @@ function ScoreCell({
         <div className="flex items-center justify-center">
           <div className="relative flex items-center justify-center w-[18px] h-[18px]">
             <div className="absolute inset-0 rounded-full border-[1.5px] border-green-600" />
-            <span className="relative z-10 text-[10px] leading-none font-bold text-green-700">{score}</span>
+            <span className="relative z-10 text-[0.625rem] leading-none font-bold text-green-700">{score}</span>
             {strokeDot}
           </div>
         </div>
@@ -125,7 +125,7 @@ function ScoreCell({
         <div className="flex items-center justify-center">
           <div className="relative flex items-center justify-center w-[18px] h-[18px]">
             <div className="absolute inset-0 rounded-sm border-[1.5px] border-gray-900" />
-            <span className="relative z-10 text-[10px] leading-none font-bold text-gray-900">{score}</span>
+            <span className="relative z-10 text-[0.625rem] leading-none font-bold text-gray-900">{score}</span>
             {strokeDot}
           </div>
         </div>
@@ -140,7 +140,7 @@ function ScoreCell({
           <div className="relative flex items-center justify-center w-[22px] h-[22px]">
             <div className="absolute inset-0 rounded-sm border-[1.5px] border-gray-900" />
             <div className="absolute inset-[3px] rounded-sm border-[1.5px] border-gray-900" />
-            <span className="relative z-10 text-[10px] leading-none font-bold text-gray-900">{score}</span>
+            <span className="relative z-10 text-[0.625rem] leading-none font-bold text-gray-900">{score}</span>
             {strokeDot}
           </div>
         </div>
@@ -153,7 +153,7 @@ function ScoreCell({
     <td className={`px-0 py-1 ${bgClass}`}>
       <div className="flex items-center justify-center">
         <div className="relative">
-          <span className="text-[10px] leading-none font-bold text-gray-900">{score}</span>
+          <span className="text-[0.625rem] leading-none font-bold text-gray-900">{score}</span>
           {strokeDot}
         </div>
       </div>
@@ -398,7 +398,7 @@ export function ScorecardsContent({
                     <p className="text-sm text-gray-300">TBD</p>
                   )}
                   {team.starting_hole && (
-                    <p className="text-[10px] text-gray-400 mt-0.5">Hole {team.starting_hole}</p>
+                    <p className="text-[0.625rem] text-gray-400 mt-0.5">Hole {team.starting_hole}</p>
                   )}
                   <p className="text-sm font-bold text-gray-700 mt-0.5">
                     Hcp {team.team_handicap}
@@ -410,7 +410,7 @@ export function ScorecardsContent({
                       {m.avatar_url ? (
                         <img src={m.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                       ) : (
-                        <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                        <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                           {(m.display_name || "?")[0].toUpperCase()}
                         </span>
                       )}
@@ -429,7 +429,7 @@ export function ScorecardsContent({
       {!loading && teams.length > 0 && showLeaderboard && (
         <div className="space-y-4">
           {/* Legend */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-gray-500 px-1">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.625rem] text-gray-500 px-1">
             <span className="flex items-center gap-1">
               <span className="inline-block w-3 h-3 rounded-sm bg-sky-100 border border-sky-200" />
               Low net (sole)
@@ -480,7 +480,7 @@ export function ScorecardsContent({
                           {m.avatar_url ? (
                             <img src={m.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                           ) : (
-                            <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                            <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                               {(m.display_name || "?")[0].toUpperCase()}
                             </span>
                           )}
@@ -505,14 +505,14 @@ export function ScorecardsContent({
                       </span>
                     )}
                     {team.verified_at ? (
-                      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-green-600">
+                      <span className="inline-flex items-center gap-0.5 text-[0.625rem] font-semibold text-green-600">
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                         Verified
                       </span>
                     ) : Object.keys(scoreMap[team.id] || {}).length > 0 ? (
-                      <span className="text-[10px] font-medium text-amber-600">Unofficial</span>
+                      <span className="text-[0.625rem] font-medium text-amber-600">Unofficial</span>
                     ) : null}
                   </div>
                 </div>
@@ -677,7 +677,7 @@ function ScramblePayoutPanel({
         <h2 className="text-xs font-bold uppercase tracking-wider text-lime-800">
           {dayLabel} scramble payouts
         </h2>
-        <span className="text-[10px] text-lime-700 tabular-nums">
+        <span className="text-[0.625rem] text-lime-700 tabular-nums">
           {fmtMoney(payout.pot)} pot
         </span>
       </div>

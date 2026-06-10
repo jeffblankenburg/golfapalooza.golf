@@ -664,7 +664,7 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
                     {player.avatar_url ? (
                       <img src={player.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                     ) : (
-                      <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                      <span className="w-4 h-4 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                         {(player.display_name || "?")[0].toUpperCase()}
                       </span>
                     )}
@@ -764,7 +764,7 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
                           {member.avatar_url ? (
                             <img src={member.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
                           ) : (
-                            <span className="w-4 h-4 rounded-full bg-green-200 flex items-center justify-center text-green-700 text-[8px] font-bold">
+                            <span className="w-4 h-4 rounded-full bg-green-200 flex items-center justify-center text-green-700 text-[0.5rem] font-bold">
                               {(member.display_name || "?")[0].toUpperCase()}
                             </span>
                           )}
@@ -798,7 +798,7 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
                 {/* Scoring */}
                 <div className="px-4 py-2.5 border-t border-gray-100 flex items-center gap-3">
                   <div className="flex-1">
-                    <label className="block text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">
+                    <label className="block text-[0.625rem] text-gray-400 uppercase tracking-wide mb-0.5">
                       Hdcp
                     </label>
                     <input
@@ -818,7 +818,7 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
                     />
                   </div>
                   <div className="flex-1 text-center">
-                    <label className="block text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">
+                    <label className="block text-[0.625rem] text-gray-400 uppercase tracking-wide mb-0.5">
                       Adj Hdcp
                     </label>
                     <div className="text-sm font-medium text-gray-700" title="What this team plays at after the lowest team is shifted to 0">
@@ -826,7 +826,7 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
                     </div>
                   </div>
                   <div className="flex-1 text-center">
-                    <label className="block text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">
+                    <label className="block text-[0.625rem] text-gray-400 uppercase tracking-wide mb-0.5">
                       Gross
                     </label>
                     <div className="text-sm font-medium text-gray-700">
@@ -834,7 +834,7 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
                     </div>
                   </div>
                   <div className="flex-1 text-center">
-                    <label className="block text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">
+                    <label className="block text-[0.625rem] text-gray-400 uppercase tracking-wide mb-0.5">
                       Net
                     </label>
                     <div className="text-sm font-medium text-gray-700">
@@ -842,7 +842,7 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
                     </div>
                   </div>
                   <div className="flex-1 text-center">
-                    <label className="block text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">
+                    <label className="block text-[0.625rem] text-gray-400 uppercase tracking-wide mb-0.5">
                       vs Par
                     </label>
                     <div className={`text-lg font-bold ${scoreVsPar !== null ? (scoreVsPar < 0 ? "text-green-700" : scoreVsPar > 0 ? "text-red-600" : "text-gray-700") : "text-gray-300"}`}>
@@ -864,7 +864,7 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
                           return next;
                         })
                       }
-                      className="w-full px-4 py-2 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-gray-500 hover:bg-gray-50"
+                      className="w-full px-4 py-2 flex items-center justify-between text-[0.625rem] font-semibold uppercase tracking-wide text-gray-500 hover:bg-gray-50"
                     >
                       <span>Handicap Calculation</span>
                       <svg
@@ -878,7 +878,7 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
                     </button>
                     {expanded && (
                       <div className="px-4 pb-3 bg-gray-50/40">
-                    <table className="w-full text-[11px]">
+                    <table className="w-full text-[0.6875rem]">
                       <thead>
                         <tr className="text-gray-400 border-b border-gray-200">
                           <th className="text-left py-1 font-medium">Player</th>
@@ -926,7 +926,7 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
                         </tr>
                       </tbody>
                     </table>
-                        <p className="text-[10px] text-gray-400 mt-2 leading-snug">
+                        <p className="text-[0.625rem] text-gray-400 mt-2 leading-snug">
                           Players sorted by Course Handicap (lowest first). HI source: event-locked snapshot when present, otherwise live (·). ⚠ = no handicap on file.
                         </p>
                       </div>
@@ -1119,7 +1119,7 @@ function CalculateHandicapsButton({
         </button>
       </div>
       {tee && (
-        <p className="text-[11px] text-gray-500 mb-1.5">
+        <p className="text-[0.6875rem] text-gray-500 mb-1.5">
           Using {tee.tee_name ? <span className="font-medium text-gray-700">{tee.tee_name}</span> : "tee"}
           {": "}
           <span className="tabular-nums">{tee.course_rating.toFixed(1)} / {tee.slope_rating} / par {tee.par}</span>
@@ -1132,13 +1132,13 @@ function CalculateHandicapsButton({
           <p>
             Each player&apos;s Handicap Index is converted to a <strong>Course Handicap</strong>:
           </p>
-          <p className="font-mono text-[11px] bg-blue-100/50 rounded px-2 py-1 inline-block">
+          <p className="font-mono text-[0.6875rem] bg-blue-100/50 rounded px-2 py-1 inline-block">
             Course HC = HI &times; (Slope / 113) + (Rating &minus; Par)
           </p>
           <p>
             Course Handicaps are sorted lowest to highest, then weighted by team size:
           </p>
-          <table className="text-[11px] mt-1">
+          <table className="text-[0.6875rem] mt-1">
             <tbody>
               <tr><td className="pr-3 text-blue-600 font-medium">2-man:</td><td className="font-mono">35% &times; A + 15% &times; B</td></tr>
               <tr><td className="pr-3 text-blue-600 font-medium">3-man:</td><td className="font-mono">25% &times; A + 15% &times; B + 10% &times; C</td></tr>

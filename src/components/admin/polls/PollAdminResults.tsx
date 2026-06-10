@@ -80,7 +80,7 @@ export function PollAdminResults({ results, isAnonymous, pollTitle }: PollAdminR
                         {voters.map((v) => (
                           <span
                             key={v.user_id}
-                            className="inline-flex items-center gap-1 pl-0.5 pr-2 py-0.5 rounded-full bg-gray-100 text-[11px] text-gray-700"
+                            className="inline-flex items-center gap-1 pl-0.5 pr-2 py-0.5 rounded-full bg-gray-100 text-[0.6875rem] text-gray-700"
                           >
                             {v.avatar_url ? (
                               // eslint-disable-next-line @next/next/no-img-element
@@ -90,7 +90,7 @@ export function PollAdminResults({ results, isAnonymous, pollTitle }: PollAdminR
                                 className="w-4 h-4 rounded-full object-cover"
                               />
                             ) : (
-                              <span className="w-4 h-4 rounded-full bg-gray-300 flex items-center justify-center text-[9px] font-semibold text-gray-600">
+                              <span className="w-4 h-4 rounded-full bg-gray-300 flex items-center justify-center text-[0.5625rem] font-semibold text-gray-600">
                                 {v.display_name?.[0]?.toUpperCase() || "?"}
                               </span>
                             )}

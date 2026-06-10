@@ -410,7 +410,7 @@ export function FakeAdManager() {
                 <div className="flex items-center gap-2 px-2 py-1.5">
                   <button
                     onClick={() => toggleActive(ad)}
-                    className={`px-2 py-0.5 rounded-full text-[11px] font-medium flex-shrink-0 ${
+                    className={`px-2 py-0.5 rounded-full text-[0.6875rem] font-medium flex-shrink-0 ${
                       ad.active
                         ? "bg-green-100 text-green-700"
                         : "bg-gray-100 text-gray-500"
@@ -423,13 +423,13 @@ export function FakeAdManager() {
                       taggedUsers.map((u) => (
                         <span
                           key={u.id}
-                          className="px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded-full text-[11px] truncate max-w-[8rem]"
+                          className="px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded-full text-[0.6875rem] truncate max-w-[8rem]"
                         >
                           {u.display_name}
                         </span>
                       ))
                     ) : (
-                      <span className="text-[11px] text-gray-400 italic">No tags</span>
+                      <span className="text-[0.6875rem] text-gray-400 italic">No tags</span>
                     )}
                   </div>
                   <button

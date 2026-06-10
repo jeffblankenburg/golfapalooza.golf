@@ -274,7 +274,7 @@ export function CategoryWinnersManager({ category }: { category: string }) {
                 <p className="text-sm font-semibold text-gray-900">
                   {t.trip_year} <span className="font-normal text-gray-500">{t.trip_name}</span>
                 </p>
-                <span className="text-[10px] text-gray-400 uppercase tracking-wide">
+                <span className="text-[0.625rem] text-gray-400 uppercase tracking-wide">
                   {t.status}
                 </span>
               </div>

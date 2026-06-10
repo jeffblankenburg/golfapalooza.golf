@@ -687,7 +687,7 @@ export function MediaViewer({
                 {item.uploader.avatar_url ? (
                   <img src={item.uploader.avatar_url} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-[10px] font-semibold">
+                  <span className="text-[0.625rem] font-semibold">
                     {(item.uploader.display_name[0] || "?").toUpperCase()}
                   </span>
                 )}

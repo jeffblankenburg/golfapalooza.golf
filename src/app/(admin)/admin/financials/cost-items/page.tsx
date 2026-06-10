@@ -246,10 +246,10 @@ export default function CostItemsAdminPage() {
 
       <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-green-700 font-semibold">
+          <div className="text-[0.625rem] uppercase tracking-wider text-green-700 font-semibold">
             Trip Cost
           </div>
-          <div className="text-[11px] text-green-600">
+          <div className="text-[0.6875rem] text-green-600">
             sum of items bundled into the trip cost
           </div>
         </div>
@@ -271,7 +271,7 @@ export default function CostItemsAdminPage() {
             const label = cat === "__uncategorized__" ? "Uncategorized" : CATEGORY_LABELS[cat] || cat;
             return (
               <div key={cat} className="space-y-1">
-                <h2 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-1">
+                <h2 className="text-[0.6875rem] font-semibold text-gray-400 uppercase tracking-wider px-1">
                   {label}
                 </h2>
                 <DndContext
@@ -350,13 +350,13 @@ function ItemRow({ item, onClick }: { item: CostItem; onClick: () => void }) {
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="font-medium text-gray-900 text-sm">{item.name}</span>
           {item.included_in_trip_cost && (
-            <span className="px-1.5 py-0.5 rounded bg-green-50 text-green-700 text-[9px] font-semibold uppercase tracking-wide">
+            <span className="px-1.5 py-0.5 rounded bg-green-50 text-green-700 text-[0.5625rem] font-semibold uppercase tracking-wide">
               in trip
             </span>
           )}
         </div>
         {item.notes && (
-          <div className="text-[10px] text-gray-400 truncate mt-0.5">{item.notes}</div>
+          <div className="text-[0.625rem] text-gray-400 truncate mt-0.5">{item.notes}</div>
         )}
       </div>
 
@@ -446,7 +446,7 @@ function CostItemModal({
 
         <div className="px-6 py-4 space-y-3 overflow-y-auto">
           <label className="flex flex-col">
-            <span className="text-gray-500 uppercase tracking-wide text-[10px] mb-0.5">Name</span>
+            <span className="text-gray-500 uppercase tracking-wide text-[0.625rem] mb-0.5">Name</span>
             <input
               type="text"
               value={name}
@@ -459,7 +459,7 @@ function CostItemModal({
 
           <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col">
-              <span className="text-gray-500 uppercase tracking-wide text-[10px] mb-0.5">Cost</span>
+              <span className="text-gray-500 uppercase tracking-wide text-[0.625rem] mb-0.5">Cost</span>
               <input
                 type="number"
                 step="0.01"
@@ -471,7 +471,7 @@ function CostItemModal({
               />
             </label>
             <label className="flex flex-col">
-              <span className="text-gray-500 uppercase tracking-wide text-[10px] mb-0.5">Category</span>
+              <span className="text-gray-500 uppercase tracking-wide text-[0.625rem] mb-0.5">Category</span>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
@@ -495,7 +495,7 @@ function CostItemModal({
           </label>
 
           <label className="flex flex-col">
-            <span className="text-gray-500 uppercase tracking-wide text-[10px] mb-0.5">Notes</span>
+            <span className="text-gray-500 uppercase tracking-wide text-[0.625rem] mb-0.5">Notes</span>
             <input
               type="text"
               value={notes}
@@ -550,7 +550,7 @@ function CostItemModal({
             type="button"
             onClick={handleSave}
             disabled={!canSave}
-            className={`flex-1 py-3 rounded-xl font-semibold text-[15px] active:opacity-80 ${
+            className={`flex-1 py-3 rounded-xl font-semibold text-[0.9375rem] active:opacity-80 ${
               canSave ? "bg-green-600 text-white" : "bg-gray-200 text-gray-400 cursor-not-allowed"
             }`}
           >
@@ -560,7 +560,7 @@ function CostItemModal({
             type="button"
             onClick={onCancel}
             disabled={saving}
-            className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600 active:bg-gray-50"
+            className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[0.9375rem] text-gray-600 active:bg-gray-50"
           >
             Cancel
           </button>

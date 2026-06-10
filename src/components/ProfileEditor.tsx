@@ -6,7 +6,9 @@ import { createClient } from "@/lib/supabase/client";
 import { formatPhoneDisplay } from "@/lib/utils/phone";
 import { AvatarCropModal } from "@/components/AvatarCropModal";
 import { AccoladesList, type AccoladeData } from "@/components/profile/AccoladesList";
+import { FontScalePicker } from "@/components/FontScalePicker";
 import { geocodeAddress } from "@/lib/geocode";
+import { isFontScale, type FontScale } from "@/lib/font-scale";
 
 interface ProfileData {
   id: string;
@@ -25,6 +27,7 @@ interface ProfileData {
   shirt_size: string | null;
   fun_fact: string | null;
   best_shot: string | null;
+  font_scale: string | null;
 }
 
 const US_STATES = [
@@ -314,7 +317,7 @@ export function ProfileEditor({
             value={form.display_name}
             onChange={(e) => updateField("display_name", e.target.value)}
             maxLength={100}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-[16px] text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-base text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
           />
         </Field>
 
@@ -324,7 +327,7 @@ export function ProfileEditor({
             value={form.full_name}
             onChange={(e) => updateField("full_name", e.target.value)}
             maxLength={100}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-[16px] text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-base text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
           />
         </Field>
 
@@ -334,12 +337,12 @@ export function ProfileEditor({
             value={form.email}
             onChange={(e) => updateField("email", e.target.value)}
             maxLength={255}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-[16px] text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-base text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
           />
         </Field>
 
         <Field label="Phone">
-          <p className="px-4 py-3 text-[16px] text-gray-400">
+          <p className="px-4 py-3 text-base text-gray-400">
             {formatPhoneDisplay(profile.phone)}
           </p>
         </Field>
@@ -350,7 +353,7 @@ export function ProfileEditor({
             value={form.birthday}
             onChange={(e) => updateField("birthday", e.target.value)}
             style={{ backgroundColor: "transparent" }}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-[16px] text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-base text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
           />
         </Field>
 
@@ -360,7 +363,7 @@ export function ProfileEditor({
             value={form.occupation}
             onChange={(e) => updateField("occupation", e.target.value)}
             maxLength={100}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-[16px] text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-base text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
           />
         </Field>
 
@@ -370,7 +373,7 @@ export function ProfileEditor({
             value={form.city}
             onChange={(e) => updateField("city", e.target.value)}
             maxLength={100}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-[16px] text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-base text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
           />
         </Field>
 
@@ -379,7 +382,7 @@ export function ProfileEditor({
             value={form.state}
             onChange={(e) => updateField("state", e.target.value)}
             style={{ backgroundColor: "transparent" }}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-[16px] text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-base text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
           >
             <option value="">Select state</option>
             {US_STATES.map((s) => (
@@ -405,7 +408,7 @@ export function ProfileEditor({
             placeholder="e.g. 1995"
             min={1900}
             max={new Date().getFullYear()}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-[16px] text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-base text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
           />
         </Field>
 
@@ -414,7 +417,7 @@ export function ProfileEditor({
             value={form.swings}
             onChange={(e) => updateField("swings", e.target.value)}
             style={{ backgroundColor: "transparent" }}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-[16px] text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-base text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
           >
             <option value="">Select</option>
             <option value="right">Right</option>
@@ -428,7 +431,7 @@ export function ProfileEditor({
             value={form.typical_shot}
             onChange={(e) => updateField("typical_shot", e.target.value)}
             style={{ backgroundColor: "transparent" }}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-[16px] text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-base text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
           >
             <option value="">Select</option>
             <option value="straight">Straight</option>
@@ -444,7 +447,7 @@ export function ProfileEditor({
             value={form.shirt_size}
             onChange={(e) => updateField("shirt_size", e.target.value)}
             style={{ backgroundColor: "transparent" }}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-[16px] text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-base text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600"
           >
             <option value="">Select</option>
             <option value="S">S</option>
@@ -471,7 +474,7 @@ export function ProfileEditor({
             placeholder="Something the other Loozers might not know about you"
             rows={3}
             style={{ backgroundColor: "transparent" }}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-[16px] text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 resize-none"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-base text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 resize-none"
           />
         </Field>
 
@@ -482,16 +485,26 @@ export function ProfileEditor({
             placeholder="Tell us about your greatest golf moment"
             rows={3}
             style={{ backgroundColor: "transparent" }}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-[16px] text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 resize-none"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-base text-gray-900 outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 resize-none"
           />
         </Field>
       </div>
+
+      {/* Text Size (issue #138) */}
+      <FontScalePicker
+        userId={profile.id}
+        initialScale={
+          isFontScale(profile.font_scale)
+            ? (profile.font_scale as FontScale)
+            : "default"
+        }
+      />
 
       {/* Save */}
       <button
         onClick={handleSave}
         disabled={saving || !form.display_name.trim()}
-        className="w-full bg-green-600 text-white py-3 rounded-xl font-semibold text-[15px] active:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+        className="w-full bg-green-600 text-white py-3 rounded-xl font-semibold text-[0.9375rem] active:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
       >
         {saving
           ? "Saving..."
@@ -503,7 +516,7 @@ export function ProfileEditor({
       {/* Sign Out */}
       <button
         onClick={handleSignOut}
-        className="w-full py-3 rounded-xl font-semibold text-[15px] text-red-600 border border-red-200 active:bg-red-50 transition-colors"
+        className="w-full py-3 rounded-xl font-semibold text-[0.9375rem] text-red-600 border border-red-200 active:bg-red-50 transition-colors"
       >
         Sign Out
       </button>

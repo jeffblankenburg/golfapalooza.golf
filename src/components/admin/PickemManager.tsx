@@ -934,7 +934,7 @@ export function PickemManager({ tripId }: { tripId: string }) {
                 ))}
             </select>
             {costItemId && (
-              <p className="text-[10px] text-gray-400 mt-1">
+              <p className="text-[0.625rem] text-gray-400 mt-1">
                 Edit on the Cost Items page. Pot derives from this amount × paid participants.
               </p>
             )}

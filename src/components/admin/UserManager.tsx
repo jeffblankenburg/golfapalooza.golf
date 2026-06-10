@@ -176,11 +176,11 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                 )}
               </div>
               {!user.is_system && user.is_financial_only && (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 bg-amber-50 text-amber-700">$</span>
+                <span className="px-2 py-0.5 rounded-full text-[0.6875rem] font-semibold flex-shrink-0 bg-amber-50 text-amber-700">$</span>
               )}
               {!user.is_system && user.handicap_index !== null && (
                 <span
-                  className={`px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 ${
+                  className={`px-2 py-0.5 rounded-full text-[0.6875rem] font-semibold flex-shrink-0 ${
                     user.handicap_source === "computed"
                       ? "bg-green-100 text-green-700"
                       : "bg-gray-100 text-gray-600"
@@ -190,10 +190,10 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                 </span>
               )}
               {user.is_system && (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 bg-purple-100 text-purple-700">Bot</span>
+                <span className="px-2 py-0.5 rounded-full text-[0.6875rem] font-semibold flex-shrink-0 bg-purple-100 text-purple-700">Bot</span>
               )}
               {!user.is_system && !user.is_financial_only && user.is_admin && (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 bg-green-100 text-green-700">
+                <span className="px-2 py-0.5 rounded-full text-[0.6875rem] font-semibold flex-shrink-0 bg-green-100 text-green-700">
                   Admin
                 </span>
               )}
@@ -235,7 +235,7 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                   value={createData.phone}
                   onChange={handleCreatePhoneChange}
                   placeholder="(555) 123-4567"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base"
                 />
               </div>
               <div>
@@ -245,7 +245,7 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                   value={createData.displayName}
                   onChange={(e) => setCreateData({ ...createData, displayName: e.target.value })}
                   placeholder="Nickname"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base"
                   required
                 />
               </div>
@@ -256,7 +256,7 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                   value={createData.fullName}
                   onChange={(e) => setCreateData({ ...createData, fullName: e.target.value })}
                   placeholder="John Smith"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base"
                 />
               </div>
             </form>
@@ -266,14 +266,14 @@ export function UserManager({ ref, onCountChange }: { ref?: Ref<{ openAdd: () =>
                 type="submit"
                 form="create-user-form"
                 disabled={creating}
-                className="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold text-[15px] disabled:bg-gray-300 active:bg-green-700"
+                className="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold text-[0.9375rem] disabled:bg-gray-300 active:bg-green-700"
               >
                 {creating ? "Creating..." : "Create"}
               </button>
               <button
                 type="button"
                 onClick={() => setShowCreate(false)}
-                className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600 active:bg-gray-50"
+                className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[0.9375rem] text-gray-600 active:bg-gray-50"
               >
                 Cancel
               </button>

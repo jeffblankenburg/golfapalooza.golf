@@ -264,7 +264,7 @@ export function PickemContent({
                 {whiteyAvatar ? (
                   <img src={whiteyAvatar} alt="" className="w-4 h-4 rounded-full object-cover" />
                 ) : (
-                  <span className="w-4 h-4 rounded-full bg-green-700 text-white text-[8px] font-bold flex items-center justify-center">W</span>
+                  <span className="w-4 h-4 rounded-full bg-green-700 text-white text-[0.5rem] font-bold flex items-center justify-center">W</span>
                 )}
                 Whitey
               </Link>
@@ -412,7 +412,7 @@ export function PickemContent({
                 <div className="flex items-center border-t border-gray-100">
                   {/* Away team */}
                   <div className="flex-1 py-3 px-3 text-center">
-                    <span className="text-[10px] uppercase tracking-wider text-gray-400">Away</span>
+                    <span className="text-[0.625rem] uppercase tracking-wider text-gray-400">Away</span>
                     {tiebreakerGame.away_logo_url && (
                       <img src={tiebreakerGame.away_logo_url} alt="" className="w-10 h-10 mx-auto my-1 object-contain" />
                     )}
@@ -421,7 +421,7 @@ export function PickemContent({
 
                   {/* Score input in the middle */}
                   <div className="flex-1 py-3 px-2 text-center border-x border-gray-100">
-                    <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Total Score</p>
+                    <p className="text-[0.625rem] uppercase tracking-wider text-gray-500 mb-1">Total Score</p>
                     {!isLocked && pick ? (
                       <TiebreakerInput
                         gameId={tiebreakerGame.id}
@@ -439,7 +439,7 @@ export function PickemContent({
 
                   {/* Home team */}
                   <div className="flex-1 py-3 px-3 text-center">
-                    <span className="text-[10px] uppercase tracking-wider font-bold text-gray-500">Home</span>
+                    <span className="text-[0.625rem] uppercase tracking-wider font-bold text-gray-500">Home</span>
                     {tiebreakerGame.home_logo_url && (
                       <img src={tiebreakerGame.home_logo_url} alt="" className="w-10 h-10 mx-auto my-1 object-contain" />
                     )}
@@ -612,7 +612,7 @@ function PickButton({
         game.is_locked ? "opacity-70" : "active:bg-gray-50"
       } ${isSelected ? (result === false ? "bg-red-50" : "bg-green-50") : ""}`}
     >
-      <span className={`text-[10px] uppercase tracking-wider ${side === "home" ? "font-bold text-gray-500" : "text-gray-400"}`}>
+      <span className={`text-[0.625rem] uppercase tracking-wider ${side === "home" ? "font-bold text-gray-500" : "text-gray-400"}`}>
         {side === "home" ? "Home" : "Away"}
       </span>
       {logoUrl && (
@@ -655,7 +655,7 @@ function PickemPayoutPanel({
         <h2 className="text-xs font-bold uppercase tracking-wider text-lime-800">
           Pick&apos;em payouts
         </h2>
-        <span className="text-[10px] text-lime-700 tabular-nums">
+        <span className="text-[0.625rem] text-lime-700 tabular-nums">
           {fmtMoney(pot)} pot
         </span>
       </div>

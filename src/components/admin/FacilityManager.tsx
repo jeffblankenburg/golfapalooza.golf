@@ -312,7 +312,7 @@ export function FacilityManager({ ref }: { ref?: Ref<{ openAdd: () => void }> })
                   {fRooms.length} room{fRooms.length !== 1 ? "s" : ""}
                 </p>
               </div>
-              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 bg-gray-100 text-gray-500">
+              <span className="px-2 py-0.5 rounded-full text-[0.6875rem] font-semibold flex-shrink-0 bg-gray-100 text-gray-500">
                 {fRooms.length}
               </span>
               <svg className="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -360,7 +360,7 @@ export function FacilityManager({ ref }: { ref?: Ref<{ openAdd: () => void }> })
                     value={facilityName}
                     onChange={(e) => setFacilityName(e.target.value)}
                     placeholder="e.g. Main Lodge"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base"
                     required
                   />
                 </div>
@@ -436,14 +436,14 @@ export function FacilityManager({ ref }: { ref?: Ref<{ openAdd: () => void }> })
                 type="submit"
                 form="facility-form"
                 disabled={saving}
-                className="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold text-[15px] disabled:bg-gray-300 active:bg-green-700"
+                className="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold text-[0.9375rem] disabled:bg-gray-300 active:bg-green-700"
               >
                 {saving ? "Saving..." : "Save"}
               </button>
               <button
                 type="button"
                 onClick={closeFacilityModal}
-                className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600 active:bg-gray-50"
+                className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[0.9375rem] text-gray-600 active:bg-gray-50"
               >
                 Cancel
               </button>
@@ -481,7 +481,7 @@ export function FacilityManager({ ref }: { ref?: Ref<{ openAdd: () => void }> })
                     value={roomNumber}
                     onChange={(e) => setRoomNumber(e.target.value)}
                     placeholder="e.g. 101"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px]"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base"
                     required
                     disabled={!!editingRoom}
                   />
@@ -493,7 +493,7 @@ export function FacilityManager({ ref }: { ref?: Ref<{ openAdd: () => void }> })
                   <select
                     value={roomBedType}
                     onChange={(e) => setRoomBedType(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px] bg-white"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base bg-white"
                   >
                     <option value="Double">Double</option>
                     <option value="King">King</option>
@@ -508,7 +508,7 @@ export function FacilityManager({ ref }: { ref?: Ref<{ openAdd: () => void }> })
                   <select
                     value={roomShowers}
                     onChange={(e) => setRoomShowers(parseInt(e.target.value))}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-[16px] bg-white"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base bg-white"
                   >
                     <option value={0}>0</option>
                     <option value={1}>1</option>
@@ -561,14 +561,14 @@ export function FacilityManager({ ref }: { ref?: Ref<{ openAdd: () => void }> })
                 type="submit"
                 form="room-form"
                 disabled={saving}
-                className="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold text-[15px] disabled:bg-gray-300 active:bg-green-700"
+                className="flex-1 bg-green-600 text-white py-3 rounded-xl font-semibold text-[0.9375rem] disabled:bg-gray-300 active:bg-green-700"
               >
                 {saving ? "Saving..." : "Save"}
               </button>
               <button
                 type="button"
                 onClick={closeRoomModal}
-                className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600 active:bg-gray-50"
+                className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[0.9375rem] text-gray-600 active:bg-gray-50"
               >
                 Cancel
               </button>

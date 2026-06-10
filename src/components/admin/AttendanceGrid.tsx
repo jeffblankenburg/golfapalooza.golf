@@ -206,7 +206,7 @@ export function AttendanceGrid() {
                           className="w-6 h-6 rounded-full object-cover flex-shrink-0"
                         />
                       ) : (
-                        <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[9px] font-bold text-gray-500 flex-shrink-0">
+                        <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[0.5625rem] font-bold text-gray-500 flex-shrink-0">
                           {l.display_name?.[0]?.toUpperCase() || "?"}
                         </span>
                       )}
@@ -264,18 +264,18 @@ export function AttendanceGrid() {
             })}
 
             <tr className="bg-gray-50 font-semibold border-t-2 border-gray-200">
-              <td className="sticky left-0 z-10 bg-gray-50 px-3 py-2 uppercase tracking-wider text-[10px] text-gray-600 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+              <td className="sticky left-0 z-10 bg-gray-50 px-3 py-2 uppercase tracking-wider text-[0.625rem] text-gray-600 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                 Totals
               </td>
               {trips.map((t) => {
                 const c = perTripTotal.get(t.id) || 0;
                 return (
-                  <td key={t.id} className="px-1.5 py-2 text-center text-[10px] text-gray-600">
+                  <td key={t.id} className="px-1.5 py-2 text-center text-[0.625rem] text-gray-600">
                     {c || ""}
                   </td>
                 );
               })}
-              <td className="sticky right-0 z-10 bg-gray-50 px-2 py-2 text-center text-[10px] text-gray-900 shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+              <td className="sticky right-0 z-10 bg-gray-50 px-2 py-2 text-center text-[0.625rem] text-gray-900 shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)]">
                 {attended.size}
               </td>
             </tr>
@@ -283,7 +283,7 @@ export function AttendanceGrid() {
         </table>
       </div>
 
-      <p className="text-[11px] text-gray-400 text-center">
+      <p className="text-[0.6875rem] text-gray-400 text-center">
         {loozers.length} Loozer{loozers.length === 1 ? "" : "s"} · {trips.length} event
         {trips.length === 1 ? "" : "s"} · {attended.size} marked attended · click any cell to toggle
       </p>

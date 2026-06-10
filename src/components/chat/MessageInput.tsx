@@ -160,10 +160,10 @@ export function MessageInput({
         <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border-b border-gray-100">
           <div className="w-0.5 h-8 bg-green-600 rounded-full flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] text-green-700 font-medium">
+            <p className="text-[0.6875rem] text-green-700 font-medium">
               {replyTo.sender?.display_name || "Unknown"}
             </p>
-            <p className="text-[12px] text-gray-500 truncate">
+            <p className="text-xs text-gray-500 truncate">
               {replyTo.content || "Image"}
             </p>
           </div>
@@ -201,7 +201,7 @@ export function MessageInput({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
-            <span className="text-[10px] text-gray-500 font-medium">Camera</span>
+            <span className="text-[0.625rem] text-gray-500 font-medium">Camera</span>
           </button>
 
           {/* Photos — no `capture` attribute, so the OS shows the gallery. */}
@@ -218,7 +218,7 @@ export function MessageInput({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
-            <span className="text-[10px] text-gray-500 font-medium">Photos</span>
+            <span className="text-[0.625rem] text-gray-500 font-medium">Photos</span>
           </button>
 
           {/* GIF */}
@@ -227,9 +227,9 @@ export function MessageInput({
             className="flex flex-col items-center gap-1"
           >
             <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center">
-              <span className="text-white font-bold text-[13px]">GIF</span>
+              <span className="text-white font-bold text-[0.8125rem]">GIF</span>
             </div>
-            <span className="text-[10px] text-gray-500 font-medium">GIFs</span>
+            <span className="text-[0.625rem] text-gray-500 font-medium">GIFs</span>
           </button>
 
           {/* Emoji */}
@@ -242,7 +242,7 @@ export function MessageInput({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <span className="text-[10px] text-gray-500 font-medium">Emoji</span>
+            <span className="text-[0.625rem] text-gray-500 font-medium">Emoji</span>
           </button>
         </div>
       )}
@@ -303,7 +303,7 @@ export function MessageInput({
             placeholder="Message"
             rows={1}
             style={{ backgroundColor: "transparent", height: "36px" }}
-            className="block w-full m-0 px-4 py-2 text-[16px] text-gray-900 placeholder-gray-400 resize-none outline-none border-none overflow-y-auto"
+            className="block w-full m-0 px-4 py-2 text-base text-gray-900 placeholder-gray-400 resize-none outline-none border-none overflow-y-auto"
           />
         </div>
 

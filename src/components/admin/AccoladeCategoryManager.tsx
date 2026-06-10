@@ -248,7 +248,7 @@ export function AccoladeCategoryManager() {
             <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">
               New award
             </p>
-            <p className="text-[10px] text-gray-400">slug auto-derived from title</p>
+            <p className="text-[0.625rem] text-gray-400">slug auto-derived from title</p>
           </div>
           <div className="grid grid-cols-[3rem_1fr] gap-2 items-center">
             <div className="relative flex items-center justify-center border border-gray-300 rounded-lg py-2 bg-gray-50">
@@ -370,7 +370,7 @@ export function AccoladeCategoryManager() {
           >
             <div className="flex items-baseline justify-between gap-2">
               <p className="text-xs font-mono text-gray-400">{c.category}</p>
-              <p className="text-[10px] text-gray-400">
+              <p className="text-[0.625rem] text-gray-400">
                 {winnerCount} winner{winnerCount === 1 ? "" : "s"} · updated{" "}
                 {new Date(c.updated_at).toLocaleDateString()}
               </p>

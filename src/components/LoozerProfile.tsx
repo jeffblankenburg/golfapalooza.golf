@@ -272,11 +272,11 @@ export function LoozerProfile({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={sponsor.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
                 ) : (
-                  <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-500">
+                  <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[0.625rem] font-bold text-gray-500">
                     {sponsor.display_name?.[0]?.toUpperCase() || "?"}
                   </span>
                 )}
-                <span className="text-[10px] font-medium leading-tight text-center truncate max-w-full">
+                <span className="text-[0.625rem] font-medium leading-tight text-center truncate max-w-full">
                   {sponsor.display_name}
                 </span>
               </Link>

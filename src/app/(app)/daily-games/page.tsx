@@ -231,7 +231,7 @@ export default async function DailyGamesPage() {
                         {u.avatar_url ? (
                           <img src={u.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
                         ) : (
-                          <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[9px] font-bold">
+                          <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5625rem] font-bold">
                             {(u.display_name || "?")[0].toUpperCase()}
                           </span>
                         )}
@@ -252,7 +252,7 @@ export default async function DailyGamesPage() {
                       <span className="text-sm font-semibold tabular-nums text-gray-400">
                         {fmtMoney(displayPot)}
                       </span>
-                      <span className="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 text-[10px] font-bold tracking-wider">
+                      <span className="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 text-[0.625rem] font-bold tracking-wider">
                         PENDING
                       </span>
                     </div>

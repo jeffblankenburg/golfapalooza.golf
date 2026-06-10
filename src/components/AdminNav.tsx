@@ -128,7 +128,7 @@ export function AdminNav({ isAdmin, permissions, activeTripId, activeTripYear }:
       );
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 pb-safe z-40">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 pb-safe z-[60]">
       <div className="flex justify-around items-center h-16">
         {items.map((item) => {
           let isActive: boolean;
@@ -152,7 +152,7 @@ export function AdminNav({ isAdmin, permissions, activeTripId, activeTripYear }:
               }`}
             >
               {item.icon}
-              <span className="text-[10px] mt-0.5 font-medium">{item.label}</span>
+              <span className="text-[0.625rem] mt-0.5 font-medium">{item.label}</span>
             </Link>
           );
         })}

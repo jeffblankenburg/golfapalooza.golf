@@ -282,7 +282,7 @@ export default function CourseLookupModal({ initialName = "", onClose, onCourseR
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-[16px]"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-base"
                 placeholder="The Medallion Club"
               />
             </div>
@@ -294,7 +294,7 @@ export default function CourseLookupModal({ initialName = "", onClose, onCourseR
                   type="text"
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-[16px]"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-base"
                 />
               </div>
               <div>
@@ -302,7 +302,7 @@ export default function CourseLookupModal({ initialName = "", onClose, onCourseR
                 <select
                   value={state}
                   onChange={(e) => setState(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-[16px] bg-white"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-base bg-white"
                 >
                   <option value="">—</option>
                   {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -325,7 +325,7 @@ export default function CourseLookupModal({ initialName = "", onClose, onCourseR
               Found {candidates.length} new course{candidates.length === 1 ? "" : "s"} at this club. Pick one or import all:
             </p>
             {response?.alreadyImported && response.alreadyImported.length > 0 && (
-              <p className="text-[11px] text-gray-500 italic">
+              <p className="text-[0.6875rem] text-gray-500 italic">
                 {response.alreadyImported.length} other course{response.alreadyImported.length === 1 ? "" : "s"} at this club already in your list.
               </p>
             )}
@@ -351,7 +351,7 @@ export default function CourseLookupModal({ initialName = "", onClose, onCourseR
               <button
                 onClick={importAll}
                 disabled={committing}
-                className="w-full mt-1 py-3 bg-green-600 text-white rounded-xl font-semibold text-[15px] disabled:opacity-50 active:opacity-80"
+                className="w-full mt-1 py-3 bg-green-600 text-white rounded-xl font-semibold text-[0.9375rem] disabled:opacity-50 active:opacity-80"
               >
                 Import all {candidates.length}
               </button>
@@ -402,13 +402,13 @@ export default function CourseLookupModal({ initialName = "", onClose, onCourseR
                 <button
                   onClick={runLookup}
                   disabled={!name.trim() || !state}
-                  className="flex-1 py-3 bg-green-600 text-white rounded-xl font-semibold text-[15px] disabled:opacity-50 active:opacity-80"
+                  className="flex-1 py-3 bg-green-600 text-white rounded-xl font-semibold text-[0.9375rem] disabled:opacity-50 active:opacity-80"
                 >
                   Look it up
                 </button>
                 <button
                   onClick={() => onManualFallback({ name, city, state })}
-                  className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600 active:bg-gray-50"
+                  className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[0.9375rem] text-gray-600 active:bg-gray-50"
                 >
                   Enter manually
                 </button>
@@ -417,13 +417,13 @@ export default function CourseLookupModal({ initialName = "", onClose, onCourseR
               <>
                 <button
                   onClick={() => onManualFallback({ name, city, state })}
-                  className="flex-1 py-3 bg-green-600 text-white rounded-xl font-semibold text-[15px] active:opacity-80"
+                  className="flex-1 py-3 bg-green-600 text-white rounded-xl font-semibold text-[0.9375rem] active:opacity-80"
                 >
                   Enter manually
                 </button>
                 <button
                   onClick={() => setPhase("input")}
-                  className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600 active:bg-gray-50"
+                  className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[0.9375rem] text-gray-600 active:bg-gray-50"
                 >
                   Try again
                 </button>
@@ -505,7 +505,7 @@ function ConfirmPanel({
       )}
 
       <div className="border border-gray-200 rounded-lg overflow-hidden">
-        <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-[11px] font-semibold uppercase tracking-wide text-gray-600 grid grid-cols-12 gap-2">
+        <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-[0.6875rem] font-semibold uppercase tracking-wide text-gray-600 grid grid-cols-12 gap-2">
           <div className="col-span-4">Tee</div>
           <div className="col-span-2 text-right">Par</div>
           <div className="col-span-2 text-right">Yards</div>
@@ -528,13 +528,13 @@ function ConfirmPanel({
         ))}
       </div>
 
-      <p className="text-[11px] text-gray-500">
+      <p className="text-[0.6875rem] text-gray-500">
         {draft.tees.length} tee{draft.tees.length === 1 ? "" : "s"} · {draft.hole_count} holes ·
         marked as <span className="font-semibold">community-submitted</span> until an admin verifies.
       </p>
 
       {warnings && warnings.length > 0 && (
-        <details className="text-[11px] text-gray-500">
+        <details className="text-[0.6875rem] text-gray-500">
           <summary className="cursor-pointer">{warnings.length} warning{warnings.length === 1 ? "" : "s"}</summary>
           <ul className="mt-1 space-y-0.5 pl-3 list-disc">
             {warnings.slice(0, 5).map((w, i) => <li key={i}>{w}</li>)}
@@ -546,7 +546,7 @@ function ConfirmPanel({
         <button
           onClick={onConfirm}
           disabled={committing}
-          className="flex-1 py-3 bg-green-600 text-white rounded-xl font-semibold text-[15px] disabled:opacity-50 active:opacity-80"
+          className="flex-1 py-3 bg-green-600 text-white rounded-xl font-semibold text-[0.9375rem] disabled:opacity-50 active:opacity-80"
         >
           {committing ? "Saving…" : "Looks right"}
         </button>
@@ -554,7 +554,7 @@ function ConfirmPanel({
           <button
             onClick={onBack}
             disabled={committing}
-            className="py-3 px-4 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600 active:bg-gray-50"
+            className="py-3 px-4 border border-gray-300 rounded-xl font-semibold text-[0.9375rem] text-gray-600 active:bg-gray-50"
           >
             Back
           </button>
@@ -562,7 +562,7 @@ function ConfirmPanel({
         <button
           onClick={onReject}
           disabled={committing}
-          className="py-3 px-4 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600 active:bg-gray-50"
+          className="py-3 px-4 border border-gray-300 rounded-xl font-semibold text-[0.9375rem] text-gray-600 active:bg-gray-50"
         >
           Manual
         </button>

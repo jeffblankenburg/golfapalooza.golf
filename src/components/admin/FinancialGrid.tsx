@@ -232,7 +232,7 @@ export function FinancialGrid() {
             }`}
           >
             {activeTrip.trip_name}{" "}
-            <span className={`ml-1 text-[10px] font-normal ${scope === "current" ? "text-white/70" : "text-gray-400"}`}>
+            <span className={`ml-1 text-[0.625rem] font-normal ${scope === "current" ? "text-white/70" : "text-gray-400"}`}>
               ({activeAttending.size} attending)
             </span>
           </button>
@@ -360,7 +360,7 @@ export function FinancialGrid() {
               <div className="mt-3 space-y-2">
                 <div className="flex gap-2">
                   <div className="flex-1">
-                    <label className="text-[10px] text-gray-500 uppercase">From</label>
+                    <label className="text-[0.625rem] text-gray-500 uppercase">From</label>
                     <input
                       type="date"
                       value={ulDateFrom}
@@ -369,7 +369,7 @@ export function FinancialGrid() {
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="text-[10px] text-gray-500 uppercase">To</label>
+                    <label className="text-[0.625rem] text-gray-500 uppercase">To</label>
                     <input
                       type="date"
                       value={ulDateTo}
@@ -407,22 +407,22 @@ export function FinancialGrid() {
                     <div className="flex gap-2 mb-3">
                       <div className="flex-1 bg-red-50 rounded-xl px-2 py-1.5 text-center">
                         <div className="text-xs font-bold text-red-700">{fmt(totalCharges)}</div>
-                        <div className="text-[9px] text-gray-500 uppercase">Charges</div>
+                        <div className="text-[0.5625rem] text-gray-500 uppercase">Charges</div>
                       </div>
                       <div className="flex-1 bg-green-50 rounded-xl px-2 py-1.5 text-center">
                         <div className="text-xs font-bold text-green-700">{fmt(totalPayments)}</div>
-                        <div className="text-[9px] text-gray-500 uppercase">Payments</div>
+                        <div className="text-[0.5625rem] text-gray-500 uppercase">Payments</div>
                       </div>
                       <div className="flex-1 bg-gray-50 rounded-xl px-2 py-1.5 text-center">
                         <div className={`text-xs font-bold ${balColor(netBalance)}`}>{fmt(netBalance)}</div>
-                        <div className="text-[9px] text-gray-500 uppercase">Balance</div>
+                        <div className="text-[0.5625rem] text-gray-500 uppercase">Balance</div>
                       </div>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => setUlSortDir((d) => (d === "desc" ? "asc" : "desc"))}
-                      className="text-[10px] text-gray-500 mb-2 flex items-center gap-1"
+                      className="text-[0.625rem] text-gray-500 mb-2 flex items-center gap-1"
                     >
                       Date {ulSortDir === "desc" ? "▼ Newest" : "▲ Oldest"} first
                     </button>
@@ -446,7 +446,7 @@ export function FinancialGrid() {
                                   {new Date(tx.created_at).toLocaleDateString()}
                                 </span>
                                 <span
-                                  className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                  className={`inline-block px-1.5 py-0.5 rounded text-[0.625rem] font-medium ${
                                     tx.type === "charge"
                                       ? "bg-red-100 text-red-700"
                                       : "bg-green-100 text-green-700"
@@ -455,12 +455,12 @@ export function FinancialGrid() {
                                   {tx.type}
                                 </span>
                                 {tx.contest_name && (
-                                  <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
+                                  <span className="inline-block px-1.5 py-0.5 rounded text-[0.625rem] font-medium bg-purple-100 text-purple-700">
                                     {tx.contest_name}
                                   </span>
                                 )}
                                 {tx.trip_name && (
-                                  <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">
+                                  <span className="inline-block px-1.5 py-0.5 rounded text-[0.625rem] font-medium bg-amber-100 text-amber-700">
                                     {tx.trip_name}
                                   </span>
                                 )}
@@ -479,7 +479,7 @@ export function FinancialGrid() {
                         ))}
                       </div>
                     )}
-                    <p className="text-[10px] text-gray-400 text-center mt-2">
+                    <p className="text-[0.625rem] text-gray-400 text-center mt-2">
                       {filteredUserLedger.length} transaction{filteredUserLedger.length !== 1 ? "s" : ""}
                     </p>
                   </>

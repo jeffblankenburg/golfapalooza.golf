@@ -629,13 +629,13 @@ function HandicapsTab({
               <p>
                 Each player&apos;s Handicap Index is converted to a <strong>Course Handicap</strong> for the assigned tee:
               </p>
-              <p className="font-mono text-[11px] bg-blue-100/50 rounded px-2 py-1 inline-block">
+              <p className="font-mono text-[0.6875rem] bg-blue-100/50 rounded px-2 py-1 inline-block">
                 Course HC = HI &times; (Slope / 113) + (Rating &minus; Par)
               </p>
               <p>
                 Then the pair scramble handicap is calculated using the USGA-recommended formula:
               </p>
-              <p className="font-mono text-[11px] bg-blue-100/50 rounded px-2 py-1 inline-block">
+              <p className="font-mono text-[0.6875rem] bg-blue-100/50 rounded px-2 py-1 inline-block">
                 Team HC = round(35% &times; Lower CH + 15% &times; Higher CH)
               </p>
               <p className="text-blue-600">
@@ -942,8 +942,8 @@ function FoursomeScoreEntry({
                 return (
                   <tr key={scorer.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50/50"} style={{ borderLeft: `3px solid ${color}` }}>
                     <td className={`sticky left-0 z-10 px-2 py-1.5 font-medium text-gray-700 truncate max-w-[96px] ${idx % 2 === 0 ? "bg-white" : "bg-gray-50"}`} style={{ borderLeft: `3px solid ${color}` }}>
-                      <div className="truncate text-[11px]">{scorer.name}</div>
-                      {handicap > 0 && <div className="text-[9px] text-gray-400">HC: {handicap}</div>}
+                      <div className="truncate text-[0.6875rem]">{scorer.name}</div>
+                      {handicap > 0 && <div className="text-[0.5625rem] text-gray-400">HC: {handicap}</div>}
                     </td>
                     {sortedHoles.map((h) => {
                       const gross = scoreLookup.get(`${scorerType}-${scorer.id}-${h.hole_number}`);
@@ -971,7 +971,7 @@ function FoursomeScoreEntry({
                             className={`w-8 h-7 text-center border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] ${scoreColor(gross, h.par)}`}
                           />
                           {net !== undefined && strokes > 0 && (
-                            <div className={`text-[9px] ${scoreColor(net, h.par)}`}>{net}</div>
+                            <div className={`text-[0.5625rem] ${scoreColor(net, h.par)}`}>{net}</div>
                           )}
                         </td>
                       );
@@ -1007,7 +1007,7 @@ function FoursomeScoreEntry({
                 <p className="text-xs font-medium text-gray-700">
                   {isScramble ? "Scramble" : `Match ${m.matchIndex + 1}`}: {m.label}
                 </p>
-                <p className="text-[10px] text-gray-400">Section {m.section} (Holes {firstHole}-{lastHole})</p>
+                <p className="text-[0.625rem] text-gray-400">Section {m.section} (Holes {firstHole}-{lastHole})</p>
               </div>
               <div className="text-right">
                 <p className="text-xs font-bold" style={{
@@ -1018,7 +1018,7 @@ function FoursomeScoreEntry({
                   {formatMatchStatus(m)}
                 </p>
                 {m.sectionWinner !== "incomplete" && (
-                  <p className="text-[10px] text-gray-400">
+                  <p className="text-[0.625rem] text-gray-400">
                     {m.team1Points} - {m.team2Points}
                   </p>
                 )}

@@ -40,7 +40,7 @@ export function ConfirmModal({
         <div className="px-6 py-4 border-t border-gray-100 flex gap-2">
           <button
             onClick={onConfirm}
-            className={`flex-1 py-3 rounded-xl font-semibold text-[15px] active:opacity-80 ${
+            className={`flex-1 py-3 rounded-xl font-semibold text-[0.9375rem] active:opacity-80 ${
               destructive
                 ? "bg-red-600 text-white"
                 : "bg-green-600 text-white"
@@ -51,7 +51,7 @@ export function ConfirmModal({
           {cancelLabel !== null && (
             <button
               onClick={onCancel}
-              className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[15px] text-gray-600 active:bg-gray-50"
+              className="flex-1 py-3 border border-gray-300 rounded-xl font-semibold text-[0.9375rem] text-gray-600 active:bg-gray-50"
             >
               {cancelLabel}
             </button>

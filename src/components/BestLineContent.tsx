@@ -162,7 +162,7 @@ export default function BestLineContent() {
           }}
           placeholder="What happened? Who said what?"
           autoFocus
-          className="w-full border border-gray-300 rounded-xl px-4 py-3 text-[15px] resize-none focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+          className="w-full border border-gray-300 rounded-xl px-4 py-3 text-[0.9375rem] resize-none focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
           style={{ height: "80px" }}
         />
         {error && <p className="text-red-600 text-sm mt-1">{error}</p>}
@@ -237,7 +237,7 @@ export default function BestLineContent() {
 
                 {/* Text content */}
                 <p
-                  className={`text-[15px] text-gray-800 whitespace-pre-wrap break-words ${
+                  className={`text-[0.9375rem] text-gray-800 whitespace-pre-wrap break-words ${
                     !isExpanded ? "line-clamp-4" : ""
                   }`}
                   onClick={() => toggleExpand(s.id)}

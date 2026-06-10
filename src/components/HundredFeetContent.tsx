@@ -132,7 +132,7 @@ export function HundredFeetContent({
           : null;
         return (
           <div className="bg-green-50 rounded-2xl border border-green-200 px-4 py-5 text-center">
-            <p className="text-[10px] uppercase tracking-wider text-green-700 font-semibold">
+            <p className="text-[0.625rem] uppercase tracking-wider text-green-700 font-semibold">
               Prize Pool
             </p>
             <p className="text-3xl font-bold text-green-700 tabular-nums mt-1">
@@ -216,7 +216,7 @@ export function HundredFeetContent({
                   {entry.avatar_url ? (
                     <img src={entry.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
                   ) : (
-                    <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[8px] font-bold flex-shrink-0">
+                    <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5rem] font-bold flex-shrink-0">
                       {(entry.display_name || "?")[0].toUpperCase()}
                     </span>
                   )}

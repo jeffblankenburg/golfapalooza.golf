@@ -102,7 +102,7 @@ function Row({
                     className="w-6 h-6 rounded-full object-cover flex-shrink-0"
                   />
                 ) : (
-                  <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-[10px] font-bold flex-shrink-0">
+                  <span className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-[0.625rem] font-bold flex-shrink-0">
                     {(u.display_name[0] ?? "?").toUpperCase()}
                   </span>
                 )}

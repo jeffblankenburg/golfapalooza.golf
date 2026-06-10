@@ -135,14 +135,25 @@ export function ChatDrawer() {
       }`}
       aria-hidden={!isOpen}
     >
-      {/* Collapse bar */}
-      <div className="shrink-0 pt-2 pb-1 flex justify-center bg-white border-b border-gray-100">
+      {/* Collapse bar — grab bar centered, explicit X on the right because
+          the bar alone wasn't obvious enough as a close affordance. */}
+      <div className="shrink-0 relative pt-3 pb-2 flex justify-center items-center bg-white border-b border-gray-100">
         <button
           type="button"
           onClick={closeDrawer}
           aria-label="Close chat"
           className="w-12 h-1.5 rounded-full bg-gray-300 active:bg-gray-400"
         />
+        <button
+          type="button"
+          onClick={closeDrawer}
+          aria-label="Close chat"
+          className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full text-gray-500 active:bg-gray-100"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
 
       {/* Both surfaces are stacked. Room list stays mounted at all times so

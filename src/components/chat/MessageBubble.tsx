@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import { TapbackMenu } from "./TapbackMenu";
 import { ReactionBadge } from "./ReactionBadge";
+import { ImageLightbox } from "@/components/ImageLightbox";
 
 const URL_REGEX = /(https?:\/\/[^\s<]+)/g;
 
@@ -70,6 +71,7 @@ export function MessageBubble({
   const [showTapback, setShowTapback] = useState(false);
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
   const [swipeOffset, setSwipeOffset] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
 
@@ -202,21 +204,32 @@ export function MessageBubble({
           }`}
           onClick={() => setShowTapback(true)}
         >
-          {/* Image / GIF */}
+          {/* Image / GIF — tap opens the lightbox; stopPropagation
+              prevents the bubble's tapback handler from firing. */}
           {message.image_url && (
             <div className={message.image_url.includes("giphy.com") && !message.content
               ? "-mx-3 -my-1.5"
               : "mb-1 -mx-1 -mt-0.5"
             }>
-              <img
-                src={message.image_url}
-                alt={message.image_url.includes("giphy.com") ? "GIF" : "Shared image"}
-                className={message.image_url.includes("giphy.com") && !message.content
-                  ? "rounded-2xl max-w-full max-h-64 object-cover w-full"
-                  : "rounded-xl max-w-full max-h-64 object-cover"
-                }
-                loading="lazy"
-              />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxOpen(true);
+                }}
+                className="block w-full"
+                aria-label="Open image"
+              >
+                <img
+                  src={message.image_url}
+                  alt={message.image_url.includes("giphy.com") ? "GIF" : "Shared image"}
+                  className={message.image_url.includes("giphy.com") && !message.content
+                    ? "rounded-2xl max-w-full max-h-64 object-cover w-full"
+                    : "rounded-xl max-w-full max-h-64 object-cover"
+                  }
+                  loading="lazy"
+                />
+              </button>
             </div>
           )}
 
@@ -279,6 +292,15 @@ export function MessageBubble({
             setShowTapback(false);
             onDelete();
           } : undefined}
+        />
+      )}
+
+      {/* Image lightbox */}
+      {lightboxOpen && message.image_url && (
+        <ImageLightbox
+          src={message.image_url}
+          alt={message.image_url.includes("giphy.com") ? "GIF" : "Shared image"}
+          onClose={() => setLightboxOpen(false)}
         />
       )}
     </div>

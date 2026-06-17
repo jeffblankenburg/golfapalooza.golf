@@ -71,6 +71,7 @@ export default async function HomePage() {
     optionSettingsResult,
     requiredOptionsResult,
     optionSelectionsResult,
+    allOptionSelectionsResult,
     latestArticleResult,
     birthdaysResult,
     activePollsResult,
@@ -112,6 +113,11 @@ export default async function HomePage() {
     supabase.from("trip_options").select("id, option_type").eq("trip_id", trip.id).eq("is_required", true),
     // User's option selections (id + value, not just count — needed to verify required-option completeness)
     queryClient.from("user_option_selections").select("option_id, value").eq("trip_id", trip.id).eq("user_id", effectiveUserId),
+    // Everyone's selections — used to compute per-participant completion
+    // booleans for the Responses card. Admin client bypasses RLS since
+    // regular users can't read other users' selections, but we only
+    // expose the derived boolean to the client, not the raw values.
+    adminClient.from("user_option_selections").select("user_id, option_id, value").eq("trip_id", trip.id),
     // Latest published article (within last 14 days)
     supabase
       .from("articles")
@@ -146,16 +152,48 @@ export default async function HomePage() {
   const incompleteActionCount = allItems.filter((a) => !completedIds.has(a.id)).length;
   const rsvpLikelihood = rsvpResult.data?.likelihood ?? null;
 
+  // Per-participant options completion. Same predicate as the
+  // hasCompletedOptions check further down, but driven off the
+  // all-users selections fetch and grouped per user_id.
+  const requiredOptionsForCompletion =
+    (requiredOptionsResult.data || []) as { id: string; option_type: string }[];
+  const selectionsByUser = new Map<string, Map<string, unknown>>();
+  for (const row of (allOptionSelectionsResult.data || []) as { user_id: string; option_id: string; value: unknown }[]) {
+    let inner = selectionsByUser.get(row.user_id);
+    if (!inner) {
+      inner = new Map();
+      selectionsByUser.set(row.user_id, inner);
+    }
+    inner.set(row.option_id, row.value);
+  }
+  function userHasCompletedOptions(userId: string): boolean {
+    if (requiredOptionsForCompletion.length === 0) return false;
+    const map = selectionsByUser.get(userId);
+    if (!map) return false;
+    return requiredOptionsForCompletion.every((o) => {
+      const v = map.get(o.id);
+      if (v === null || v === undefined || v === false) return false;
+      if (Array.isArray(v) && v.length === 0) return false;
+      if (typeof v === "string" && v.trim() === "") return false;
+      if (o.option_type === "quantity") {
+        return v !== null && typeof v === "object" && !Array.isArray(v);
+      }
+      return true;
+    });
+  }
+
   // Participants
   const participants = (participantsResult.data || []).map((p) => {
     const u = Array.isArray(p.user) ? p.user[0] : p.user;
     const typed = u as { display_name: string; avatar_url: string | null } | null;
+    const userId = p.user_id as string;
     return {
-      userId: p.user_id as string,
+      userId,
       likelihood: p.likelihood as number,
       likelihoodSetAt: (p.likelihood_set_at as string | null) ?? null,
       displayName: typed?.display_name || "Unknown",
       avatarUrl: typed?.avatar_url || null,
+      hasCompletedOptions: userHasCompletedOptions(userId),
     };
   });
 
@@ -652,6 +690,7 @@ export default async function HomePage() {
       myBalance={myBalance}
       optionsDeadline={optionsDeadline}
       hasCompletedOptions={hasCompletedOptions}
+      showOptionsCompletion={optionSettings?.is_open === true && requiredOptionsForCompletion.length > 0}
       latestArticle={latestArticleResult.data ? (() => {
         const d = latestArticleResult.data;
         const img = Array.isArray(d.featured_image) ? d.featured_image[0] : d.featured_image;

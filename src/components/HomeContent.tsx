@@ -273,6 +273,7 @@ export function HomeContent({
   myBalance = null,
   optionsDeadline = null,
   hasCompletedOptions = false,
+  showOptionsCompletion = false,
   latestArticle = null,
   hiddenQuickLinks = [],
   initialBirthdays = [],
@@ -288,7 +289,7 @@ export function HomeContent({
   myTeammates?: string[];
   teeTimeDay?: string | null;
   simulatedDate?: string | null;
-  participants?: { userId: string; likelihood: number; likelihoodSetAt?: string | null; displayName: string; avatarUrl?: string | null }[];
+  participants?: { userId: string; likelihood: number; likelihoodSetAt?: string | null; displayName: string; avatarUrl?: string | null; hasCompletedOptions?: boolean }[];
   nextScheduleItem?: { title: string; location: string | null; time: string | null; dayLabel: string } | null;
   timezone?: string;
   courseName?: string | null;
@@ -304,6 +305,7 @@ export function HomeContent({
   myBalance?: { charges: number; payments: number; balance: number } | null;
   optionsDeadline?: string | null;
   hasCompletedOptions?: boolean;
+  showOptionsCompletion?: boolean;
   latestArticle?: { id: string; title: string; publishAt: string; imageUrl: string | null; preview: string | null; focalX?: number; focalY?: number } | null;
   hiddenQuickLinks?: string[];
   initialBirthdays?: { id: string; display_name: string; avatar_url: string | null; age: number }[];
@@ -576,38 +578,53 @@ export function HomeContent({
                     return b.likelihoodSetAt.localeCompare(a.likelihoodSetAt);
                   });
                 if (group.length === 0) return null;
+                // Subdivide the Attending bucket into "Completed options" /
+                // "Hasn't" once options are open. Other likelihood buckets
+                // render flat — completion only matters for the people
+                // who say they're coming.
+                const isAttending = option.value === 99;
+                const subdivide = isAttending && showOptionsCompletion;
+                const completed = subdivide ? group.filter((p) => p.hasCompletedOptions) : [];
+                const notYet = subdivide ? group.filter((p) => !p.hasCompletedOptions) : [];
                 return (
                   <div key={option.value}>
                     <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
                       {option.label} {option.value}% ({group.length})
                     </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {group.map((p) => {
-                        const d = p.likelihoodSetAt ? new Date(p.likelihoodSetAt) : null;
-                        const dateLabel = d
-                          ? `${d.getMonth() + 1}/${d.getDate()}`
-                          : null;
-                        return (
-                          <Link
-                            key={p.userId}
-                            href={`/loozers/${p.userId}`}
-                            className="inline-flex items-center gap-1.5 pl-0.5 pr-2 py-0.5 bg-gray-100 rounded-full text-sm text-gray-700"
-                          >
-                            {p.avatarUrl ? (
-                              <img src={p.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
-                            ) : (
-                              <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5625rem] font-bold">
-                                {(p.displayName || "?")[0].toUpperCase()}
-                              </span>
-                            )}
-                            <span>{p.displayName}</span>
-                            {dateLabel && (
-                              <span className="text-[0.625rem] text-gray-400 tabular-nums">{dateLabel}</span>
-                            )}
-                          </Link>
-                        );
-                      })}
-                    </div>
+                    {subdivide ? (
+                      <div className="space-y-2 pl-3">
+                        {completed.length > 0 && (
+                          <div>
+                            <p className="text-[0.625rem] font-medium text-green-700 uppercase tracking-wide mb-1">
+                              Completed options ({completed.length})
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {completed.map((p) => (
+                                <ParticipantChip key={p.userId} p={p} />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {notYet.length > 0 && (
+                          <div>
+                            <p className="text-[0.625rem] font-medium text-gray-400 uppercase tracking-wide mb-1">
+                              Hasn&rsquo;t ({notYet.length})
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {notYet.map((p) => (
+                                <ParticipantChip key={p.userId} p={p} />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {group.map((p) => (
+                          <ParticipantChip key={p.userId} p={p} />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1076,5 +1093,38 @@ export function HomeContent({
         </div>
       )}
     </div>
+  );
+}
+
+function ParticipantChip({
+  p,
+}: {
+  p: {
+    userId: string;
+    displayName: string;
+    avatarUrl?: string | null;
+    likelihoodSetAt?: string | null;
+  };
+}) {
+  const d = p.likelihoodSetAt ? new Date(p.likelihoodSetAt) : null;
+  const dateLabel = d ? `${d.getMonth() + 1}/${d.getDate()}` : null;
+  return (
+    <Link
+      href={`/loozers/${p.userId}`}
+      className="inline-flex items-center gap-1.5 pl-0.5 pr-2 py-0.5 bg-gray-100 rounded-full text-sm text-gray-700"
+    >
+      {p.avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={p.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+      ) : (
+        <span className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-[0.5625rem] font-bold">
+          {(p.displayName || "?")[0].toUpperCase()}
+        </span>
+      )}
+      <span>{p.displayName}</span>
+      {dateLabel && (
+        <span className="text-[0.625rem] text-gray-400 tabular-nums">{dateLabel}</span>
+      )}
+    </Link>
   );
 }

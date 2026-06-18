@@ -165,7 +165,7 @@ export function TagPicker({
         </div>
 
         {/* Save button */}
-        <div className="px-4 pt-4 pb-24 border-t border-gray-200">
+        <div className="px-4 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] border-t border-gray-200">
           <button
             onClick={handleSave}
             disabled={saving}

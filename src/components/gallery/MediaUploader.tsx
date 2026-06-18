@@ -351,7 +351,7 @@ export function MediaUploader({
             ))}
           </div>
 
-          <div className="px-4 pt-4 pb-24 border-t border-gray-200">
+          <div className="px-4 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] border-t border-gray-200">
             <button
               onClick={() => setShowTagPicker(false)}
               className="w-full py-3 bg-green-600 text-white font-semibold rounded-xl active:scale-95 transition-transform"
@@ -377,7 +377,7 @@ export function MediaUploader({
           <DragHandle onClose={onClose} className="" />
         </div>
 
-        <div className="px-4 pb-24">
+        <div className="px-4 pb-[calc(5rem+env(safe-area-inset-bottom,0px))]">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-gray-900">Share a Moment</h2>

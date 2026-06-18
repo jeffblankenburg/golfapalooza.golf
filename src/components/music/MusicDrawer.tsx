@@ -70,7 +70,7 @@ export function MusicDrawer() {
       {/* Expanded overlay — clips below the sticky HeaderBar (h-14) so the
           header remains visible and tappable. */}
       <div
-        className={`fixed top-14 inset-x-0 bottom-0 z-[55] bg-white transition-transform duration-300 ease-out flex flex-col ${
+        className={`fixed top-14 inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] z-[55] bg-white transition-transform duration-300 ease-out flex flex-col ${
           isDrawerExpanded ? "translate-y-0" : "translate-y-full pointer-events-none"
         }`}
         style={{
@@ -116,7 +116,7 @@ export function MusicDrawer() {
 
       {/* Collapsed mini-player — hidden while expanded so we don't double up */}
       <div
-        className={`fixed bottom-16 left-0 right-0 z-35 bg-white border-t border-gray-200 shadow-lg transition-opacity duration-200 ${
+        className={`fixed bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-[35] bg-white border-t border-gray-200 shadow-lg transition-opacity duration-200 ${
           isDrawerExpanded ? "opacity-0 pointer-events-none" : "opacity-100"
         }`}
         aria-hidden={isDrawerExpanded}

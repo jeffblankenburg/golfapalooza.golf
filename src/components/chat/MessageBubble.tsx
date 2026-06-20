@@ -5,6 +5,7 @@ import Link from "next/link";
 import { TapbackMenu } from "./TapbackMenu";
 import { ReactionBadge } from "./ReactionBadge";
 import { ImageLightbox } from "@/components/ImageLightbox";
+import { splitMessageContent } from "@/lib/chat/mentions";
 
 const URL_REGEX = /(https?:\/\/[^\s<]+)/g;
 
@@ -28,6 +29,39 @@ function Linkify({ text, isSent }: { text: string; isSent: boolean }) {
           <span key={i}>{part}</span>
         )
       )}
+    </>
+  );
+}
+
+/**
+ * Renders message content with both URL linkification and @-mention
+ * chips. Mentions split the content first (so URL regex doesn't try to
+ * eat the markup), then each text segment runs through Linkify.
+ */
+function RenderedContent({ content, isSent }: { content: string; isSent: boolean }) {
+  const segments = splitMessageContent(content);
+  if (segments.length === 0) return null;
+  return (
+    <>
+      {segments.map((seg, i) => {
+        if (seg.type === "mention") {
+          return (
+            <Link
+              key={i}
+              href={`/loozers/${seg.userId}`}
+              onClick={(e) => e.stopPropagation()}
+              className={`inline-flex items-center px-1.5 py-0.5 -my-0.5 rounded-md font-semibold ${
+                isSent
+                  ? "bg-green-700/40 text-white"
+                  : "bg-green-100 text-green-800"
+              }`}
+            >
+              @{seg.displayName}
+            </Link>
+          );
+        }
+        return <Linkify key={i} text={seg.value} isSent={isSent} />;
+      })}
     </>
   );
 }
@@ -233,10 +267,10 @@ export function MessageBubble({
             </div>
           )}
 
-          {/* Text content */}
+          {/* Text content — RenderedContent handles both @mentions and URLs */}
           {message.content && (
             <p className="text-[0.9375rem] leading-snug whitespace-pre-wrap break-words">
-              <Linkify text={message.content} isSent={isSent} />
+              <RenderedContent content={message.content} isSent={isSent} />
             </p>
           )}
 

@@ -52,7 +52,7 @@ export default async function AppLayout({
       .select("id", { count: "exact", head: true })
       .eq("user_id", effectiveUserId)
       .eq("read", false)
-      .neq("type", "chat_message"),
+      .not("type", "in", '("chat_message","chat_mention")'),
     queryClient
       .from("chat_room_members")
       .select("room_id")

@@ -56,5 +56,16 @@ export async function DELETE(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Hiding a message also removes this user's notification rows tied to
+  // it. The push already left the building (can't unsend), but the
+  // stored chat_message / chat_mention row no longer reflects something
+  // the user is meant to see.
+  await admin
+    .from("notifications")
+    .delete()
+    .eq("user_id", effectiveUserId)
+    .in("type", ["chat_message", "chat_mention"])
+    .eq("data->>messageId", messageId);
+
   return NextResponse.json({ success: true });
 }

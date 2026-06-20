@@ -68,7 +68,7 @@ export function HeaderBar({
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .eq("read", false)
-      .neq("type", "chat_message")
+      .not("type", "in", '("chat_message","chat_mention")')
       .then(({ count }) => {
         setUnreadCount(count || 0);
       });

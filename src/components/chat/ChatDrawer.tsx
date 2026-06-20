@@ -128,9 +128,19 @@ export function ChatDrawer() {
   }, [isOpen]);
 
   return (
+    <>
+      {/* Dim backdrop in the gap above the drawer so it's obvious the
+          page is still there underneath. Fades with the drawer. */}
+      <div
+        onClick={closeDrawer}
+        aria-hidden="true"
+        className={`fixed top-14 inset-x-0 h-8 z-[54] bg-black/40 transition-opacity duration-300 ${
+          isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      />
     <div
       data-pull-refresh="off"
-      className={`fixed top-14 inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] z-[55] bg-white transition-transform duration-300 ease-out flex flex-col ${
+      className={`fixed top-[calc(3.5rem+2rem)] inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] z-[55] bg-white rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out flex flex-col ${
         isOpen ? "translate-y-0" : "translate-y-full pointer-events-none"
       }`}
       aria-hidden={!isOpen}
@@ -211,5 +221,6 @@ export function ChatDrawer() {
         )}
       </div>
     </div>
+    </>
   );
 }

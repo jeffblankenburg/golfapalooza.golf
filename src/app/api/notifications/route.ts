@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     .from("notifications")
     .select("*")
     .eq("user_id", effectiveUserId)
-    .neq("type", "chat_message")
+    .not("type", "in", '("chat_message","chat_mention")')
     .order("created_at", { ascending: false })
     .limit(limit);
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendBulkNotifications } from "@/lib/notifications/service";
+import { parseMentions, stripMentionMarkup } from "@/lib/chat/mentions";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveUserId, isSimulating, isSimulatingTrip } from "@/lib/simulator";
 
@@ -261,21 +262,55 @@ export async function POST(
 
     const senderName = sender?.display_name || "Someone";
     const isGif = !content && imageUrl?.includes("giphy.com");
+    // Strip the @[Name](id) markup before previewing — push payload
+    // should read "@Quack hi" not "@[Quack](uuid…) hi".
+    const previewSource = stripMentionMarkup(content) || (isGif ? "" : "");
     const preview = content
-      ? content.length > 50
-        ? content.slice(0, 50) + "..."
-        : content
+      ? previewSource.length > 50
+        ? previewSource.slice(0, 50) + "..."
+        : previewSource
       : isGif
         ? "Sent a GIF"
         : "Sent an image";
 
-    const otherUserIds = members.map((m) => m.user_id);
-    await sendBulkNotifications(otherUserIds, {
-      type: "chat_message",
-      title: senderName,
-      body: preview,
-      data: { roomId, messageId: message.id },
-    }).catch(console.error);
+    // Mentioned users get a stronger `chat_mention` notification; the
+    // rest of the room gets the standard `chat_message`. Sender is
+    // never notified about their own message. We dedupe so a mentioned
+    // user doesn't also receive the generic chat_message.
+    const mentionedIds = new Set(
+      parseMentions(content)
+        .map((m) => m.userId)
+        .filter((id) => id !== effectiveUserId),
+    );
+    const memberIdSet = new Set(members.map((m) => m.user_id));
+    const mentionRecipients = [...mentionedIds].filter((id) => memberIdSet.has(id));
+    const mentionRecipientSet = new Set(mentionRecipients);
+    const otherRecipients = members
+      .map((m) => m.user_id)
+      .filter((id) => !mentionRecipientSet.has(id));
+
+    const notifyPromises: Promise<unknown>[] = [];
+    if (mentionRecipients.length) {
+      notifyPromises.push(
+        sendBulkNotifications(mentionRecipients, {
+          type: "chat_mention",
+          title: `${senderName} mentioned you`,
+          body: preview,
+          data: { roomId, messageId: message.id },
+        }),
+      );
+    }
+    if (otherRecipients.length) {
+      notifyPromises.push(
+        sendBulkNotifications(otherRecipients, {
+          type: "chat_message",
+          title: senderName,
+          body: preview,
+          data: { roomId, messageId: message.id },
+        }),
+      );
+    }
+    await Promise.all(notifyPromises).catch(console.error);
   }
 
   return NextResponse.json({ message }, { status: 201 });

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { compressImage } from "@/lib/gallery/compress";
 import { GifPicker } from "./GifPicker";
 import { EmojiPicker } from "./EmojiPicker";
+import { buildContentWithMentions, locateMentionSpans } from "@/lib/chat/mentions";
 
 interface ReplyMessage {
   id: string;
@@ -14,25 +15,73 @@ interface ReplyMessage {
 
 type ActivePanel = "menu" | "emoji" | "gif" | null;
 
+interface MentionableMember {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
 export function MessageInput({
   onSend,
   onTyping,
   replyTo,
   onCancelReply,
   roomId,
+  members = [],
+  currentUserId,
 }: {
   onSend: (content: string, imageUrl?: string) => void;
   onTyping: () => void;
   replyTo: ReplyMessage | null;
   onCancelReply: () => void;
   roomId: string;
+  members?: MentionableMember[];
+  currentUserId?: string;
 }) {
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
+  // Mention autocomplete state. `mentionQuery` is null when the dropdown
+  // shouldn't show; a string (possibly empty) means the user just typed
+  // @ or is editing a partial @query at the caret. `mentionRange` is the
+  // [start, end] slice of `text` that the @query covers — picking an
+  // option replaces that slice.
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionRange, setMentionRange] = useState<[number, number] | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  // Parallel list of mentions inserted via the picker. Drives send-time
+  // conversion of plain "@Butter" to the markup "@[Butter](uuid)". Stays
+  // in sync with the textarea text: see how `pickMention` adds entries
+  // and how `handleSubmit` consumes + clears them.
+  const [pendingMentions, setPendingMentions] = useState<
+    { userId: string; displayName: string }[]
+  >([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Computed once per render: where the @mention spans land in the
+  // current display text. The overlay paints highlight pills at exactly
+  // these character ranges; the textarea's text sits on top of them.
+  const mentionSpans = locateMentionSpans(text, pendingMentions);
+
+  // Filter members against the active @query — case-insensitive prefix
+  // match, then includes-anywhere as fallback. Excludes the current
+  // user (you can't tag yourself) and caps at 6 visible options.
+  const mentionMatches = (() => {
+    if (mentionQuery === null) return [];
+    const q = mentionQuery.toLowerCase();
+    const pool = members.filter((m) => m.id !== currentUserId);
+    if (q === "") return pool.slice(0, 6);
+    const prefix = pool.filter((m) => m.display_name.toLowerCase().startsWith(q));
+    const rest = pool.filter(
+      (m) =>
+        !m.display_name.toLowerCase().startsWith(q) &&
+        m.display_name.toLowerCase().includes(q),
+    );
+    return [...prefix, ...rest].slice(0, 6);
+  })();
 
   // Scroll to bottom when text changes so the latest line is visible
   useEffect(() => {
@@ -53,8 +102,12 @@ export function MessageInput({
     const trimmed = text.trim();
     if (!trimmed || sending) return;
     setSending(true);
-    await onSend(trimmed);
+    // Zip picker selections back into markup form for the wire — server
+    // and renderer both work in `@[Name](uuid)` units.
+    const content = buildContentWithMentions(trimmed, pendingMentions);
+    await onSend(content);
     setText("");
+    setPendingMentions([]);
     setSending(false);
     if (textareaRef.current) {
       textareaRef.current.style.height = "36px";
@@ -62,10 +115,93 @@ export function MessageInput({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Enter inserts a new line (default textarea behavior)
-    // No keyboard shortcut to send — use the send button
-    void e;
+  // Look back from the caret to detect an in-progress @mention. Stops
+  // at the first whitespace, @ (so two @s in a row reset), or the start
+  // of the string. Returns null if no active mention context.
+  const detectMentionContext = (
+    value: string,
+    caret: number,
+  ): { query: string; range: [number, number] } | null => {
+    let i = caret - 1;
+    while (i >= 0) {
+      const ch = value[i];
+      if (ch === "@") {
+        // Confirm @ is at start-of-string or preceded by whitespace —
+        // emails like "foo@bar" must not trigger the picker.
+        const prev = i > 0 ? value[i - 1] : "";
+        if (i === 0 || /\s/.test(prev)) {
+          return { query: value.slice(i + 1, caret), range: [i, caret] };
+        }
+        return null;
+      }
+      if (/\s/.test(ch)) return null;
+      i--;
+    }
+    return null;
+  };
+
+  const updateMentionState = (value: string, caret: number) => {
+    const ctx = detectMentionContext(value, caret);
+    if (ctx) {
+      setMentionQuery(ctx.query);
+      setMentionRange(ctx.range);
+      setMentionIndex(0);
+    } else {
+      setMentionQuery(null);
+      setMentionRange(null);
+    }
+  };
+
+  const pickMention = (member: MentionableMember) => {
+    if (!mentionRange) return;
+    const [start, end] = mentionRange;
+    // Insert *clean* text — the user sees "@Butter ", not the markup.
+    // The userId is tracked separately and zipped back in at send time.
+    const insert = `@${member.display_name} `;
+    const next = text.slice(0, start) + insert + text.slice(end);
+    setText(next);
+    setPendingMentions((prev) => [
+      ...prev,
+      { userId: member.id, displayName: member.display_name },
+    ]);
+    setMentionQuery(null);
+    setMentionRange(null);
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      const pos = start + insert.length;
+      ta.focus();
+      ta.selectionStart = ta.selectionEnd = pos;
+    });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // When the mention dropdown is open, hijack arrow keys + Enter / Tab
+    // for navigation. Escape closes it without inserting.
+    if (mentionQuery !== null && mentionMatches.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setMentionIndex((i) => (i + 1) % mentionMatches.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setMentionIndex((i) => (i - 1 + mentionMatches.length) % mentionMatches.length);
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        pickMention(mentionMatches[mentionIndex]);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setMentionQuery(null);
+        setMentionRange(null);
+        return;
+      }
+    }
+    // Otherwise Enter inserts a new line (default textarea behavior).
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,8 +250,10 @@ export function MessageInput({
         .from("chat-images")
         .getPublicUrl(data.path);
 
-      await onSend(text.trim(), urlData.publicUrl);
+      const content = buildContentWithMentions(text.trim(), pendingMentions);
+      await onSend(content, urlData.publicUrl);
       setText("");
+      setPendingMentions([]);
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -154,7 +292,42 @@ export function MessageInput({
   const hasContent = text.trim().length > 0;
 
   return (
-    <div className="border-t border-gray-200 bg-white">
+    <div className="relative border-t border-gray-200 bg-white">
+      {/* @mention autocomplete — anchored above the input area. */}
+      {mentionQuery !== null && mentionMatches.length > 0 && (
+        <div className="absolute left-2 right-2 bottom-full mb-1 bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden z-10">
+          {mentionMatches.map((m, i) => (
+            <button
+              key={m.id}
+              type="button"
+              onMouseDown={(e) => {
+                // mousedown (not click) so the textarea doesn't blur
+                // before we restore focus inside pickMention.
+                e.preventDefault();
+                pickMention(m);
+              }}
+              onTouchStart={(e) => {
+                e.preventDefault();
+                pickMention(m);
+              }}
+              className={`flex items-center gap-2.5 w-full px-3 py-2 text-left ${
+                i === mentionIndex ? "bg-green-50" : "active:bg-gray-50"
+              }`}
+            >
+              {m.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={m.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
+              ) : (
+                <span className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-xs font-bold">
+                  {(m.display_name || "?")[0].toUpperCase()}
+                </span>
+              )}
+              <span className="text-sm font-medium text-gray-900">{m.display_name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Reply preview */}
       {replyTo && (
         <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border-b border-gray-100">
@@ -283,18 +456,82 @@ export function MessageInput({
           )}
         </button>
 
-        {/* Text input bubble */}
-        <div className={`flex-1 min-w-0 border border-gray-300 ${text.includes("\n") || text.length > 60 ? "rounded-2xl" : "rounded-full"}`}>
+        {/* Text input bubble — wraps an overlay div + textarea so we can
+            render highlight pills behind picked @mentions. The two must
+            share identical font, padding, line-height, and white-space
+            rules or the highlight will drift. */}
+        <div className={`relative flex-1 min-w-0 border border-gray-300 ${text.includes("\n") || text.length > 60 ? "rounded-2xl" : "rounded-full"}`}>
+          {/* Highlight overlay — pointer-events-none so it never steals
+              touches from the textarea above. Mirrors the textarea's
+              scroll position on every input. Visible-text is transparent
+              so only the mention spans' backgrounds show through. */}
+          <div
+            ref={overlayRef}
+            aria-hidden="true"
+            className="absolute inset-0 m-0 px-4 py-2 text-base whitespace-pre-wrap break-words pointer-events-none overflow-hidden text-transparent"
+            style={{ height: "36px" }}
+          >
+            {(() => {
+              if (mentionSpans.length === 0) {
+                return <span>{text || "​"}</span>;
+              }
+              const out: React.ReactNode[] = [];
+              let cursor = 0;
+              mentionSpans.forEach((s, i) => {
+                if (s.start > cursor) out.push(<span key={`t${i}`}>{text.slice(cursor, s.start)}</span>);
+                out.push(
+                  <span
+                    key={`m${i}`}
+                    className="bg-green-100 text-green-800 rounded-md"
+                    style={{
+                      // box-decoration-break keeps the pill rendering
+                      // clean if the mention happens to wrap a line.
+                      WebkitBoxDecorationBreak: "clone",
+                      boxDecorationBreak: "clone",
+                    }}
+                  >
+                    {text.slice(s.start, s.end)}
+                  </span>,
+                );
+                cursor = s.end;
+              });
+              if (cursor < text.length) {
+                out.push(<span key="tend">{text.slice(cursor)}</span>);
+              }
+              return out;
+            })()}
+          </div>
           <textarea
             ref={textareaRef}
             value={text}
             onChange={(e) => {
-              setText(e.target.value);
+              const next = e.target.value;
+              setText(next);
               onTyping();
-              // Auto-grow
+              // Auto-grow textarea + sync overlay height so the pills
+              // stay positioned correctly when the input wraps.
               const el = e.target;
               el.style.height = "36px";
               el.style.height = Math.min(el.scrollHeight, 120) + "px";
+              if (overlayRef.current) {
+                overlayRef.current.style.height = el.style.height;
+              }
+              updateMentionState(next, el.selectionStart ?? next.length);
+            }}
+            onScroll={(e) => {
+              // Mirror scroll into the overlay so the highlights track
+              // the visible text region.
+              if (overlayRef.current) {
+                overlayRef.current.scrollTop = e.currentTarget.scrollTop;
+              }
+            }}
+            onKeyUp={(e) => {
+              const el = e.currentTarget;
+              updateMentionState(text, el.selectionStart ?? text.length);
+            }}
+            onClick={(e) => {
+              const el = e.currentTarget;
+              updateMentionState(text, el.selectionStart ?? text.length);
             }}
             onKeyDown={handleKeyDown}
             onFocus={() => {
@@ -303,7 +540,7 @@ export function MessageInput({
             placeholder="Message"
             rows={1}
             style={{ backgroundColor: "transparent", height: "36px" }}
-            className="block w-full m-0 px-4 py-2 text-base text-gray-900 placeholder-gray-400 resize-none outline-none border-none overflow-y-auto"
+            className="relative block w-full m-0 px-4 py-2 text-base text-gray-900 placeholder-gray-400 resize-none outline-none border-none overflow-y-auto bg-transparent"
           />
         </div>
 

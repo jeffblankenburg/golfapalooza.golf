@@ -67,10 +67,20 @@ export function MusicDrawer() {
 
   return (
     <>
-      {/* Expanded overlay — clips below the sticky HeaderBar (h-14) so the
-          header remains visible and tappable. */}
+      {/* Dim backdrop in the 32px gap above the drawer so it's obvious
+          the page is still there underneath. */}
       <div
-        className={`fixed top-14 inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] z-[55] bg-white transition-transform duration-300 ease-out flex flex-col ${
+        onClick={collapseDrawer}
+        aria-hidden="true"
+        className={`fixed top-14 inset-x-0 h-8 z-[54] bg-black/40 transition-opacity duration-300 ${
+          isDrawerExpanded ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      />
+      {/* Expanded overlay — clips below the sticky HeaderBar (h-14) with
+          a 32px breathing gap so the header and a peek of the page
+          remain visible. */}
+      <div
+        className={`fixed top-[calc(3.5rem+2rem)] inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] z-[55] bg-white rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out flex flex-col ${
           isDrawerExpanded ? "translate-y-0" : "translate-y-full pointer-events-none"
         }`}
         style={{

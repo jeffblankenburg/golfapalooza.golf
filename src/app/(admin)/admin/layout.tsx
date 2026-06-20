@@ -75,7 +75,7 @@ export default async function AdminLayout({
     .select("id", { count: "exact", head: true })
     .eq("user_id", user.id)
     .eq("read", false)
-    .neq("type", "chat_message");
+    .not("type", "in", '("chat_message","chat_mention")');
 
   return (
     <div className="min-h-dvh pb-20">

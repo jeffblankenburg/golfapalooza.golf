@@ -562,6 +562,8 @@ export function ChatRoom({
         replyTo={replyTo}
         onCancelReply={() => setReplyTo(null)}
         roomId={roomId}
+        members={chatMembers}
+        currentUserId={currentUserId}
       />
 
       {/* Settings sheet */}

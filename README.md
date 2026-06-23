@@ -18,6 +18,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 ### Home Page
 - Trip countdown with days remaining
 - Latest article with featured image and preview
+- Spirit Wear Store card — prominent link to the external apparel shop (opens in a new tab) with a strip of product photos; also shown on the public spectator home
 - RSVP status with attendance likelihood (99%/75%/50%/25%)
 - Participant list grouped by likelihood
 - Tee time card with starting hole, time, and teammates

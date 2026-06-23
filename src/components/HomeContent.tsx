@@ -9,6 +9,7 @@ import { FakeAdCarousel } from "@/components/FakeAdCarousel";
 import { BirthdayBanner } from "@/components/BirthdayBanner";
 import { PollHomeButton } from "@/components/polls/PollHomeButton";
 import { RecentRoundsFeed } from "@/components/RecentRoundsFeed";
+import { SpiritWearCard } from "@/components/SpiritWearCard";
 import { DragHandle } from "@/components/DragHandle";
 
 interface TripData {
@@ -892,6 +893,9 @@ export function HomeContent({
           </svg>
         </Link>
       )}
+
+      {/* Spirit Wear Store — prominent link out to the external apparel shop */}
+      <SpiritWearCard />
 
       {/* Options Action Card — hidden once the user has answered every required option.
           The "My Options" quick link below remains so they can still make changes. */}

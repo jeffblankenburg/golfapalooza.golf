@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FakeAdCarousel } from "@/components/FakeAdCarousel";
+import { SpiritWearCard } from "@/components/SpiritWearCard";
 
 interface TripData {
   trip_name: string;
@@ -211,6 +212,9 @@ export function SpectatorHomeContent({
           )}
         </Link>
       )}
+
+      {/* Spirit Wear Store — public link out to the external apparel shop */}
+      <SpiritWearCard />
 
       {/* Quick Links */}
       <div className="mt-3">

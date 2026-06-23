@@ -8,6 +8,7 @@ interface ItineraryItem {
   trip_id: string;
   title: string;
   location: string | null;
+  description: string | null;
   day_number: number | null;
   start_date: string | null;
   start_time: string | null;
@@ -19,6 +20,7 @@ interface ItineraryItem {
 interface FormData {
   title: string;
   location: string;
+  description: string;
   day_number: number | null;
   start_date: string;
   start_time: string;
@@ -54,6 +56,7 @@ function formatDateShort(dateStr: string | null): string {
 const emptyForm: FormData = {
   title: "",
   location: "",
+  description: "",
   day_number: null,
   start_date: "",
   start_time: "",
@@ -135,6 +138,7 @@ export function ItineraryManager({ tripId: propTripId }: { tripId?: string } = {
     setForm({
       title: item.title,
       location: item.location || "",
+      description: item.description || "",
       day_number: item.day_number,
       start_date: item.start_date || "",
       start_time: item.start_time?.slice(0, 5) || "",
@@ -161,6 +165,7 @@ export function ItineraryManager({ tripId: propTripId }: { tripId?: string } = {
         ...(editingId ? { id: editingId } : { trip_id: tripId }),
         title: form.title.trim(),
         location: form.location.trim() || null,
+        description: form.description.trim() || null,
         day_number: form.day_number,
         start_date: isPreEvent ? form.start_date || null : null,
         start_time: form.start_time || null,
@@ -247,6 +252,13 @@ export function ItineraryManager({ tripId: propTripId }: { tripId?: string } = {
         value={form.location}
         onChange={(e) => setForm({ ...form, location: e.target.value })}
         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base bg-white"
+      />
+      <textarea
+        placeholder="Description (e.g. menu details)"
+        value={form.description}
+        onChange={(e) => setForm({ ...form, description: e.target.value })}
+        rows={3}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base bg-white resize-y"
       />
       <div className="grid grid-cols-2 gap-3">
         {isPreEvent && (
@@ -446,7 +458,10 @@ function DaySection({
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-900">{item.title}</p>
                       {item.location && (
-                        <p className="text-xs text-gray-500 mt-0.5">{item.location}</p>
+                        <p className="text-xs font-semibold text-gray-900 mt-0.5">{item.location}</p>
+                      )}
+                      {item.description && (
+                        <p className="text-xs text-gray-500 mt-0.5 whitespace-pre-line">{item.description}</p>
                       )}
                       <p className="text-xs text-gray-400 mt-0.5">
                         {isPreEvent ? (

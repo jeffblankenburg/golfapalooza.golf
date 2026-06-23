@@ -60,7 +60,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { trip_id, title, location, day_number, start_date, start_time, end_date, end_time, sort_order } = body;
+    const { trip_id, title, location, description, day_number, start_date, start_time, end_date, end_time, sort_order } = body;
 
     if (!trip_id || !title) {
       return NextResponse.json({ error: "Trip ID and title are required" }, { status: 400 });
@@ -73,6 +73,7 @@ export async function POST(request: Request) {
         trip_id,
         title,
         location: location || null,
+        description: description || null,
         day_number: day_number ?? null,
         start_date: start_date || null,
         start_time: start_time || null,
@@ -102,7 +103,7 @@ export async function PUT(request: Request) {
 
   try {
     const body = await request.json();
-    const { id, title, location, day_number, start_date, start_time, end_date, end_time, sort_order } = body;
+    const { id, title, location, description, day_number, start_date, start_time, end_date, end_time, sort_order } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Item ID is required" }, { status: 400 });
@@ -114,6 +115,7 @@ export async function PUT(request: Request) {
       .update({
         title,
         location: location || null,
+        description: description || null,
         day_number: day_number ?? null,
         start_date: start_date || null,
         start_time: start_time || null,

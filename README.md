@@ -189,6 +189,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 ### Schedule & Itinerary
 - Day-by-day event schedule
 - Event locations and times
+- Optional long-form descriptions per item (e.g. meal menus), with line breaks preserved
 - Timezone-aware display
 - Personal tee time assignments integrated into schedule
 

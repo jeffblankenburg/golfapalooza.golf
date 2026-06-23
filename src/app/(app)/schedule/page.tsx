@@ -32,7 +32,7 @@ export default async function SchedulePage() {
   const [itemsResult, eventDaysResult] = await Promise.all([
     supabase
       .from("itinerary_items")
-      .select("id, title, location, day_number, start_date, start_time, end_date, end_time")
+      .select("id, title, location, description, day_number, start_date, start_time, end_date, end_time")
       .eq("trip_id", trip.id)
       .order("day_number", { ascending: true, nullsFirst: true })
       .order("sort_order", { ascending: true })

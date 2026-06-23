@@ -7,6 +7,7 @@ interface ItineraryItem {
   id: string;
   title: string;
   location: string | null;
+  description: string | null;
   day_number: number | null;
   start_date: string | null;
   start_time: string | null;
@@ -86,7 +87,10 @@ export function ScheduleView({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-900">{item.title}</p>
                   {item.location && (
-                    <p className="text-xs text-gray-500 mt-0.5">{item.location}</p>
+                    <p className="text-xs font-semibold text-gray-900 mt-0.5">{item.location}</p>
+                  )}
+                  {item.description && (
+                    <p className="text-sm text-gray-600 mt-1 whitespace-pre-line">{item.description}</p>
                   )}
                 </div>
                 <span className="text-xs text-gray-400 flex-shrink-0 text-right">
@@ -177,7 +181,10 @@ export function ScheduleView({
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-900">{item.title}</p>
                       {item.location && (
-                        <p className="text-xs text-gray-500 mt-0.5">{item.location}</p>
+                        <p className="text-xs font-semibold text-gray-900 mt-0.5">{item.location}</p>
+                      )}
+                      {item.description && (
+                        <p className="text-sm text-gray-600 mt-1 whitespace-pre-line">{item.description}</p>
                       )}
                     </div>
                   </div>

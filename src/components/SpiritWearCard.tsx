@@ -1,6 +1,6 @@
 "use client";
 
-const STORE_HOST_PATH = "stores.inksoft.com/golfapalooza_spiritwear/shop/home";
+const STORE_HOST_PATH = "stores.inksoft.com/golfapalooza_spiritwear/shop/products/all?page=1";
 const STORE_URL = `https://${STORE_HOST_PATH}`;
 
 // Force the link out of the app and into the device's real browser.

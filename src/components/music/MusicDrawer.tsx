@@ -28,6 +28,7 @@ export function MusicDrawer() {
     previous,
     expandDrawer,
     collapseDrawer,
+    dismiss,
   } = useMusicPlayer();
 
   // Drag-to-collapse on the expanded drawer header.
@@ -139,7 +140,19 @@ export function MusicDrawer() {
           />
         </div>
 
-        <div className="flex items-center h-14 px-3 gap-3">
+        <div className="flex items-center h-14 px-2 gap-2">
+          {/* Close — stops the music and dismisses the player entirely */}
+          <button
+            type="button"
+            onClick={dismiss}
+            className="flex items-center justify-center w-9 h-9 flex-shrink-0 text-gray-400 active:text-gray-600"
+            aria-label="Close music player"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
           {/* Art + Song info — tappable to expand */}
           <button
             type="button"

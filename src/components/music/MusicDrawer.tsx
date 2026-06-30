@@ -120,7 +120,7 @@ export function MusicDrawer() {
         </div>
         {/* Music page content — only render when expanded so its useEffects
             don't run while the drawer is closed. */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
           {isDrawerExpanded && <MusicPage initialSongs={songs} />}
         </div>
       </div>

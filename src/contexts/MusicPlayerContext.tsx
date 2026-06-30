@@ -114,6 +114,21 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
   const shouldAutoResumeRef = useRef(loadStoredBool(STORAGE_KEY_PLAYING, false));
   const storedTimeRef = useRef(loadStoredNumber(STORAGE_KEY_TIME, 0));
 
+  // Tracks whether the user WANTS audio playing, independent of the element's
+  // actual state. iOS involuntarily pauses the <audio> element when a
+  // standalone PWA is backgrounded; that fires the audio "pause" event and
+  // flips `isPlaying` false, but it does NOT mean the user paused. We keep this
+  // intent flag (and the persisted STORAGE_KEY_PLAYING) true through such
+  // interruptions so we can auto-resume on return to the foreground. Only an
+  // explicit `pause()`/`dismiss()` clears it.
+  const intendPlayingRef = useRef(loadStoredBool(STORAGE_KEY_PLAYING, false));
+  const setIntendPlaying = useCallback((want: boolean) => {
+    intendPlayingRef.current = want;
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY_PLAYING, String(want));
+    }
+  }, []);
+
   // Refs for stable access inside callbacks (avoids stale closures)
   const songsRef = useRef(songs);
   songsRef.current = songs;
@@ -192,6 +207,7 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
       if (!audio) return;
 
       setIsVisible(true);
+      setIntendPlaying(true);
       startPlayTimer(targetSong.id);
 
       // Only reload if the src actually changed
@@ -205,7 +221,7 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
       audio.play().catch(() => {});
       setIsPlaying(true);
     },
-    [startPlayTimer]
+    [startPlayTimer, setIntendPlaying]
   );
 
   const loadSongs = useCallback(
@@ -287,9 +303,10 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
     }
     audio.volume = volumeRef.current;
     setIsPlaying(true);
+    setIntendPlaying(true);
     const song = songsRef.current[currentIndexRef.current];
     if (song) startPlayTimer(song.id);
-  }, [startPlayTimer]);
+  }, [startPlayTimer, setIntendPlaying]);
 
   const play = useCallback(
     (index?: number) => {
@@ -308,8 +325,9 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
   const pause = useCallback(() => {
     audioRef.current?.pause();
     setIsPlaying(false);
+    setIntendPlaying(false);
     cancelPlayTimer();
-  }, [cancelPlayTimer]);
+  }, [cancelPlayTimer, setIntendPlaying]);
 
   const togglePlayPause = useCallback(() => {
     if (isPlaying) pause();
@@ -520,9 +538,11 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
     localStorage.setItem(STORAGE_KEY_SHUFFLE, String(isShuffled));
   }, [isShuffled]);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_PLAYING, String(isPlaying));
-  }, [isPlaying]);
+  // NOTE: STORAGE_KEY_PLAYING is intentionally NOT driven off `isPlaying`.
+  // It tracks user INTENT and is written by setIntendPlaying() from the
+  // play/resume/pause actions. Persisting raw `isPlaying` here would let an
+  // involuntary background pause (iOS suspending the PWA) clobber the intent
+  // and break cold-start auto-resume.
 
   // Persist current time periodically (every 5 seconds to avoid thrashing)
   const lastSavedTimeRef = useRef(0);
@@ -532,6 +552,25 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
       localStorage.setItem(STORAGE_KEY_TIME, String(currentTime));
     }
   }, [currentTime]);
+
+  // ── Resume playback when returning to the foreground ───────────────────
+  // iOS suspends a standalone PWA when backgrounded, involuntarily pausing the
+  // <audio> element. When the user comes back, re-arm playback from the saved
+  // position if they still intend to be playing. Best-effort: if iOS rejects
+  // the programmatic play() (no user gesture), it no-ops and the user can tap
+  // play — but in practice resuming interrupted media is usually allowed.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const audio = audioRef.current;
+      if (intendPlayingRef.current && audio && audio.paused) {
+        resume();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [resume]);
 
   // ── Media Session API (lock screen / CarPlay controls) ─────────────────
 

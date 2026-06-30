@@ -8,8 +8,11 @@ import { subscribeToRound } from "@/lib/realtime/round-channel";
 import { TEE_HEX_COLORS } from "@/lib/utils/tee-colors";
 
 interface Player {
+  // Stable per-player key for local state. For Loozers this is their user_id;
+  // for guests it's a temp token before the round exists, then `guest:<rpId>`.
   id: string;
   name: string;
+  isGuest?: boolean;
   teeName?: string;
   teeColor?: string | null;
   teeId?: string;
@@ -207,17 +210,35 @@ export default function LiveScoringEntry({
           tee_id: teeId,
           round_type: roundType,
           round_date: roundDate || new Date().toISOString().split("T")[0],
-          players: initialPlayers.map((p) => ({ user_id: p.id, tee_id: p.teeId || teeId })),
+          players: initialPlayers.map((p) => ({
+            key: p.id,
+            user_id: p.isGuest ? null : p.id,
+            guest_name: p.isGuest ? p.name : null,
+            tee_id: p.teeId || teeId,
+          })),
         }),
       });
 
       if (res.ok) {
         const data = await res.json();
         setRoundId(data.round.id);
+        // Re-key local state to the canonical player key (user_id for Loozers,
+        // `guest:<rpId>` for guests). Safe because no scores exist yet at
+        // creation — this matches the scheme reloadRoster uses on later syncs.
+        const rps = (data.round_players || []) as {
+          id: string;
+          user_id: string | null;
+          player_position: number;
+        }[];
         const map: Record<string, string> = {};
-        for (const rp of data.round_players || []) {
-          map[rp.user_id] = rp.id;
+        const rebuilt: Player[] = [];
+        for (const rp of [...rps].sort((a, b) => (a.player_position || 0) - (b.player_position || 0))) {
+          const local = initialPlayers[(rp.player_position ?? 0) - 1];
+          const key = rp.user_id ?? `guest:${rp.id}`;
+          map[key] = rp.id;
+          rebuilt.push({ ...(local ?? { id: key, name: "Player" }), id: key, roundPlayerId: rp.id });
         }
+        setPlayers(rebuilt);
         setPlayerMap(map);
         setReady(true);
       }
@@ -341,46 +362,52 @@ export default function LiveScoringEntry({
     const json = await res.json();
     const rps = (json.round?.round_players || []) as {
       id: string;
-      user_id: string;
+      user_id: string | null;
+      guest_name?: string | null;
       user: { display_name?: string } | { display_name?: string }[] | null;
       player_tee: { tee_name?: string } | { tee_name?: string }[] | null;
       tee_id?: string;
     }[];
 
+    // Canonical key: user_id for Loozers, `guest:<rpId>` for guests.
+    const keyOf = (rp: { id: string; user_id: string | null }) =>
+      rp.user_id ?? `guest:${rp.id}`;
+
     const nextPlayers: Player[] = rps.map((rp) => {
       const user = Array.isArray(rp.user) ? rp.user[0] : rp.user;
       const tee = Array.isArray(rp.player_tee) ? rp.player_tee[0] : rp.player_tee;
       return {
-        id: rp.user_id,
-        name: user?.display_name || "Player",
+        id: keyOf(rp),
+        name: user?.display_name || rp.guest_name || "Player",
+        isGuest: !rp.user_id,
         teeName: tee?.tee_name,
         teeId: rp.tee_id,
         roundPlayerId: rp.id,
       };
     });
     const nextMap: Record<string, string> = {};
-    for (const rp of rps) nextMap[rp.user_id] = rp.id;
-    const validUserIds = new Set(rps.map((r) => r.user_id));
+    for (const rp of rps) nextMap[keyOf(rp)] = rp.id;
+    const validKeys = new Set(rps.map(keyOf));
 
     setPlayers(nextPlayers);
     setPlayerMap(nextMap);
     setScores((prev) => {
       const next: typeof prev = {};
-      for (const uid of Object.keys(prev)) {
-        if (validUserIds.has(uid)) next[uid] = prev[uid];
+      for (const k of Object.keys(prev)) {
+        if (validKeys.has(k)) next[k] = prev[k];
       }
-      for (const uid of validUserIds) {
-        if (!next[uid]) next[uid] = {};
+      for (const k of validKeys) {
+        if (!next[k]) next[k] = {};
       }
       return next;
     });
     setPutts((prev) => {
       const next: typeof prev = {};
-      for (const uid of Object.keys(prev)) {
-        if (validUserIds.has(uid)) next[uid] = prev[uid];
+      for (const k of Object.keys(prev)) {
+        if (validKeys.has(k)) next[k] = prev[k];
       }
-      for (const uid of validUserIds) {
-        if (!next[uid]) next[uid] = {};
+      for (const k of validKeys) {
+        if (!next[k]) next[k] = {};
       }
       return next;
     });

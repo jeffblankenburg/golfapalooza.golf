@@ -13,7 +13,9 @@ import { notifyPlayersAddedToRound } from "@/lib/rounds/notify";
  *     tags: [Rounds]
  *     description: |
  *       Issue #130 co-equal ownership. Any player already in the round (or
- *       an admin) can add another Loozer. Inserts a `round_players` row at
+ *       an admin) can add another Loozer, or a guest (a non-app player whose
+ *       scores are still tracked). Provide either `user_id` (a Loozer) or
+ *       `guest_name` (a guest), never both. Inserts a `round_players` row at
  *       the next `player_position`. Reuses the round's default tee unless
  *       a `tee_id` is provided that belongs to the round's course.
  *     parameters:
@@ -27,10 +29,10 @@ import { notifyPlayersAddedToRound } from "@/lib/rounds/notify";
  *         application/json:
  *           schema:
  *             type: object
- *             required: [user_id]
  *             properties:
- *               user_id: { type: string, format: uuid }
- *               tee_id:  { type: string, format: uuid }
+ *               user_id:    { type: string, format: uuid }
+ *               guest_name: { type: string }
+ *               tee_id:     { type: string, format: uuid }
  *     responses:
  *       200: { description: Player added }
  *       400: { description: Bad request }
@@ -60,15 +62,19 @@ export async function POST(
     );
   }
 
-  let body: { user_id?: string; tee_id?: string };
+  let body: { user_id?: string; guest_name?: string; tee_id?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
   const { user_id: newUserId, tee_id: requestedTeeId } = body;
-  if (!newUserId) {
-    return NextResponse.json({ error: "user_id is required" }, { status: 400 });
+  const guestName = body.guest_name?.trim();
+  if (!newUserId && !guestName) {
+    return NextResponse.json({ error: "user_id or guest_name is required" }, { status: 400 });
+  }
+  if (newUserId && guestName) {
+    return NextResponse.json({ error: "Provide either user_id or guest_name, not both" }, { status: 400 });
   }
 
   const admin = createAdminClient();
@@ -104,9 +110,13 @@ export async function POST(
     .eq("round_id", roundId)
     .order("player_position", { ascending: true });
 
-  const alreadyIn = (existing || []).some((p) => p.user_id === newUserId);
-  if (alreadyIn) {
-    return NextResponse.json({ error: "Player already in this round" }, { status: 409 });
+  // Dedup only applies to real Loozers — a round can have multiple guests
+  // (even with the same name), so guests are never rejected as duplicates.
+  if (newUserId) {
+    const alreadyIn = (existing || []).some((p) => p.user_id === newUserId);
+    if (alreadyIn) {
+      return NextResponse.json({ error: "Player already in this round" }, { status: 409 });
+    }
   }
 
   const nextPosition =
@@ -116,24 +126,27 @@ export async function POST(
     .from("round_players")
     .insert({
       round_id: roundId,
-      user_id: newUserId,
+      user_id: newUserId ?? null,
+      guest_name: newUserId ? null : guestName,
       tee_id: teeId,
       player_position: nextPosition,
       is_scorer: false,
     })
-    .select("id, user_id, tee_id, player_position")
+    .select("id, user_id, guest_name, tee_id, player_position")
     .single();
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   // Issue #131 — ping the newly added player with a deep link to the live
-  // scorer. Best-effort; never blocks the response.
-  await notifyPlayersAddedToRound({
-    roundId,
-    playerUserIds: [newUserId],
-    actorUserId: effectiveUserId,
-  });
+  // scorer. Best-effort; never blocks the response. Guests have no account.
+  if (newUserId) {
+    await notifyPlayersAddedToRound({
+      roundId,
+      playerUserIds: [newUserId],
+      actorUserId: effectiveUserId,
+    });
+  }
 
   return NextResponse.json({ player: inserted, actor_user_id: effectiveUserId });
 }

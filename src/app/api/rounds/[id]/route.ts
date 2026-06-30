@@ -61,7 +61,9 @@ export async function GET(
   const tee = Array.isArray(round.tee) ? round.tee[0] : round.tee;
   if (tee && (round.round_type ?? "18") === "18") {
     const playersNeedingDiff = (round.round_players || []).filter(
-      (p: { final_gross_score: number | null; score_differential: number | null; scores?: unknown[] }) => {
+      (p: { user_id: string | null; final_gross_score: number | null; score_differential: number | null; scores?: unknown[] }) => {
+        // Guests have no handicap, so never get a differential.
+        if (!p.user_id) return false;
         if (p.final_gross_score == null || p.score_differential != null) return false;
         // If hole scores exist, require all 18 before backfilling.
         const holeCount = Array.isArray(p.scores) ? p.scores.length : 0;
@@ -211,6 +213,9 @@ export async function PUT(
           // Calculate adjusted score and differential for each player
           const playerUserIds = new Set<string>();
           for (const p of allPlayers) {
+            // Guests keep their gross total but get no adjusted score,
+            // differential, or handicap recalc.
+            if (!p.user_id) continue;
             if (p.final_gross_score == null) continue;
             const tee = teeMap.get(p.tee_id);
             if (!tee) continue;

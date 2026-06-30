@@ -14,7 +14,7 @@ interface AddPlayerDrawerProps {
   roundId: string;
   excludedUserIds: string[];
   onClose: () => void;
-  onAdded: (userId: string) => void;
+  onAdded: (userId?: string) => void;
 }
 
 export function AddPlayerDrawer({
@@ -28,10 +28,13 @@ export function AddPlayerDrawer({
   const [query, setQuery] = useState("");
   const [addingUserId, setAddingUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [guestName, setGuestName] = useState("");
+  const [addingGuest, setAddingGuest] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setQuery("");
+    setGuestName("");
     setError(null);
     let cancelled = false;
     async function load() {
@@ -82,6 +85,31 @@ export function AddPlayerDrawer({
     }
   }
 
+  async function addGuest() {
+    const name = guestName.trim();
+    if (!name || addingGuest) return;
+    setAddingGuest(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/rounds/${roundId}/players`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guest_name: name }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setError(data?.error || `Failed to add guest (${res.status})`);
+        return;
+      }
+      setGuestName("");
+      onAdded();
+    } catch {
+      setError("Network error — please try again");
+    } finally {
+      setAddingGuest(false);
+    }
+  }
+
   return (
     <BottomDrawer open={open} onClose={onClose} title="Add player">
       <div className="px-6 pt-4">
@@ -93,6 +121,36 @@ export function AddPlayerDrawer({
           className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40"
         />
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+
+        {/* Guest entry — a non-app player whose scores are still tracked. */}
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <div className="text-[0.625rem] font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+            Add a guest (not in the app)
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={guestName}
+              onChange={(e) => setGuestName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addGuest();
+                }
+              }}
+              placeholder="Guest name"
+              className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40"
+            />
+            <button
+              type="button"
+              onClick={addGuest}
+              disabled={!guestName.trim() || addingGuest}
+              className="px-4 py-2.5 rounded-lg bg-green-600 text-white text-sm font-semibold active:bg-green-700 disabled:opacity-50"
+            >
+              {addingGuest ? "Adding..." : "Add"}
+            </button>
+          </div>
+        </div>
       </div>
       <div className="px-6 mt-2 divide-y divide-gray-100">
         {filtered.length === 0 ? (

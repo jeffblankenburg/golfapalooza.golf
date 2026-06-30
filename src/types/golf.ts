@@ -96,7 +96,10 @@ export interface Round {
 export interface RoundPlayer {
   id: string;
   round_id: string;
-  user_id: string;
+  // NULL for guest players (non-app participants). Exactly one of user_id /
+  // guest_name is set per row — see migration 00161.
+  user_id: string | null;
+  guest_name: string | null;
   tee_id: string;
   player_position: number;
   is_scorer: boolean;
@@ -126,11 +129,12 @@ export interface RoundScore {
 
 // Round with related data
 export interface RoundPlayerWithUser extends RoundPlayer {
+  // NULL for guest players — use guest_name for the display name in that case.
   user: {
     id: string;
     display_name: string;
     full_name: string | null;
-  };
+  } | null;
   tee: CourseTee;
   scores: RoundScore[];
 }

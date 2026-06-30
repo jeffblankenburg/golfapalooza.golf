@@ -100,6 +100,12 @@ export default function RoundForm() {
   const [allLoozers, setAllLoozers] = useState<Loozer[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+  // Guests: non-app players we still keep scores for. Each gets a temporary
+  // client id (`guest-N`); the server assigns the real round_player_id and the
+  // live scorer re-keys to `guest:<rpId>` once the round exists.
+  const [guests, setGuests] = useState<{ id: string; name: string }[]>([]);
+  const [guestNameInput, setGuestNameInput] = useState("");
+  const guestCounterRef = useRef(0);
   // Refs used by the Players step to preserve scroll position when toggling
   // a player. The selected/unselected lists are siblings — removing a row
   // from the unselected list shrinks it and silently shifts scrollTop, so
@@ -137,8 +143,15 @@ export default function RoundForm() {
   const [geoStatus, setGeoStatus] = useState<"unknown" | "granted" | "denied" | "prompt">("unknown");
   const [locating, setLocating] = useState(false);
 
-  const allPlayerIds = selectedPlayerIds;
-  const getPlayerName = (id: string) => allLoozers.find((l) => l.id === id)?.display_name || "Unknown";
+  const allPlayerIds = useMemo(
+    () => [...selectedPlayerIds, ...guests.map((g) => g.id)],
+    [selectedPlayerIds, guests],
+  );
+  const isGuestId = (id: string) => guests.some((g) => g.id === id);
+  const getPlayerName = (id: string) =>
+    allLoozers.find((l) => l.id === id)?.display_name ||
+    guests.find((g) => g.id === id)?.name ||
+    "Unknown";
   const getPlayerTee = (id: string) => {
     const tid = playerTees[id];
     return tid ? tees.find((t) => t.id === tid) ?? null : null;
@@ -285,13 +298,40 @@ export default function RoundForm() {
     });
   }
 
+  function addGuest() {
+    const name = guestNameInput.trim();
+    if (!name) return;
+    const id = `guest-${guestCounterRef.current++}`;
+    setGuests((prev) => [...prev, { id, name }]);
+    setGuestNameInput("");
+  }
+
+  function removeGuest(id: string) {
+    setGuests((prev) => prev.filter((g) => g.id !== id));
+    setPlayerTees((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setTotalScores((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }
+
   async function handleQuickEntry() {
     if (!selectedCourse || !selectedTee) return;
-    const players = allPlayerIds.map((id) => ({
-      user_id: id,
-      tee_id: playerTees[id] || selectedTee.id,
-      final_gross_score: totalScores[id] ? parseInt(totalScores[id]) : undefined,
-    }));
+    const players = allPlayerIds.map((id) => {
+      const guest = guests.find((g) => g.id === id);
+      return {
+        key: id,
+        user_id: guest ? null : id,
+        guest_name: guest ? guest.name : null,
+        tee_id: playerTees[id] || selectedTee.id,
+        final_gross_score: totalScores[id] ? parseInt(totalScores[id]) : undefined,
+      };
+    });
     if (players.some((p) => !p.final_gross_score)) return;
 
     setSaving(true);
@@ -326,7 +366,15 @@ export default function RoundForm() {
         tee_id: selectedTee.id,
         round_type: roundType,
         round_date: roundDate,
-        players: allPlayerIds.map((id) => ({ user_id: id, tee_id: playerTees[id] || selectedTee.id })),
+        players: allPlayerIds.map((id) => {
+          const guest = guests.find((g) => g.id === id);
+          return {
+            key: id,
+            user_id: guest ? null : id,
+            guest_name: guest ? guest.name : null,
+            tee_id: playerTees[id] || selectedTee.id,
+          };
+        }),
         hole_scores: cardScores,
       }),
     });
@@ -769,12 +817,68 @@ export default function RoundForm() {
           )}
         </div>
 
+        {/* Guests — people in the group who aren't in the app. We still keep
+            their scores; the round is saved unattached to any account. */}
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <div className="text-[0.625rem] font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+            Guests (not in the app)
+          </div>
+          {guests.length > 0 && (
+            <div className="space-y-1 mb-2">
+              {guests.map((g) => (
+                <div
+                  key={g.id}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200"
+                >
+                  <span className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center shrink-0 text-white text-[0.625rem] font-bold">
+                    {(g.name.trim()[0] || "?").toUpperCase()}
+                  </span>
+                  <span className="flex-1 text-sm font-medium text-gray-900 truncate">{g.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeGuest(g.id)}
+                    aria-label={`Remove ${g.name}`}
+                    className="w-6 h-6 flex items-center justify-center rounded-full text-gray-400 active:bg-gray-100 active:text-gray-700"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={guestNameInput}
+              onChange={(e) => setGuestNameInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addGuest();
+                }
+              }}
+              placeholder="Guest name"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            />
+            <button
+              type="button"
+              onClick={addGuest}
+              disabled={!guestNameInput.trim()}
+              className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold active:bg-green-700 disabled:opacity-50"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+
         <button
           onClick={() => { setStep("tees"); setSearchQuery(""); }}
-          disabled={selectedPlayerIds.length === 0}
+          disabled={allPlayerIds.length === 0}
           className="w-full mt-4 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 transition-colors"
         >
-          Continue with {selectedPlayerIds.length || 0} Loozer{selectedPlayerIds.length !== 1 ? "s" : ""}
+          Continue with {allPlayerIds.length || 0} player{allPlayerIds.length !== 1 ? "s" : ""}
         </button>
       </StepCard>
     );
@@ -897,7 +1001,7 @@ export default function RoundForm() {
 
   // ── Step: Score mode ──
   if (step === "score-mode") {
-    const liveDisabled = selectedPlayerIds.length > 4;
+    const liveDisabled = allPlayerIds.length > 4;
     return (
       <StepCard title="Enter Scores" subtitle="How do you want to enter scores?" onBack={() => setStep("tees")}>
         <div className="space-y-2">
@@ -1035,6 +1139,7 @@ export default function RoundForm() {
     const livePlayers = allPlayerIds.map((id) => ({
       id,
       name: getPlayerName(id),
+      isGuest: isGuestId(id),
       teeName: getPlayerTee(id)?.tee_name,
       teeColor: getPlayerTee(id)?.tee_color ?? null,
       teeId: playerTees[id] || selectedTee?.id,

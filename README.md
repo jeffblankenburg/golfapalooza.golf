@@ -41,6 +41,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Overhead and green image views
 - Auto-save with 600ms debounce, flush on exit
 - Multi-player support (up to 4 players per round)
+- Guest players — add someone who isn't in the app by typing their name (at round creation or mid-round via "Add player"). Their strokes and putts are tracked and their scorecard is saved like any other player. Guests are unattached to any account, have no handicap, and never appear in handicap calculations or on anyone's profile.
 - Course search with tee selection per player
 - 18-hole, Front 9, and Back 9 round types
 - Full scorecard view with 9-hole and 18-hole totals

@@ -22,7 +22,8 @@ interface RoundData {
   tee: { tee_name: string; tee_color: string | null; course_rating: number; slope_rating: number; par: number } | null;
   round_players: {
     id: string;
-    user_id: string;
+    user_id: string | null;
+    guest_name: string | null;
     final_gross_score: number | null;
     score_differential: number | null;
     user: { id: string; display_name: string; full_name: string | null } | null;
@@ -245,8 +246,10 @@ export default function RoundDetailPage() {
           if (b.user_id === currentUserId) return 1;
           return 0;
         }).map((player) => {
-          const userName = Array.isArray(player.user) ? player.user[0]?.display_name : player.user?.display_name;
-          const isMe = player.user_id === currentUserId;
+          const resolvedUserName = Array.isArray(player.user) ? player.user[0]?.display_name : player.user?.display_name;
+          const isGuest = !player.user_id;
+          const displayName = resolvedUserName || player.guest_name || "Player";
+          const isMe = player.user_id != null && player.user_id === currentUserId;
           const grossScore = player.final_gross_score;
           const scoreToPar = grossScore != null ? grossScore - par : null;
           const isExpanded = expandedPlayers.has(player.id);
@@ -272,9 +275,9 @@ export default function RoundDetailPage() {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setRemovePlayer({ id: player.id, name: userName || "Player" });
+                    setRemovePlayer({ id: player.id, name: displayName });
                   }}
-                  aria-label={`Remove ${userName || "player"} from round`}
+                  aria-label={`Remove ${displayName} from round`}
                   className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-gray-400 active:bg-gray-100 active:text-gray-700 z-10"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -291,10 +294,13 @@ export default function RoundDetailPage() {
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm font-medium text-gray-900">
-                          {userName || "Player"}
+                          {displayName}
                         </span>
                         {isMe && (
                           <span className="text-[0.625rem] bg-green-50 text-green-600 px-1.5 py-0.5 rounded-full font-medium">You</span>
+                        )}
+                        {isGuest && (
+                          <span className="text-[0.625rem] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-medium">Guest</span>
                         )}
                       </div>
                       {(player.score_differential != null || playerScores.some((s) => s.putts != null)) && (
@@ -428,7 +434,7 @@ export default function RoundDetailPage() {
       <AddPlayerDrawer
         open={addPlayerOpen}
         roundId={roundId}
-        excludedUserIds={players.map((p) => p.user_id)}
+        excludedUserIds={players.map((p) => p.user_id).filter((id): id is string => !!id)}
         onClose={() => setAddPlayerOpen(false)}
         onAdded={() => {
           setAddPlayerOpen(false);

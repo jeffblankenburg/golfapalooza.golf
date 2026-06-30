@@ -40,6 +40,7 @@ export default async function EditRoundPage({
       round_players(
         id,
         user_id,
+        guest_name,
         tee_id,
         user:users(id, display_name),
         scores:round_scores(hole_number, strokes, putts)
@@ -84,6 +85,7 @@ export default async function EditRoundPage({
 
   const players: EditorPlayer[] = (round.round_players || []).map((rp: {
     id: string;
+    guest_name: string | null;
     tee_id: string;
     user: { display_name: string } | { display_name: string }[] | null;
     scores: { hole_number: number; strokes: number; putts: number | null }[];
@@ -95,7 +97,7 @@ export default async function EditRoundPage({
     }
     return {
       round_player_id: rp.id,
-      display_name: u?.display_name || "Player",
+      display_name: u?.display_name || rp.guest_name || "Player",
       initial_tee_id: rp.tee_id,
       scores,
     };

@@ -79,9 +79,19 @@ export async function recalcAffectedPlayers(
 
   const playerUserIds = new Set<string>();
 
-  for (const p of players as { id: string; user_id: string; tee_id: string }[]) {
+  for (const p of players as { id: string; user_id: string | null; tee_id: string }[]) {
     const gross = grossByPlayer.get(p.id) ?? null;
     const tee = teeMap.get(p.tee_id) as { id: string; course_rating: number; slope_rating: number; par: number } | undefined;
+
+    // Guests have no handicap: keep the gross total fresh, but never compute an
+    // adjusted score / differential and never trigger a handicap recalc.
+    if (!p.user_id) {
+      await supabase
+        .from("round_players")
+        .update({ final_gross_score: gross, final_adjusted_score: null, score_differential: null })
+        .eq("id", p.id);
+      continue;
+    }
 
     if (gross == null || !tee) {
       await supabase

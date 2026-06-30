@@ -123,15 +123,28 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { course_id, tee_id, round_type, round_date, players, hole_scores } = body;
-    // players: array of { user_id, final_gross_score? }
-    // hole_scores: optional Record<user_id, Record<hole_number, strokes>> for full scorecard
+    // players: array of { key?, user_id?, guest_name?, tee_id?, final_gross_score? }
+    //   - exactly one of user_id / guest_name per player (guests are non-app players)
+    //   - key: client identifier used to look up this player's hole_scores; defaults
+    //     to user_id, so guests MUST supply a key
+    // hole_scores: optional Record<key, Record<hole_number, strokes>> for full scorecard
 
     if (!course_id || !tee_id) {
       return NextResponse.json({ error: "course_id and tee_id are required" }, { status: 400 });
     }
 
-    const allPlayers: { user_id: string; tee_id?: string; final_gross_score?: number | null }[] =
+    type IncomingPlayer = {
+      key?: string;
+      user_id?: string | null;
+      guest_name?: string | null;
+      tee_id?: string;
+      final_gross_score?: number | null;
+    };
+    const allPlayers: IncomingPlayer[] =
       players && players.length > 0 ? players : [{ user_id: userId }];
+
+    // The stable identifier the client used to key hole_scores for this player.
+    const playerKey = (p: IncomingPlayer): string => p.key ?? p.user_id ?? "";
 
     const hasHoleScores = hole_scores && Object.keys(hole_scores).length > 0;
     const effectiveRoundType = round_type || "18";
@@ -139,7 +152,7 @@ export async function POST(request: Request) {
     // If we have hole scores, compute gross totals from them
     if (hasHoleScores) {
       for (const p of allPlayers) {
-        const playerHoles = hole_scores[p.user_id];
+        const playerHoles = hole_scores[playerKey(p)];
         if (playerHoles) {
           p.final_gross_score = Object.values(playerHoles).reduce((sum: number, s: unknown) => sum + (s as number), 0);
         }
@@ -151,10 +164,10 @@ export async function POST(request: Request) {
     // Handicap differentials are only valid for complete 18-hole rounds.
     // Quick Entry (no hole_scores) trusts the user's final_gross_score as a
     // full-round total. Hole-by-hole entry requires all 18 holes scored.
-    function qualifiesForHandicap(userId: string): boolean {
+    function qualifiesForHandicap(key: string): boolean {
       if (effectiveRoundType !== "18") return false;
       if (!hasHoleScores) return true;
-      const playerHoles = hole_scores[userId];
+      const playerHoles = hole_scores[key];
       return !!playerHoles && Object.keys(playerHoles).length >= 18;
     }
 
@@ -186,12 +199,21 @@ export async function POST(request: Request) {
     }
 
     // 2. Batch insert all round_players (each player may have their own tee)
+    // Map player_position -> client key so we can re-key hole_scores after
+    // insert (the inserted rows carry user_id=NULL for guests, so we can't
+    // look them up by user_id; position is assigned i+1 below).
+    const keyByPosition = new Map<number, string>();
+    allPlayers.forEach((p, i) => keyByPosition.set(i + 1, playerKey(p)));
+
     const playerRows = allPlayers.map((p, i) => {
       const playerTeeId = p.tee_id || tee_id;
       const playerTee = teeMap.get(playerTeeId);
+      const isGuest = !p.user_id;
       let scoreDifferential: number | null = null;
+      // Guests have no handicap and never get a differential.
       if (
-        qualifiesForHandicap(p.user_id) &&
+        !isGuest &&
+        qualifiesForHandicap(playerKey(p)) &&
         p.final_gross_score != null &&
         playerTee?.course_rating &&
         playerTee?.slope_rating
@@ -200,7 +222,8 @@ export async function POST(request: Request) {
       }
       return {
         round_id: round.id,
-        user_id: p.user_id,
+        user_id: p.user_id ?? null,
+        guest_name: isGuest ? (p.guest_name ?? "Guest") : null,
         tee_id: playerTeeId,
         player_position: i + 1,
         is_scorer: p.user_id === userId,
@@ -229,7 +252,8 @@ export async function POST(request: Request) {
       }[] = [];
 
       for (const rp of roundPlayers) {
-        const playerHoles = hole_scores[rp.user_id];
+        const key = keyByPosition.get(rp.player_position);
+        const playerHoles = key ? hole_scores[key] : undefined;
         if (!playerHoles) continue;
 
         for (const [holeStr, strokes] of Object.entries(playerHoles)) {
@@ -274,11 +298,14 @@ export async function POST(request: Request) {
           }
 
           for (const rp of roundPlayers) {
+            // Guests get gross totals only — no adjusted score, no differential.
+            if (!rp.user_id) continue;
             if (rp.final_gross_score == null) continue;
-            const playerTeeId = allPlayers.find((p) => p.user_id === rp.user_id)?.tee_id || tee_id;
+            const key = keyByPosition.get(rp.player_position);
+            const playerTeeId = allPlayers[rp.player_position - 1]?.tee_id || tee_id;
             const tee = teeMap.get(playerTeeId);
             const holes = holesByTee.get(playerTeeId);
-            const playerHoles = hole_scores[rp.user_id];
+            const playerHoles = key ? hole_scores[key] : undefined;
             if (!tee || !holes || !playerHoles) continue;
 
             // Get player's current handicap for NDB calculation
@@ -301,7 +328,7 @@ export async function POST(request: Request) {
 
             if (holeScoreData.length > 0) {
               const adjustedGross = calculateAdjustedGrossScore(holeScoreData, courseHandicap);
-              const eligible = qualifiesForHandicap(rp.user_id);
+              const eligible = qualifiesForHandicap(key ?? "");
               const differential = eligible
                 ? calculateDifferential(adjustedGross, tee.course_rating, tee.slope_rating)
                 : null;
@@ -322,7 +349,7 @@ export async function POST(request: Request) {
       // If no hole scores (Quick Entry), still recalculate handicaps
       if (!hasHoleScores) {
         for (const rp of roundPlayers) {
-          playerUserIds.add(rp.user_id);
+          if (rp.user_id) playerUserIds.add(rp.user_id);
         }
       }
 
@@ -338,7 +365,10 @@ export async function POST(request: Request) {
     if (roundPlayers && roundPlayers.length > 0) {
       await notifyPlayersAddedToRound({
         roundId: round.id,
-        playerUserIds: roundPlayers.map((rp) => rp.user_id),
+        // Guests (user_id NULL) have no account to notify.
+        playerUserIds: roundPlayers
+          .map((rp) => rp.user_id)
+          .filter((id): id is string => !!id),
         actorUserId: userId,
       });
     }

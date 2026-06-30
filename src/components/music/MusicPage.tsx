@@ -234,7 +234,7 @@ export function MusicPage({ initialSongs, headerAction }: { initialSongs: Song[]
                 onClick={() => play(originalIndex)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors cursor-pointer ${
                   isActive
-                    ? "bg-green-50 border-l-4 border-green-600"
+                    ? "bg-green-50"
                     : "active:bg-gray-50"
                 }`}
               >

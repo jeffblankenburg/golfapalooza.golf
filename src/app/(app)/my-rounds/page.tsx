@@ -21,6 +21,7 @@ export default async function MyRoundsPage() {
         id,
         round_date,
         round_type,
+        format,
         status,
         course:courses(id, name, club_name, city, state),
         tee:course_tees(id, tee_name, tee_color, par),
@@ -58,6 +59,7 @@ export default async function MyRoundsPage() {
       id: r.id,
       round_date: r.round_date,
       round_type: r.round_type,
+      format: r.format,
       status: r.status,
       course_name: course ? formatCourseName(course) : "Unknown",
       course_city: course?.city,
@@ -71,7 +73,11 @@ export default async function MyRoundsPage() {
     };
   });
 
-  const completedRounds = roundSummaries.filter((r) => r.final_score != null);
+  // Scramble team scores aren't a personal score — keep them out of the
+  // avg/best aggregates (they'd inflate "best", since scrambles score low).
+  const completedRounds = roundSummaries.filter(
+    (r) => r.final_score != null && r.format !== "scramble",
+  );
   const avgScore = completedRounds.length > 0
     ? Math.round(completedRounds.reduce((sum, r) => sum + (r.final_score || 0), 0) / completedRounds.length)
     : null;

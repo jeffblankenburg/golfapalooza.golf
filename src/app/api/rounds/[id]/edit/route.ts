@@ -51,7 +51,7 @@ export async function PUT(
 
   const { data: roundRow } = await admin
     .from("rounds")
-    .select("id, status, created_by, round_type, course_id")
+    .select("id, status, created_by, round_type, format, course_id")
     .eq("id", roundId)
     .single();
 
@@ -193,7 +193,7 @@ export async function PUT(
   // still needs adjusted/differential recompute against the new tee's
   // rating/slope/par). Then stamp edited_at + edited_by.
   if (affectedPlayerIds.size > 0) {
-    await recalcAffectedPlayers(admin, roundId, roundRow.round_type ?? "18", [...affectedPlayerIds]);
+    await recalcAffectedPlayers(admin, roundId, roundRow.round_type ?? "18", [...affectedPlayerIds], roundRow.format);
   }
 
   if (round_date || (player_tees && player_tees.length > 0) || (player_scores && player_scores.length > 0)) {

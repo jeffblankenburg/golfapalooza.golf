@@ -142,11 +142,13 @@ export async function PUT(
       // Get the round and all player info
       const { data: round } = await adminClient
         .from("rounds")
-        .select("tee_id, created_by, round_type")
+        .select("tee_id, created_by, round_type, format")
         .eq("id", id)
         .single();
 
       const is18 = (round?.round_type ?? "18") === "18";
+      // Scramble = a single team ball, never fed into any player's handicap.
+      const isScramble = round?.format === "scramble";
 
       if (round) {
         // Fetch all players and their tee data
@@ -217,6 +219,15 @@ export async function PUT(
             // differential, or handicap recalc.
             if (!p.user_id) continue;
             if (p.final_gross_score == null) continue;
+            // Scramble: keep the team gross on every roster row, but no
+            // adjusted score / differential and no handicap recalc.
+            if (isScramble) {
+              await adminClient
+                .from("round_players")
+                .update({ final_adjusted_score: null, score_differential: null })
+                .eq("id", p.id);
+              continue;
+            }
             const tee = teeMap.get(p.tee_id);
             if (!tee) continue;
 

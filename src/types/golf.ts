@@ -76,6 +76,10 @@ export interface CourseComplete extends Course {
 
 export type RoundType = "9-front" | "9-back" | "18";
 export type RoundStatus = "in_progress" | "completed" | "abandoned";
+// Orthogonal to RoundType (which encodes hole count). "individual" = everyone
+// plays their own ball, WHS handicap-eligible. "scramble" = the whole group
+// plays one team ball, one score per hole, excluded from handicap.
+export type RoundFormat = "individual" | "scramble";
 
 export interface Round {
   id: string;
@@ -84,6 +88,7 @@ export interface Round {
   tee_id: string;
   round_date: string;
   round_type: RoundType;
+  format: RoundFormat;
   status: RoundStatus;
   weather_conditions: string | null;
   notes: string | null;

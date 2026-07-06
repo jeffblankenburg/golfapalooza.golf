@@ -42,7 +42,7 @@ export function AvatarCropModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+    <div className="fixed inset-0 z-50 bg-black flex flex-col pt-14 pb-[calc(4rem+env(safe-area-inset-bottom))]">
       <div className="flex items-center justify-between px-4 h-14 text-white flex-shrink-0">
         <button
           onClick={onCancel}

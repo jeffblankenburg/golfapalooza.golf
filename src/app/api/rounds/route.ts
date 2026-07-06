@@ -21,6 +21,7 @@ export async function GET() {
       id,
       round_date,
       round_type,
+      format,
       status,
       notes,
       created_at,
@@ -94,6 +95,7 @@ export async function GET() {
       id: r.id,
       round_date: r.round_date,
       round_type: r.round_type,
+      format: r.format,
       status: r.status,
       course_name: course?.name || "Unknown",
       course_city: course?.city,
@@ -122,7 +124,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { course_id, tee_id, round_type, round_date, players, hole_scores } = body;
+    const { course_id, tee_id, round_type, round_date, players, hole_scores, format } = body;
     // players: array of { key?, user_id?, guest_name?, tee_id?, final_gross_score? }
     //   - exactly one of user_id / guest_name per player (guests are non-app players)
     //   - key: client identifier used to look up this player's hole_scores; defaults
@@ -148,6 +150,9 @@ export async function POST(request: Request) {
 
     const hasHoleScores = hole_scores && Object.keys(hole_scores).length > 0;
     const effectiveRoundType = round_type || "18";
+    // Scramble rounds are a single team ball, excluded from every player's WHS
+    // handicap. Anything not explicitly "scramble" is individual play.
+    const effectiveFormat = format === "scramble" ? "scramble" : "individual";
 
     // If we have hole scores, compute gross totals from them
     if (hasHoleScores) {
@@ -165,6 +170,7 @@ export async function POST(request: Request) {
     // Quick Entry (no hole_scores) trusts the user's final_gross_score as a
     // full-round total. Hole-by-hole entry requires all 18 holes scored.
     function qualifiesForHandicap(key: string): boolean {
+      if (effectiveFormat === "scramble") return false;
       if (effectiveRoundType !== "18") return false;
       if (!hasHoleScores) return true;
       const playerHoles = hole_scores[key];
@@ -187,6 +193,7 @@ export async function POST(request: Request) {
         course_id,
         tee_id,
         round_type: round_type || "18",
+        format: effectiveFormat,
         round_date: round_date || new Date().toISOString().split("T")[0],
         status: isComplete ? "completed" : "in_progress",
         completed_at: isComplete ? new Date().toISOString() : null,

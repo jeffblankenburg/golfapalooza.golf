@@ -44,6 +44,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Guest players — add someone who isn't in the app by typing their name (at round creation or mid-round via "Add player"). Their strokes and putts are tracked and their scorecard is saved like any other player. Guests are unattached to any account, have no handicap, and never appear in handicap calculations or on anyone's profile.
 - Course search with tee selection per player
 - 18-hole, Front 9, and Back 9 round types
+- **Scramble format** — at round creation, choose "Own ball" (everyone plays their own ball) or "Scramble" (the whole group plays one team ball). Scramble rounds use a dedicated live scorer with a single team score per hole (no per-player entry, no putts), stay in sync across devices like any round, and are **excluded from every player's handicap** and from the personal avg/best stats and the global Recent Rounds feed. They appear in each player's round history badged "Scramble," and the round detail page collapses to a single Team card.
 - Full scorecard view with 9-hole and 18-hole totals
 - Putt tracking per hole with totals on round detail
 - Co-equal round ownership — every player in a round can edit scores, complete the round, add/remove other players, and delete the round (with confirmation). The original "creator" is shown as the attribution but no longer gates any action.

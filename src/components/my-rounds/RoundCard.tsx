@@ -7,6 +7,7 @@ interface RoundCardProps {
   id: string;
   round_date: string;
   round_type: string;
+  format?: string;
   status: string;
   course_name: string;
   course_city?: string | null;
@@ -28,9 +29,10 @@ function formatDate(dateStr: string): string {
 
 export default function RoundCard(props: RoundCardProps) {
   const {
-    id, round_date, round_type, status, course_name,
+    id, round_date, round_type, format, status, course_name,
     tee_name, tee_color, par, final_score, score_to_par, score_differential,
   } = props;
+  const isScramble = format === "scramble";
 
   return (
     <Link
@@ -60,6 +62,14 @@ export default function RoundCard(props: RoundCardProps) {
                 </span>
               </>
             )}
+            {isScramble && (
+              <>
+                <span>·</span>
+                <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-1.5 py-0.5 rounded font-medium">
+                  Scramble
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -83,11 +93,15 @@ export default function RoundCard(props: RoundCardProps) {
         </div>
       </div>
 
-      {score_differential != null && (
+      {isScramble ? (
+        <div className="mt-2 text-xs text-gray-400">
+          Team score · Par {par} · Not counted toward handicap
+        </div>
+      ) : score_differential != null ? (
         <div className="mt-2 text-xs text-gray-400">
           Differential: {score_differential.toFixed(1)} · Par {par}
         </div>
-      )}
+      ) : null}
     </Link>
   );
 }

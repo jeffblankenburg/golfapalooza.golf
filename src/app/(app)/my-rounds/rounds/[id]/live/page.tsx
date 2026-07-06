@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import LiveScoringEntry from "@/components/my-rounds/LiveScoringEntry";
+import ScrambleScoringEntry from "@/components/my-rounds/ScrambleScoringEntry";
 import { type HoleInfo } from "@/components/scoring/ScoringShell";
 
 interface RoundData {
   id: string;
   round_type: string;
+  format?: string;
   course: { name: string } | null;
   tee: { tee_name: string; tee_color: string | null } | null;
   round_players: {
@@ -34,7 +36,12 @@ export default function LiveScoringResumePage() {
     initialPlayerMap: Record<string, string>;
     courseName: string;
     roundType: string;
+    format: string;
     teeColor: string | null;
+    // Scramble-only: one team score per hole + the roster rows we fan it out to.
+    scrambleTeamScores: Record<number, number>;
+    scrambleRoundPlayerIds: string[];
+    scrambleMembers: { id: string; name: string; isGuest?: boolean }[];
   } | null>(null);
 
   useEffect(() => {
@@ -93,6 +100,27 @@ export default function LiveScoringResumePage() {
       // Get tee color from the round's tee
       const roundTee = Array.isArray(round.tee) ? round.tee[0] : round.tee;
 
+      // Scramble: every roster row carries the same team score, so any one
+      // player's scores reconstruct the team card. Fan-out targets = all rows.
+      const scrambleTeamScores: Record<number, number> = {};
+      const withScores = roundPlayers.find(
+        (rp: RoundData["round_players"][0]) => rp.scores && rp.scores.length > 0,
+      );
+      if (withScores) {
+        for (const s of withScores.scores) scrambleTeamScores[s.hole_number] = s.strokes;
+      }
+      const scrambleRoundPlayerIds = roundPlayers.map(
+        (rp: RoundData["round_players"][0]) => rp.id,
+      );
+      const scrambleMembers = roundPlayers.map((rp: RoundData["round_players"][0]) => {
+        const user = Array.isArray(rp.user) ? rp.user[0] : rp.user;
+        return {
+          id: rp.user_id ?? `guest:${rp.id}`,
+          name: user?.display_name || rp.guest_name || "Player",
+          isGuest: !rp.user_id,
+        };
+      });
+
       setData({
         round,
         holes,
@@ -102,7 +130,11 @@ export default function LiveScoringResumePage() {
         initialPlayerMap,
         courseName: course?.name || "Unknown Course",
         roundType: round.round_type,
+        format: round.format || "individual",
         teeColor: roundTee?.tee_color || null,
+        scrambleTeamScores,
+        scrambleRoundPlayerIds,
+        scrambleMembers,
       });
     }
     load();
@@ -113,6 +145,25 @@ export default function LiveScoringResumePage() {
       <div className="fixed inset-0 z-50 bg-white flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin" />
       </div>
+    );
+  }
+
+  if (data.format === "scramble") {
+    return (
+      <ScrambleScoringEntry
+        holes={data.holes}
+        members={data.scrambleMembers}
+        roundType={data.roundType}
+        courseName={data.courseName}
+        roundId={roundId}
+        teeColor={data.teeColor}
+        initialTeamScores={data.scrambleTeamScores}
+        initialRoundPlayerIds={data.scrambleRoundPlayerIds}
+        onClose={() => {
+          router.push("/my-rounds");
+          router.refresh();
+        }}
+      />
     );
   }
 

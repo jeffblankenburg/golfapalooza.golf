@@ -22,10 +22,14 @@ export async function recalcAffectedPlayers(
   roundId: string,
   roundType: string,
   affectedPlayerIds: string[],
+  format?: string,
 ): Promise<void> {
   if (affectedPlayerIds.length === 0) return;
 
   const is18 = (roundType ?? "18") === "18";
+  // Scramble = one team ball; its gross stays fresh on every roster row, but no
+  // player ever gets an adjusted score, differential, or handicap recalc.
+  const isScramble = format === "scramble";
 
   // Pull latest tee_id + gross totals from round_scores.
   const { data: players } = await supabase
@@ -82,6 +86,16 @@ export async function recalcAffectedPlayers(
   for (const p of players as { id: string; user_id: string | null; tee_id: string }[]) {
     const gross = grossByPlayer.get(p.id) ?? null;
     const tee = teeMap.get(p.tee_id) as { id: string; course_rating: number; slope_rating: number; par: number } | undefined;
+
+    // Scramble: keep the team gross fresh on every roster row, but never a
+    // differential/adjusted score, and never a handicap recalc.
+    if (isScramble) {
+      await supabase
+        .from("round_players")
+        .update({ final_gross_score: gross, final_adjusted_score: null, score_differential: null })
+        .eq("id", p.id);
+      continue;
+    }
 
     // Guests have no handicap: keep the gross total fresh, but never compute an
     // adjusted score / differential and never trigger a handicap recalc.

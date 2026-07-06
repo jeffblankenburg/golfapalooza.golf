@@ -54,6 +54,9 @@ export async function GET(request: Request) {
       )
     `)
     .eq("status", "completed")
+    // Scramble rounds are a single team ball — one card per member with an
+    // identical gross would spam the feed, and it isn't a personal score.
+    .eq("format", "individual")
     .order("round_date", { ascending: false })
     .order("completed_at", { ascending: false, nullsFirst: false })
     .order("player_position", { referencedTable: "round_players", ascending: true })

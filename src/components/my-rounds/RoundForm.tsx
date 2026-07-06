@@ -4,6 +4,7 @@ import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import ScorecardEntry from "./ScorecardEntry";
 import LiveScoringEntry from "./LiveScoringEntry";
+import ScrambleScoringEntry from "./ScrambleScoringEntry";
 import CourseLookupModal from "./CourseLookupModal";
 import { calculateDifferential } from "@/lib/golf/calculator";
 import { getTeeDotStyle } from "@/lib/utils/tee-colors";
@@ -75,10 +76,16 @@ const STEPS = [
 
 type StepKey = (typeof STEPS)[number]["key"];
 // Internal sub-steps within "scores"
-type Step = StepKey | "score-mode" | "total-entry" | "scorecard" | "live";
+type Step = StepKey | "score-mode" | "total-entry" | "scorecard" | "live" | "scramble-live";
 
 function getStepIndex(step: Step): number {
-  if (step === "score-mode" || step === "total-entry" || step === "scorecard" || step === "live") {
+  if (
+    step === "score-mode" ||
+    step === "total-entry" ||
+    step === "scorecard" ||
+    step === "live" ||
+    step === "scramble-live"
+  ) {
     return STEPS.findIndex((s) => s.key === "scores");
   }
   return STEPS.findIndex((s) => s.key === step);
@@ -95,6 +102,10 @@ export default function RoundForm() {
   const [selectedCourse, setSelectedCourse] = useState<CourseSummary | null>(null);
   const [tees, setTees] = useState<Tee[]>([]);
   const [roundType, setRoundType] = useState<"18" | "9-front" | "9-back">("18");
+  // Orthogonal to roundType: "individual" = everyone plays their own ball
+  // (handicap-eligible); "scramble" = one team ball, excluded from handicap and
+  // scored on the dedicated scramble live scorer.
+  const [format, setFormat] = useState<"individual" | "scramble">("individual");
   const [roundDate, setRoundDate] = useState(new Date().toISOString().split("T")[0]);
 
   const [allLoozers, setAllLoozers] = useState<Loozer[]>([]);
@@ -491,6 +502,11 @@ export default function RoundForm() {
                 {dateLabel}
                 <span className="mx-2 text-gray-300">|</span>
                 {typeLabel}
+                {format === "scramble" && (
+                  <span className="ml-2 text-xs bg-green-50 text-green-700 border border-green-200 px-1.5 py-0.5 rounded font-medium">
+                    Scramble
+                  </span>
+                )}
               </div>
             )}
 
@@ -725,6 +741,34 @@ export default function RoundForm() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Format</label>
+            <div className="flex gap-2">
+              {([
+                { value: "individual", label: "Own ball", hint: "Everyone plays their own ball" },
+                { value: "scramble", label: "Scramble", hint: "One team ball · not counted for handicap" },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setFormat(opt.value)}
+                  className={`flex-1 py-2.5 px-2 rounded-lg text-sm font-medium transition-colors ${
+                    format === opt.value
+                      ? "bg-green-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-1.5">
+              {format === "scramble"
+                ? "Your whole group plays one ball. You'll enter a single team score per hole, and the round won't affect anyone's handicap."
+                : "Everyone plays their own ball. Counts toward your handicap when it's a completed 18."}
+            </p>
           </div>
 
           <button
@@ -989,11 +1033,15 @@ export default function RoundForm() {
         )}
 
         <button
-          onClick={() => setStep("score-mode")}
+          onClick={() => setStep(format === "scramble" ? "scramble-live" : "score-mode")}
           disabled={!allPlayersHaveTees}
           className="w-full mt-4 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 disabled:opacity-50 transition-colors"
         >
-          {allPlayersHaveTees ? "Continue" : "Pick a tee for every player"}
+          {allPlayersHaveTees
+            ? format === "scramble"
+              ? "Start Scramble"
+              : "Continue"
+            : "Pick a tee for every player"}
         </button>
       </StepCard>
     );
@@ -1157,6 +1205,33 @@ export default function RoundForm() {
         courseId={selectedCourse?.id}
         teeId={selectedTee?.id}
         effectiveTeeId={effectiveTeeId}
+        teeColor={getPlayerTee(currentUserId || "")?.tee_color || selectedTee?.tee_color}
+        roundDate={roundDate}
+        onClose={() => {
+          router.push("/my-rounds");
+          router.refresh();
+        }}
+      />
+    );
+  }
+
+  // ── Step: Scramble live scoring ──
+  if (step === "scramble-live") {
+    const members = allPlayerIds.map((id) => ({
+      id,
+      name: getPlayerName(id),
+      isGuest: isGuestId(id),
+      teeId: playerTees[id] || selectedTee?.id,
+    }));
+
+    return (
+      <ScrambleScoringEntry
+        holes={holes}
+        members={members}
+        roundType={roundType}
+        courseName={selectedCourse ? formatCourseName(selectedCourse) : ""}
+        courseId={selectedCourse?.id}
+        teeId={selectedTee?.id}
         teeColor={getPlayerTee(currentUserId || "")?.tee_color || selectedTee?.tee_color}
         roundDate={roundDate}
         onClose={() => {

@@ -49,7 +49,7 @@ export async function POST(
   // the right downstream recalc (adjusted/diff/handicap) afterwards.
   const { data: roundRow } = await supabase
     .from("rounds")
-    .select("id, status, created_by, round_type, tee_id")
+    .select("id, status, created_by, round_type, format, tee_id")
     .eq("id", roundId)
     .single();
 
@@ -170,7 +170,7 @@ export async function POST(
     // recalculate their handicaps. This mirrors the completion flow in
     // PUT /api/rounds/[id] but never re-flips status.
     if (isCompletedRound && affectedPlayerIds.length > 0) {
-      await recalcAffectedPlayers(supabase, roundId, roundRow.round_type ?? "18", affectedPlayerIds);
+      await recalcAffectedPlayers(supabase, roundId, roundRow.round_type ?? "18", affectedPlayerIds, roundRow.format);
 
       await supabase
         .from("rounds")

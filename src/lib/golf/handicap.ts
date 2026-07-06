@@ -21,11 +21,12 @@ export async function recalculateHandicap(
       final_adjusted_score,
       final_gross_score,
       tee:course_tees!round_players_tee_id_fkey(course_rating, slope_rating),
-      round:rounds!inner(round_date, status, round_type, course:courses(name))
+      round:rounds!inner(round_date, status, round_type, format, course:courses(name))
     `)
     .eq("user_id", userId)
     .eq("round.status", "completed")
     .eq("round.round_type", "18")
+    .eq("round.format", "individual")
     .not("score_differential", "is", null)
     .order("round(round_date)", { ascending: false })
     .limit(20);

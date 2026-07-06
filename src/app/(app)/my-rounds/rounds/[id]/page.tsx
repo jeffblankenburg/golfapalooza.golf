@@ -14,6 +14,7 @@ interface RoundData {
   created_at: string;
   round_date: string;
   round_type: string;
+  format?: string;
   status: string;
   notes: string | null;
   edited_at: string | null;
@@ -153,6 +154,9 @@ export default function RoundDetailPage() {
   const course = Array.isArray(round.course) ? round.course[0] : round.course;
   const roundTee = Array.isArray(round.tee) ? round.tee[0] : round.tee;
   const players = round.round_players || [];
+  // Scramble = one team ball. Every roster row carries the identical team
+  // score, so we collapse them into a single Team card below.
+  const isScramble = round.format === "scramble";
   const currentPlayer = players.find((p) => p.user_id === currentUserId);
   const currentPlayerTee = currentPlayer?.player_tee
     ? (Array.isArray(currentPlayer.player_tee) ? currentPlayer.player_tee[0] : currentPlayer.player_tee)
@@ -202,6 +206,11 @@ export default function RoundDetailPage() {
                     {round.round_type === "9-front" ? "Front 9" : "Back 9"}
                   </span>
                 )}
+                {isScramble && (
+                  <span className="ml-1.5 text-xs bg-green-50 text-green-700 border border-green-200 px-1.5 py-0.5 rounded font-medium">
+                    Scramble
+                  </span>
+                )}
                 {round.edited_at && (
                   <span className="ml-1.5 text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded" title={`Last edited ${new Date(round.edited_at).toLocaleString()}`}>
                     Edited
@@ -229,8 +238,10 @@ export default function RoundDetailPage() {
 
       {/* Player cards — effective user first */}
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-xs uppercase tracking-wide text-gray-500 font-medium">Players</h2>
-        {canManage && (
+        <h2 className="text-xs uppercase tracking-wide text-gray-500 font-medium">
+          {isScramble ? "Team" : "Players"}
+        </h2>
+        {canManage && !isScramble && (
           <button
             type="button"
             onClick={() => setAddPlayerOpen(true)}
@@ -240,6 +251,63 @@ export default function RoundDetailPage() {
           </button>
         )}
       </div>
+
+      {isScramble && (() => {
+        // One Team card: members + a single shared scorecard. Every roster row
+        // holds the identical team score, so the first scored row is canonical.
+        const scored = players.find((p) => (p.scores || []).length > 0) || players[0];
+        const teamGross = scored?.final_gross_score ?? null;
+        const teamToPar = teamGross != null ? teamGross - par : null;
+        const teamScoresMap: Record<number, number> = {};
+        for (const s of scored?.scores || []) teamScoresMap[s.hole_number] = s.strokes;
+        const hasScores = Object.keys(teamScoresMap).length > 0;
+        const memberNames = players.map((p) => {
+          const u = Array.isArray(p.user) ? p.user[0] : p.user;
+          return u?.display_name || p.guest_name || "Player";
+        });
+        return (
+          <div className="mb-6">
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap gap-1.5">
+                      {memberNames.map((name, i) => (
+                        <span key={i} className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full font-medium">
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="text-[0.6875rem] text-gray-400 mt-1.5">Not counted toward handicap</div>
+                  </div>
+                  {teamGross != null && (
+                    <div className="text-right shrink-0 ml-3">
+                      <span className="text-2xl font-bold text-gray-900">{teamGross}</span>
+                      {teamToPar != null && (
+                        <span className={`ml-1.5 text-sm font-medium ${
+                          teamToPar > 0 ? "text-red-600" : teamToPar < 0 ? "text-green-600" : "text-gray-500"
+                        }`}>
+                          {teamToPar > 0 ? "+" : ""}{teamToPar}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {hasScores && (
+                <div className="px-4 pb-4 border-t border-gray-100 pt-3">
+                  <ScorecardView holes={holes} scores={teamScoresMap} roundType={round.round_type} />
+                  <div className="mt-3 pt-2 border-t border-gray-100 text-[0.6875rem] text-gray-400 italic">
+                    Scramble · {new Date(round.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {!isScramble && (
       <div className="space-y-2 mb-6">
         {[...players].sort((a, b) => {
           if (a.user_id === currentUserId) return -1;
@@ -355,6 +423,7 @@ export default function RoundDetailPage() {
           );
         })}
       </div>
+      )}
 
       {round.status === "in_progress" && (
         <Link

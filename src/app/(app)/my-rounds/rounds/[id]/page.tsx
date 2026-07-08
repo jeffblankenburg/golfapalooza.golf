@@ -6,6 +6,7 @@ import Link from "next/link";
 import ScorecardView from "@/components/my-rounds/ScorecardView";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { AddPlayerDrawer } from "@/components/my-rounds/AddPlayerDrawer";
+import { FavoriteStarButton } from "@/components/favorites/FavoriteStarButton";
 import { BTN_BACK, BTN_DESTRUCTIVE } from "@/lib/ui/buttons";
 
 interface RoundData {
@@ -338,6 +339,19 @@ export default function RoundDetailPage() {
 
           return (
             <div key={player.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden relative">
+              {/* Favorite star (issue #140) — favorite a fellow player straight
+                  from the scorecard. Non-guest, non-self only. Sibling of the
+                  toggle button (never nested) to keep valid HTML. */}
+              {player.user_id && player.user_id !== currentUserId && (
+                <div className={`absolute top-2 ${canManage ? "right-11" : "right-2"} z-10`}>
+                  <FavoriteStarButton
+                    favoriteUserId={player.user_id}
+                    name={displayName}
+                    size="sm"
+                    stopPropagation
+                  />
+                </div>
+              )}
               {canManage && (
                 <button
                   type="button"

@@ -5,6 +5,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { HeaderBar } from "@/components/HeaderBar";
 import { SimulatorBanner } from "@/components/SimulatorBanner";
 import { AppShell } from "@/components/AppShell";
+import { FavoritesProvider } from "@/components/favorites/FavoritesContext";
 import { RouteProgress } from "@/components/RouteProgress";
 import { getSimDate, getSimUserId, getEffectiveUserId, isSimulating, isSimulatingTrip } from "@/lib/simulator";
 import { hasAnyPermission } from "@/lib/permissions";
@@ -131,7 +132,9 @@ export default async function AppLayout({
         displayName={profile?.display_name || ""}
         avatarUrl={profile?.avatar_url || null}
       />
-      <main>{children}</main>
+      <main>
+        <FavoritesProvider>{children}</FavoritesProvider>
+      </main>
       <BottomNav isAdmin={isAdmin || hasAnyPermission(simulating ? (profile?.permissions as Record<string, boolean> | null) : realPermissions)} />
     </AppShell>
   );

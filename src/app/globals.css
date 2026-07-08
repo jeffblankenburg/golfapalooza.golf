@@ -230,6 +230,41 @@ textarea::placeholder {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* Rich user-authored prose (Loozer bios, issue #140 follow-up).
+   Bios allow raw/pasted HTML, so content can arrive with hard-coded inline
+   font sizes, line heights, and ugly paste fonts from Word/Docs. Those fixed
+   sizes ignore the app's per-user font-scale (issue #138, a root font-size %
+   override), so at "large"/"xlarge" the rest of the UI grows while the bio
+   stays put — and pasted tables/media overflow the column. Neutralize the
+   rogue inline sizing so the bio follows our rem-based (scalable) typography,
+   and clamp media/tables/pre so nothing blows out the layout at any scale. */
+@layer components {
+  .rich-bio [style*="font-size"] {
+    font-size: inherit !important;
+  }
+  .rich-bio [style*="line-height"] {
+    line-height: inherit !important;
+  }
+  .rich-bio [style*="font-family"] {
+    font-family: inherit !important;
+  }
+  .rich-bio {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .rich-bio img,
+  .rich-bio video,
+  .rich-bio table,
+  .rich-bio pre {
+    max-width: 100% !important;
+    height: auto;
+  }
+  .rich-bio table {
+    display: block;
+    overflow-x: auto;
+  }
+}
+
 /* Brass nameplate — used for hole names in admin + live scoring */
 @layer components {
   .brass-plate {

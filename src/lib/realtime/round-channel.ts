@@ -25,12 +25,21 @@ export type RoundRow = {
   status: string;
 };
 
+export type RoundCommentRow = {
+  id: string;
+  round_id: string;
+  sender_id: string;
+  body: string;
+  created_at: string;
+};
+
 type ChangeKind = "INSERT" | "UPDATE" | "DELETE";
 
 export interface RoundChannelHandlers {
   onScoreChange?: (event: { kind: ChangeKind; row: ScoreRow | null; old: ScoreRow | null }) => void;
   onRosterChange?: (event: { kind: ChangeKind; row: RoundPlayerRow | null; old: RoundPlayerRow | null }) => void;
   onRoundChange?: (event: { kind: ChangeKind; row: RoundRow | null; old: RoundRow | null }) => void;
+  onComment?: (event: { kind: ChangeKind; row: RoundCommentRow | null; old: RoundCommentRow | null }) => void;
   onStatusChange?: (status: "SUBSCRIBED" | "CHANNEL_ERROR" | "CLOSED" | "TIMED_OUT") => void;
 }
 
@@ -86,6 +95,20 @@ export function subscribeToRound(
           kind: payload.eventType as ChangeKind,
           row: (payload.new as RoundRow) ?? null,
           old: (payload.old as RoundRow) ?? null,
+        });
+      },
+    );
+  }
+
+  if (handlers.onComment) {
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "round_comments", filter: `round_id=eq.${roundId}` },
+      (payload) => {
+        handlers.onComment!({
+          kind: payload.eventType as ChangeKind,
+          row: (payload.new as RoundCommentRow) ?? null,
+          old: (payload.old as RoundCommentRow) ?? null,
         });
       },
     );

@@ -7,6 +7,7 @@ import { resolveHolesForTee } from "@/lib/golf/composition-tees";
 import { getEffectiveUserId } from "@/lib/simulator";
 import { checkIsAdmin } from "@/lib/permissions-server";
 import { canManageRound } from "@/lib/rounds/access";
+import { notifyFavoritesRoundCompleted } from "@/lib/favorites/fanout";
 
 // GET - Fetch round with full details
 export async function GET(
@@ -127,6 +128,16 @@ export async function PUT(
 
     // Handle completing a round
     if (status === "completed") {
+      // Issue #140 — remember whether this is the live in_progress→completed
+      // transition (vs. re-saving an already-completed round). Only the real
+      // transition fires "Round Finished" favorite notifications.
+      const { data: priorRound } = await adminClient
+        .from("rounds")
+        .select("status")
+        .eq("id", id)
+        .single();
+      const wasInProgress = priorRound?.status === "in_progress";
+
       // Flip status to "completed" BEFORE calculating differentials and
       // recalculating handicaps. recalculateHandicap filters by
       // round.status = 'completed', so the just-completed round must already
@@ -292,6 +303,26 @@ export async function PUT(
           await Promise.all(
             [...playerUserIds].map((uid) => recalculateHandicap(adminClient, uid))
           );
+
+          // Issue #140 — ping favoriters that their Loozer finished ("Round
+          // Finished"). Only on the live transition, never for scrambles, and
+          // guests (no user_id) are skipped. Best-effort.
+          if (wasInProgress && !isScramble) {
+            await Promise.all(
+              allPlayers
+                .filter((p) => !!p.user_id)
+                .map((p) =>
+                  notifyFavoritesRoundCompleted({
+                    roundId: id,
+                    playerUserId: p.user_id as string,
+                    scoreLine:
+                      p.final_gross_score != null
+                        ? `Shot ${p.final_gross_score}`
+                        : null,
+                  })
+                )
+            );
+          }
         }
       }
     } else if (status) {

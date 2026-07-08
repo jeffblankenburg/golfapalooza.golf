@@ -4,6 +4,7 @@ import { calculateDifferential, calculateAdjustedGrossScore, calculateCourseHand
 import { recalculateHandicap } from "@/lib/golf/handicap";
 import { getEffectiveUserId } from "@/lib/simulator";
 import { notifyPlayersAddedToRound } from "@/lib/rounds/notify";
+import { notifyFavoritesRoundStarted } from "@/lib/favorites/fanout";
 
 // GET - List user's rounds
 export async function GET() {
@@ -378,6 +379,21 @@ export async function POST(request: Request) {
           .filter((id): id is string => !!id),
         actorUserId: userId,
       });
+    }
+
+    // Issue #140 — a favorited Loozer starting a live individual round pings
+    // everyone who favorited them ("Rounds Played"). Only for in-progress
+    // individual play; quick-entry (already complete) and scramble rounds are
+    // excluded, and guests have no account to be favorited. Best-effort.
+    if (!isComplete && effectiveFormat === "individual" && roundPlayers) {
+      const watchedPlayerIds = roundPlayers
+        .map((rp) => rp.user_id)
+        .filter((id): id is string => !!id);
+      await Promise.all(
+        watchedPlayerIds.map((pid) =>
+          notifyFavoritesRoundStarted({ roundId: round.id, playerUserId: pid })
+        )
+      );
     }
 
     return NextResponse.json({ round, round_players: roundPlayers });

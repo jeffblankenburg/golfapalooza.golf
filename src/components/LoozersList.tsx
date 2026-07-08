@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { LoozerTree } from "@/components/LoozerTree";
+import { FavoriteStarButton } from "@/components/favorites/FavoriteStarButton";
 import { readGeoCache, writeGeoCache, GEO_CACHE_TTL_MS } from "@/lib/geo-cache";
 
 // Mapbox + the LoozerMap glue together are ~hundreds of KB. Most visits to
@@ -289,6 +290,19 @@ export function LoozersList({
                 href={`${basePath}/${loozer.id}`}
                 className="relative flex flex-col items-center p-3 bg-white rounded-xl border border-gray-200 shadow-sm active:scale-95 transition-transform"
               >
+                {/* Favorite star (issue #140) — one-tap favoriting while
+                    browsing. stopPropagation so tapping it doesn't open the
+                    profile. Hidden on your own card. */}
+                {currentUserId && loozer.id !== currentUserId && (
+                  <div className="absolute top-1.5 right-1.5 z-10">
+                    <FavoriteStarButton
+                      favoriteUserId={loozer.id}
+                      name={loozer.display_name}
+                      size="sm"
+                      stopPropagation
+                    />
+                  </div>
+                )}
                 <div className="relative mb-2">
                   <div className="w-16 h-16 rounded-full overflow-hidden bg-green-700 text-white flex items-center justify-center">
                     {loozer.avatar_url ? (

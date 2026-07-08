@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getEffectiveUserId } from "@/lib/simulator";
 import { canManageRound } from "@/lib/rounds/access";
 import { recalcAffectedPlayers } from "@/lib/golf/recalc";
+import {
+  notifyFavoritesHolesScored,
+  type HoleTransition,
+} from "@/lib/favorites/fanout";
 
 // GET - Get all scores for a round
 export async function GET(
@@ -134,6 +138,22 @@ export async function POST(
       affectedPlayerIds.push(roundPlayer.id);
     }
 
+    // Issue #140 — before the upsert, snapshot which (player, hole) cells
+    // already have a score so we can tell first-scores (null→value) apart from
+    // edits. Only first-scores fire hole-by-hole favorite notifications; edits
+    // never re-notify. Skipped for completed rounds (no live watchers).
+    const notifyHoles = !isCompletedRound && roundRow.format !== "scramble";
+    let existingCells = new Set<string>();
+    if (notifyHoles && allRows.length > 0) {
+      const { data: existing } = await supabase
+        .from("round_scores")
+        .select("round_player_id, hole_number")
+        .in("round_player_id", affectedPlayerIds);
+      existingCells = new Set(
+        (existing || []).map((s) => `${s.round_player_id}:${s.hole_number}`)
+      );
+    }
+
     if (allRows.length > 0) {
       const { error: upsertError } = await supabase
         .from("round_scores")
@@ -176,6 +196,68 @@ export async function POST(
         .from("rounds")
         .update({ edited_at: new Date().toISOString(), edited_by: effectiveUserId })
         .eq("id", roundId);
+    }
+
+    // Issue #140 — fan hole-by-hole pushes out to favoriters. Only first-scores
+    // (cells not present before this request), only roster rows with a real
+    // user_id (guests skipped), coalesced per request inside the helper.
+    if (notifyHoles) {
+      const firstScores = allRows.filter(
+        (r) => !existingCells.has(`${r.round_player_id}:${r.hole_number}`)
+      );
+      if (firstScores.length > 0) {
+        const rpIds = [...new Set(firstScores.map((r) => r.round_player_id))];
+        const { data: rpRows } = await supabase
+          .from("round_players")
+          .select("id, user_id, tee_id")
+          .in("id", rpIds);
+
+        const rpById = new Map(
+          (rpRows || []).map((rp) => [rp.id, rp as { id: string; user_id: string | null; tee_id: string | null }])
+        );
+        const userIds = [
+          ...new Set(
+            (rpRows || []).map((rp) => rp.user_id).filter((u): u is string => !!u)
+          ),
+        ];
+        const teeIds = [
+          ...new Set(
+            (rpRows || []).map((rp) => rp.tee_id).filter((t): t is string => !!t)
+          ),
+        ];
+
+        if (userIds.length > 0) {
+          const [{ data: names }, { data: holePars }] = await Promise.all([
+            supabase.from("users").select("id, display_name").in("id", userIds),
+            teeIds.length > 0
+              ? supabase
+                  .from("course_holes")
+                  .select("tee_id, hole_number, par")
+                  .in("tee_id", teeIds)
+              : Promise.resolve({ data: [] as { tee_id: string; hole_number: number; par: number }[] }),
+          ]);
+
+          const nameById = new Map((names || []).map((n) => [n.id, n.display_name]));
+          const parByCell = new Map(
+            (holePars || []).map((h) => [`${h.tee_id}:${h.hole_number}`, h.par])
+          );
+
+          const transitions: HoleTransition[] = [];
+          for (const r of firstScores) {
+            const rp = rpById.get(r.round_player_id);
+            if (!rp?.user_id) continue; // skip guests
+            transitions.push({
+              playerUserId: rp.user_id,
+              playerName: nameById.get(rp.user_id) || "A Loozer",
+              hole: r.hole_number,
+              strokes: r.strokes,
+              par: rp.tee_id ? parByCell.get(`${rp.tee_id}:${r.hole_number}`) ?? null : null,
+            });
+          }
+
+          await notifyFavoritesHolesScored({ roundId, transitions });
+        }
+      }
     }
 
     return NextResponse.json({ success: true });

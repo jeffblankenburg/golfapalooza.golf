@@ -11,6 +11,7 @@ import { FakeAdCarousel } from "@/components/FakeAdCarousel";
 import { AccoladesList, type AccoladeData } from "@/components/profile/AccoladesList";
 import { LoozerTree } from "@/components/LoozerTree";
 import { AvatarLightbox } from "@/components/AvatarLightbox";
+import { FavoriteStarButton } from "@/components/favorites/FavoriteStarButton";
 import { BTN_PRIMARY } from "@/lib/ui/buttons";
 
 interface DescendantLoozer {
@@ -285,9 +286,21 @@ export function LoozerProfile({
 
           {/* Name + stats */}
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold text-gray-900 truncate">
-              {profile.display_name}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-gray-900 truncate">
+                {profile.display_name}
+              </h1>
+              {/* Favorite star (issue #140). Authenticated, non-self only —
+                  the spectator profile lives outside the FavoritesProvider. */}
+              {!spectator && !isOwnProfile && (
+                <FavoriteStarButton
+                  favoriteUserId={profile.id}
+                  name={profile.display_name}
+                  size="lg"
+                  className="flex-shrink-0"
+                />
+              )}
+            </div>
             {!spectator && profile.full_name && profile.full_name !== profile.display_name && (
               <p className="text-sm text-gray-500 truncate">{profile.full_name}</p>
             )}
@@ -419,7 +432,7 @@ export function LoozerProfile({
           isOpen={openSections.has("bio")}
           onToggle={() => toggleSection("bio")}
         >
-          <div className="prose prose-sm max-w-none text-gray-700">
+          <div className="rich-bio prose prose-sm max-w-none text-gray-700">
             <ReactMarkdown
               remarkPlugins={[remarkBreaks]}
               rehypePlugins={[rehypeRaw]}

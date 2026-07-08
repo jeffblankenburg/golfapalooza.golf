@@ -9,6 +9,7 @@ import { FakeAdCarousel } from "@/components/FakeAdCarousel";
 import { BirthdayBanner } from "@/components/BirthdayBanner";
 import { PollHomeButton } from "@/components/polls/PollHomeButton";
 import { RecentRoundsFeed } from "@/components/RecentRoundsFeed";
+import { LiveNowFeed } from "@/components/LiveNowFeed";
 import { SpiritWearCard } from "@/components/SpiritWearCard";
 import { DragHandle } from "@/components/DragHandle";
 
@@ -1030,6 +1031,9 @@ export function HomeContent({
           })}
         </div>
       </div>
+
+      {/* Live Now — every in-progress individual round, watchable by anyone */}
+      <LiveNowFeed />
 
       {/* Recent Rounds — last 25 player-rounds across all Loozers */}
       <RecentRoundsFeed />

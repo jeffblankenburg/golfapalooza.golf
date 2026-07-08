@@ -1,253 +1,198 @@
-# Feature: Favorite Loozers
+# Feature: Favorite Loozers (watch live rounds + live comments)
+
+**Phase:** Social / Live Scoring
+**Related:** #132 (Live Scoring Realtime Sync), #131 (Round Invite Notifications), #14 (closed — generic friends system, out of scope)
+
+> Supersedes the May-16 draft. Reconciled with the current spec: 3 notification toggles (not 5), **live** comments (not completed-only), a read-only spectator view, and a home-page "Live Now" list. Notification coalescing and the per-favorite model carry over from the earlier draft.
+
+## Problem
+
+Every Loozer is family, but most of us have a smaller circle we actually want to keep tabs on. Today the app treats everyone equally, and you can't watch a round unfold unless you're on its roster. We want a lightweight, **one-way** "favorite" relationship that drives live watching, notifications, and in-round commentary — without the weight of a bidirectional friends/blocking system.
 
 ## Overview
 
-While every Loozer is family, most of us have a smaller circle we play with weekly, hang out with on weekends, and just want to pay closer attention to. Today the app treats everyone equally — every photo upload, every round, every accolade is just one of many in the firehose.
+A user can **favorite** any Loozer (a star on their profile, on a scorecard, or on a `/loozers` card). Favoriting is **silent and one-way** — the favorited Loozer is never told and can't see who favorited them.
 
-This feature lets each Loozer mark others as **favorites**, opt into per-favorite notifications (round started, hole completed, round finished, photo uploaded), and leave comments on **any** Loozer's completed scorecard to razz, congratulate, or encourage them.
+Favoriting drives per-favorite notifications and easy live-watching. Two things ship together but are independent:
+1. **Favorites + per-favorite notification preferences** — who you watch and what pings you.
+2. **Live round comments** — anyone watching an in-progress round can comment as it happens; open to all Loozers regardless of favorite status.
 
-Two related but distinct sub-features ship together:
-1. **Favorites + per-favorite notification preferences** — who you follow and what pings you get
-2. **Scorecard comments** — comment threads on any completed round, open to all Loozers regardless of favorite status
+Plus one public surface not gated on favoriting:
+3. **Live Now on the home page** — every in-progress *individual* round is listed for any Loozer to watch.
 
-## User Experience
+## Decisions (confirmed with product)
 
-### Marking a favorite
+- **Notification toggles: 3** — **Rounds Played** (fires when they *start* a live round, so you can go watch), **Hole-by-Hole Updates** (fires as they card holes), **Round Finished** (fires on completion with their score). Defaults all ON. (Photo-upload and comment-on-card pings from the old draft are dropped.)
+- **Watch surface:** a NEW **read-only live scoreboard** spectator view — NOT the existing score-entry `/live` page (that stays roster-only for editing).
+- **Hole cadence:** fires on the **first score recorded for a hole**, not on edits/re-saves. Coalesced per request (see below).
+- **Reciprocity:** silent / one-way. No "X favorited you," no follower counts.
+- **Live Now scope:** all in-progress **individual** rounds (`format='individual'`, `status='in_progress'`), watchable by any signed-in Loozer. Trip scrambles keep their own home treatment — out of scope here.
+- **Star placement:** Loozer profile header, round/scorecard view, AND every `/loozers` card (Grid + Tree). Hidden on your own card/profile.
+- **Comments:** any signed-in Loozer, any round, **any time** — there is NO round-status gate. Comment mid-round to razz a birdie, or years later on a historical card. Text-only in v1. Reuse the proven `gallery_comments` / `MediaComments` pattern with realtime.
+- **Scope:** personal `rounds` only. KGB Cup (`kgb_cup_*`) and scrambles (`scramble_scores`) use separate tables/APIs and never flow through `/api/rounds`, so they're naturally excluded — no explicit filtering needed.
 
-A small outline heart sits in the **top-right corner** of every Loozer card on `/loozers` (both Grid and Tree views) and on every Loozer profile page (`/loozers/[userId]`). The heart is hidden on your own card/profile.
+## UX Flow
 
-- **Outline heart** = not a favorite
-- **Filled heart** = favorite
+### Favoriting
+- **Star toggle** (outline → filled) on: profile header (`LoozerProfile.tsx`), each `/loozers` card (`LoozersList.tsx`, Grid + Tree, top-right), and next to roster players on the round/scorecard view.
+- Tapping an empty star opens a **BottomDrawer** ("Following [Name]") with the three notification toggles (all ON by default); closing saves the favorite. Re-opening for an existing favorite edits prefs and shows a destructive **"Unfavorite [Name]"** button.
+- One gesture, one effect. No long-press/swipe. Optimistic; reverts on API failure.
+- Self-favorite blocked (star hidden on own surfaces + DB CHECK + API guard).
 
-**Tap behavior** (same on cards and profile):
-- Tapping the heart opens a `BottomDrawer` titled "Following [Name]"
-- The drawer shows the Loozer's avatar + name and a list of checkbox preferences (see below)
-- Closing the drawer saves the favorite (if it didn't already exist) with whatever boxes are checked
-- For existing favorites, the same drawer opens to edit prefs and contains a destructive **"Unfavorite [Name]"** button at the bottom
+### Watching
+- Home gains a **Live Now** section: all in-progress individual rounds (player avatar + name, course, thru-N, score-to-par). Each links to the spectator view.
+- Notification deep-links open the same spectator view: `/rounds/{id}/watch`.
+- Spectator view = read-only realtime scorecard/leaderboard via `subscribeToRound`, plus the live comments panel. Loads for completed rounds too (historical, no longer live-updating); Live Now drops a round on `status='completed'`.
 
-Defaults (when first favoriting):
-- ✅ Notify me when they **start a live scoring round**
-- ✅ Notify me when they **complete each hole** (coalesced per-request — see Notification Coalescing)
-- ✅ Notify me when they **complete a round**
-- ✅ Notify me when they **upload a photo to the gallery**
-- ✅ Notify me when **someone comments on their scorecard**
-
-The heart is purely a tap target — no long-press, no swipe. One gesture, one effect.
-
-### Scorecard comments
-
-On every round's scorecard view (`/my-rounds/rounds/[id]` and any future shared scorecard surface), a comments thread appears below the score grid. Comments work on **in-progress and completed** rounds — saying "Nice birdie!" mid-round is half the point.
-
-- Anyone (any signed-in Loozer) can post a comment
-- Comments are short (≤500 chars), text-only in v1 (no GIFs, no images — keep scope tight)
-- The scorecard owner is notified on every new comment (regardless of favorite status)
-- Users who have favorited the scorecard owner AND have **"someone comments on their scorecard"** enabled also get notified
-- You can delete your own comment; admins can delete any comment
-- Comments persist on the round indefinitely
+### Commenting
+- On the spectator view, a comments feed (newest at bottom, autoscroll — adapted from `MediaComments`) with a text input. New comments broadcast in realtime to everyone watching. Roster players get a best-effort `round_comment` push. Delete your own; admins delete any.
 
 ## Data Model
 
-### New tables
-
+### Migration 00163 — `user_favorites`
 ```sql
 CREATE TABLE user_favorites (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  favorite_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  notify_round_started BOOLEAN NOT NULL DEFAULT TRUE,
-  notify_hole_completed BOOLEAN NOT NULL DEFAULT TRUE,
-  notify_round_completed BOOLEAN NOT NULL DEFAULT TRUE,
-  notify_photo_uploaded BOOLEAN NOT NULL DEFAULT TRUE,
-  notify_scorecard_comment BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,           -- the favoriter
+  favorite_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,  -- the watched Loozer
+  notify_round_started   boolean NOT NULL DEFAULT true,  -- "Rounds Played"
+  notify_hole_completed  boolean NOT NULL DEFAULT true,  -- "Hole-by-Hole Updates"
+  notify_round_completed boolean NOT NULL DEFAULT true,  -- "Round Finished"
+  created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (user_id, favorite_user_id),
   CHECK (user_id <> favorite_user_id)
 );
-CREATE INDEX idx_user_favorites_favorite ON user_favorites(favorite_user_id);
-
-CREATE TABLE round_comments (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  round_id UUID NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
-  sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  body TEXT NOT NULL CHECK (length(body) > 0 AND length(body) <= 500),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  edited_at TIMESTAMPTZ
-);
-CREATE INDEX idx_round_comments_round ON round_comments(round_id, created_at);
+CREATE INDEX idx_user_favorites_favorite ON user_favorites(favorite_user_id); -- fan-out lookup
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE user_favorites TO authenticated, service_role;
 ```
+RLS: read/write your own rows only (`user_id = auth.uid()`). Fan-out runs server-side via service role so the favorited person can NEVER see who favorited them (silent).
 
-### RLS
-
-- `user_favorites`: read/write your own rows only (`user_id = auth.uid()`); the fan-out queries run server-side via the service role so other users' favorites stay private.
-- `round_comments`: any authenticated Loozer can read all comments on any completed round; you can insert/delete only your own row; admins can delete any row.
-
-### Migration
-
-`00151_favorites_and_round_comments.sql` — creates both tables, indexes, and RLS policies.
+### Migration 00164 — `round_comments`
+Mirror `gallery_comments`:
+```sql
+CREATE TABLE round_comments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  round_id uuid NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+  sender_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body text NOT NULL CHECK (length(body) > 0 AND length(body) <= 500),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_round_comments_round ON round_comments(round_id, created_at ASC);
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE round_comments TO authenticated, service_role;
+```
+RLS: any authenticated Loozer reads all comments on any round; insert/delete your own; admins delete any. Add `round_comments` to the realtime publication for `onComment`.
 
 ## API Endpoints
-
-### Favorites
+All use `getEffectiveUserId`, `@swagger`-annotated, tags `Loozers` / `Rounds`.
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/favorites` | List current user's favorites with preferences. Includes basic Loozer info (id, display_name, avatar_url). |
-| POST | `/api/favorites` | Add a favorite. Body: `{ favorite_user_id, preferences? }`. Idempotent — `ON CONFLICT (user_id, favorite_user_id) DO UPDATE`. |
-| PUT | `/api/favorites/{favoriteUserId}` | Update preferences. Body: `{ notify_round_started?, notify_hole_completed?, notify_round_completed?, notify_photo_uploaded?, notify_scorecard_comment? }`. |
+|---|---|---|
+| GET | `/api/favorites` | My favorites + prefs + basic Loozer info (id, display_name, avatar_url). |
+| POST | `/api/favorites` | Add. Body `{ favorite_user_id, preferences? }`. Idempotent (`ON CONFLICT DO UPDATE`). |
+| PUT | `/api/favorites/{favoriteUserId}` | Update the 3 notify flags. |
 | DELETE | `/api/favorites/{favoriteUserId}` | Unfavorite. |
-
-### Round comments
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/rounds/{roundId}/comments` | List comments on a round (ordered by `created_at` ascending). Includes sender `{id, display_name, avatar_url}`. Returns 404 for non-completed rounds. |
-| POST | `/api/rounds/{roundId}/comments` | Post a comment. Body: `{ body: string }`. 422 on rounds where `status != 'completed'`. |
-| DELETE | `/api/rounds/{roundId}/comments/{commentId}` | Delete a comment (own only, or admin). |
-
-## Scope: Personal Rounds Only
-
-**Favorites notifications and scorecard comments apply only to personal/summer rounds — not KGB Cup play and not Golfapalooza scrambles.**
-
-The scoping is natural: KGB Cup uses its own tables (`kgb_cup_hole_scores`, `kgb_cup_player_handicaps`, `kgb_cup_pair_handicaps`) and the scrambles use `scramble_scores`. None of those flow through `/api/rounds` or the `rounds` table. Since every favorites hook (round_started, hole_completed, round_completed) and the comments thread are wired to the `rounds` table, event-time play is already excluded.
-
-This issue does **not** add favorites notifications or comments to KGB Cup or scramble scoring surfaces. Photo uploads, however, continue to ping followers regardless of when/where they were taken — gallery is gallery.
+| GET | `/api/rounds/live` | All in-progress individual rounds for Live Now (player, course, thru, to-par). Select only needed cols. |
+| GET | `/api/rounds/{id}/comments` | List (created_at ASC) with sender `{id, display_name, avatar_url}`. |
+| POST | `/api/rounds/{id}/comments` | Add. Body `{ body }`. No round-status gate — allowed on any round regardless of `status`. |
+| DELETE | `/api/rounds/{id}/comments/{commentId}` | Delete (own or admin). |
 
 ## Notification Fan-out
 
-A new helper `src/lib/favorites/fanout.ts` wraps the lookup-and-notify pattern so each call site is one line:
-
+New helper `src/lib/favorites/fanout.ts`:
 ```ts
-await notifyFollowersOf(userId, "round_started", { round_id, course_name });
+await notifyFollowersOf(actorUserId, "round_started" | "hole_completed" | "round_completed", data);
 ```
-
-The helper:
-1. Selects `user_id` from `user_favorites` where `favorite_user_id = $1 AND notify_round_started = TRUE`
-2. Builds a notification payload with type `favorite_<event>` and a deep link in `data`
-3. Calls `sendBulkNotifications(followerIds, payload)`
+1. Selects favoriters where `favorite_user_id = actor AND notify_<event> = TRUE`.
+2. Builds payload type `favorite_<event>` with a deep link in `data`.
+3. Calls `sendBulkNotifications` (simulator suppression inherited; best-effort).
 
 ### Hook points
-
 | Event | Where | Notes |
-|-------|-------|-------|
-| `round_started` | `POST /api/rounds` after row insert | One ping per follower. Title: "[Name] started a round at [Course]." |
-| `hole_completed` | `PUT /api/rounds/{id}/scores` | Compare submitted scores against existing rows; only fire on null→value transitions (not edits or re-saves). Coalesced per request — see Notification Coalescing below. Skip if the round was created less than 30 seconds ago to avoid double-firing alongside round_started. |
-| `round_completed` | `POST /api/rounds/{id}/complete` | One ping per follower. Title: "[Name] finished with a [score]." |
-| `photo_uploaded` | `POST /api/gallery` after row insert | One ping per follower of the uploader. |
-| `scorecard_comment` | `POST /api/rounds/{id}/comments` | Always notify the scorecard owner. Also notify followers of the owner who have `notify_scorecard_comment = TRUE`. Do NOT notify the commenter. |
+|---|---|---|
+| `round_started` | `POST /api/rounds` after insert | Guard `format='individual'`, `status='in_progress'`. Deep-link `/rounds/{id}/watch`. |
+| `hole_completed` | `POST /api/rounds/{id}/scores` | Only null→value transitions (first score per hole), never edits. Skip guests (`user_id IS NULL`). Coalesced per request. Skip first 30s after round creation to avoid stacking behind `round_started`. |
+| `round_completed` | `PUT /api/rounds/{id}` `{status:'completed'}` | One ping per follower with final score. Deep-link `/rounds/{id}/watch`. |
+| `round_comment` | `POST /api/rounds/{id}/comments` | Best-effort push to roster players (except commenter). Deep-link `/rounds/{id}/watch`. |
 
-### Notification Coalescing (hole_completed)
+### Hole coalescing
+`POST /scores` accepts batches. Per request: diff incoming vs existing for null→value transitions, group by follower, emit **one** push per follower summarizing every followed player's hole (e.g. *"Hole 5 — Randy: 4 (birdie), Steve: 3 (eagle)"*). Cross-request coalescing is out of scope for v1 (revisit with a 30s buffer if noisy in practice). **Perf:** look up favoriters once per request and reuse across holes; batch the fan-out.
 
-The realistic noisy case: you favorite four people who are all playing in the same Saturday foursome. Naïvely each hole produces four push notifications. To keep that sane:
-
-**Per-request coalescing.** `PUT /api/rounds/{id}/scores` accepts batch updates. For each request, the server:
-
-1. Diffs incoming scores against existing rows to find null→value transitions
-2. Groups transitions by **follower** (anyone with `notify_hole_completed = TRUE` for any of the players whose scores changed)
-3. Emits **one** notification per follower summarizing every transition they care about
-
-Example: a foursome with Randy, Steve, Bob, Joe; you follow Randy + Steve. Scorer batches hole 5 for all four players in one PUT. You get one push:
-> **Hole 5** — Randy: 4 (birdie), Steve: 3 (eagle)
-
-Not two pushes, not four. The notification body lists each followed player with their score and a label (`eagle` / `birdie` / `par` / `bogey` / `double+`). The `data` payload includes the round_id so tapping deep-links into the scorecard.
-
-**Cross-request coalescing is out of scope for v1.** If a scorer enters hole 5 one player at a time across four separate requests, the follower gets four pushes. We'll watch real-world usage and consider a 30s server-side buffer as a follow-up if it's actually a problem.
-
-### Notification payload shape
-
+### Payload shape
 ```ts
 {
-  type: "favorite_round_started" | "favorite_hole_completed" | "favorite_round_completed" | "favorite_photo_uploaded" | "favorite_scorecard_comment",
+  type: "favorite_round_started" | "favorite_hole_completed" | "favorite_round_completed" | "round_comment",
   title: "Jeff started a round at Alpine Lake",
-  body?: optional contextual line (e.g., "Hole 4 — par 3, scored 2"),
-  data: {
-    actor_user_id: string,
-    round_id?: string,
-    hole_number?: number,
-    gallery_item_id?: string,
-    comment_id?: string,
-    deep_link: string  // e.g., "/loozers/{actor_user_id}" or "/my-rounds/rounds/{round_id}"
-  }
+  body?: "Hole 5 — Randy: 4 (birdie), Steve: 3 (eagle)",
+  data: { actor_user_id, round_id, hole_number?, comment_id?, url: "/rounds/{round_id}/watch" }
 }
 ```
 
 ## Surface Area
 
 ### New files
-
-- `supabase/migrations/00151_favorites_and_round_comments.sql`
-- `src/app/api/favorites/route.ts` (GET, POST)
-- `src/app/api/favorites/[favoriteUserId]/route.ts` (PUT, DELETE)
-- `src/app/api/rounds/[id]/comments/route.ts` (GET, POST)
-- `src/app/api/rounds/[id]/comments/[commentId]/route.ts` (DELETE)
-- `src/lib/favorites/fanout.ts` — `notifyFollowersOf(actorId, event, data)`
-- `src/components/favorites/FavoriteHeartButton.tsx` — the heart icon + drawer trigger
-- `src/components/favorites/FavoritePreferencesDrawer.tsx` — BottomDrawer + form
-- `src/components/scoring/RoundComments.tsx` — list + composer for a round
-- `src/types/golf.ts` — add `UserFavorite`, `RoundComment` types
+- `supabase/migrations/00163_user_favorites.sql`, `00164_round_comments.sql`
+- `src/app/api/favorites/route.ts` (GET, POST), `.../[favoriteUserId]/route.ts` (PUT, DELETE)
+- `src/app/api/rounds/live/route.ts` (GET)
+- `src/app/api/rounds/[id]/comments/route.ts` (GET, POST), `.../[commentId]/route.ts` (DELETE)
+- `src/app/(app)/rounds/[id]/watch/page.tsx` — spectator view
+- `src/lib/favorites/fanout.ts`
+- `src/components/favorites/FavoriteStarButton.tsx`, `FavoritePreferencesDrawer.tsx`
+- `src/components/rounds/LiveScoreboard.tsx` — read-only realtime scorecard
+- `src/components/rounds/RoundComments.tsx` — adapted from `MediaComments`, with realtime
+- `src/types/golf.ts` — `UserFavorite`, `RoundComment`
 
 ### Files to modify
-
-- `src/components/LoozersList.tsx` — drop `<FavoriteHeartButton>` into the absolutely-positioned top-right of each card (both Grid and Tree views)
-- `src/components/LoozerProfile.tsx` — same button in the profile header
-- `src/components/my-rounds/ScorecardView.tsx` — render `<RoundComments>` below the score grid for completed rounds
-- `src/app/api/rounds/route.ts` (POST) — call `notifyFollowersOf(...) "round_started"`
-- `src/app/api/rounds/[id]/scores/route.ts` (PUT) — diff incoming vs. existing scores, call `notifyFollowersOf(...) "hole_completed"` for each null→value hole
-- `src/app/api/rounds/[id]/complete/route.ts` — call `notifyFollowersOf(...) "round_completed"`
-- `src/app/api/gallery/route.ts` (POST) — call `notifyFollowersOf(...) "photo_uploaded"`
-- `CLAUDE.md` — add endpoints, tables, and migration to the reference sections
-- `README.md` — note the new Favorites + scorecard comments capabilities
+- `src/components/LoozersList.tsx`, `src/components/LoozerProfile.tsx`, round/scorecard view — drop in `<FavoriteStarButton>`
+- `src/components/HomeContent.tsx` + `src/app/(app)/page.tsx` — Live Now section (data from `/api/rounds/live`)
+- `src/lib/realtime/round-channel.ts` — add `onComment` for `round_comments`
+- `src/app/api/rounds/route.ts`, `.../[id]/scores/route.ts`, `.../[id]/route.ts` — fire fan-out hooks
+- `CLAUDE.md`, `README.md` — document tables, endpoints, migrations, capabilities
 
 ## Edge Cases & Constraints
+- **Hole edits never re-fire** — only first score per `(round_player_id, hole)`.
+- **Guests** (`round_players.user_id IS NULL`) never trigger notifications; skipped in scoring fan-out.
+- **Scramble rounds** (`format='scramble'`) excluded from Live Now + all fan-out (one team card fanned to every player = noisy/wrong).
+- **Self-favorite** blocked at DB (CHECK) + API + hidden UI.
+- **User deletion** cascades both `user_favorites` directions and `round_comments`.
+- **Financial-only / system users** excluded from favorite surfaces (consistent with elsewhere).
+- **Round creation race** — skip `hole_completed` for 30s post-creation so bulk initial saves don't stack behind `round_started`.
+- **Privacy** — favorited person can't query who favorited them (RLS + server-side fan-out).
+- **Completed round** — spectator view still loads read-only; Live Now drops it on completion.
+- **Spectator/public home** (`SpectatorHomeContent.tsx`) — NO Live Now, no stars, no comments (keep live individual rounds behind auth; consistent with "nothing personalized on spectator").
+- **`getEffectiveUserId`** on every new endpoint (admin simulator).
 
-- **Self-favoriting blocked** at DB (CHECK) and API layers.
-- **Deleting a user** cascades to both `user_favorites` rows (as `user_id` or `favorite_user_id`) and their `round_comments`.
-- **Financial-only / system users** are excluded from favorite pickers and never appear in the heart-icon surface (consistent with how they're hidden elsewhere).
-- **The `getEffectiveUserId(user.id)` rule** applies to every new endpoint — admin simulator must work for favorites and comments.
-- **Hole-completed dedup**: when `PUT /scores` is called multiple times for the same hole (correction, partial save, etc.), only the first null→value transition emits a notification. Edits do not re-notify.
-- **Round creation race**: skip `hole_completed` notifications for the first 30 seconds after a round is created so the initial bulk save doesn't fire 18 pings stacked behind the `round_started` ping.
-- **Spectator page**: no favorites, no comments — consistent with the "nothing personalized on spectator" rule.
-- **Notification stacking**: per-hole notifications are coalesced per-request by follower (see Notification Coalescing). The preferences drawer notes "can be noisy" next to the per-hole checkbox so users opting in know what they're signing up for.
-- **Event play is excluded**: KGB Cup and scramble scoring use separate tables and APIs; the favorites notification hooks and the comments thread are wired to the personal `rounds` table only. No code needs to explicitly filter event rounds — the scope is set by which endpoints we hook.
-
-## Out of Scope (Possible Follow-ups)
-
-- **Reciprocal favorites** — "X people follow you" indicator on profile
-- **Activity feed surface** — `/feed` showing recent activity by favorites (vs. relying entirely on notifications)
-- **Comment reactions / GIFs / images** — keep v1 text-only
-- **Mid-round comments** — currently gated to completed rounds; could open up later
-- **Bulk follow** ("favorite everyone in my tee group")
-- **Notification digests** — daily summary instead of real-time, for noisy followers
+## Out of Scope (Follow-ups)
+- Reciprocal indicator ("N people follow you"), activity feed (`/feed`), comment reactions/GIFs/images, bulk-follow a tee group, notification digests, cross-request hole coalescing, favorites for KGB Cup / scramble surfaces.
 
 ## Acceptance Criteria
-
-- [ ] Heart icon visible top-right on every Loozer card in `/loozers` (Grid + Tree) and on each profile, hidden on own card/profile
-- [ ] Tapping an empty heart opens the preferences drawer with default checkboxes; closing saves the favorite
-- [ ] Tapping a filled heart opens the same drawer with current prefs; an "Unfavorite" button removes the row
-- [ ] Migration `00151_favorites_and_round_comments.sql` creates both tables with the RLS policies described
-- [ ] `GET/POST/PUT/DELETE` favorite endpoints work and respect `getEffectiveUserId`
-- [ ] Round-started, round-completed, hole-completed (null→value only), and photo-uploaded notifications fire to the right followers based on prefs
-- [ ] Scorecard owners get notified on every comment on their completed round
-- [ ] Favorites-with-notify-scorecard-comment-on also get pinged when someone comments on a favorite's scorecard
-- [ ] Comments can be posted, deleted by sender or admin, and are visible to all authenticated Loozers
-- [ ] CLAUDE.md and README.md updated
-- [ ] Spectator page shows no hearts and no comments
+- [ ] Star visible on profile, `/loozers` cards (Grid + Tree), and scorecard; hidden on own surfaces.
+- [ ] Empty star → drawer with 3 default-ON toggles; closing saves the favorite.
+- [ ] Filled star → drawer edits prefs; "Unfavorite" removes the row.
+- [ ] Migrations `00163` + `00164` create both tables with grants + RLS as described.
+- [ ] Favorite CRUD endpoints work and respect `getEffectiveUserId`.
+- [ ] `round_started`, `hole_completed` (null→value only, coalesced), and `round_completed` fire to the right followers per prefs.
+- [ ] Notification deep-links open a working read-only spectator view that updates in realtime.
+- [ ] Home Live Now lists all in-progress individual rounds; each opens the spectator view.
+- [ ] Anyone watching can post a comment; it appears in realtime for all watchers; roster players get a `round_comment` push.
+- [ ] Favorited person cannot see who favorited them.
+- [ ] Guests, scramble rounds, and event (KGB/scramble) play excluded from all of the above.
+- [ ] Spectator page shows no stars/comments/Live Now.
+- [ ] README + CLAUDE.md updated; both migrations run and grants verified.
 
 ## Verification Checklist
-
-1. **Favorites happy path:** From a clean state, tap heart on a Loozer card → drawer opens with defaults → close → page refresh → heart is filled.
-2. **Edit prefs:** Tap a filled heart → toggle "hole completed" on → close → reopen → checkbox state persisted.
-3. **Unfavorite:** Open drawer → tap "Unfavorite" → drawer closes → heart returns to outline → DB row deleted.
-4. **Self-favorite blocked:** Confirm heart icon doesn't render on your own card or profile. Hit `POST /api/favorites` with your own id → 422.
-5. **Round-started ping:** As user B, favorite user A with round_started ON. As user A, start a round. Confirm user B receives a push.
-6. **Per-hole ping (null→value only):** As user A, score hole 1. Confirm user B (with per-hole ON) gets one ping. Edit hole 1's score → no new ping. Score hole 2 → one new ping.
-7. **Round-completed ping:** As user A, complete the round. Confirm user B gets the round_completed ping.
-8. **Photo ping:** As user A, upload to gallery. Confirm user B gets the photo_uploaded ping.
-9. **Comment notifies owner:** As user C, comment on user A's completed scorecard. Confirm user A gets the comment ping (even though A hasn't favorited C).
-10. **Comment notifies followers of owner:** As user C, comment on A's scorecard. Confirm user B (who follows A with comment-pings on) also gets pinged. Confirm user C (the commenter) does NOT.
-11. **Comments work on in-progress rounds:** Visit an in-progress round → composer renders → post "nice birdie" → owner receives a notification mid-round.
-12. **Hole-completed coalescing:** As scorer for a 4-player round, batch hole 5 for all four players in one save. As a follower of two of those players, confirm you receive exactly **one** push that mentions both players and their scores (not two pushes).
-13. **Event scoring excluded:** As a follower with all prefs on, watch a KGB Cup match or scramble round progress. Confirm **zero** favorites notifications fire from those scoring surfaces.
-14. **Admin can delete any comment.** As admin, delete another user's comment → it disappears.
-15. **User deletion cascades:** Delete a test user → confirm their `user_favorites` (both directions) and `round_comments` rows are gone.
-16. **Spectator parity:** Open `/spectator` while logged out → no hearts, no comments.
-17. **Migration applied:** Confirm `00151` is in `schema_migrations` and both tables exist with the right columns and indexes.
+1. **Favorite happy path:** tap empty star → drawer with defaults → close → refresh → star filled.
+2. **Edit prefs:** filled star → toggle Hole-by-Hole off → reopen → persisted.
+3. **Unfavorite:** drawer → Unfavorite → star outline → row deleted.
+4. **Self-favorite blocked:** no star on own profile/card; `POST /api/favorites` with own id → 422.
+5. **Round-started ping:** B favorites A (round_started on). A starts an individual round → B pushed; tapping opens the spectator view live.
+6. **Per-hole (null→value only):** A scores hole 1 → B (hole on) gets one ping. Edit hole 1 → no new ping. Score hole 2 → one ping.
+7. **Coalescing:** score a 4-player round's hole 5 in one batch; follower of two players gets exactly one push naming both.
+8. **Round-finished ping:** A completes → B (round_completed on) pushed with score.
+9. **Live comments:** open A's in-progress round as C → post "nice birdie" → appears in realtime for all watchers; A's roster players get a `round_comment` push; C does not.
+10. **Live Now:** home shows A's in-progress individual round; opens spectator view; disappears on completion.
+11. **Privacy:** as A, confirm no API/UI reveals who favorited you.
+12. **Exclusions:** guests, scramble rounds, and KGB/scramble scoring fire zero favorite notifications and don't appear in Live Now.
+13. **Admin delete comment:** admin removes another user's comment.
+14. **User deletion cascades:** delete a test user → their `user_favorites` (both directions) + `round_comments` gone.
+15. **Spectator parity:** `/spectator` shows no stars/comments/Live Now.
+16. **Migrations:** `00163` + `00164` in `schema_migrations`; tables, indexes, grants present.

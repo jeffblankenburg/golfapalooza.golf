@@ -3,7 +3,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect, notFound } from "next/navigation";
 import { getEffectiveUserId, isSimulating } from "@/lib/simulator";
 import { LoozerProfile, type LoozerProfileData } from "@/components/LoozerProfile";
+import { LoozerJumpSearch } from "@/components/loozers/LoozerJumpSearch";
 import { loadLoozerProfile } from "@/lib/loozers/profile-data";
+import { loadLoozerList } from "@/lib/loozers/list-data";
 import Link from "next/link";
 import { BTN_BACK } from "@/lib/ui/buttons";
 
@@ -26,14 +28,29 @@ export default async function LoozerProfilePage({
   const simulating = await isSimulating();
   const queryClient = simulating ? createAdminClient() : supabase;
   const adminClient = createAdminClient();
-  const data = await loadLoozerProfile(queryClient, adminClient, userId);
+  const [data, roster] = await Promise.all([
+    loadLoozerProfile(queryClient, adminClient, userId),
+    loadLoozerList(adminClient),
+  ]);
   if (!data) notFound();
+
+  const jumpList = roster.map((l) => ({
+    id: l.id,
+    display_name: l.display_name,
+    full_name: l.full_name,
+    avatar_url: l.avatar_url,
+  }));
 
   return (
     <div className="px-4 pt-6 pb-8">
-      <Link href="/loozers" className={`mb-3 ${BTN_BACK}`}>
-        &larr; All Loozers
-      </Link>
+      <div className="mb-3 flex items-center gap-2">
+        <Link href="/loozers" className={`shrink-0 ${BTN_BACK}`}>
+          &larr; All Loozers
+        </Link>
+        <div className="ml-auto w-full max-w-xs">
+          <LoozerJumpSearch loozers={jumpList} currentUserId={userId} />
+        </div>
+      </div>
       <LoozerProfile
         userId={userId}
         isOwnProfile={isOwnProfile}

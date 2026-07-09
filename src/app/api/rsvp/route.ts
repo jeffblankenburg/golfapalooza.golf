@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveUserId, isSimulating, getEffectiveTripId } from "@/lib/simulator";
 import { cascadeRemoveFromRoster, addToEventChat } from "@/lib/roster";
+import { syncAttendanceEnrollment } from "@/lib/attendance-contest-sync";
 
 /**
  * @swagger
@@ -136,11 +137,19 @@ export async function POST(request: Request) {
     }
 
     if (attending && !wasOnRoster) {
-      // Joining the roster: add to event chat. Contest enrollment comes
-      // from option selections (issue #124), not from RSVP.
-      await addToEventChat(trip.id, effectiveUserId);
+      // Joining the roster: add to event chat and auto-enroll into the
+      // blanket contests everyone plays — Calcutta, Scramble, KGB Cup
+      // (issue #137). Per-option contests still come from option
+      // selections (issue #124); this only covers `auto_enroll_attendees`.
+      await Promise.all([
+        addToEventChat(trip.id, effectiveUserId),
+        syncAttendanceEnrollment(adminClient, trip.id, effectiveUserId, true),
+      ]);
     } else if (!attending && wasOnRoster) {
-      // Leaving the roster: cascade remove from contests/teams/etc
+      // Explicit "I'm not coming": full hard leave — cascade remove from
+      // every contest/team/tee-time/room/chat. (The guarded removal that
+      // protects bidding state lives on the admin attendance toggle, where
+      // an accidental flip shouldn't silently destroy a Calcutta bid.)
       await cascadeRemoveFromRoster(trip.id, effectiveUserId);
     }
 

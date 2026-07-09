@@ -105,11 +105,28 @@ export async function syncContestEnrollment(
       await removeParticipantWithPickemPayment(adminClient, option.linked_contest_id, userId);
     }
   } else if (option.option_type === "select") {
-    if (!option.linked_contest_id) return;
-    if (value && value !== "none" && value !== "") {
-      await upsertParticipantWithPickemPayment(adminClient, option.linked_contest_id, userId);
-    } else {
-      await removeParticipantWithPickemPayment(adminClient, option.linked_contest_id, userId);
+    // Per-choice contest_id (mirrors multi_select): enroll into a choice's
+    // contest only when that exact choice is the selected value. This is how
+    // Yes/No opt-ins work — only the "Yes" choice carries a contest_id, so a
+    // "No" selection correctly un-enrolls instead of enrolling (which the
+    // whole-option linked_contest_id path below would wrongly do).
+    const choices = (option.choices || []) as OptionChoice[];
+    for (const choice of choices) {
+      if (!choice.contest_id) continue;
+      if (value === choice.value) {
+        await upsertParticipantWithPickemPayment(adminClient, choice.contest_id, userId);
+      } else {
+        await removeParticipantWithPickemPayment(adminClient, choice.contest_id, userId);
+      }
+    }
+
+    // Legacy whole-option link: any non-empty value enrolls.
+    if (option.linked_contest_id) {
+      if (value && value !== "none" && value !== "") {
+        await upsertParticipantWithPickemPayment(adminClient, option.linked_contest_id, userId);
+      } else {
+        await removeParticipantWithPickemPayment(adminClient, option.linked_contest_id, userId);
+      }
     }
   } else if (option.option_type === "multi_select") {
     const choices = (option.choices || []) as OptionChoice[];

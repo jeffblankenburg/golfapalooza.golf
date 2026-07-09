@@ -101,6 +101,10 @@ export async function POST(request: Request) {
 
     const adminClient = createAdminClient();
 
+    // Blanket contests everyone plays auto-enroll the trip roster (issue #137);
+    // per-option contests (cornhole/skins/pickem) enroll on opt-in instead.
+    const AUTO_ENROLL_TYPES = new Set(["calcutta", "scramble", "ryder_cup"]);
+
     const { data, error } = await adminClient
       .from("contests")
       .insert({
@@ -109,6 +113,7 @@ export async function POST(request: Request) {
         contest_type,
         day_number: day_number || null,
         sort_order: sort_order || 0,
+        auto_enroll_attendees: AUTO_ENROLL_TYPES.has(contest_type),
       })
       .select()
       .single();

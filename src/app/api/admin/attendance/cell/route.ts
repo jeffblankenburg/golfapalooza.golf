@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkPermissionAccess } from "@/lib/permissions-server";
+import { syncAttendanceEnrollment } from "@/lib/attendance-contest-sync";
 
 /**
  * @swagger
@@ -58,6 +59,9 @@ export async function PUT(request: Request) {
       });
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     }
+    // Attendance -> blanket-contest enrollment (issue #137).
+    const sync = await syncAttendanceEnrollment(adminClient, body.tripId, body.userId, true);
+    return NextResponse.json({ success: true, enrollment: sync });
   } else {
     const { error } = await adminClient
       .from("event_participants")
@@ -65,7 +69,11 @@ export async function PUT(request: Request) {
       .eq("trip_id", body.tripId)
       .eq("user_id", body.userId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  }
 
-  return NextResponse.json({ success: true });
+    // Guarded un-enroll: remove from auto-enroll contests, but refuse (and
+    // warn) where a Calcutta bid / scramble seat / KGB pairing would be
+    // orphaned. Admin sees the warnings and unwinds those by hand.
+    const sync = await syncAttendanceEnrollment(adminClient, body.tripId, body.userId, false);
+    return NextResponse.json({ success: true, enrollment: sync });
+  }
 }

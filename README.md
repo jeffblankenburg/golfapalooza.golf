@@ -284,6 +284,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Create contests (scramble, ryder_cup, calcutta, pickem, cornhole_singles, cornhole_doubles)
 - Assign contest days and tees
 - Contest-specific scoring lifecycle (open → close → verify)
+- **Auto-enroll on attendance** — contests flagged `auto_enroll_attendees` (Calcutta, per-day Scramble, KGB Cup) automatically add every Loozer who is on the trip roster. RSVPing "yes" or an admin checking the attendance cell enrolls them; going off the roster removes them, but the admin toggle refuses (and warns) when doing so would orphan a Calcutta bid, scramble team seat, or KGB pairing. A manual de-enroll (`contest_enrollment_exclusions`) is remembered so attendance sync won't re-add someone who opted out while staying on the trip. Per-option contests (cornhole, skins, pickem) still enroll only on the matching option opt-in.
 
 ### KGB Cup Admin
 - Team creation with colors and names

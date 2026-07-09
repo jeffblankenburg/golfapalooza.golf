@@ -7,6 +7,33 @@ import { getEffectiveUserId } from "@/lib/simulator";
 // Spectators (no auth) get the same view minus buyer-specific fields.
 const RANDY_USER_ID = "539feb9d-eb8d-4dfe-88d3-7d0bc89c7154";
 
+// Supabase returns to-one joins as an object, but the typings widen to
+// `T | T[]`. Normalize defensively so downstream code stays simple.
+function unwrap<T>(v: T | T[] | null | undefined): T | null {
+  if (v == null) return null;
+  return Array.isArray(v) ? (v[0] ?? null) : v;
+}
+
+interface PartnerRef {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
+// One entry per (loozer, award category), collapsing repeat wins into a count.
+interface GroupedAccolade {
+  category: string;
+  title: string;
+  short_label: string;
+  icon: string;
+  icon_url: string | null;
+  sort_order: number;
+  count: number;
+  trip_name: string | null;
+  trip_year: number | null;
+  partners: PartnerRef[];
+}
+
 export async function GET(request: Request) {
   const supabase = await createClient();
   const {
@@ -68,8 +95,7 @@ export async function GET(request: Request) {
       (p) => p.auction_order === contest.calcutta_active_order
     );
 
-    let teamPartners: { contest_name: string; partners: string[]; day_number: number | null; score: number | null; course_par: number | null; is_participant: boolean }[] = [];
-    let accolades: { title: string; trip_name?: string }[] = [];
+    const teamPartners: { contest_name: string; partners: string[]; partnerAvatars: (string | null)[]; day_number: number | null; score: number | null; course_par: number | null; is_participant: boolean }[] = [];
     let cornholeSinglesIn: boolean | null = null;
     let eightBagAverage: number | null = null;
     let avgScrambleScore: number | null = null;
@@ -86,13 +112,14 @@ export async function GET(request: Request) {
 
       // Build maps of contest_id -> partners, score, and course_par for this user
       const partnerMap = new Map<string, string[]>();
+      const partnerAvatarMap = new Map<string, (string | null)[]>();
       const scoreMap = new Map<string, number | null>();
       const parMap = new Map<string, number | null>();
 
       // Get scramble teams this user is on
       const { data: memberRows } = await adminClient
         .from("scramble_team_members")
-        .select("team_id, scramble_teams(id, contest_id, gross_score, course_par, scramble_team_members(user_id, user:users(display_name)))")
+        .select("team_id, scramble_teams(id, contest_id, gross_score, course_par, scramble_team_members(user_id, user:users(display_name, avatar_url)))")
         .eq("user_id", activeParticipant.user_id);
 
       if (memberRows) {
@@ -100,18 +127,19 @@ export async function GET(request: Request) {
           const team = Array.isArray(row.scramble_teams) ? row.scramble_teams[0] : row.scramble_teams;
           if (!team) continue;
 
-          const members = (team.scramble_team_members as Array<{
+          const teammates = (team.scramble_team_members as Array<{
             user_id: string;
-            user: { display_name: string } | { display_name: string }[] | null;
+            user: { display_name: string; avatar_url: string | null } | { display_name: string; avatar_url: string | null }[] | null;
           }>)
             .filter((m) => m.user_id !== activeParticipant.user_id)
             .map((m) => {
               const u = Array.isArray(m.user) ? m.user[0] : m.user;
-              return u?.display_name || "Unknown";
+              return { name: u?.display_name || "Unknown", avatar_url: u?.avatar_url ?? null };
             });
 
-          if (members.length > 0) {
-            partnerMap.set(team.contest_id, members);
+          if (teammates.length > 0) {
+            partnerMap.set(team.contest_id, teammates.map((t) => t.name));
+            partnerAvatarMap.set(team.contest_id, teammates.map((t) => t.avatar_url));
           }
           scoreMap.set(team.contest_id, team.gross_score ?? null);
           parMap.set(team.contest_id, team.course_par ?? null);
@@ -121,7 +149,7 @@ export async function GET(request: Request) {
       // Get cornhole doubles teams this user is on
       const { data: cornholeRows } = await adminClient
         .from("cornhole_team_members")
-        .select("team_id, cornhole_teams(id, contest_id, cornhole_team_members(user_id, user:users(display_name)))")
+        .select("team_id, cornhole_teams(id, contest_id, cornhole_team_members(user_id, user:users(display_name, avatar_url)))")
         .eq("user_id", activeParticipant.user_id);
 
       if (cornholeRows) {
@@ -129,18 +157,19 @@ export async function GET(request: Request) {
           const team = Array.isArray(row.cornhole_teams) ? row.cornhole_teams[0] : row.cornhole_teams;
           if (!team) continue;
 
-          const members = (team.cornhole_team_members as Array<{
+          const teammates = (team.cornhole_team_members as Array<{
             user_id: string;
-            user: { display_name: string } | { display_name: string }[] | null;
+            user: { display_name: string; avatar_url: string | null } | { display_name: string; avatar_url: string | null }[] | null;
           }>)
             .filter((m) => m.user_id !== activeParticipant.user_id)
             .map((m) => {
               const u = Array.isArray(m.user) ? m.user[0] : m.user;
-              return u?.display_name || "Unknown";
+              return { name: u?.display_name || "Unknown", avatar_url: u?.avatar_url ?? null };
             });
 
-          if (members.length > 0) {
-            partnerMap.set(team.contest_id, members);
+          if (teammates.length > 0) {
+            partnerMap.set(team.contest_id, teammates.map((t) => t.name));
+            partnerAvatarMap.set(team.contest_id, teammates.map((t) => t.avatar_url));
           }
         }
       }
@@ -159,6 +188,7 @@ export async function GET(request: Request) {
         teamPartners.push({
           contest_name: tc.name,
           partners: partnerMap.get(tc.id) || [],
+          partnerAvatars: partnerAvatarMap.get(tc.id) || [],
           day_number: tc.day_number,
           score: tc.contest_type === "scramble" ? (scoreMap.get(tc.id) ?? null) : null,
           course_par: tc.contest_type === "scramble" ? (parMap.get(tc.id) ?? null) : null,
@@ -186,22 +216,6 @@ export async function GET(request: Request) {
           .maybeSingle();
 
         cornholeSinglesIn = !!singlesEntry;
-      }
-
-      // Get accolades across all trips
-      const { data: accData } = await adminClient
-        .from("accolades")
-        .select("title, trip:trip_settings(event_name)")
-        .eq("user_id", activeParticipant.user_id);
-
-      if (accData) {
-        accolades = accData.map((a) => {
-          const trip = Array.isArray(a.trip) ? a.trip[0] : a.trip;
-          return {
-            title: a.title,
-            trip_name: (trip as { event_name?: string })?.event_name || undefined,
-          };
-        });
       }
 
       // Fetch handicap and user metrics
@@ -341,7 +355,7 @@ export async function GET(request: Request) {
 
     // Bulk fetch handicaps + user metrics for all participants (for Loozers table)
     const allUserIds = (participants || []).map((p) => p.user_id).filter(Boolean);
-    const [{ data: allHandicaps }, { data: allUserMetrics }, { data: randyUser }] = await Promise.all([
+    const [{ data: allHandicaps }, { data: allUserMetrics }, { data: randyUser }, { data: accRows }] = await Promise.all([
       allUserIds.length > 0
         ? adminClient.from("player_handicaps").select("user_id, handicap_index").in("user_id", allUserIds)
         : { data: [] },
@@ -349,6 +363,14 @@ export async function GET(request: Request) {
         ? adminClient.from("users").select("id, eight_bag_average, avg_scramble_score").in("id", allUserIds)
         : { data: [] },
       adminClient.from("users").select("avatar_url").eq("id", RANDY_USER_ID).maybeSingle(),
+      // Every accolade where a participant is either the winner OR the doubles
+      // partner. One row per doubles team, so we attribute it to both members.
+      allUserIds.length > 0
+        ? adminClient
+            .from("accolades")
+            .select("id, title, category, user_id, partner_user_id, trip:trip_settings(trip_name, trip_year), winner:users!accolades_user_id_fkey(id, display_name, avatar_url), partner:users!accolades_partner_user_id_fkey(id, display_name, avatar_url), category_meta:accolade_categories!accolades_category_fkey(category, title, short_label, icon, icon_url, sort_order)")
+            .or(`user_id.in.(${allUserIds.join(",")}),partner_user_id.in.(${allUserIds.join(",")})`)
+        : { data: [] },
     ]);
 
     const loozerStats: Record<string, { handicap: number | null; eightBag: number | null; avgScramble: number | null }> = {};
@@ -362,14 +384,94 @@ export async function GET(request: Request) {
       };
     }
 
+    // Group each participant's accolades by category, collapsing repeat wins
+    // into a count and gathering doubles partners. Custom accolades group by
+    // their free-form title so unrelated honors don't merge.
+    const participantIdSet = new Set(allUserIds);
+    const accByUser = new Map<string, Map<string, GroupedAccolade>>();
+
+    const addAccolade = (
+      loozerId: string,
+      row: {
+        title: string;
+        category: string;
+        trip: unknown;
+        category_meta: unknown;
+      },
+      partner: PartnerRef | null
+    ) => {
+      let groups = accByUser.get(loozerId);
+      if (!groups) {
+        groups = new Map();
+        accByUser.set(loozerId, groups);
+      }
+      const meta = unwrap(row.category_meta) as
+        | { title: string; short_label: string; icon: string; icon_url: string | null; sort_order: number }
+        | null;
+      const isCustom = row.category === "custom" || !meta;
+      const displayTitle = isCustom ? row.title : meta!.title;
+      const key = isCustom ? `custom:${row.title}` : row.category;
+      const trip = unwrap(row.trip) as { trip_name?: string; trip_year?: number } | null;
+
+      let g = groups.get(key);
+      if (!g) {
+        g = {
+          category: row.category,
+          title: displayTitle,
+          short_label: meta?.short_label || displayTitle,
+          icon: meta?.icon || "🏆",
+          icon_url: meta?.icon_url ?? null,
+          sort_order: meta?.sort_order ?? 99,
+          count: 0,
+          trip_name: null,
+          trip_year: null,
+          partners: [],
+        };
+        groups.set(key, g);
+      }
+      g.count += 1;
+      const ty = trip?.trip_year ?? null;
+      if (ty != null && (g.trip_year == null || ty > g.trip_year)) {
+        g.trip_year = ty;
+        g.trip_name = trip?.trip_name ?? null;
+      } else if (g.trip_name == null && trip?.trip_name) {
+        g.trip_name = trip.trip_name;
+      }
+      if (partner && !g.partners.some((p) => p.id === partner.id)) {
+        g.partners.push(partner);
+      }
+    };
+
+    for (const row of accRows || []) {
+      const winner = unwrap(row.winner) as PartnerRef | null;
+      const partner = unwrap(row.partner) as PartnerRef | null;
+      if (participantIdSet.has(row.user_id)) {
+        addAccolade(row.user_id, row, partner);
+      }
+      if (row.partner_user_id && participantIdSet.has(row.partner_user_id)) {
+        addAccolade(row.partner_user_id, row, winner);
+      }
+    }
+
+    const loozerAccolades: Record<string, GroupedAccolade[]> = {};
+    for (const [uid, groups] of accByUser) {
+      loozerAccolades[uid] = [...groups.values()].sort(
+        (a, b) =>
+          a.sort_order - b.sort_order ||
+          b.count - a.count ||
+          (b.trip_year ?? 0) - (a.trip_year ?? 0)
+      );
+    }
+
     return NextResponse.json({
       contest_name: contest.name,
       active_order: contest.calcutta_active_order,
       participants: normalizedParticipants,
       prizes: enrichedPrizes,
       pool,
-      spotlight: activeParticipant ? { teamPartners, accolades, cornholeSinglesIn, eightBagAverage, avgScrambleScore, handicapIndex } : null,
+      spotlight: activeParticipant ? { teamPartners, accolades: loozerAccolades[activeParticipant.user_id] || [], cornholeSinglesIn, eightBagAverage, avgScrambleScore, handicapIndex } : null,
       loozerStats,
+      loozerAccolades,
       buyer_paid: effectiveUserId ? !!buyerPaidRow : true,
       buyer_owes: buyerOwes,
       randy_avatar_url: randyUser?.avatar_url || null,

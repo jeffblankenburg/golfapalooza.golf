@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useChatDrawer } from "@/contexts/ChatDrawerContext";
 import { ChatRoomList } from "./ChatRoomList";
 import { ChatRoom, type ChatMember } from "./ChatRoom";
@@ -37,6 +38,7 @@ interface RoomData {
  */
 export function ChatDrawer() {
   const { isOpen, currentRoomId, lastOpenedAt, closeDrawer, selectRoom, backToList } = useChatDrawer();
+  const pathname = usePathname();
 
   // Pre-load the room list data at app start (drawer is mounted by the root
   // layout, so this effect fires once on app mount — long before the user
@@ -126,6 +128,10 @@ export function ChatDrawer() {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
   }, [isOpen]);
+
+  // The big-screen Calcutta display is a standalone, chrome-free surface — no
+  // chat drawer there. (Hooks above still run so ordering stays stable.)
+  if (pathname?.startsWith("/calcutta-display")) return null;
 
   return (
     <>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
+import { AwardBadge } from "@/components/AwardBadge";
 
 interface ResultUser {
   id: string;
@@ -66,14 +67,28 @@ interface TeamPartner {
   is_participant?: boolean;
 }
 
-interface Accolade {
+interface AccoladePartner {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
+interface GroupedAccolade {
+  category: string;
   title: string;
-  trip_name?: string;
+  short_label: string;
+  icon: string;
+  icon_url: string | null;
+  sort_order: number;
+  count: number;
+  trip_name: string | null;
+  trip_year: number | null;
+  partners: AccoladePartner[];
 }
 
 interface SpotlightData {
   teamPartners: TeamPartner[];
-  accolades: Accolade[];
+  accolades: GroupedAccolade[];
   cornholeSinglesIn: boolean | null;
   eightBagAverage: number | null;
   avgScrambleScore: number | null;
@@ -143,12 +158,108 @@ function Accordion({ title, defaultOpen = false, children }: { title: string; de
   );
 }
 
+// A single grouped-accolade line: badge (image → emoji → 🏆 fallback via
+// AwardBadge), title, repeat-win count, and doubles-cornhole partners.
+function AccoladeRow({ acc }: { acc: GroupedAccolade }) {
+  return (
+    <div className="flex items-center gap-2">
+      <AwardBadge iconUrl={acc.icon_url} emoji={acc.icon} alt={acc.title} size="md" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-medium text-gray-800 truncate">{acc.title}</span>
+          {acc.count > 1 && (
+            <span className="text-xs font-bold text-yellow-600 bg-yellow-50 px-1.5 py-0.5 rounded-full flex-shrink-0">
+              × {acc.count}
+            </span>
+          )}
+        </div>
+        {acc.partners.length > 0 && (
+          <div className="flex items-center flex-wrap gap-1 mt-0.5">
+            <span className="text-xs text-gray-400">with</span>
+            {acc.partners.map((p) => (
+              <span key={p.id} className="flex items-center gap-1">
+                {p.avatar_url ? (
+                  <img src={p.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                ) : (
+                  <span className="w-4 h-4 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 text-[0.5rem] font-bold">
+                    {(p.display_name || "?")[0].toUpperCase()}
+                  </span>
+                )}
+                <span className="text-xs text-gray-500">{p.display_name}</span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      {(acc.trip_year != null || acc.trip_name) && (
+        <span className="text-xs text-gray-400 flex-shrink-0">{acc.trip_year ?? acc.trip_name}</span>
+      )}
+    </div>
+  );
+}
+
+// Full accolades view for one Loozer, opened by tapping their badge row.
+function AccoladesModal({
+  name,
+  avatarUrl,
+  accolades,
+  onClose,
+}: {
+  name: string;
+  avatarUrl: string | null;
+  accolades: GroupedAccolade[];
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl max-h-[80vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+          ) : (
+            <span className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 text-sm font-bold flex-shrink-0">
+              {(name || "?")[0].toUpperCase()}
+            </span>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-gray-900 truncate">{name}</p>
+            <p className="text-xs text-yellow-600 uppercase tracking-wide font-semibold">Accolades</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 active:bg-gray-100"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="p-4 space-y-3">
+          {accolades.map((acc, i) => (
+            <AccoladeRow key={i} acc={acc} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function CalcuttaResults({ contestId, userId, headerAction }: { contestId: string; userId?: string; headerAction?: React.ReactNode }) {
   const [participants, setParticipants] = useState<ResultParticipant[]>([]);
   const [prizes, setPrizes] = useState<Prize[]>([]);
   const [activeOrder, setActiveOrder] = useState<number | null>(null);
   const [spotlight, setSpotlight] = useState<SpotlightData | null>(null);
   const [loozerStats, setLoozerStats] = useState<Record<string, LoozerStat>>({});
+  const [loozerAccolades, setLoozerAccolades] = useState<Record<string, GroupedAccolade[]>>({});
+  const [accoladeModalUserId, setAccoladeModalUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [resultsView, setResultsView] = useState<"loozers" | "auction" | "summary" | "winners">("loozers");
   const [expandedBuyers, setExpandedBuyers] = useState<Set<string>>(new Set());
@@ -170,6 +281,7 @@ export function CalcuttaResults({ contestId, userId, headerAction }: { contestId
       setActiveOrder(data.active_order);
       setSpotlight(data.spotlight || null);
       setLoozerStats(data.loozerStats || {});
+      setLoozerAccolades(data.loozerAccolades || {});
       if (data.pool != null) setPool(data.pool);
       if (data.buyer_paid != null) setBuyerPaid(data.buyer_paid);
       if (data.buyer_owes != null) setBuyerOwes(data.buyer_owes);
@@ -249,6 +361,7 @@ export function CalcuttaResults({ contestId, userId, headerAction }: { contestId
         .map((p) => {
           const stats = loozerStats[p.user_id];
           const age = p.user?.birthday ? calculateAgeDecimal(p.user.birthday) : null;
+          const accList = loozerAccolades[p.user_id] || [];
           return (
             <div
               key={p.id}
@@ -263,9 +376,28 @@ export function CalcuttaResults({ contestId, userId, headerAction }: { contestId
                     {(p.user?.display_name || "?")[0].toUpperCase()}
                   </span>
                 )}
-                <span className="text-sm font-medium text-gray-900 truncate">
-                  {p.user?.display_name || "Unknown"}
-                </span>
+                <div className="min-w-0 flex flex-col gap-0.5">
+                  <span className="text-sm font-medium text-gray-900 truncate">
+                    {p.user?.display_name || "Unknown"}
+                  </span>
+                  {accList.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setAccoladeModalUserId(p.user_id)}
+                      aria-label={`View ${p.user?.display_name || "Loozer"}'s accolades`}
+                      className="flex items-center gap-0.5 active:opacity-70 -ml-0.5"
+                    >
+                      {accList.slice(0, 3).map((acc, i) => (
+                        <AwardBadge key={i} iconUrl={acc.icon_url} emoji={acc.icon} alt={acc.title} size="sm" />
+                      ))}
+                      {accList.length > 3 && (
+                        <span className="text-[0.625rem] font-bold text-gray-500 bg-gray-100 rounded-full px-1.5 py-0.5">
+                          +{accList.length - 3}
+                        </span>
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
               <span className="text-xs text-gray-700 text-center tabular-nums">{age != null ? age.toFixed(1) : "—"}</span>
               <span className="text-xs text-gray-700 text-center tabular-nums">{stats?.handicap ?? "—"}</span>
@@ -856,17 +988,9 @@ export function CalcuttaResults({ contestId, userId, headerAction }: { contestId
               {spotlight?.accolades && spotlight.accolades.length > 0 && (
                 <div className="bg-white rounded-xl border border-gray-200 p-3">
                   <p className="text-xs font-bold text-yellow-600 uppercase tracking-wide mb-2">Past Wins</p>
-                  <div className="space-y-1">
+                  <div className="space-y-3">
                     {spotlight.accolades.map((acc, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
-                        <span className="text-sm font-medium text-gray-800">{acc.title}</span>
-                        {acc.trip_name && (
-                          <span className="text-xs text-gray-400">({acc.trip_name})</span>
-                        )}
-                      </div>
+                      <AccoladeRow key={i} acc={acc} />
                     ))}
                   </div>
                 </div>
@@ -902,6 +1026,20 @@ export function CalcuttaResults({ contestId, userId, headerAction }: { contestId
           )}
         </>
       )}
+
+      {accoladeModalUserId && (() => {
+        const target = participants.find((p) => p.user_id === accoladeModalUserId);
+        const list = loozerAccolades[accoladeModalUserId] || [];
+        if (!target || list.length === 0) return null;
+        return (
+          <AccoladesModal
+            name={target.user?.display_name || "Loozer"}
+            avatarUrl={target.user?.avatar_url ?? null}
+            accolades={list}
+            onClose={() => setAccoladeModalUserId(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

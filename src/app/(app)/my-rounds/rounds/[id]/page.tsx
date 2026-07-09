@@ -7,6 +7,7 @@ import ScorecardView from "@/components/my-rounds/ScorecardView";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { AddPlayerDrawer } from "@/components/my-rounds/AddPlayerDrawer";
 import { FavoriteStarButton } from "@/components/favorites/FavoriteStarButton";
+import { RoundComments } from "@/components/rounds/RoundComments";
 import { BTN_BACK, BTN_DESTRUCTIVE } from "@/lib/ui/buttons";
 
 interface RoundData {
@@ -452,6 +453,17 @@ export default function RoundDetailPage() {
         <div className="bg-gray-50 rounded-lg p-3 mb-6">
           <div className="text-xs text-gray-500 mb-1">Notes</div>
           <div className="text-sm text-gray-700">{round.notes}</div>
+        </div>
+      )}
+
+      {currentUserId && (
+        <div className="rounded-xl border border-gray-100 bg-white p-4 mb-6">
+          <h2 className="text-sm font-bold text-gray-900 mb-2">Comments</h2>
+          <RoundComments
+            roundId={round.id}
+            currentUserId={currentUserId}
+            isAdmin={isAdmin}
+          />
         </div>
       )}
 

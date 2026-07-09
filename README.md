@@ -121,6 +121,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Prize distribution with linked contest winners
 - Buyer payment tracking
 - Winnings displayed on home page with breakdown
+- Accolade badges surfaced on the display: the Loozers tab shows a capped badge row (top 3 by prestige, `+N` overflow) under each player's name; tapping it opens their full accolades view. Doubles-cornhole wins show both teammates and repeat wins in a category collapse to a single `× N` row. Badge images (`accolade_categories.icon_url`) render when uploaded, falling back to the emoji icon. The live auction spotlight's "Past Wins" card uses the same rendering.
 
 ### Cornhole
 - Singles and doubles tournament brackets

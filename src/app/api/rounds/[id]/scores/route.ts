@@ -163,12 +163,16 @@ export async function POST(
       }
     }
 
-    // Recalculate gross score from ALL hole scores in DB (not just this batch)
+    // Recalculate gross score from ALL hole scores in DB (not just this batch).
+    // Kept hoisted so the favorite-notification block below can reuse it to
+    // compute each player's cumulative to-par standing without another query.
+    let allDbScores: { round_player_id: string; hole_number: number; strokes: number }[] = [];
     if (affectedPlayerIds.length > 0) {
-      const { data: allDbScores } = await supabase
+      const { data } = await supabase
         .from("round_scores")
-        .select("round_player_id, strokes")
+        .select("round_player_id, hole_number, strokes")
         .in("round_player_id", affectedPlayerIds);
+      allDbScores = data ?? [];
 
       const totalsByPlayer = new Map<string, number>();
       for (const s of allDbScores || []) {
@@ -242,16 +246,41 @@ export async function POST(
             (holePars || []).map((h) => [`${h.tee_id}:${h.hole_number}`, h.par])
           );
 
+          // Cumulative to-par per roster row, computed over every scored hole in
+          // the DB (post-upsert), so the push can say e.g. "3 over thru 7".
+          const standingByRp = new Map<string, { toPar: number | null; holes: number }>();
+          const scoresByRp = new Map<string, { hole: number; strokes: number }[]>();
+          for (const s of allDbScores) {
+            if (!scoresByRp.has(s.round_player_id)) scoresByRp.set(s.round_player_id, []);
+            scoresByRp.get(s.round_player_id)!.push({ hole: s.hole_number, strokes: s.strokes });
+          }
+          for (const [rpId, rows] of scoresByRp) {
+            const teeId = rpById.get(rpId)?.tee_id;
+            let toPar = 0;
+            let counted = 0;
+            for (const row of rows) {
+              const par = teeId ? parByCell.get(`${teeId}:${row.hole}`) : undefined;
+              if (par != null) {
+                toPar += row.strokes - par;
+                counted++;
+              }
+            }
+            standingByRp.set(rpId, { toPar: counted > 0 ? toPar : null, holes: counted });
+          }
+
           const transitions: HoleTransition[] = [];
           for (const r of firstScores) {
             const rp = rpById.get(r.round_player_id);
             if (!rp?.user_id) continue; // skip guests
+            const standing = standingByRp.get(r.round_player_id);
             transitions.push({
               playerUserId: rp.user_id,
               playerName: nameById.get(rp.user_id) || "A Loozer",
               hole: r.hole_number,
               strokes: r.strokes,
               par: rp.tee_id ? parByCell.get(`${rp.tee_id}:${r.hole_number}`) ?? null : null,
+              standingToPar: standing?.toPar ?? null,
+              holesPlayed: standing?.holes ?? 0,
             });
           }
 

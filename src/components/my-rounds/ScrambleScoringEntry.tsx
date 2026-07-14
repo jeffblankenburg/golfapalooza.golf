@@ -5,6 +5,7 @@ import ScoringShell, { type HoleInfo } from "@/components/scoring/ScoringShell";
 import { getScoreDescription } from "@/lib/golf/calculator";
 import { DragHandle } from "@/components/DragHandle";
 import { subscribeToRound } from "@/lib/realtime/round-channel";
+import { RoundComments } from "@/components/rounds/RoundComments";
 
 // Scramble scoring for a personal round: the whole group plays ONE team ball,
 // so there is a single score per hole. We persist that team score by fanning it
@@ -121,6 +122,20 @@ export default function ScrambleScoringEntry({
   }, [roundPlayerIds]);
 
   const [ready, setReady] = useState(!!existingRoundId);
+  // Current viewer (simulator-aware) for the comments thread's delete gate.
+  const [me, setMe] = useState<{ id: string; isAdmin: boolean } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.user?.id) setMe({ id: d.user.id, isAdmin: !!d.user.is_admin });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [completeError, setCompleteError] = useState<string | null>(null);
@@ -602,6 +617,14 @@ export default function ScrambleScoringEntry({
               >
                 Complete Scramble
               </button>
+
+              {/* Live comments (issue #140) — visible while scoring. */}
+              {roundId && me && (
+                <div className="mt-3 rounded-xl border border-gray-100 bg-white p-3">
+                  <h2 className="text-xs font-bold text-gray-900 mb-1">Comments</h2>
+                  <RoundComments roundId={roundId} currentUserId={me.id} isAdmin={me.isAdmin} />
+                </div>
+              )}
             </div>
           );
         }}

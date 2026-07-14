@@ -50,6 +50,13 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Co-equal round ownership — every player in a round can edit scores, complete the round, add/remove other players, and delete the round (with confirmation). The original "creator" is shown as the attribution but no longer gates any action.
 - Push notification when someone adds you to a round, with a one-tap deep link into the live scorer (`round_invite` notification type).
 - Live scoring stays in sync across devices — when two players in the same group both have the round open, score edits propagate within ~1 second. Last-write-wins; in-progress local edits are protected from being overwritten by remote echoes. Header shows a Live/Connecting/Offline badge.
+- Comments thread inside the live scorer — the round's comments appear below the score inputs (same thread as the round detail and spectator watch pages), updating in real time so the group and any watchers can chat as the round unfolds.
+
+### Favorite Loozers & Notifications
+- Mark any Loozer as a favorite to follow their play. Per favorite, toggle pushes for round started, hole-by-hole updates, and round finished.
+- Hole-by-hole pushes name the result and running standing — e.g. title "Whitey had a birdie" with body "Hole 7 — Whitey: 4 (birdie) · 3 over thru 7". One coalesced push per follower when a save records several followed players at once.
+- Favorite pushes deep-link to the read-only spectator scorecard at `/rounds/{id}/watch`, where anyone can watch the live scoreboard and add comments.
+- A follower who is themselves playing in the round gets no favorite pushes for it — no buzz every hole for the player in the next cart seat.
 
 ### Course Library
 - `/courses` lists every course in the system with the active event's course featured on top.

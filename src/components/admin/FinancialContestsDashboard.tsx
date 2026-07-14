@@ -1048,6 +1048,7 @@ export function FinancialContestsDashboard() {
                                         <option>Cash</option>
                                         <option>G Credit</option>
                                         <option>Venmo</option>
+                                        <option>PayPal</option>
                                         <option>Zelle</option>
                                         <option>Check</option>
                                         <option>Other</option>
@@ -1306,6 +1307,7 @@ export function FinancialContestsDashboard() {
                             <option>Cash</option>
                             <option>G Credit</option>
                             <option>Venmo</option>
+                            <option>PayPal</option>
                             <option>Zelle</option>
                             <option>Check</option>
                             <option>Other</option>
@@ -1511,6 +1513,7 @@ export function FinancialContestsDashboard() {
                             <option>Cash</option>
                             <option>G Credit</option>
                             <option>Venmo</option>
+                            <option>PayPal</option>
                             <option>Zelle</option>
                             <option>Check</option>
                             <option>Other</option>

@@ -162,19 +162,6 @@ export interface HoleTransition {
   holesPlayed?: number;
 }
 
-/** Relative-to-par label for a hole score. */
-function holeLabel(strokes: number, par: number | null): string {
-  if (par == null) return `${strokes}`;
-  const diff = strokes - par;
-  if (strokes === 1) return "1 (ace)";
-  if (diff <= -3) return `${strokes} (albatross)`;
-  if (diff === -2) return `${strokes} (eagle)`;
-  if (diff === -1) return `${strokes} (birdie)`;
-  if (diff === 0) return `${strokes} (par)`;
-  if (diff === 1) return `${strokes} (bogey)`;
-  return `${strokes} (+${diff})`;
-}
-
 /**
  * Named result for a single hole, e.g. "a birdie" — used for the title so it
  * reads "Whitey had a birdie" instead of the generic "Whitey carded a hole".
@@ -195,16 +182,15 @@ function resultPhrase(strokes: number, par: number | null): string | null {
 }
 
 /**
- * Cumulative-to-par standing for the body, e.g. "3 over thru 7", "even thru 7",
- * "2 under thru 7". Null when we couldn't compute it (no par data).
+ * Cumulative-to-par standing in golf notation, e.g. "+3 thru 7", "E thru 7",
+ * "-2 thru 7". Null when we couldn't compute it (no par data).
  */
-function standingPhrase(
+function standingTag(
   toPar: number | null | undefined,
   holesPlayed: number | undefined
 ): string | null {
   if (toPar == null || !holesPlayed || holesPlayed <= 0) return null;
-  const rel =
-    toPar === 0 ? "even" : toPar > 0 ? `${toPar} over` : `${Math.abs(toPar)} under`;
+  const rel = toPar === 0 ? "E" : toPar > 0 ? `+${toPar}` : `${toPar}`;
   return `${rel} thru ${holesPlayed}`;
 }
 
@@ -264,27 +250,32 @@ export async function notifyFavoritesHolesScored({
         // Order by hole for a stable readable summary.
         relevant.sort((a, b) => a.hole - b.hole);
 
-        // Each segment carries the hole score AND the player's running standing
-        // relative to par so a watcher sees both "what they got" and "how many
-        // over par they are" (issue #140 follow-up).
-        const segments = relevant.map((t) => {
-          const base = `Hole ${t.hole} — ${t.playerName}: ${holeLabel(t.strokes, t.par)}`;
-          const standing = standingPhrase(t.standingToPar, t.holesPlayed);
-          return standing ? `${base} · ${standing}` : base;
-        });
-        const body = segments.join("; ");
-
-        // Name the result in the title for the common single-hole case:
-        // "Whitey had a birdie" instead of "Whitey carded a hole".
+        // Common single-hole case reads like "Whitey had a birdie" / "He is
+        // +3 thru 7" — result in the title, running standing in the body
+        // (issue #140 follow-up).
         let title: string;
+        let body: string;
         if (relevant.length === 1) {
           const t = relevant[0];
           const phrase = resultPhrase(t.strokes, t.par);
           title = phrase
             ? `${t.playerName} had ${phrase}`
             : `${t.playerName} carded a hole`;
+          const tag = standingTag(t.standingToPar, t.holesPlayed);
+          body = tag ? `He is ${tag}` : `Hole ${t.hole}: ${t.strokes}`;
         } else {
+          // Multiple followed players in one save: one line each, name-led so
+          // there's no ambiguous pronoun.
           title = "Live scoring update";
+          body = relevant
+            .map((t) => {
+              const phrase = resultPhrase(t.strokes, t.par) ?? `a ${t.strokes}`;
+              const tag = standingTag(t.standingToPar, t.holesPlayed);
+              return tag
+                ? `${t.playerName} had ${phrase} (${tag})`
+                : `${t.playerName} had ${phrase} on ${t.hole}`;
+            })
+            .join("; ");
         }
 
         return sendNotification(follower, {

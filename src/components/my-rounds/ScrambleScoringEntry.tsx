@@ -6,6 +6,7 @@ import { getScoreDescription } from "@/lib/golf/calculator";
 import { DragHandle } from "@/components/DragHandle";
 import { subscribeToRound } from "@/lib/realtime/round-channel";
 import { RoundComments } from "@/components/rounds/RoundComments";
+import { ScoreMark } from "@/components/scoring/ScoreMark";
 
 // Scramble scoring for a personal round: the whole group plays ONE team ball,
 // so there is a single score per hole. We persist that team score by fanning it
@@ -49,44 +50,6 @@ function scoreColorClass(strokes: number | undefined, par: number): string {
   if (strokes < par) return "text-green-700";
   if (strokes > par) return "text-red-600";
   return "text-gray-900";
-}
-
-function MiniScoreCell({ score, par }: { score: number | undefined; par: number }) {
-  if (score == null) return <span className="text-[0.625rem] text-gray-300">·</span>;
-  const diff = score - par;
-  if (diff <= -2) {
-    return (
-      <div className="relative w-[16px] h-[16px] flex items-center justify-center mx-auto">
-        <div className="absolute inset-0 rounded-full border-[1px] border-green-600" />
-        <div className="absolute inset-[2px] rounded-full border-[1px] border-green-600" />
-        <span className="relative z-10 text-[0.5625rem] font-bold text-green-700">{score}</span>
-      </div>
-    );
-  }
-  if (diff === -1) {
-    return (
-      <div className="relative w-[14px] h-[14px] flex items-center justify-center mx-auto">
-        <div className="absolute inset-0 rounded-full border-[1px] border-green-600" />
-        <span className="relative z-10 text-[0.5625rem] font-bold text-green-700">{score}</span>
-      </div>
-    );
-  }
-  if (diff === 0) return <span className="text-[0.625rem] font-bold text-gray-900">{score}</span>;
-  if (diff === 1) {
-    return (
-      <div className="relative w-[14px] h-[14px] flex items-center justify-center mx-auto">
-        <div className="absolute inset-0 rounded-sm border-[1px] border-gray-900" />
-        <span className="relative z-10 text-[0.5625rem] font-bold text-gray-900">{score}</span>
-      </div>
-    );
-  }
-  return (
-    <div className="relative w-[16px] h-[16px] flex items-center justify-center mx-auto">
-      <div className="absolute inset-0 rounded-sm border-[1px] border-gray-900" />
-      <div className="absolute inset-[2px] rounded-sm border-[1px] border-gray-900" />
-      <span className="relative z-10 text-[0.5625rem] font-bold text-gray-900">{score}</span>
-    </div>
-  );
 }
 
 export default function ScrambleScoringEntry({
@@ -534,7 +497,7 @@ export default function ScrambleScoringEntry({
                       </td>
                     )}
                     <td className="px-0 py-0.5 text-center">
-                      <MiniScoreCell score={scores[h.hole_number]} par={h.par} />
+                      <ScoreMark score={scores[h.hole_number]} par={h.par} />
                     </td>
                   </Fragment>
                 ))}

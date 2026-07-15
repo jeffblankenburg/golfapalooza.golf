@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { subscribeToRound } from "@/lib/realtime/round-channel";
+import { ScoreMark } from "@/components/scoring/ScoreMark";
 
 export interface ScoreboardHole {
   hole_number: number;
@@ -126,16 +127,6 @@ export function LiveScoreboard({
       </span>
     );
 
-  const cellColor = (strokes: number | undefined, par: number) => {
-    if (strokes == null) return "text-gray-300";
-    const diff = strokes - par;
-    if (diff <= -2) return "text-yellow-600 font-bold";
-    if (diff === -1) return "text-red-600 font-semibold";
-    if (diff === 0) return "text-gray-800";
-    if (diff === 1) return "text-blue-600";
-    return "text-blue-800 font-semibold";
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -222,11 +213,8 @@ export function LiveScoreboard({
                 {visibleHoles.map((h) => {
                   const v = cells.get(`${p.round_player_id}:${h.hole_number}`);
                   return (
-                    <td
-                      key={h.hole_number}
-                      className={`px-1.5 py-1.5 ${cellColor(v, parByHole.get(h.hole_number) ?? h.par)}`}
-                    >
-                      {v ?? "·"}
+                    <td key={h.hole_number} className="px-1.5 py-1.5">
+                      <ScoreMark score={v} par={parByHole.get(h.hole_number) ?? h.par} size={18} />
                     </td>
                   );
                 })}

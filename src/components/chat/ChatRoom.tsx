@@ -81,6 +81,10 @@ export function ChatRoom({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldScrollRef = useRef(true);
+  // Ids of every message currently in state, so the reactions realtime handler
+  // can tell whether a reaction change belongs to a message we've loaded
+  // (chat_reactions has no room_id and the channel is app-wide).
+  const loadedIdsRef = useRef<Set<string>>(new Set());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const presenceChannelRef = useRef<any>(null);
 
@@ -99,6 +103,11 @@ export function ChatRoom({
   const scrollToBottom = useCallback(() => {
     if (shouldScrollRef.current) snapToBottom(true);
   }, [snapToBottom]);
+
+  // Keep the loaded-id set in sync for the reactions handler's relevance check.
+  useEffect(() => {
+    loadedIdsRef.current = new Set(messages.map((m) => m.id));
+  }, [messages]);
 
   // Fetch the latest window of messages and merge by id. Used as a resync
   // fallback when the realtime channel may have missed events (iOS kills
@@ -125,13 +134,21 @@ export function ChatRoom({
       });
       if (didAddNew) {
         // Resyncs fire on drawer reveal, tab visibility, network reconnect,
-        // and channel (re)subscribe — all "catch me up" moments. Scroll
-        // unconditionally so the user sees what they missed. (The in-the-
-        // moment realtime INSERT handler still respects scroll position
-        // so it doesn't yank you down while you're reading history.)
-        shouldScrollRef.current = true;
-        requestAnimationFrame(() => snapToBottom(true));
-        setTimeout(() => snapToBottom(true), 350);
+        // and channel (re)subscribe. Only snap to the newest message if the
+        // user is already near the bottom — otherwise someone scrolled up
+        // reading history gets yanked down every time one of these fires. The
+        // drawer-reveal path snaps on its own (see the revealedAt effect), so
+        // deliberately opening a room still lands on the latest message.
+        const container = scrollContainerRef.current;
+        const isNearBottom =
+          !container ||
+          container.scrollHeight - container.scrollTop - container.clientHeight <
+            150;
+        if (isNearBottom) {
+          shouldScrollRef.current = true;
+          requestAnimationFrame(() => snapToBottom(true));
+          setTimeout(() => snapToBottom(true), 350);
+        }
       }
     } catch {
       // Best-effort — the next realtime event or resync trigger will retry.
@@ -282,13 +299,43 @@ export function ChatRoom({
           schema: "public",
           table: "chat_reactions",
         },
-        () => {
-          // Refetch messages to get updated reactions
+        (payload) => {
+          // This channel is app-wide (chat_reactions has no room_id). On
+          // INSERT/UPDATE the payload carries message_id, so we can ignore
+          // reactions on messages we haven't loaded (e.g. another room). On
+          // DELETE the payload only has the primary key (default replica
+          // identity), so we can't tell — fall through and refetch to be safe.
+          const changedMsgId = (payload.new as { message_id?: string } | null)
+            ?.message_id;
+          if (changedMsgId && !loadedIdsRef.current.has(changedMsgId)) return;
+
+          // Refetch the latest window for fresh reaction counts, then MERGE by
+          // id — never replace. The old code replaced state with the newest 50,
+          // which silently discarded all the older history the user had
+          // scrolled back to load (and reset the scroll position).
           fetch(`/api/chat/rooms/${roomId}/messages?limit=50`)
             .then((res) => res.json())
             .then((data) => {
-              setMessages((data.messages || []).reverse());
-            });
+              const fetched = ((data.messages || []) as Message[])
+                .slice()
+                .reverse();
+              if (fetched.length === 0) return;
+              setMessages((prev) => {
+                if (prev.length === 0) return fetched;
+                const fetchedById = new Map(fetched.map((m) => [m.id, m]));
+                // Overwrite messages that appear in the fetched window (picks
+                // up reaction changes); keep every older message untouched.
+                const merged = prev.map((m) => fetchedById.get(m.id) ?? m);
+                const known = new Set(prev.map((m) => m.id));
+                for (const m of fetched) if (!known.has(m.id)) merged.push(m);
+                return merged.sort(
+                  (a, b) =>
+                    new Date(a.created_at).getTime() -
+                    new Date(b.created_at).getTime()
+                );
+              });
+            })
+            .catch(() => {});
         }
       )
       .subscribe();

@@ -52,6 +52,12 @@ interface ScoringShellProps {
   // every row in renderScorecardRows.
   scorecardLeadHeader?: ReactNode;
 
+  // Optional extra trailing column after the "Tot" total (e.g., total putts).
+  // When provided, the shell renders an extra <th> with this node at the end of
+  // the header row; consumers must include a matching trailing <td> on every row
+  // in renderScorecardRows.
+  scorecardTrailHeader?: ReactNode;
+
   // Slot: status banners (verified, closed, etc.)
   statusBanner?: ReactNode;
 
@@ -78,6 +84,7 @@ export default function ScoringShell({
   headerRight,
   renderScorecardRows,
   scorecardLeadHeader,
+  scorecardTrailHeader,
   statusBanner,
   courseStrip,
   renderScorePanel,
@@ -155,7 +162,7 @@ export default function ScoringShell({
           className="w-full text-[0.625rem]"
           style={{
             tableLayout: "fixed",
-            minWidth: `${(holes.length + (holes.length > 9 ? 3 : 1) + (scorecardLeadHeader !== undefined ? 1 : 0)) * 34}px`,
+            minWidth: `${(holes.length + (holes.length > 9 ? 3 : 1) + (scorecardLeadHeader !== undefined ? 1 : 0) + (scorecardTrailHeader !== undefined ? 1 : 0)) * 34}px`,
           }}
         >
           <thead>
@@ -218,6 +225,11 @@ export default function ScoringShell({
                 <th className="px-0 py-1 text-center font-bold text-gray-400 border-l border-r border-gray-200">In</th>
               )}
               <th className="px-0 py-1 text-center font-bold text-gray-400 border-l border-gray-200">Tot</th>
+              {scorecardTrailHeader !== undefined && (
+                <th className="px-0 py-1 text-center font-bold text-gray-400 border-l border-gray-200">
+                  {scorecardTrailHeader}
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>

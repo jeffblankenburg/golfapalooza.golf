@@ -36,3 +36,23 @@ export function getStrokesOnHole(
   const remainder = teamHandicap % 18;
   return fullPasses + (holeRank < remainder ? 1 : 0);
 }
+
+/**
+ * Strokes received on a hole given the hole's own stroke index
+ * (`handicap_index`, where 1 = hardest hole gets the first stroke). Use this
+ * when you already know a hole's index and don't need to re-rank a subset —
+ * e.g. showing "pops" on a live scorecard.
+ *
+ * @param handicap - The player's (already group-adjusted) handicap strokes
+ * @param holeHandicapIndex - The hole's stroke index (1–18)
+ */
+export function strokesByHoleIndex(
+  handicap: number,
+  holeHandicapIndex: number,
+  totalHoles = 18
+): number {
+  if (handicap <= 0) return 0;
+  const fullPasses = Math.floor(handicap / totalHoles);
+  const remainder = handicap % totalHoles;
+  return fullPasses + (holeHandicapIndex <= remainder ? 1 : 0);
+}

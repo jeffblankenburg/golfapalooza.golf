@@ -51,6 +51,8 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Push notification when someone adds you to a round, with a one-tap deep link into the live scorer (`round_invite` notification type).
 - Live scoring stays in sync across devices — when two players in the same group both have the round open, score edits propagate within ~1 second. Last-write-wins; in-progress local edits are protected from being overwritten by remote echoes. Header shows a Live/Connecting/Offline badge.
 - Comments thread inside the live scorer — the round's comments appear below the score inputs (same thread as the round detail and spectator watch pages), updating in real time so the group and any watchers can chat as the round unfolds.
+- "Pops" dots on the live scorecard (non-scramble rounds) — small dots mark the holes where each player receives handicap strokes, allocated to the hardest holes relative to the **lowest Course Handicap in the group** (the low player gets none). Purely informational for anyone playing a net game; requires at least two players with established handicaps, and guests/un-established players show none.
+- Each player's running total in the score panel shows their score relative to par for holes played, e.g. `(+5)`.
 
 ### Favorite Loozers & Notifications
 - Mark any Loozer as a favorite to follow their play. Per favorite, toggle pushes for round started, hole-by-hole updates, and round finished.

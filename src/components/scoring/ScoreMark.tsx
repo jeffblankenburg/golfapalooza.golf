@@ -5,9 +5,16 @@
 // truth used by the live scorers and the read-only live scoreboard so the
 // notation matches everywhere.
 //
-// `size` is the outer glyph size in px for the double marks; single marks are
-// 2px smaller. Text scales with it. Default 16 reproduces the dense scorecard
-// used inside the live scorers exactly.
+// Rendered as SVG so the number is centered in its shape by geometry
+// (text-anchor + dominant-baseline) instead of fighting CSS font-baseline
+// metrics. `size` is the outer glyph size in px; single marks are drawn 2px
+// smaller. Default 16 matches the dense scorecard inside the live scorers.
+
+const GREEN_STROKE = "#16a34a"; // green-600
+const GREEN_TEXT = "#15803d"; // green-700
+const DARK = "#111827"; // gray-900
+const EMPTY = "#d1d5db"; // gray-300
+
 export function ScoreMark({
   score,
   par,
@@ -17,84 +24,87 @@ export function ScoreMark({
   par: number;
   size?: number;
 }) {
+  const c = size / 2;
+  const fontSize = size * 0.58;
+
+  // Unscored hole — a small centered dot.
   if (score == null) {
     return (
-      <span className="text-gray-300" style={{ fontSize: size * 0.625 }}>
-        ·
-      </span>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="block mx-auto">
+        <circle cx={c} cy={c} r={size * 0.06} fill={EMPTY} />
+      </svg>
     );
   }
 
   const diff = score - par;
-  const markFont = size * 0.5625;
-  const single = size - 2;
+  const round = diff < 0;
+  const stroke = round ? GREEN_STROKE : DARK;
+  const textFill = round ? GREEN_TEXT : DARK;
+  const double = diff <= -2 || diff >= 2;
+  const isPar = diff === 0;
 
-  // Eagle or better — double circle.
-  if (diff <= -2) {
-    return (
-      <div
-        className="relative flex items-center justify-center mx-auto"
-        style={{ width: size, height: size }}
-      >
-        <div className="absolute inset-0 rounded-full border border-green-600" />
-        <div className="absolute rounded-full border border-green-600" style={{ inset: 2 }} />
-        <span className="relative z-10 font-bold text-green-700" style={{ fontSize: markFont }}>
-          {score}
-        </span>
-      </div>
-    );
-  }
-
-  // Birdie — single circle.
-  if (diff === -1) {
-    return (
-      <div
-        className="relative flex items-center justify-center mx-auto"
-        style={{ width: single, height: single }}
-      >
-        <div className="absolute inset-0 rounded-full border border-green-600" />
-        <span className="relative z-10 font-bold text-green-700" style={{ fontSize: markFont }}>
-          {score}
-        </span>
-      </div>
-    );
-  }
-
-  // Par — plain number.
-  if (diff === 0) {
-    return (
-      <span className="font-bold text-gray-900" style={{ fontSize: size * 0.625 }}>
-        {score}
-      </span>
-    );
-  }
-
-  // Bogey — single square.
-  if (diff === 1) {
-    return (
-      <div
-        className="relative flex items-center justify-center mx-auto"
-        style={{ width: single, height: single }}
-      >
-        <div className="absolute inset-0 rounded-sm border border-gray-900" />
-        <span className="relative z-10 font-bold text-gray-900" style={{ fontSize: markFont }}>
-          {score}
-        </span>
-      </div>
-    );
-  }
-
-  // Double bogey or worse — double square.
-  return (
-    <div
-      className="relative flex items-center justify-center mx-auto"
-      style={{ width: size, height: size }}
+  const num = (
+    <text
+      x={c}
+      y={c}
+      textAnchor="middle"
+      dominantBaseline="central"
+      fontSize={fontSize}
+      fontWeight={700}
+      fill={textFill}
     >
-      <div className="absolute inset-0 rounded-sm border border-gray-900" />
-      <div className="absolute rounded-sm border border-gray-900" style={{ inset: 2 }} />
-      <span className="relative z-10 font-bold text-gray-900" style={{ fontSize: markFont }}>
-        {score}
-      </span>
-    </div>
+      {score}
+    </text>
+  );
+
+  // Par — number only, no shape.
+  if (isPar) {
+    return (
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="block mx-auto">
+        {num}
+      </svg>
+    );
+  }
+
+  // Outer shape fills the box (double marks) or insets 1.5px (single marks).
+  const outerInset = double ? 0.5 : 1.5;
+  const outer = round ? (
+    <circle cx={c} cy={c} r={c - outerInset} fill="none" stroke={stroke} strokeWidth={1} />
+  ) : (
+    <rect
+      x={outerInset}
+      y={outerInset}
+      width={size - outerInset * 2}
+      height={size - outerInset * 2}
+      rx={2}
+      fill="none"
+      stroke={stroke}
+      strokeWidth={1}
+    />
+  );
+
+  const inner = double
+    ? round
+      ? <circle cx={c} cy={c} r={c - 2.5} fill="none" stroke={stroke} strokeWidth={1} />
+      : (
+        <rect
+          x={2.5}
+          y={2.5}
+          width={size - 5}
+          height={size - 5}
+          rx={1.5}
+          fill="none"
+          stroke={stroke}
+          strokeWidth={1}
+        />
+      )
+    : null;
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="block mx-auto">
+      {outer}
+      {inner}
+      {num}
+    </svg>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect, Fragment } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo, Fragment } from "react";
 import ScoringShell, { type HoleInfo } from "@/components/scoring/ScoringShell";
+import { strokesByHoleIndex } from "@/lib/golf/stroke-distribution";
 import { getScoreDescription } from "@/lib/golf/calculator";
 import { DragHandle } from "@/components/DragHandle";
 import { subscribeToRound } from "@/lib/realtime/round-channel";
@@ -131,6 +132,12 @@ export default function LiveScoringEntry({
   // Roster is local state (not the prop) so realtime INSERT/DELETE events can
   // merge new/removed players in place without reloading the whole page.
   const [players, setPlayers] = useState<Player[]>(initialPlayers);
+
+  // Course Handicap per player key (user_id), fetched once the round exists.
+  // Drives the "pops" dots — handicap strokes each player gets relative to the
+  // group's lowest, allocated to the hardest holes. Loozers only; guests and
+  // players without an established index are absent → no pops.
+  const [courseHcp, setCourseHcp] = useState<Record<string, number>>({});
 
   // Suppress the global pull-to-refresh while live scoring is mounted. The
   // listener in PullToRefresh.tsx fires on any touch ancestor that lacks the
@@ -330,6 +337,35 @@ export default function LiveScoringEntry({
     roundIdRef.current = roundId;
   }, [roundId]);
 
+  // Pull each player's Course Handicap for the pops display. Refetched on
+  // roster changes so the group's lowest (and thus everyone's strokes) stays
+  // correct when someone joins or leaves.
+  const refreshHandicaps = useCallback(async () => {
+    const rid = roundIdRef.current;
+    if (!rid) return;
+    try {
+      const res = await fetch(`/api/rounds/${rid}/handicaps`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const map: Record<string, number> = {};
+      for (const h of (data.handicaps || []) as {
+        user_id: string;
+        course_handicap: number;
+      }[]) {
+        if (h.user_id != null && h.course_handicap != null) {
+          map[h.user_id] = h.course_handicap;
+        }
+      }
+      setCourseHcp(map);
+    } catch {
+      /* best-effort — pops are a non-essential display aid */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (roundId) refreshHandicaps();
+  }, [roundId, refreshHandicaps]);
+
   // Rebuild local roster from the server after a remote add/remove. Preserves
   // existing per-player scores/putts (server state could be 1-2 saves behind
   // our local edits) and adds empty maps for any newly arriving players.
@@ -390,7 +426,9 @@ export default function LiveScoringEntry({
       }
       return next;
     });
-  }, []);
+    // Roster changed → the group's low handicap may have too. Refresh pops.
+    refreshHandicaps();
+  }, [refreshHandicaps]);
 
   useEffect(() => {
     if (!roundId) return;
@@ -568,6 +606,24 @@ export default function LiveScoringEntry({
     (p) => visibleHoles.every((h) => scores[p.id]?.[h.hole_number] != null)
   );
 
+  // Group-adjusted handicap strokes per player key (user_id): each player's
+  // Course Handicap minus the group's lowest. Needs at least two known
+  // handicaps for the notion of "pops relative to the group" to mean anything.
+  const adjustedStrokes = useMemo(() => {
+    const known = players
+      .filter((p) => !p.isGuest && courseHcp[p.id] != null)
+      .map((p) => courseHcp[p.id]);
+    if (known.length < 2) return {} as Record<string, number>;
+    const low = Math.min(...known);
+    const out: Record<string, number> = {};
+    for (const p of players) {
+      if (!p.isGuest && courseHcp[p.id] != null) {
+        out[p.id] = Math.max(0, Math.round(courseHcp[p.id] - low));
+      }
+    }
+    return out;
+  }, [players, courseHcp]);
+
   if (!ready) {
     return (
       <div className="fixed inset-0 z-50 bg-white flex items-center justify-center">
@@ -644,6 +700,7 @@ export default function LiveScoringEntry({
         </div>
       }
       scorecardLeadHeader="#"
+      scorecardTrailHeader="Putt"
       renderScorecardRows={(holes, currentHoleNumber) => {
         const hasBothNines = holes.length > 9 && holes[0]?.hole_number <= 9;
         const front9 = hasBothNines ? holes.filter((h) => h.hole_number <= 9) : [];
@@ -671,6 +728,7 @@ export default function LiveScoringEntry({
               <td className="px-0 py-0.5 text-center text-gray-400 font-bold border-l border-gray-200">
                 {holes.reduce((s, h) => s + h.par, 0)}
               </td>
+              <td className="px-0 py-0.5 border-l border-gray-200" />
             </tr>
             <tr className="border-t border-gray-100">
               <td className="px-1 py-0.5 text-center text-gray-300 font-bold border-r border-gray-200">Hcp</td>
@@ -686,6 +744,7 @@ export default function LiveScoringEntry({
                 <td className="px-0 py-0.5 text-center text-gray-300 border-l border-r border-gray-200" />
               )}
               <td className="px-0 py-0.5 text-center text-gray-300 border-l border-gray-200" />
+              <td className="px-0 py-0.5 border-l border-gray-200" />
             </tr>
             {players.map((p) => {
               const total = holes.reduce((s, h) => s + (scores[p.id]?.[h.hole_number] ?? 0), 0);
@@ -714,8 +773,32 @@ export default function LiveScoringEntry({
                           {hasAnyFront ? front9Total : "·"}
                         </td>
                       )}
-                      <td className="px-0 py-0.5 text-center">
-                        <ScoreMark score={scores[p.id]?.[h.hole_number]} par={h.par} />
+                      <td className="px-0 py-0.5">
+                        {(() => {
+                          const pops = adjustedStrokes[p.id]
+                            ? strokesByHoleIndex(adjustedStrokes[p.id], h.handicap_index)
+                            : 0;
+                          // Fixed-height slots — a dot strip (always present, even
+                          // with 0 pops) over a 16px mark slot — so both the dot
+                          // row and the marks line up across every cell and the
+                          // double-bogey box never crowds the dots.
+                          return (
+                            <div className="flex flex-col items-center leading-none">
+                              <div className="flex items-center justify-center gap-[1.5px] h-[4px] mb-[1px]">
+                                {Array.from({ length: Math.min(pops, 3) }).map((_, i) => (
+                                  <span key={i} className="w-[3px] h-[3px] rounded-full bg-gray-500" />
+                                ))}
+                              </div>
+                              <div className="h-4 flex items-center justify-center">
+                                <ScoreMark score={scores[p.id]?.[h.hole_number]} par={h.par} />
+                              </div>
+                              {/* Balances the 5px dot strip above so the mark
+                                  centers in the cell and lines up with the
+                                  player's initial badge. */}
+                              <div className="h-[5px]" />
+                            </div>
+                          );
+                        })()}
                       </td>
                     </Fragment>
                   ))}
@@ -726,6 +809,13 @@ export default function LiveScoringEntry({
                   )}
                   <td className="px-0 py-0.5 text-center font-bold text-gray-900 border-l border-gray-200">
                     {hasAny ? total : "·"}
+                  </td>
+                  <td className="px-0 py-0.5 text-center font-semibold text-gray-500 border-l border-gray-200">
+                    {(() => {
+                      const anyPutts = holes.some((h) => putts[p.id]?.[h.hole_number] != null);
+                      const puttTotal = holes.reduce((s, h) => s + (putts[p.id]?.[h.hole_number] ?? 0), 0);
+                      return anyPutts ? puttTotal : "·";
+                    })()}
                   </td>
                 </tr>
               );
@@ -750,6 +840,13 @@ export default function LiveScoringEntry({
 
               const roundTotal = visibleHoles.reduce((sum, h) => sum + (scores[p.id]?.[h.hole_number] ?? 0), 0);
               const holesPlayed = visibleHoles.filter((h) => scores[p.id]?.[h.hole_number] != null).length;
+              // Score relative to the par of holes played so far, e.g. (+5).
+              const parPlayed = visibleHoles.reduce(
+                (sum, h) => sum + (scores[p.id]?.[h.hole_number] != null ? h.par : 0),
+                0,
+              );
+              const toPar = roundTotal - parPlayed;
+              const toParLabel = toPar === 0 ? "E" : toPar > 0 ? `+${toPar}` : `${toPar}`;
 
               return (
                 <div key={p.id} className="flex items-center bg-gray-50 rounded-lg px-3 py-1.5">
@@ -761,11 +858,21 @@ export default function LiveScoringEntry({
                     <div className="text-xs font-semibold text-gray-700 truncate">{p.name}</div>
                     {p.teeName && <div className="text-[0.625rem] text-gray-400 truncate">{p.teeName}</div>}
                   </div>
-                  {/* Running total */}
-                  <div className="w-[40px] shrink-0 flex items-center justify-center">
-                    <span className="text-2xl font-bold tabular-nums text-gray-900">
-                      {holesPlayed > 0 ? roundTotal : ""}
-                    </span>
+                  {/* Running total with the par differential as a superscript.
+                      An invisible label matching the Strokes column's keeps the
+                      two big numbers vertically aligned without the extra text. */}
+                  <div className="min-w-[40px] shrink-0 flex flex-col items-center leading-none">
+                    {holesPlayed > 0 ? (
+                      <>
+                        <span className="text-2xl font-bold tabular-nums text-gray-900">
+                          {roundTotal}
+                          <sup className="ml-[1px] text-[0.8125rem] font-semibold tabular-nums text-gray-500">
+                            {toParLabel}
+                          </sup>
+                        </span>
+                        <span aria-hidden className="text-[0.4375rem] uppercase -mt-0.5 invisible">Total</span>
+                      </>
+                    ) : null}
                   </div>
                   <div className="flex-1" />
                   {/* Strokes */}
@@ -818,22 +925,18 @@ export default function LiveScoringEntry({
             })}
           </div>
 
-          {/* Reserved slot: always rendered so the score panel doesn't jump
-              when the final score flips allComplete=true. */}
-          <button
-            type="button"
-            onClick={() => setConfirmCompleteOpen(true)}
-            disabled={!allComplete}
-            aria-hidden={!allComplete}
-            tabIndex={allComplete ? 0 : -1}
-            className={`w-full mt-2 py-3 font-semibold rounded-xl transition-opacity ${
-              allComplete
-                ? "bg-green-600 text-white active:bg-green-700 opacity-100"
-                : "bg-green-600 text-white opacity-0 pointer-events-none"
-            }`}
-          >
-            Complete Round
-          </button>
+          {/* Only rendered once every player is complete — no reserved slot, so
+              the panel sizes to the actual roster (a real 5th player still shows
+              via the players map above). */}
+          {allComplete && (
+            <button
+              type="button"
+              onClick={() => setConfirmCompleteOpen(true)}
+              className="w-full mt-2 py-3 font-semibold rounded-xl bg-green-600 text-white active:bg-green-700"
+            >
+              Complete Round
+            </button>
+          )}
 
           {/* Live comments (issue #140) — visible while scoring so the group
               sees remarks as they happen. Mounts once the round exists. */}

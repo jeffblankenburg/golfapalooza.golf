@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { checkIsAdmin } from "@/lib/permissions-server";
+import { checkPermissionAccess } from "@/lib/permissions-server";
 import { computePickemRankings } from "@/lib/pickem/rankings";
 import { materializePickemWinners } from "@/lib/winners/materialize";
 
 // GET - Calculate and return standings
 export async function GET(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_pickem");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -77,7 +77,7 @@ export async function GET(request: Request) {
 
 // PUT - Mark game result
 export async function PUT(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_pickem");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

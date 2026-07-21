@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { checkIsAdmin } from "@/lib/permissions-server";
+import { checkIsAdmin, checkAnyEventAccess } from "@/lib/permissions-server";
 
 /**
  * @swagger
@@ -21,7 +21,10 @@ import { checkIsAdmin } from "@/lib/permissions-server";
  *         description: Unauthorized
  */
 export async function GET(request: Request) {
-  const admin = await checkIsAdmin();
+  // Read access for any event-permission holder (e.g. manage_pickem) so the
+  // per-contest admin pages can locate their contest. Create/edit/delete below
+  // stay admin-only.
+  const admin = await checkAnyEventAccess();
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

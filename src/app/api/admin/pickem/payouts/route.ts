@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { checkIsAdmin } from "@/lib/permissions-server";
+import { checkPermissionAccess } from "@/lib/permissions-server";
 
 // As of issue #124 Phase F, paid status lives on `contest_winners.paid`
 // (the legacy `pickem_payouts` table is dropped). The endpoint shape is
@@ -9,7 +9,7 @@ import { checkIsAdmin } from "@/lib/permissions-server";
 // and PUT writes back to contest_winners.
 
 export async function GET(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_pickem");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_pickem");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

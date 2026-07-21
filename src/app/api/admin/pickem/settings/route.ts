@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { checkIsAdmin } from "@/lib/permissions-server";
+import { checkPermissionAccess } from "@/lib/permissions-server";
 import { getPickemEntryFee } from "@/lib/pickem/entry-fee";
 
 // GET - Fetch settings for a contest. As of issue #124, payout structure
@@ -8,7 +8,7 @@ import { getPickemEntryFee } from "@/lib/pickem/entry-fee";
 // from `contests.buy_in_cost_item_id → cost_items.cost`. This endpoint
 // translates everything back into the legacy shape PickemManager consumes.
 export async function GET(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_pickem");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -72,7 +72,7 @@ export async function GET(request: Request) {
 // switch to sending `cost_item_id`. Field is preserved on pickem_settings
 // only until Phase 5 drops the column.
 export async function PUT(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkPermissionAccess("manage_pickem");
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

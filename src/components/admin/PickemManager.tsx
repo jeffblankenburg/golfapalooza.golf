@@ -258,6 +258,7 @@ export function PickemManager({ tripId }: { tripId: string }) {
   const [spread, setSpread] = useState("-3");
   const [favorite, setFavorite] = useState<"away" | "home">("home");
   const [gameTime, setGameTime] = useState("12:00"); // time only (HH:MM)
+  const [gameDate, setGameDate] = useState(""); // YYYY-MM-DD; seeded to Saturday, editable
   const [tvChannel, setTvChannel] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
 
@@ -272,11 +273,13 @@ export function PickemManager({ tripId }: { tripId: string }) {
     ? Number(costItems.find((ci) => ci.id === costItemId)?.cost ?? 0)
     : Number(settings?.entry_fee ?? 0);
 
-  // Helper: combine Saturday date + time into ISO string
-  const buildGameTime = (time: string): string => {
-    if (!saturdayDate) return new Date().toISOString();
+  // Helper: combine a date (YYYY-MM-DD) + time (HH:MM) into an ISO string.
+  // Falls back to the event's Saturday if no date is supplied.
+  const buildGameTime = (date: string, time: string): string => {
+    const base = date || saturdayDate;
+    if (!base) return new Date().toISOString();
     const [h, m] = time.split(":").map(Number);
-    const [y, mo, d] = saturdayDate.split("-").map(Number);
+    const [y, mo, d] = base.split("-").map(Number);
     return new Date(y, mo - 1, d, h, m).toISOString();
   };
 
@@ -284,6 +287,12 @@ export function PickemManager({ tripId }: { tripId: string }) {
   const extractTime = (iso: string): string => {
     const d = new Date(iso);
     return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
+
+  // Helper: extract YYYY-MM-DD (local) from an ISO game_time
+  const extractDate = (iso: string): string => {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
 
   // Find pickem contest for this trip + derive Saturday date
@@ -298,6 +307,7 @@ export function PickemManager({ tripId }: { tripId: string }) {
         const sat = new Date(y, m - 1, d + 3);
         const satStr = `${sat.getFullYear()}-${String(sat.getMonth() + 1).padStart(2, "0")}-${String(sat.getDate()).padStart(2, "0")}`;
         setSaturdayDate(satStr);
+        setGameDate((prev) => prev || satStr); // default the add-form date to Saturday
       }
 
       if (data.contest_types?.includes("pickem")) {
@@ -373,7 +383,7 @@ export function PickemManager({ tripId }: { tripId: string }) {
   }, [tripId]);
 
   const addGame = async () => {
-    if (!contestId || !awayTeamObj || !homeTeamObj || !gameTime) return;
+    if (!contestId || !awayTeamObj || !homeTeamObj || !gameTime || !gameDate) return;
 
     setSaving("add");
     const res = await fetch("/api/admin/pickem", {
@@ -389,7 +399,7 @@ export function PickemManager({ tripId }: { tripId: string }) {
         home_color: homeTeamObj.primaryColor,
         spread: parseFloat(spread) || -3,
         favorite,
-        game_time: buildGameTime(gameTime),
+        game_time: buildGameTime(gameDate, gameTime),
         tv_channel: tvChannel || null,
       }),
     });
@@ -763,18 +773,16 @@ export function PickemManager({ tripId }: { tripId: string }) {
               </div>
             </div>
 
-            {saturdayDate && (
-              <p className="text-xs text-gray-400">
-                All games on Saturday,{" "}
-                {new Date(saturdayDate + "T00:00:00").toLocaleDateString("en-US", {
-                  month: "long",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </p>
-            )}
-
             <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="text-xs text-gray-500 block mb-1">Game Date</label>
+                <input
+                  type="date"
+                  value={gameDate}
+                  onChange={(e) => setGameDate(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
               <div className="flex-1">
                 <label className="text-xs text-gray-500 block mb-1">Kickoff Time</label>
                 <input
@@ -784,21 +792,22 @@ export function PickemManager({ tripId }: { tripId: string }) {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                 />
               </div>
-              <div className="flex-1">
-                <label className="text-xs text-gray-500 block mb-1">TV (optional)</label>
-                <input
-                  type="text"
-                  placeholder="ESPN"
-                  value={tvChannel}
-                  onChange={(e) => setTvChannel(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">TV (optional)</label>
+              <input
+                type="text"
+                placeholder="ESPN"
+                value={tvChannel}
+                onChange={(e) => setTvChannel(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
             </div>
 
             <button
               onClick={addGame}
-              disabled={!awayTeamObj || !homeTeamObj || !gameTime || saving === "add"}
+              disabled={!awayTeamObj || !homeTeamObj || !gameTime || !gameDate || saving === "add"}
               className="w-full bg-green-600 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-50"
             >
               {saving === "add" ? "Adding..." : "Add Game"}
@@ -823,6 +832,7 @@ export function PickemManager({ tripId }: { tripId: string }) {
                 formatGameTime={formatGameTime}
                 buildGameTime={buildGameTime}
                 extractTime={extractTime}
+                extractDate={extractDate}
                 onEdit={(id) => setEditingGame(editingGame === id ? null : id)}
                 onResult={(id) => setResultGame(resultGame === id ? null : id)}
                 onUpdate={updateGame}
@@ -1143,6 +1153,7 @@ function GameCard({
   formatGameTime,
   buildGameTime,
   extractTime,
+  extractDate,
   onEdit,
   onResult,
   onUpdate,
@@ -1156,8 +1167,9 @@ function GameCard({
   saturdayDate: string | null;
   formatSpread: (g: Game) => string;
   formatGameTime: (iso: string) => string;
-  buildGameTime: (time: string) => string;
+  buildGameTime: (date: string, time: string) => string;
   extractTime: (iso: string) => string;
+  extractDate: (iso: string) => string;
   onEdit: (id: string) => void;
   onResult: (id: string) => void;
   onUpdate: (id: string, updates: Partial<Game>) => void;
@@ -1170,6 +1182,9 @@ function GameCard({
   const [editFavorite, setEditFavorite] = useState(game.favorite);
   const [editTime, setEditTime] = useState(
     game.game_time ? extractTime(game.game_time) : "12:00"
+  );
+  const [editDate, setEditDate] = useState(
+    game.game_time ? extractDate(game.game_time) : ""
   );
   const [editTv, setEditTv] = useState(game.tv_channel || "");
   const [resultAwayScore, setResultAwayScore] = useState(
@@ -1252,54 +1267,79 @@ function GameCard({
         </div>
       </div>
 
-      {/* Inline edit form — spread, favorite, time, TV only (team names set at creation) */}
+      {/* Inline edit form — date, spread, favorite, time, TV (team names set at creation) */}
       {isEditing && (
         <div className="border-t border-gray-100 px-3 py-3 bg-gray-50 space-y-2">
+          {/* Row 1: Line + Favorite */}
           <div className="flex gap-2">
-            <input
-              type="number"
-              step="0.5"
-              value={editSpread}
-              onChange={(e) => setEditSpread(e.target.value)}
-              className="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
-              placeholder="Spread"
-            />
-            <select
-              value={editFavorite}
-              onChange={(e) => setEditFavorite(e.target.value as "away" | "home")}
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
-              style={{ backgroundColor: "transparent" }}
-            >
-              <option value="away">{game.away_team} fav</option>
-              <option value="home">{game.home_team} fav</option>
-            </select>
-            <input
-              type="time"
-              value={editTime}
-              onChange={(e) => setEditTime(e.target.value)}
-              className="w-28 border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
-            />
+            <div className="flex-1">
+              <label className="text-xs text-gray-500 block mb-1">Line</label>
+              <input
+                type="number"
+                step="0.5"
+                value={editSpread}
+                onChange={(e) => setEditSpread(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                placeholder="Spread"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-xs text-gray-500 block mb-1">Favorite</label>
+              <select
+                value={editFavorite}
+                onChange={(e) => setEditFavorite(e.target.value as "away" | "home")}
+                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+              >
+                <option value="away">{game.away_team}</option>
+                <option value="home">{game.home_team}</option>
+              </select>
+            </div>
           </div>
+          {/* Row 2: Date + Time */}
           <div className="flex gap-2">
-            <input
-              type="text"
-              value={editTv}
-              onChange={(e) => setEditTv(e.target.value)}
-              className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
-              placeholder="TV Channel"
-            />
+            <div className="flex-1">
+              <label className="text-xs text-gray-500 block mb-1">Date</label>
+              <input
+                type="date"
+                value={editDate}
+                onChange={(e) => setEditDate(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-xs text-gray-500 block mb-1">Time</label>
+              <input
+                type="time"
+                value={editTime}
+                onChange={(e) => setEditTime(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+              />
+            </div>
+          </div>
+          {/* Row 3: Channel + Save */}
+          <div className="flex gap-2 items-end">
+            <div className="flex-1">
+              <label className="text-xs text-gray-500 block mb-1">Channel</label>
+              <input
+                type="text"
+                value={editTv}
+                onChange={(e) => setEditTv(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                placeholder="TV Channel"
+              />
+            </div>
             <button
               onClick={() => {
                 onUpdate(game.id, {
                   spread: parseFloat(editSpread) as unknown as number,
                   favorite: editFavorite,
-                  game_time: buildGameTime(editTime),
+                  game_time: buildGameTime(editDate, editTime),
                   tv_channel: editTv || null,
                 });
                 onEdit(game.id);
               }}
               disabled={saving === game.id}
-              className="bg-green-600 text-white rounded-lg px-4 py-1.5 text-sm font-medium disabled:opacity-50"
+              className="flex-1 bg-green-600 text-white rounded-lg px-4 py-1.5 text-sm font-medium disabled:opacity-50"
             >
               Save
             </button>

@@ -2,6 +2,7 @@ import { getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
+import { AutoRefresh } from "@/components/AutoRefresh";
 import { getEffectiveDate, getEffectiveTripId } from "@/lib/simulator";
 import { isFeatureVisible } from "@/lib/visibility";
 import {
@@ -171,6 +172,7 @@ export default async function DailyGamesPage() {
 
   return (
     <div className="px-4 pt-6 pb-8 space-y-6">
+      <AutoRefresh />
       <div className="flex items-center gap-2">
         <h1 className="text-2xl font-bold text-gray-900">Daily Games</h1>
         <PinnedNoteButton pinnedTo="daily_games" />

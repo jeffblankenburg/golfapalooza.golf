@@ -104,17 +104,6 @@ export default function ScrambleScoringEntry({
   const [completeError, setCompleteError] = useState<string | null>(null);
   const [liveStatus, setLiveStatus] = useState<"live" | "connecting" | "offline">("connecting");
 
-  // Suppress global pull-to-refresh while scoring (matches LiveScoringEntry).
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const prev = document.body.getAttribute("data-pull-refresh");
-    document.body.setAttribute("data-pull-refresh", "off");
-    return () => {
-      if (prev == null) document.body.removeAttribute("data-pull-refresh");
-      else document.body.setAttribute("data-pull-refresh", prev);
-    };
-  }, []);
-
   // Dirty tracking: hole_number -> strokes.
   const dirtyRef = useRef<Map<number, number>>(new Map());
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

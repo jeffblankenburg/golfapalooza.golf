@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
 import { KgbCupScoreboard, KgbCupGroupResults, type KgbGroupData } from "@/components/kgb-cup/KgbCupResultsView";
@@ -56,24 +56,31 @@ export function KgbCupResults({ contestId, headerAction }: { contestId: string; 
     </div>
   );
 
-  useEffect(() => {
-    async function fetchResults() {
-      try {
-        const res = await fetch(`/api/kgb-cup/results?contest_id=${contestId}`);
-        if (!res.ok) {
-          setError("Failed to load results");
-          return;
-        }
-        const json = await res.json();
-        setData(json);
-      } catch {
-        setError("Failed to load results");
-      } finally {
-        setLoading(false);
+  // Live results poll every 15s so scores tick up during active play without a
+  // manual refresh. First load surfaces the spinner / any error; later polls
+  // update silently (never clear existing data on a transient failure).
+  const fetchResults = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/kgb-cup/results?contest_id=${contestId}`);
+      if (!res.ok) {
+        setError((prev) => prev ?? "Failed to load results");
+        return;
       }
+      const json = await res.json();
+      setData(json);
+      setError(null);
+    } catch {
+      setError((prev) => prev ?? "Failed to load results");
+    } finally {
+      setLoading(false);
     }
-    fetchResults();
   }, [contestId]);
+
+  useEffect(() => {
+    fetchResults();
+    const interval = setInterval(fetchResults, 15000);
+    return () => clearInterval(interval);
+  }, [fetchResults]);
 
   if (loading) {
     return (

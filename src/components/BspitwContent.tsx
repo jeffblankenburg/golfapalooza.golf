@@ -106,8 +106,12 @@ export function BspitwContent({
     setLoading(false);
   }, [tripId]);
 
+  // Poll every 15s so live scores tick up without a manual refresh. fetchData
+  // never toggles the loading spinner mid-flight, so polls update silently.
   useEffect(() => {
     fetchData();
+    const interval = setInterval(fetchData, 15000);
+    return () => clearInterval(interval);
   }, [fetchData]);
 
   const DAYS = scrambleDays.length > 0 ? scrambleDays : [2, 3, 4];

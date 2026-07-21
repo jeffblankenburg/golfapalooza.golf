@@ -68,9 +68,13 @@ export function HundredFeetContent({
     setLoading(false);
   }, [tripId]);
 
+  // Poll every 15s so live scores tick up without a manual refresh. fetchData
+  // never toggles the loading spinner mid-flight, so polls update silently.
   useEffect(() => {
     if (!featureVisible) return;
     fetchData();
+    const interval = setInterval(fetchData, 15000);
+    return () => clearInterval(interval);
   }, [featureVisible, fetchData]);
 
   const DAYS = scrambleDays.length > 0 ? scrambleDays : [2, 3, 4];

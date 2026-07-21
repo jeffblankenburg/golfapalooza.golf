@@ -28,7 +28,6 @@ export function BottomDrawer({ open, onClose, title, subtitle, children }: Botto
 
   return (
     <div
-      data-pull-refresh="off"
       className="fixed top-14 bottom-0 left-0 right-0 z-35 flex items-end justify-center"
     >
       {/* Overlay — fills the constrained area */}

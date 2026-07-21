@@ -214,14 +214,16 @@ export function ScorecardsContent({
   const showLeaderboard = contestComplete || hasAnyScores;
   const teeSheetPublished = !!data?.tee_sheet_published_at;
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (background = false) => {
     if (!selectedContest) {
       setData(null);
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    // Poll (background=true) refetches silently so live scores tick up without
+    // flashing the spinner; only the initial load / contest switch shows it.
+    if (!background) setLoading(true);
     const res = await fetch(`/api/scrambles?contest_id=${selectedContest.id}`);
     const json = await res.json();
 
@@ -239,6 +241,8 @@ export function ScorecardsContent({
 
   useEffect(() => {
     fetchData();
+    const interval = setInterval(() => fetchData(true), 15000);
+    return () => clearInterval(interval);
   }, [fetchData]);
 
   if (contests.length === 0) {

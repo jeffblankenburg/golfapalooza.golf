@@ -139,21 +139,6 @@ export default function LiveScoringEntry({
   // players without an established index are absent → no pops.
   const [courseHcp, setCourseHcp] = useState<Record<string, number>>({});
 
-  // Suppress the global pull-to-refresh while live scoring is mounted. The
-  // listener in PullToRefresh.tsx fires on any touch ancestor that lacks the
-  // opt-out — HeaderBar above us is sticky z-[60] (not .fixed.z-50), so
-  // incidental thumb contact at the top of the screen was reloading the page
-  // mid-round. Body-level opt-out catches every touch path.
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const prev = document.body.getAttribute("data-pull-refresh");
-    document.body.setAttribute("data-pull-refresh", "off");
-    return () => {
-      if (prev == null) document.body.removeAttribute("data-pull-refresh");
-      else document.body.setAttribute("data-pull-refresh", prev);
-    };
-  }, []);
-
   const [ready, setReady] = useState(!!existingRoundId);
   // Current viewer (simulator-aware) so the comments thread knows whose
   // comments can be deleted. Best-effort — comments still render if this fails.

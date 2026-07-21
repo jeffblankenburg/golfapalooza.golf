@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { PullToRefresh } from "@/components/PullToRefresh";
 import { ActivityTracker } from "@/components/ActivityTracker";
 import { SplashFader } from "@/components/SplashFader";
 import { WakeLockKeeper } from "@/components/WakeLockKeeper";
@@ -150,7 +149,6 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50 text-gray-900 min-h-dvh`}
       >
         <SplashFader />
-        <PullToRefresh />
         <ActivityTracker />
         <WakeLockKeeper />
         {/* Universal music player + chat drawer — single instances cover

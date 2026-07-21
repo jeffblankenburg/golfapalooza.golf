@@ -42,8 +42,8 @@ export async function GET(request: Request) {
         .from("pickem_games")
         .select("*")
         .eq("contest_id", contestId)
-        .order("sort_order")
-        .order("game_time"),
+        .order("game_time")
+        .order("sort_order"),
       adminClient
         .from("pickem_picks")
         .select("game_id, user_id, picked_team, tiebreaker_total"),

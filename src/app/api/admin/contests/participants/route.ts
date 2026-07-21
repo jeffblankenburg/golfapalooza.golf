@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { checkIsAdmin } from "@/lib/permissions-server";
+import { checkAnyEventAccess, checkContestManageAccess } from "@/lib/permissions-server";
 
 /**
  * @swagger
@@ -21,7 +21,7 @@ import { checkIsAdmin } from "@/lib/permissions-server";
  *         description: Unauthorized
  */
 export async function GET(request: Request) {
-  const admin = await checkIsAdmin();
+  const admin = await checkAnyEventAccess();
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -134,11 +134,6 @@ async function fundedByOptionUserIds(
  *         description: Unauthorized
  */
 export async function POST(request: Request) {
-  const admin = await checkIsAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const { contest_id, user_id } = await request.json();
 
@@ -147,6 +142,11 @@ export async function POST(request: Request) {
         { error: "contest_id and user_id are required" },
         { status: 400 }
       );
+    }
+
+    const admin = await checkContestManageAccess(contest_id);
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const adminClient = createAdminClient();
@@ -182,11 +182,6 @@ export async function POST(request: Request) {
  *         description: Unauthorized
  */
 export async function PUT(request: Request) {
-  const admin = await checkIsAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const { contest_id, user_ids } = await request.json();
 
@@ -195,6 +190,11 @@ export async function PUT(request: Request) {
         { error: "contest_id and user_ids array are required" },
         { status: 400 }
       );
+    }
+
+    const admin = await checkContestManageAccess(contest_id);
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const adminClient = createAdminClient();
@@ -244,11 +244,6 @@ export async function PUT(request: Request) {
  *         description: Unauthorized
  */
 export async function DELETE(request: Request) {
-  const admin = await checkIsAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const { contest_id, user_id } = await request.json();
 
@@ -257,6 +252,11 @@ export async function DELETE(request: Request) {
         { error: "contest_id and user_id are required" },
         { status: 400 }
       );
+    }
+
+    const admin = await checkContestManageAccess(contest_id);
+    if (!admin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const adminClient = createAdminClient();

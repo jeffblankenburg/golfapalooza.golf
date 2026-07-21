@@ -100,6 +100,43 @@ export async function checkAnyEventAccess() {
   return null;
 }
 
+// Which event permission manages each contest type. Types not listed fall back
+// to admin-only (so an unmapped/misspelled type never silently over-grants).
+const CONTEST_TYPE_PERMISSION: Record<string, string> = {
+  pickem: "manage_pickem",
+  scramble: "manage_scrambles",
+  scramble_skins: "manage_scrambles",
+  calcutta: "manage_calcutta",
+  cornhole_singles: "manage_cornhole",
+  cornhole_doubles: "manage_cornhole",
+  ryder_cup: "manage_kgb_cup",
+};
+
+/**
+ * Authorize managing a specific contest. Passes for an admin, a holder of
+ * `manage_contests`, or a holder of the permission mapped to this contest's
+ * type (e.g. `manage_pickem` for a pickem contest). Returns the auth user or
+ * null. Admins short-circuit, so this only ever grants access beyond the old
+ * admin-only gate — never removes it.
+ */
+export async function checkContestManageAccess(contestId: string) {
+  const profile = await getEffectiveProfile();
+  if (!profile) return null;
+  if (profile.isAdmin) return profile.authUser;
+  if (profile.permissions?.manage_contests) return profile.authUser;
+
+  const adminClient = createAdminClient();
+  const { data: contest } = await adminClient
+    .from("contests")
+    .select("contest_type")
+    .eq("id", contestId)
+    .single();
+  const key = contest ? CONTEST_TYPE_PERMISSION[contest.contest_type] : undefined;
+  if (key && profile.permissions?.[key]) return profile.authUser;
+
+  return null;
+}
+
 /**
  * Check if the effective user is an admin OR has any permission at all.
  * Used for read-only endpoints like listing users.

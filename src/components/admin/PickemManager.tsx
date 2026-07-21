@@ -589,7 +589,11 @@ export function PickemManager({ tripId }: { tripId: string }) {
     );
   }
 
-  const paidCount = payments.filter((p) => p.paid).length;
+  // Only count payments belonging to CURRENT participants. Orphaned paid
+  // records (someone paid, then was removed from the contest roster) would
+  // otherwise make paid exceed participants (e.g. "36/33") and inflate the pot.
+  const participantIds = new Set(participants.map((p) => p.user_id));
+  const paidCount = payments.filter((p) => p.paid && participantIds.has(p.user_id)).length;
 
   return (
     <div className="space-y-4">
@@ -983,7 +987,7 @@ export function PickemManager({ tripId }: { tripId: string }) {
 
             {/* Computed payout preview */}
             {(() => {
-              const paidCount = payments.filter((pay) => pay.paid).length;
+              const paidCount = payments.filter((pay) => pay.paid && participantIds.has(pay.user_id)).length;
               const fee = entryFee;
               const pot = fee * paidCount;
               const parsed = payouts.map((p) => ({

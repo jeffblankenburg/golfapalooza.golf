@@ -34,8 +34,8 @@ export async function GET(request: Request) {
         .from("pickem_games")
         .select("*")
         .eq("contest_id", contestId)
-        .order("sort_order")
-        .order("game_time"),
+        .order("game_time")
+        .order("sort_order"),
       adminClient
         .from("pickem_settings")
         .select("contest_id, is_open")

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { checkIsAdmin } from "@/lib/permissions-server";
+import { checkIsAdmin, checkAnyEventAccess } from "@/lib/permissions-server";
 import { cascadeRemoveFromRoster } from "@/lib/roster";
 
 /**
@@ -22,7 +22,9 @@ import { cascadeRemoveFromRoster } from "@/lib/roster";
  *         description: Unauthorized
  */
 export async function GET(request: Request) {
-  const admin = await checkIsAdmin();
+  // Read the event roster for any event-permission holder (e.g. a manage_pickem
+  // helper needs it to enroll pickem participants). Add/remove below stay admin.
+  const admin = await checkAnyEventAccess();
   if (!admin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

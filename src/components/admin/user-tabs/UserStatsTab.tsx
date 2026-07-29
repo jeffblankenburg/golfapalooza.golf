@@ -119,7 +119,7 @@ export function UserStatsTab({ userId }: { userId: string }) {
     <div className="space-y-4">
       <Section title="Scoring">
         <StatRow label="Completed rounds" value={s.completed_rounds} />
-        <StatRow label="Best gross" value={s.best_gross ?? "—"} />
+        <StatRow label="Best 18 gross" value={s.best_gross ?? "—"} />
         <StatRow
           label="Best differential"
           value={s.best_differential != null ? s.best_differential.toFixed(1) : "—"}

@@ -144,11 +144,14 @@ export default async function MyRoundsPage() {
   const completedRounds = roundSummaries.filter(
     (r) => r.final_score != null && r.format !== "scramble" && !r.is_incomplete,
   );
-  const avgScore = completedRounds.length > 0
-    ? Math.round(completedRounds.reduce((sum, r) => sum + (r.final_score || 0), 0) / completedRounds.length)
+  // Average and Best are always over full 18-hole rounds — a 9-hole score
+  // (e.g. 42) is lower/smaller but isn't comparable to an 18-hole total.
+  const eighteenHoleRounds = completedRounds.filter((r) => r.round_type === "18");
+  const avgScore = eighteenHoleRounds.length > 0
+    ? Math.round(eighteenHoleRounds.reduce((sum, r) => sum + (r.final_score || 0), 0) / eighteenHoleRounds.length)
     : null;
-  const bestScore = completedRounds.length > 0
-    ? Math.min(...completedRounds.map((r) => r.final_score || 999))
+  const bestScore = eighteenHoleRounds.length > 0
+    ? Math.min(...eighteenHoleRounds.map((r) => r.final_score || 999))
     : null;
 
   return (
@@ -185,7 +188,7 @@ export default async function MyRoundsPage() {
             <div className="text-lg font-bold text-gray-900">{avgScore ?? "—"}</div>
           </div>
           <div className="bg-white border border-gray-200 rounded-lg p-3 text-center">
-            <div className="text-xs text-gray-500">Best</div>
+            <div className="text-xs text-gray-500">Best 18</div>
             <div className="text-lg font-bold text-green-600">{bestScore ?? "—"}</div>
           </div>
         </div>

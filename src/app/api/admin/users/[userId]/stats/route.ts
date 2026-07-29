@@ -87,10 +87,12 @@ export async function GET(
       (p.scores || []).length,
       p.final_gross_score != null,
     );
-    // Partial rounds have an artificially low gross — never let one become the
-    // "best" score. Their differential is already null so best_differential is
+    // "Best gross" is always a full 18-hole round: a 9-hole score is lower but
+    // not comparable, and a partial round's gross is artificially low. Both are
+    // excluded. Differential is already null for those, so best_differential is
     // safe. Per-hole scoring breakdown below still counts real holes played.
-    if (p.final_gross_score != null && !incomplete) {
+    const is18 = (round?.round_type || "18") === "18";
+    if (p.final_gross_score != null && !incomplete && is18) {
       if (bestGross == null || p.final_gross_score < bestGross) bestGross = p.final_gross_score;
     }
     if (p.score_differential != null) {

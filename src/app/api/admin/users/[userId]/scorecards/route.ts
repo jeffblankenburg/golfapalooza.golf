@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkAnyPermissionAccess } from "@/lib/permissions-server";
+import { isRoundIncomplete, expectedHoleCount } from "@/lib/rounds/incomplete";
 
 /**
  * @swagger
@@ -93,11 +94,13 @@ export async function GET(
     for (const s of p.scores || []) {
       scoreByHole[s.hole_number] = s.strokes;
     }
+    const roundType = round?.round_type || "18";
+    const holesPlayed = (p.scores || []).length;
     return {
       round_player_id: p.id,
       round_id: round?.id || null,
       played_at: round?.completed_at || round?.created_at || null,
-      round_type: round?.round_type || "18",
+      round_type: roundType,
       course_name: course?.name || "Unknown course",
       tee_name: tee?.tee_name || null,
       tee_color: tee?.tee_color || null,
@@ -105,6 +108,9 @@ export async function GET(
       final_gross_score: p.final_gross_score,
       final_adjusted_score: p.final_adjusted_score,
       score_differential: p.score_differential,
+      is_incomplete: isRoundIncomplete(roundType, holesPlayed, p.final_gross_score != null),
+      holes_played: holesPlayed,
+      expected_holes: expectedHoleCount(roundType),
       holes,
       scores: scoreByHole,
     };

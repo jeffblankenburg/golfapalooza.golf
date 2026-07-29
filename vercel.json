@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/polls-lifecycle",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/close-stale-rounds",
+      "schedule": "0 6 * * *"
     }
   ]
 }

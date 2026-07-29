@@ -21,6 +21,9 @@ interface Scorecard {
   final_gross_score: number | null;
   final_adjusted_score: number | null;
   score_differential: number | null;
+  is_incomplete: boolean;
+  holes_played: number;
+  expected_holes: number;
   holes: HoleData[];
   scores: Record<number, number>;
 }
@@ -134,7 +137,7 @@ function ScorecardAccordion({ card }: { card: Scorecard }) {
   const showFront = card.round_type !== "9-back";
   const showBack = card.round_type !== "9-front";
   const toPar =
-    card.final_gross_score != null && card.par != null
+    card.final_gross_score != null && card.par != null && !card.is_incomplete
       ? card.final_gross_score - card.par
       : null;
 
@@ -151,13 +154,18 @@ function ScorecardAccordion({ card }: { card: Scorecard }) {
             {dateLabel}
             {card.tee_name ? ` · ${card.tee_name}` : ""}
             {card.round_type !== "18" ? ` · ${card.round_type === "9-front" ? "Front 9" : "Back 9"}` : ""}
+            {card.is_incomplete ? " · Incomplete" : ""}
           </p>
         </div>
         <div className="text-right flex-shrink-0">
           <p className="text-base font-bold text-gray-900 leading-none">
             {card.final_gross_score ?? "—"}
           </p>
-          {toPar != null && (
+          {card.is_incomplete ? (
+            <p className="text-[0.625rem] font-semibold text-amber-700">
+              {card.holes_played} of {card.expected_holes}
+            </p>
+          ) : toPar != null && (
             <p
               className={`text-[0.625rem] font-semibold ${
                 toPar < 0 ? "text-green-700" : toPar === 0 ? "text-gray-500" : "text-gray-700"

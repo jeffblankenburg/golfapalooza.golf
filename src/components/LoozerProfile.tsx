@@ -63,6 +63,9 @@ interface ScorecardSummary {
   par: number;
   scoreToPar: number;
   differential: number | null;
+  isIncomplete?: boolean;
+  holesPlayed?: number;
+  expectedHoles?: number;
 }
 
 interface SponsorRef {
@@ -521,16 +524,24 @@ export function LoozerProfile({
                     <span className="text-sm font-semibold text-gray-900">{sc.courseName}</span>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-bold text-gray-900">{sc.score}</span>
-                      <span className={`text-xs font-medium ${sc.scoreToPar < 0 ? "text-green-600" : sc.scoreToPar > 0 ? "text-red-600" : "text-gray-500"}`}>
-                        ({toParStr})
-                      </span>
+                      {sc.isIncomplete ? (
+                        <span className="text-xs font-medium text-amber-700">
+                          ({sc.holesPlayed} of {sc.expectedHoles})
+                        </span>
+                      ) : (
+                        <span className={`text-xs font-medium ${sc.scoreToPar < 0 ? "text-green-600" : sc.scoreToPar > 0 ? "text-red-600" : "text-gray-500"}`}>
+                          ({toParStr})
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-gray-500">{dateStr}</p>
-                    {sc.differential != null && (
+                    {sc.isIncomplete ? (
+                      <span className="text-xs text-amber-700 shrink-0">Incomplete</span>
+                    ) : sc.differential != null ? (
                       <span className="text-xs text-gray-400 shrink-0">Diff {sc.differential}</span>
-                    )}
+                    ) : null}
                   </div>
                 </>
               );

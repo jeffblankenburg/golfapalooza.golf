@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isRoundIncomplete, expectedHoleCount } from "@/lib/rounds/incomplete";
 
 /**
  * @swagger
@@ -87,6 +88,22 @@ export async function GET(request: Request) {
 
   const list = (rounds || []) as Round[];
 
+  // Count scored holes per player so we can flag rounds set up for 18 (or 9)
+  // that were only partially played — their gross is a sum of played holes.
+  const feedPlayerIds = list.flatMap((r) =>
+    (r.round_players || []).filter((p) => p.final_gross_score != null).map((p) => p.id),
+  );
+  const holesByPlayer = new Map<string, number>();
+  if (feedPlayerIds.length > 0) {
+    const { data: scoreRows } = await adminClient
+      .from("round_scores")
+      .select("round_player_id")
+      .in("round_player_id", feedPlayerIds);
+    for (const s of scoreRows || []) {
+      holesByPlayer.set(s.round_player_id, (holesByPlayer.get(s.round_player_id) || 0) + 1);
+    }
+  }
+
   // 9-hole rounds need per-nine par, not the tee's 18-hole par. Batch fetch
   // course_holes for every distinct tee that backs a non-18 player.
   const nineHoleTeeIds = new Set<string>();
@@ -124,6 +141,9 @@ export async function GET(request: Request) {
     gross_score: number;
     par: number;
     score_to_par: number;
+    is_incomplete: boolean;
+    holes_played: number;
+    expected_holes: number;
   }[] = [];
 
   for (const r of list) {
@@ -150,6 +170,7 @@ export async function GET(request: Request) {
       }
 
       const gross = p.final_gross_score;
+      const holesPlayed = holesByPlayer.get(p.id) || 0;
       cards.push({
         round_id: r.id,
         round_player_id: p.id,
@@ -163,6 +184,9 @@ export async function GET(request: Request) {
         gross_score: gross,
         par,
         score_to_par: gross - par,
+        is_incomplete: isRoundIncomplete(r.round_type, holesPlayed, gross != null),
+        holes_played: holesPlayed,
+        expected_holes: expectedHoleCount(r.round_type),
       });
 
       if (cards.length >= limit) break;

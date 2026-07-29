@@ -18,6 +18,9 @@ interface RoundCardProps {
   final_score: number | null;
   score_to_par: number | null;
   score_differential: number | null;
+  is_incomplete?: boolean;
+  holes_played?: number;
+  expected_holes?: number;
 }
 
 
@@ -31,6 +34,7 @@ export default function RoundCard(props: RoundCardProps) {
   const {
     id, round_date, round_type, format, status, course_name,
     tee_name, tee_color, par, final_score, score_to_par, score_differential,
+    is_incomplete, holes_played, expected_holes,
   } = props;
   const isScramble = format === "scramble";
 
@@ -70,6 +74,14 @@ export default function RoundCard(props: RoundCardProps) {
                 </span>
               </>
             )}
+            {is_incomplete && (
+              <>
+                <span>·</span>
+                <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded font-medium">
+                  Incomplete
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -77,13 +89,19 @@ export default function RoundCard(props: RoundCardProps) {
           {final_score != null ? (
             <>
               <div className="text-xl font-bold text-gray-900">{final_score}</div>
-              <div className={`text-sm font-medium ${
-                (score_to_par || 0) > 0 ? "text-red-600"
-                : (score_to_par || 0) < 0 ? "text-green-600"
-                : "text-gray-600"
-              }`}>
-                {(score_to_par || 0) > 0 ? "+" : ""}{score_to_par ?? "E"}
-              </div>
+              {is_incomplete ? (
+                <div className="text-xs font-medium text-amber-700">
+                  {holes_played} of {expected_holes} holes
+                </div>
+              ) : (
+                <div className={`text-sm font-medium ${
+                  (score_to_par || 0) > 0 ? "text-red-600"
+                  : (score_to_par || 0) < 0 ? "text-green-600"
+                  : "text-gray-600"
+                }`}>
+                  {(score_to_par || 0) > 0 ? "+" : ""}{score_to_par ?? "E"}
+                </div>
+              )}
             </>
           ) : (
             <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">
@@ -96,6 +114,10 @@ export default function RoundCard(props: RoundCardProps) {
       {isScramble ? (
         <div className="mt-2 text-xs text-gray-400">
           Team score · Par {par} · Not counted toward handicap
+        </div>
+      ) : is_incomplete ? (
+        <div className="mt-2 text-xs text-gray-400">
+          Partial round · Not counted toward stats or handicap
         </div>
       ) : score_differential != null ? (
         <div className="mt-2 text-xs text-gray-400">

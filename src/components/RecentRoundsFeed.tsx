@@ -21,6 +21,9 @@ interface RecentRound {
   gross_score: number;
   par: number;
   score_to_par: number;
+  is_incomplete: boolean;
+  holes_played: number;
+  expected_holes: number;
 }
 
 function formatRelDate(iso: string | null, fallback: string): string {
@@ -125,9 +128,18 @@ export function RecentRoundsFeed() {
                     <span className="text-base font-bold text-gray-900">
                       {r.gross_score}
                     </span>
-                    <span className={`text-xs font-semibold ${scoreColor(r.score_to_par)}`}>
-                      {formatToPar(r.score_to_par)}
-                    </span>
+                    {r.is_incomplete ? (
+                      <span
+                        className="text-xs font-semibold text-amber-700"
+                        title={`Incomplete round — ${r.holes_played} of ${r.expected_holes} holes`}
+                      >
+                        {r.holes_played}/{r.expected_holes}
+                      </span>
+                    ) : (
+                      <span className={`text-xs font-semibold ${scoreColor(r.score_to_par)}`}>
+                        {formatToPar(r.score_to_par)}
+                      </span>
+                    )}
                   </div>
 
                   {/* Date */}

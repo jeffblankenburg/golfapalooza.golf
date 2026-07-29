@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkAnyPermissionAccess } from "@/lib/permissions-server";
+import { isRoundIncomplete } from "@/lib/rounds/incomplete";
 
 /**
  * @swagger
@@ -41,7 +42,7 @@ export async function GET(
       tee_id,
       final_gross_score,
       score_differential,
-      round:rounds!inner(id, status),
+      round:rounds!inner(id, status, round_type),
       scores:round_scores(hole_number, strokes)
     `)
     .eq("user_id", userId)
@@ -80,7 +81,16 @@ export async function GET(
   const completedRounds = players?.length || 0;
 
   for (const p of players || []) {
-    if (p.final_gross_score != null) {
+    const round = Array.isArray(p.round) ? p.round[0] : p.round;
+    const incomplete = isRoundIncomplete(
+      round?.round_type || "18",
+      (p.scores || []).length,
+      p.final_gross_score != null,
+    );
+    // Partial rounds have an artificially low gross — never let one become the
+    // "best" score. Their differential is already null so best_differential is
+    // safe. Per-hole scoring breakdown below still counts real holes played.
+    if (p.final_gross_score != null && !incomplete) {
       if (bestGross == null || p.final_gross_score < bestGross) bestGross = p.final_gross_score;
     }
     if (p.score_differential != null) {

@@ -9,6 +9,7 @@ import { AddPlayerDrawer } from "@/components/my-rounds/AddPlayerDrawer";
 import { FavoriteStarButton } from "@/components/favorites/FavoriteStarButton";
 import { RoundComments } from "@/components/rounds/RoundComments";
 import { BTN_BACK, BTN_DESTRUCTIVE } from "@/lib/ui/buttons";
+import { isRoundIncomplete, expectedHoleCount } from "@/lib/rounds/incomplete";
 
 interface RoundData {
   id: string;
@@ -321,10 +322,13 @@ export default function RoundDetailPage() {
           const displayName = resolvedUserName || player.guest_name || "Player";
           const isMe = player.user_id != null && player.user_id === currentUserId;
           const grossScore = player.final_gross_score;
-          const scoreToPar = grossScore != null ? grossScore - par : null;
           const isExpanded = expandedPlayers.has(player.id);
           const playerScores = player.scores || [];
           const hasScores = playerScores.length > 0;
+          // Partial round (rained out, etc.): gross is a sum of only the holes
+          // played, so suppress the misleading vs-par and label it instead.
+          const isIncomplete = isRoundIncomplete(round.round_type, playerScores.length, grossScore != null);
+          const scoreToPar = grossScore != null && !isIncomplete ? grossScore - par : null;
 
           // Build scores and putts maps for ScorecardView
           const scoresMap: Record<number, number> = {};
@@ -385,6 +389,9 @@ export default function RoundDetailPage() {
                         {isGuest && (
                           <span className="text-[0.625rem] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-medium">Guest</span>
                         )}
+                        {isIncomplete && (
+                          <span className="text-[0.625rem] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-medium">Incomplete</span>
+                        )}
                       </div>
                       {(player.score_differential != null || playerScores.some((s) => s.putts != null)) && (
                         <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
@@ -402,7 +409,11 @@ export default function RoundDetailPage() {
                     {grossScore != null && (
                       <div className="text-right">
                         <span className="text-2xl font-bold text-gray-900">{grossScore}</span>
-                        {scoreToPar != null && (
+                        {isIncomplete ? (
+                          <span className="ml-1.5 text-xs font-medium text-amber-700">
+                            {playerScores.length} of {expectedHoleCount(round.round_type)} holes
+                          </span>
+                        ) : scoreToPar != null && (
                           <span className={`ml-1.5 text-sm font-medium ${
                             scoreToPar > 0 ? "text-red-600" : scoreToPar < 0 ? "text-green-600" : "text-gray-500"
                           }`}>

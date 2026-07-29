@@ -5,6 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getEffectiveDate, getEffectiveTripId } from "@/lib/simulator";
 import { isFeatureVisible } from "@/lib/visibility";
+import { isRoundIncomplete, expectedHoleCount } from "@/lib/rounds/incomplete";
 
 export interface LoozerProfileResponse {
   profile: {
@@ -43,6 +44,9 @@ export interface LoozerProfileResponse {
     par: number;
     scoreToPar: number;
     differential: number | null;
+    isIncomplete: boolean;
+    holesPlayed: number;
+    expectedHoles: number;
   }>;
   isFounder: boolean;
   sponsor: { id: string; display_name: string; avatar_url: string | null } | null;
@@ -113,7 +117,7 @@ export async function loadLoozerProfile(
         id, round_date, round_type, status,
         course:courses(name),
         round_players!inner(
-          user_id, final_gross_score, score_differential, tee_id,
+          id, user_id, final_gross_score, score_differential, tee_id,
           player_tee:course_tees(id, par)
         )
       `)
@@ -188,6 +192,24 @@ export async function loadLoozerProfile(
     }
   }
 
+  // Count scored holes per player to flag incomplete (partially played) rounds.
+  const scorecardPlayerIds: string[] = [];
+  for (const r of rawRounds) {
+    const players = Array.isArray(r.round_players) ? r.round_players : [r.round_players];
+    const player = players.find((p: { user_id: string }) => p.user_id === userId) || players[0];
+    if (player?.id) scorecardPlayerIds.push(player.id);
+  }
+  const holesByPlayer = new Map<string, number>();
+  if (scorecardPlayerIds.length > 0) {
+    const { data: scoreRows } = await adminClient
+      .from("round_scores")
+      .select("round_player_id")
+      .in("round_player_id", scorecardPlayerIds);
+    for (const s of scoreRows || []) {
+      holesByPlayer.set(s.round_player_id, (holesByPlayer.get(s.round_player_id) || 0) + 1);
+    }
+  }
+
   const scorecards = rawRounds
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .map((r: any) => {
@@ -210,6 +232,7 @@ export async function loadLoozerProfile(
           par = Math.round(teePar / 2);
         }
       }
+      const holesPlayed = player.id ? (holesByPlayer.get(player.id) || 0) : 0;
       return {
         roundId: r.id as string,
         roundDate: r.round_date as string,
@@ -219,6 +242,9 @@ export async function loadLoozerProfile(
         par,
         scoreToPar: (player.final_gross_score as number) - par,
         differential: (player.score_differential as number) ?? null,
+        isIncomplete: isRoundIncomplete(r.round_type, holesPlayed, player.final_gross_score != null),
+        holesPlayed,
+        expectedHoles: expectedHoleCount(r.round_type),
       };
     })
     .filter((x): x is NonNullable<typeof x> => x != null);

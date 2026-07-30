@@ -243,6 +243,11 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
 
     const currentTeam = teams.find((t) => t.id === drawerTeam.id);
     for (const pair of currentTeam?.pairs || []) {
+      // Pool rows (sort_order=0) are single-player holders — the Step 2 pair
+      // picker only ever surfaces their player_a. Filling their player_b here
+      // strands that player (invisible + unplaceable), so never treat a pool
+      // row's empty slots as open.
+      if (pair.sort_order === 0) continue;
       if (!pair.player_a) openSlots.push({ pairId: pair.id, slot: "player_a_id" });
       if (!pair.player_b) openSlots.push({ pairId: pair.id, slot: "player_b_id" });
     }

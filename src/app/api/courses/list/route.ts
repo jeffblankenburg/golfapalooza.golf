@@ -86,12 +86,14 @@ export async function GET() {
     holesByCourse.set(h.course_id, arr);
   }
 
-  // Most-recent played round per course. Prefer completed_at; fall back to
-  // round_date so historical imports (which lack a precise timestamp) still
-  // surface.
+  // Most-recent played round per course, keyed off round_date (the calendar
+  // date the round was played) — not completed_at, which for a backfilled
+  // historical round is "today" and would wrongly float old courses to the top
+  // (issue #143). round_date is NOT NULL, so every round contributes and all
+  // comparisons stay date-only.
   const lastPlayed = new Map<string, string>();
   for (const r of roundsRes.data || []) {
-    const when = r.completed_at || r.round_date;
+    const when = r.round_date;
     if (!when || !r.course_id) continue;
     const prev = lastPlayed.get(r.course_id);
     if (!prev || when > prev) lastPlayed.set(r.course_id, when);

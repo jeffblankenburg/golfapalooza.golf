@@ -26,11 +26,14 @@ interface RecentRound {
   expected_holes: number;
 }
 
-function formatRelDate(iso: string | null, fallback: string): string {
-  const date = iso ? new Date(iso) : (() => {
-    const [y, m, d] = fallback.split("-").map(Number);
-    return new Date(y, m - 1, d);
-  })();
+// Relative label for when a round was *played* — always keyed off round_date
+// (the calendar date the round happened), never completed_at. A backfilled
+// historical round is entered/completed today but was played long ago; keying
+// off completed_at made those read as "Today" (issue #143). round_date is the
+// source of truth, and the feed already sorts by it.
+function formatRelDate(roundDate: string): string {
+  const [y, m, d] = roundDate.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -144,7 +147,7 @@ export function RecentRoundsFeed() {
 
                   {/* Date */}
                   <span className="text-[0.6875rem] text-gray-400 flex-shrink-0 w-10 text-right tabular-nums">
-                    {formatRelDate(r.completed_at, r.round_date)}
+                    {formatRelDate(r.round_date)}
                   </span>
                 </Link>
               </li>

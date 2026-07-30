@@ -684,18 +684,24 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
                 <div key={team.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                   {/* Team name + color */}
                   <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 space-y-1.5">
-                    <input
-                      type="text"
-                      value={team.team_name || ""}
-                      onChange={(e) =>
-                        setTeams((prev) =>
-                          prev.map((t) => (t.id === team.id ? { ...t, team_name: e.target.value } : t))
-                        )
-                      }
-                      onBlur={() => updateTeamName(team.id, team.team_name || "")}
-                      className="w-full text-sm font-semibold text-gray-700 bg-transparent border-none outline-none p-0"
-                      placeholder={`Team ${team.team_number}`}
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={team.team_name || ""}
+                        onChange={(e) =>
+                          setTeams((prev) =>
+                            prev.map((t) => (t.id === team.id ? { ...t, team_name: e.target.value } : t))
+                          )
+                        }
+                        onBlur={() => updateTeamName(team.id, team.team_name || "")}
+                        className="flex-1 min-w-0 text-sm font-semibold text-gray-700 bg-transparent border-none outline-none p-0"
+                        placeholder={`Team ${team.team_number}`}
+                      />
+                      {/* Assigned-player count for quick verification (issue #144) */}
+                      <span className="shrink-0 text-sm font-semibold text-gray-400 tabular-nums">
+                        ({players.length})
+                      </span>
+                    </div>
                     <div className="flex items-center gap-1">
                       {["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"].map((hex) => (
                         <button

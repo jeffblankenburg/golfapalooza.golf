@@ -315,10 +315,18 @@ export interface Poll {
   is_anonymous: boolean;
   send_notification_on_launch: boolean;
   show_results_while_open: boolean;
+  // When true AND show_results_while_open is true, eligible users see live
+  // results even before they vote. Admin-set; no effect if show_results_while_open
+  // is false.
+  show_results_before_vote: boolean;
   status: PollStatus;
   starts_at: string | null;
   ends_at: string | null;
+  // created_by = the admin who physically authored the poll.
   created_by: string | null;
+  // on_behalf_of_user_id = the Loozer the poll was created for (admin-only
+  // attribution, distinct from the audience). Issue #142.
+  on_behalf_of_user_id: string | null;
   created_at: string;
   updated_at: string;
   questions: PollQuestion[];

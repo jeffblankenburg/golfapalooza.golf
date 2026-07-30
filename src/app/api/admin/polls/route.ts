@@ -26,6 +26,8 @@ interface CreatePollBody {
   is_anonymous?: boolean;
   send_notification_on_launch?: boolean;
   show_results_while_open?: boolean;
+  show_results_before_vote?: boolean;
+  on_behalf_of_user_id?: string | null;
   questions: IncomingQuestion[];
 }
 
@@ -86,7 +88,7 @@ export async function GET() {
   const { data: polls, error } = await adminClient
     .from("polls")
     .select(
-      "id, title, description, audience_type, audience_user_ids, trip_id, is_anonymous, send_notification_on_launch, show_results_while_open, status, starts_at, ends_at, created_by, created_at, updated_at"
+      "id, title, description, audience_type, audience_user_ids, trip_id, is_anonymous, send_notification_on_launch, show_results_while_open, show_results_before_vote, status, starts_at, ends_at, created_by, on_behalf_of_user_id, created_at, updated_at"
     )
     .order("created_at", { ascending: false });
 
@@ -106,9 +108,29 @@ export async function GET() {
     }
   }
 
+  // Resolve creator + "on behalf of" display names in one batched query.
+  // Admin-only route, so exposing these names here is fine (issue #142).
+  const nameIds = new Set<string>();
+  for (const p of polls || []) {
+    if (p.created_by) nameIds.add(p.created_by);
+    if (p.on_behalf_of_user_id) nameIds.add(p.on_behalf_of_user_id);
+  }
+  const nameById = new Map<string, string>();
+  if (nameIds.size > 0) {
+    const { data: users } = await adminClient
+      .from("users")
+      .select("id, display_name")
+      .in("id", Array.from(nameIds));
+    for (const u of users || []) nameById.set(u.id, u.display_name);
+  }
+
   const result = (polls || []).map((p) => ({
     ...p,
     response_count: countsByPoll.get(p.id) || 0,
+    created_by_name: p.created_by ? nameById.get(p.created_by) || null : null,
+    on_behalf_of_name: p.on_behalf_of_user_id
+      ? nameById.get(p.on_behalf_of_user_id) || null
+      : null,
   }));
 
   return NextResponse.json({ polls: result });
@@ -158,6 +180,9 @@ export async function POST(request: NextRequest) {
       is_anonymous: body.is_anonymous ?? false,
       send_notification_on_launch: body.send_notification_on_launch ?? true,
       show_results_while_open: body.show_results_while_open ?? false,
+      // Only meaningful when show_results_while_open is on.
+      show_results_before_vote: body.show_results_before_vote ?? false,
+      on_behalf_of_user_id: body.on_behalf_of_user_id || null,
       status: "draft",
       created_by: admin.id,
     })

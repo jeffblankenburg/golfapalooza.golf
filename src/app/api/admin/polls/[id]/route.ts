@@ -33,6 +33,8 @@ interface UpdatePollBody {
   is_anonymous?: boolean;
   send_notification_on_launch?: boolean;
   show_results_while_open?: boolean;
+  show_results_before_vote?: boolean;
+  on_behalf_of_user_id?: string | null;
   starts_at?: string | null;
   ends_at?: string | null;
   questions?: IncomingQuestion[];
@@ -118,6 +120,12 @@ export async function PUT(
   }
   if (body.show_results_while_open !== undefined) {
     update.show_results_while_open = body.show_results_while_open;
+  }
+  if (body.show_results_before_vote !== undefined) {
+    update.show_results_before_vote = body.show_results_before_vote;
+  }
+  if (body.on_behalf_of_user_id !== undefined) {
+    update.on_behalf_of_user_id = body.on_behalf_of_user_id || null;
   }
 
   // Window edits: validate overlap. Allowed for draft/scheduled/active.

@@ -168,8 +168,9 @@ export function PollForm({
   }, [answers]);
 
   // Live percentages baked into each option row. Server only returns
-  // `liveResults` when poll.show_results_while_open AND the user has voted,
-  // so we don't need to re-check those conditions here.
+  // `liveResults` when poll.show_results_while_open AND (the user has voted OR
+  // poll.show_results_before_vote is on), so we don't re-check those here —
+  // the mere presence of liveResults means we're cleared to show them.
   const showLiveResults =
     poll.status === "active" && poll.show_results_while_open && !!liveResults;
 

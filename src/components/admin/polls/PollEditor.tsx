@@ -82,6 +82,12 @@ export function PollEditor({
   const [showResultsWhileOpen, setShowResultsWhileOpen] = useState(
     poll?.show_results_while_open ?? false
   );
+  const [showResultsBeforeVote, setShowResultsBeforeVote] = useState(
+    poll?.show_results_before_vote ?? false
+  );
+  const [onBehalfOfUserId, setOnBehalfOfUserId] = useState<string>(
+    poll?.on_behalf_of_user_id || ""
+  );
   const [questions, setQuestions] = useState<DraftQuestion[]>(
     poll?.questions?.length
       ? poll.questions.map((q) => ({
@@ -261,6 +267,10 @@ export function PollEditor({
     is_anonymous: isAnonymous,
     send_notification_on_launch: sendNotification,
     show_results_while_open: showResultsWhileOpen,
+    // "Before vote" only applies when live results are on; force off otherwise
+    // so a stale toggle can't leak results early.
+    show_results_before_vote: showResultsWhileOpen && showResultsBeforeVote,
+    on_behalf_of_user_id: onBehalfOfUserId || null,
     questions: questions.map((q) => ({
       id: q.id,
       question_text: q.question_text.trim(),
@@ -399,6 +409,28 @@ export function PollEditor({
           onChange={(e) => setDescription(e.target.value)}
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base resize-none"
         />
+      </div>
+
+      {/* On behalf of (admin-only attribution — issue #142) */}
+      <div>
+        <label className="text-xs font-medium text-gray-500 mb-1 block">
+          On behalf of (optional)
+        </label>
+        <select
+          value={onBehalfOfUserId}
+          onChange={(e) => setOnBehalfOfUserId(e.target.value)}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base bg-white"
+        >
+          <option value="">No one — created by me</option>
+          {allUsers.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.display_name}
+            </option>
+          ))}
+        </select>
+        <p className="text-[0.6875rem] text-gray-400 mt-1">
+          Who this poll is for / who requested it. Admin-only — not shown to voters.
+        </p>
       </div>
 
       {/* Audience */}
@@ -628,6 +660,19 @@ export function PollEditor({
             Show live results to voters after they submit
           </span>
         </label>
+        {showResultsWhileOpen && (
+          <label className="flex items-center gap-2 pl-6">
+            <input
+              type="checkbox"
+              checked={showResultsBeforeVote}
+              onChange={(e) => setShowResultsBeforeVote(e.target.checked)}
+              className="w-4 h-4"
+            />
+            <span className="text-sm text-gray-700">
+              …even before they vote
+            </span>
+          </label>
+        )}
       </div>
 
       {/* Questions */}

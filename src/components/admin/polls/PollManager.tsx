@@ -22,6 +22,9 @@ interface User {
 
 interface PollListRow extends Poll {
   response_count?: number;
+  // Admin-only attribution resolved server-side (issue #142).
+  created_by_name?: string | null;
+  on_behalf_of_name?: string | null;
 }
 
 const statusBadgeColors: Record<PollStatus, string> = {
@@ -269,6 +272,14 @@ export function PollManager() {
                           </span>
                         )}
                       </div>
+                      {(p.created_by_name || p.on_behalf_of_name) && (
+                        <div className="mt-1 text-[0.6875rem] text-gray-400">
+                          {p.created_by_name && <span>by {p.created_by_name}</span>}
+                          {p.on_behalf_of_name && (
+                            <span> · for {p.on_behalf_of_name}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 

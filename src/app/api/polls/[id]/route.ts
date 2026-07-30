@@ -52,9 +52,11 @@ export async function GET(
   } else if (
     poll.status === "active" &&
     poll.show_results_while_open &&
-    response
+    (response || poll.show_results_before_vote)
   ) {
-    // Live results: voters who've submitted see aggregate percentages.
+    // Live results while the poll is open. By default only voters who've
+    // submitted see them; when show_results_before_vote is on, everyone in
+    // the audience sees them even before voting.
     // Strip text-answer content — only the count of responses is exposed.
     results = await loadPollResults(adminClient, poll, "anonymous");
     for (const q of results.questions) {

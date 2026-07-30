@@ -887,10 +887,13 @@ export function RyderCupManager({ tripId }: { tripId: string }) {
                       );
                     })}
 
-                    {/* New Pair button — only if unplaced players outnumber empty slots */}
+                    {/* New Pair button — only if unplaced players outnumber empty slots.
+                        Count only the standard A/B slots: player_c is the optional
+                        3rd-player slot for uneven teams, so treating every open C slot
+                        as available would suppress the button while players are pooled. */}
                     {(() => {
                       const emptySlots = realPairs.reduce(
-                        (n, p) => n + (p.player_a ? 0 : 1) + (p.player_b ? 0 : 1) + (p.player_c ? 0 : 1),
+                        (n, p) => n + (p.player_a ? 0 : 1) + (p.player_b ? 0 : 1),
                         0,
                       );
                       return poolPairs.length > emptySlots;

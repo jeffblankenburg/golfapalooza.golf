@@ -27,6 +27,7 @@ interface CreatePollBody {
   send_notification_on_launch?: boolean;
   show_results_while_open?: boolean;
   show_results_before_vote?: boolean;
+  show_voters?: boolean;
   on_behalf_of_user_id?: string | null;
   questions: IncomingQuestion[];
 }
@@ -88,7 +89,7 @@ export async function GET() {
   const { data: polls, error } = await adminClient
     .from("polls")
     .select(
-      "id, title, description, audience_type, audience_user_ids, trip_id, is_anonymous, send_notification_on_launch, show_results_while_open, show_results_before_vote, status, starts_at, ends_at, created_by, on_behalf_of_user_id, created_at, updated_at"
+      "id, title, description, audience_type, audience_user_ids, trip_id, is_anonymous, send_notification_on_launch, show_results_while_open, show_results_before_vote, show_voters, status, starts_at, ends_at, created_by, on_behalf_of_user_id, created_at, updated_at"
     )
     .order("created_at", { ascending: false });
 
@@ -182,6 +183,8 @@ export async function POST(request: NextRequest) {
       show_results_while_open: body.show_results_while_open ?? false,
       // Only meaningful when show_results_while_open is on.
       show_results_before_vote: body.show_results_before_vote ?? false,
+      // Attribution to voters only applies to non-anonymous polls.
+      show_voters: body.is_anonymous ? false : body.show_voters ?? false,
       on_behalf_of_user_id: body.on_behalf_of_user_id || null,
       status: "draft",
       created_by: admin.id,

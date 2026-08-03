@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Poll, PollResponse, PollResults } from "@/types/golf";
+import type { Poll, PollResponse, PollResults, PollVoter } from "@/types/golf";
+import { VoterChips } from "./VoterChips";
 
 interface PollFormProps {
   poll: Poll;
@@ -177,7 +178,10 @@ export function PollForm({
   const pctByOption = useMemo(() => {
     const m = new Map<string, number>(); // option_id -> percentage (0-100)
     const textCounts = new Map<string, number>(); // question_id -> response count
-    if (!liveResults) return { options: m, textCounts };
+    // option_id -> voters, populated only when the poll attributes votes
+    // (non-anonymous + show_voters). Empty otherwise.
+    const voters = new Map<string, PollVoter[]>();
+    if (!liveResults) return { options: m, textCounts, voters };
     const totalRespondents = liveResults.total_respondents;
     for (const q of liveResults.questions) {
       if (q.options) {
@@ -186,13 +190,14 @@ export function PollForm({
             o.option_id,
             totalRespondents > 0 ? (o.count / totalRespondents) * 100 : 0
           );
+          if (o.voters) voters.set(o.option_id, o.voters);
         }
       }
       if (q.text_answers) {
         textCounts.set(q.question_id, q.text_answers.length);
       }
     }
-    return { options: m, textCounts };
+    return { options: m, textCounts, voters };
   }, [liveResults]);
 
   return (
@@ -227,8 +232,8 @@ export function PollForm({
                     ? pctByOption.options.get(o.id) ?? 0
                     : null;
                   return (
+                    <div key={o.id}>
                     <button
-                      key={o.id}
                       onClick={() =>
                         setAnswer(q.id, { type: "single", option_id: o.id })
                       }
@@ -265,6 +270,8 @@ export function PollForm({
                         </span>
                       )}
                     </button>
+                      <VoterChips voters={pctByOption.voters.get(o.id)} />
+                    </div>
                   );
                 })}
               </div>
@@ -278,8 +285,8 @@ export function PollForm({
                     ? pctByOption.options.get(o.id) ?? 0
                     : null;
                   return (
+                    <div key={o.id}>
                     <button
-                      key={o.id}
                       onClick={() => {
                         const next = new Set(a.option_ids);
                         if (next.has(o.id)) next.delete(o.id);
@@ -333,6 +340,8 @@ export function PollForm({
                         </span>
                       )}
                     </button>
+                      <VoterChips voters={pctByOption.voters.get(o.id)} />
+                    </div>
                   );
                 })}
               </div>

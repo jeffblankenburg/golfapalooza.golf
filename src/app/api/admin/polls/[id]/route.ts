@@ -34,6 +34,7 @@ interface UpdatePollBody {
   send_notification_on_launch?: boolean;
   show_results_while_open?: boolean;
   show_results_before_vote?: boolean;
+  show_voters?: boolean;
   on_behalf_of_user_id?: string | null;
   starts_at?: string | null;
   ends_at?: string | null;
@@ -124,6 +125,13 @@ export async function PUT(
   if (body.show_results_before_vote !== undefined) {
     update.show_results_before_vote = body.show_results_before_vote;
   }
+  if (body.show_voters !== undefined) {
+    update.show_voters = body.show_voters;
+  }
+  // Anonymous polls never attribute votes to voters — if the poll is (or is
+  // becoming) anonymous, force show_voters off regardless of what was sent.
+  const effectiveAnon = body.is_anonymous ?? existing.is_anonymous;
+  if (effectiveAnon) update.show_voters = false;
   if (body.on_behalf_of_user_id !== undefined) {
     update.on_behalf_of_user_id = body.on_behalf_of_user_id || null;
   }

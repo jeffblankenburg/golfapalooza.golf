@@ -45,10 +45,14 @@ export async function GET(
 
   const response = await loadUserResponse(adminClient, id, effectiveUserId);
 
+  // Voters see attribution (who voted for each option) only when the poll is
+  // non-anonymous AND the admin opted in via show_voters. Otherwise results are
+  // counts-only. Admins always see attribution via the admin route.
+  const attribution = !poll.is_anonymous && poll.show_voters ? "attributed" : "anonymous";
+
   let results = null;
   if (poll.status === "closed") {
-    // Players never see attribution, even on non-anonymous polls.
-    results = await loadPollResults(adminClient, poll, "anonymous");
+    results = await loadPollResults(adminClient, poll, attribution);
   } else if (
     poll.status === "active" &&
     poll.show_results_while_open &&
@@ -57,11 +61,13 @@ export async function GET(
     // Live results while the poll is open. By default only voters who've
     // submitted see them; when show_results_before_vote is on, everyone in
     // the audience sees them even before voting.
-    // Strip text-answer content — only the count of responses is exposed.
-    results = await loadPollResults(adminClient, poll, "anonymous");
-    for (const q of results.questions) {
-      if (q.text_answers) {
-        q.text_answers = q.text_answers.map(() => ({ text: "" }));
+    results = await loadPollResults(adminClient, poll, attribution);
+    if (attribution === "anonymous") {
+      // Counts-only: strip free-text content, expose response count only.
+      for (const q of results.questions) {
+        if (q.text_answers) {
+          q.text_answers = q.text_answers.map(() => ({ text: "" }));
+        }
       }
     }
   }

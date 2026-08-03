@@ -88,6 +88,7 @@ export function PollEditor({
   const [onBehalfOfUserId, setOnBehalfOfUserId] = useState<string>(
     poll?.on_behalf_of_user_id || ""
   );
+  const [showVoters, setShowVoters] = useState(poll?.show_voters ?? false);
   const [questions, setQuestions] = useState<DraftQuestion[]>(
     poll?.questions?.length
       ? poll.questions.map((q) => ({
@@ -270,6 +271,8 @@ export function PollEditor({
     // "Before vote" only applies when live results are on; force off otherwise
     // so a stale toggle can't leak results early.
     show_results_before_vote: showResultsWhileOpen && showResultsBeforeVote,
+    // Voter attribution only applies to non-anonymous polls.
+    show_voters: !isAnonymous && showVoters,
     on_behalf_of_user_id: onBehalfOfUserId || null,
     questions: questions.map((q) => ({
       id: q.id,
@@ -638,6 +641,19 @@ export function PollEditor({
             Anonymous (results show counts only)
           </span>
         </label>
+        {!isAnonymous && (
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={showVoters}
+              onChange={(e) => setShowVoters(e.target.checked)}
+              className="w-4 h-4"
+            />
+            <span className="text-sm text-gray-700">
+              Show who voted for each option (visible to everyone)
+            </span>
+          </label>
+        )}
         <label className="flex items-center gap-2">
           <input
             type="checkbox"

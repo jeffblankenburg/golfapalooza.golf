@@ -45,6 +45,17 @@ export async function updateSession(request: NextRequest) {
     !isPublicRoute &&
     !request.nextUrl.pathname.startsWith("/api");
 
+  // Public article detail links: let anyone read a shared /articles/:id URL.
+  // Anonymous visitors are internally rewritten to the spectator render (same
+  // published-only data, no auth) so the URL stays /articles/:id. Signed-in
+  // users fall through to the full in-app article page below.
+  const articleMatch = request.nextUrl.pathname.match(/^\/articles\/([^/]+)\/?$/);
+  if (!user && articleMatch) {
+    const url = request.nextUrl.clone();
+    url.pathname = `/spectator/articles/${articleMatch[1]}`;
+    return NextResponse.rewrite(url);
+  }
+
   // Redirect unauthenticated users to login
   if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone();

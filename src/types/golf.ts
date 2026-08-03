@@ -319,6 +319,10 @@ export interface Poll {
   // results even before they vote. Admin-set; no effect if show_results_while_open
   // is false.
   show_results_before_vote: boolean;
+  // When true AND the poll is not anonymous, results shown to voters include
+  // who voted for each option (not just admins). Mutually exclusive with
+  // is_anonymous (anonymous wins).
+  show_voters: boolean;
   status: PollStatus;
   starts_at: string | null;
   ends_at: string | null;

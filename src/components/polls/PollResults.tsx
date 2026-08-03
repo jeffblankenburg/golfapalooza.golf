@@ -1,6 +1,7 @@
 "use client";
 
 import type { PollResults } from "@/types/golf";
+import { VoterChips } from "./VoterChips";
 
 interface PollResultsViewProps {
   results: PollResults;
@@ -41,6 +42,7 @@ export function PollResultsView({ results, isAnonymous }: PollResultsViewProps) 
                         style={{ width: `${pct}%` }}
                       />
                     </div>
+                    <VoterChips voters={o.voters} />
                   </div>
                 );
               })}

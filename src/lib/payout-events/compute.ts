@@ -7,6 +7,11 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PayoutSplit } from "./splits";
+import {
+  allocateCtpDailyPots,
+  allocateLongDrivePots,
+  type DailyContestInput,
+} from "@/lib/winners/daily-pots";
 
 export type ParticipantSource =
   | "option"
@@ -201,6 +206,9 @@ type CostItemJoin = { cost: number | string } | { cost: number | string }[] | nu
 // item so the contest's current cost ships without an extra round-trip.
 type RawJoinedContest = PayoutSheetEventContest & {
   buy_in_cost_item?: CostItemJoin;
+  // Resolution state needed to run the daily-pot carry/split allocator.
+  declared_no_winner?: boolean;
+  contest_winners?: Array<{ user_id: string }> | null;
 };
 
 type RawJoinedRow = Omit<PayoutSheetEvent, "amount_per_participant" | "payout_splits" | "contest"> & {
@@ -272,22 +280,81 @@ export async function loadPayoutSheet(
   const { data: events, error } = await client
     .from("payout_sheet_events")
     .select(
-      "id, trip_id, label, sort_order, participant_source, source_ref, source_filter, amount_per_participant, day_count, is_payout, notes, contest_id, contest:contests(id, name, contest_type, day_number, parent_contest_id, buy_in_cost_item_id, payout_splits, buy_in_cost_item:cost_items!contests_buy_in_cost_item_id_fkey(cost))",
+      "id, trip_id, label, sort_order, participant_source, source_ref, source_filter, amount_per_participant, day_count, is_payout, notes, contest_id, contest:contests(id, name, contest_type, day_number, parent_contest_id, buy_in_cost_item_id, payout_splits, declared_no_winner, contest_winners(user_id), buy_in_cost_item:cost_items!contests_buy_in_cost_item_id_fkey(cost))",
     )
     .eq("trip_id", tripId)
     .order("sort_order");
   if (error || !events) return [];
 
-  const projected = (events as unknown as RawJoinedRow[]).map(projectRow);
+  const rawRows = events as unknown as RawJoinedRow[];
+  const projected = rawRows.map(projectRow);
 
   const counts = await Promise.all(
     projected.map((e) => computeParticipantCount(client, tripId, e)),
   );
 
-  return projected.map((ev, i) => {
+  const rows: PayoutSheetRow[] = projected.map((ev, i) => {
     const c = counts[i];
     const total =
       Math.round((Number(ev.amount_per_participant) || 0) * c * (ev.day_count || 1) * 100) / 100;
     return { ...ev, participant_count: c, total };
   });
+
+  // CTP (front/back) and Long Drive pots don't pay out as the naive
+  // per-contest amount × count. They follow the carry-forward + $5
+  // front/back split rules in src/lib/winners/daily-pots.ts — the same
+  // allocator the public Daily Games page runs. Re-split those rows here
+  // (participant counts above stay authoritative; only the per-day pot
+  // division changes) so the cash sheet, denominations, and public
+  // results all agree.
+  applyDailyPotAllocation(rows, rawRows);
+
+  return rows;
+}
+
+/**
+ * Mutates `rows` in place: overrides the `total` of every CTP/LD
+ * contest-linked row with its allocated pot from the daily-pot allocator,
+ * keyed off the parallel raw contest join (day_number, type, winner state).
+ * Rows that aren't per-day CTP/LD contests are left untouched.
+ */
+function applyDailyPotAllocation(rows: PayoutSheetRow[], rawRows: RawJoinedRow[]): void {
+  const ctpInputs: DailyContestInput[] = [];
+  const ldInputs: DailyContestInput[] = [];
+  const rowIndexByContestId = new Map<string, number>();
+
+  rows.forEach((row, i) => {
+    const contest = unwrapJoin(rawRows[i].contest);
+    if (!contest || contest.day_number == null) return;
+    const type = contest.contest_type;
+    const isLd = type === "long_drive";
+    const isCtp = type === "ctp_front" || type === "ctp_back";
+    if (!isCtp && !isLd) return;
+
+    const declared_no_winner = !!contest.declared_no_winner;
+    const winners = contest.contest_winners ?? [];
+    const input: DailyContestInput = {
+      id: contest.id,
+      day_number: contest.day_number,
+      side: isLd ? "ld" : type === "ctp_front" ? "front" : "back",
+      // base_pot is the naive per-contest total (amount × count × days).
+      // The allocator re-divides the day's combined pot from these.
+      base_pot: row.total,
+      has_winner: winners.length > 0 && !declared_no_winner,
+      declared_no_winner,
+    };
+    (isLd ? ldInputs : ctpInputs).push(input);
+    rowIndexByContestId.set(contest.id, i);
+  });
+
+  if (ctpInputs.length === 0 && ldInputs.length === 0) return;
+
+  const allocations = [
+    ...allocateCtpDailyPots(ctpInputs),
+    ...allocateLongDrivePots(ldInputs),
+  ];
+  for (const a of allocations) {
+    const idx = rowIndexByContestId.get(a.id);
+    if (idx != null) rows[idx] = { ...rows[idx], total: a.adjusted_pot };
+  }
 }

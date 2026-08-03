@@ -74,7 +74,6 @@ export default function CoursesPage() {
   const [data, setData] = useState<CoursesResponse | null>(null);
   const [query, setQuery] = useState("");
   const [showLookup, setShowLookup] = useState(false);
-  const [manualPrefill, setManualPrefill] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/courses/list");
@@ -167,19 +166,6 @@ export default function CoursesPage() {
         </div>
       )}
 
-      {manualPrefill && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 max-w-md w-[calc(100%-2rem)] bg-amber-50 border border-amber-200 text-amber-800 text-sm px-3 py-2 rounded-lg shadow-md z-50">
-          We couldn&apos;t find <strong>{manualPrefill}</strong> automatically. Try the round-creation flow to add it manually.
-          <button
-            type="button"
-            className="ml-2 underline font-semibold"
-            onClick={() => setManualPrefill(null)}
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
       {showLookup && (
         <CourseLookupModal
           onClose={() => setShowLookup(false)}
@@ -189,7 +175,11 @@ export default function CoursesPage() {
           }}
           onManualFallback={(prefill) => {
             setShowLookup(false);
-            setManualPrefill(prefill.name);
+            const params = new URLSearchParams();
+            if (prefill.name) params.set("name", prefill.name);
+            if (prefill.city) params.set("city", prefill.city);
+            if (prefill.state) params.set("state", prefill.state);
+            router.push(`/my-rounds/courses/new?${params.toString()}`);
           }}
         />
       )}

@@ -129,9 +129,10 @@ export function ChatDrawer() {
     return () => { document.body.style.overflow = prev; };
   }, [isOpen]);
 
-  // The big-screen Calcutta display is a standalone, chrome-free surface — no
-  // chat drawer there. (Hooks above still run so ordering stays stable.)
-  if (pathname?.startsWith("/calcutta-display")) return null;
+  // Standalone, chrome-free surfaces (big-screen Calcutta display, the walk-up
+  // player) own the whole viewport — no chat drawer there. (Hooks above still
+  // run so ordering stays stable.)
+  if (pathname?.startsWith("/calcutta-display") || pathname === "/admin/music/walkups") return null;
 
   return (
     <>

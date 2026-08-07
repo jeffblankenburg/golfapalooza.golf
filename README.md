@@ -360,7 +360,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 ### Music Management
 - Song library management
 - User tagging
-- **Walk-Up Player** (`/admin/music/walkups`) — a live 1st-tee tool for the Thursday scramble. Lists rostered Loozers in tee-off order (day-2 tee-time groups, sorted within a group by handicap ascending), lets the announcer drag rows to reorder (persisted), pick a song for anyone with multiple tagged songs (players with none are flagged), set a per-player start offset (e.g. `0:32`), and hit Play to hear each walk-up song beginning at that offset.
+- **Walk-Up Player** (`/admin/music/walkups`) — a full-screen, chrome-less 1st-tee tool for the Thursday scramble announcer. Lists rostered Loozers grouped into bordered sections by tee-off group (day-2 tee-time groups, else the Thursday scramble teams in group order; within a group, handicap high→low), with large fonts and per-player details (nickname, real name, hometown, years attended, handicap). Rows can be dragged to reorder **within a group** (persisted; "Reset order" reverts to group order). Each row has a big Play button that starts that player's song at the saved offset. Tapping a player opens a prep modal with a song picker (for multi-song Loozers), an audio **scrubber** with elapsed/duration, and a "set start to here" control for dialing in the exact walk-up entrance moment. Players with no tagged song are flagged.
 
 ### Room Management
 - Facility and room setup

@@ -52,11 +52,12 @@ export async function GET() {
     liveHcpRes,
     teeTimesRes,
     scrambleContestsRes,
+    attendanceRes,
     entriesRes,
   ] = await Promise.all([
     supabase
       .from("event_participants")
-      .select("user_id, user:users!event_participants_user_id_fkey(id, display_name, avatar_url)")
+      .select("user_id, user:users!event_participants_user_id_fkey(id, display_name, avatar_url, full_name, city, state)")
       .eq("trip_id", tripId)
       .eq("on_roster", true),
     supabase
@@ -83,6 +84,8 @@ export async function GET() {
       .eq("trip_id", tripId)
       .eq("contest_type", "scramble")
       .eq("day_number", THURSDAY_SCRAMBLE_DAY),
+    // Every on-roster row across all trips → distinct trip count = years attended.
+    supabase.from("event_participants").select("user_id, trip_id").eq("on_roster", true),
     supabase
       .from("walkup_entries")
       .select("user_id, song_id, start_seconds, sort_order")
@@ -96,9 +99,18 @@ export async function GET() {
     liveHcpRes.error ||
     teeTimesRes.error ||
     scrambleContestsRes.error ||
+    attendanceRes.error ||
     entriesRes.error;
   if (firstErr) {
     return NextResponse.json({ error: firstErr.message }, { status: 500 });
+  }
+
+  // Years attended = distinct trips a user has been on-roster for.
+  const tripsByUser = new Map<string, Set<string>>();
+  for (const row of attendanceRes.data || []) {
+    const set = tripsByUser.get(row.user_id) || new Set<string>();
+    set.add(row.trip_id);
+    tripsByUser.set(row.user_id, set);
   }
 
   // Handicap: prefer the event-locked snapshot, fall back to the live index.
@@ -198,14 +210,29 @@ export async function GET() {
     }
   });
 
+  type Rostered = {
+    id: string;
+    display_name: string;
+    avatar_url: string | null;
+    full_name: string | null;
+    city: string | null;
+    state: string | null;
+  };
   const rostered = (participantsRes.data || [])
-    .map((p) => {
+    .map((p): Rostered | null => {
       const u = Array.isArray(p.user) ? p.user[0] : p.user;
       return u
-        ? { id: u.id as string, display_name: u.display_name as string, avatar_url: u.avatar_url as string | null }
+        ? {
+            id: u.id as string,
+            display_name: u.display_name as string,
+            avatar_url: u.avatar_url as string | null,
+            full_name: (u.full_name as string | null) ?? null,
+            city: (u.city as string | null) ?? null,
+            state: (u.state as string | null) ?? null,
+          }
         : null;
     })
-    .filter((u): u is { id: string; display_name: string; avatar_url: string | null } => !!u);
+    .filter((u): u is Rostered => !!u);
 
   const rosterIds = new Set(rostered.map((u) => u.id));
 
@@ -232,6 +259,10 @@ export async function GET() {
     return {
       user_id: u.id,
       display_name: u.display_name,
+      full_name: u.full_name,
+      city: u.city,
+      state: u.state,
+      years_attended: tripsByUser.get(u.id)?.size ?? 0,
       avatar_url: u.avatar_url,
       handicap: handicaps.get(u.id) ?? null,
       group_number: gi?.groupNumber ?? null,

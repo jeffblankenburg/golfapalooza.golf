@@ -34,7 +34,10 @@ export async function GET(request: Request) {
     adminClient
       .from("event_participants")
       .select("user:users(id, display_name, full_name, avatar_url)")
-      .eq("trip_id", tripId),
+      .eq("trip_id", tripId)
+      // on_roster=true is the single source for "who's on the roster" — the
+      // unfiltered row set also includes RSVP'd-then-removed Loozers.
+      .eq("on_roster", true),
   ]);
 
   if (contestsRes.error) {

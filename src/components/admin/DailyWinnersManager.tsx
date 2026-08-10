@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ConfirmModal } from "./ConfirmModal";
-import { ContestParticipantsAccordion } from "./ContestParticipantsAccordion";
+import { ContestParticipantsReadOnly } from "./ContestParticipantsReadOnly";
 
 interface Participant {
   id: string;
@@ -60,8 +60,6 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
   const [scrambleDayNumbers, setScrambleDayNumbers] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
-  const [ctpContestId, setCtpContestId] = useState<string | null>(null);
-  const [longDriveContestId, setLongDriveContestId] = useState<string | null>(null);
   // Eligibility per (day, contest_type) → Set<user_id>. Built from the
   // per-day contests' contest_participants (issue #124). Falls back to
   // "everyone" when the corresponding contest doesn't exist or has no
@@ -81,6 +79,20 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
     const ed = eventDays.find((d) => d.day_number === dayNum);
     return { day: dayNum, label: ed?.name || `Day ${dayNum}` };
   });
+
+  // Read-only rosters per contest family, derived from the per-day opt-in sets
+  // (options-driven, issue #124). CTP unions front + back — both are fanned
+  // from the single CTP option, so the union is the full "who's in" list.
+  const rosterFor = (matches: (contestType: string) => boolean) => {
+    const ids = new Set<string>();
+    for (const [key, set] of eligibilityByDayType) {
+      const type = key.slice(key.indexOf("-") + 1);
+      if (matches(type)) set.forEach((id) => ids.add(id));
+    }
+    return participants.filter((p) => ids.has(p.id));
+  };
+  const ctpParticipants = rosterFor((t) => t === "ctp_front" || t === "ctp_back");
+  const ldParticipants = rosterFor((t) => t === "long_drive");
 
   const winnerKey = (day: number, type: string) => `${day}-${type}`;
 
@@ -111,12 +123,6 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
     dayNums.sort((a, b) => a - b);
     setScrambleDayNumbers(dayNums);
 
-    // Legacy umbrella contests for the participants-accordion UI.
-    const ctp = contests.find((c) => c.name === "Closest to the Pin" && c.contest_type === "other");
-    const ld = contests.find((c) => c.name === "Long Drive" && c.contest_type === "other");
-    setCtpContestId(ctp?.id || null);
-    setLongDriveContestId(ld?.id || null);
-
     // Issue #124: eligibility comes from per-day contests now, not the
     // umbrella. Find every per-day contest for the four daily types and
     // batch-load their participants.
@@ -128,13 +134,22 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
       dayTypeContests.map((c) =>
         fetch(`/api/admin/contests/participants?contest_id=${c.id}`)
           .then((r) => r.json())
-          .then((d) => ({ c, participants: (d.participants || []) as { user_id: string }[] })),
+          .then((d) => ({
+            c,
+            participants: (d.participants || []) as { user_id: string }[],
+            // Users whose current option selection funds this contest — the
+            // live options truth. Included so a "yes" opt-in that hasn't yet
+            // materialized a contest_participants row still counts (sync drift).
+            funded: (d.funded_by_option_user_ids || []) as string[],
+          })),
       ),
     );
     const map = new Map<string, Set<string>>();
-    for (const { c, participants: ps } of lookups) {
+    for (const { c, participants: ps, funded } of lookups) {
       const key = `${c.day_number}-${c.contest_type}`;
-      map.set(key, new Set(ps.map((p) => p.user_id)));
+      const set = new Set<string>(ps.map((p) => p.user_id));
+      for (const uid of funded) set.add(uid);
+      map.set(key, set);
     }
     setEligibilityByDayType(map);
   }, [tripId]);
@@ -333,25 +348,22 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
         </button>
       </div>
 
-      {/* Contest Participant Accordions — these still edit the legacy
-          umbrella contests for now. Eligibility on the dropdowns below
-          uses the per-day contests' participant lists (issue #124). */}
-      {ctpContestId && (
-        <ContestParticipantsAccordion
-          tripId={tripId}
-          contestName="Closest to the Pin"
-          contestId={ctpContestId}
-          onChanged={() => fetchScrambleDays()}
-        />
-      )}
-      {longDriveContestId && (
-        <ContestParticipantsAccordion
-          tripId={tripId}
-          contestName="Long Drive"
-          contestId={longDriveContestId}
-          onChanged={() => fetchScrambleDays()}
-        />
-      )}
+      {/* Read-only rosters — who opted in via their options (issue #124).
+          The winner dropdowns below use the same per-day opt-in data, so the
+          counts here match the options each dropdown offers. Enrollment is
+          changed by editing a Loozer's option selection, not here. */}
+      <ContestParticipantsReadOnly
+        contestName="Closest to the Pin"
+        participants={ctpParticipants}
+        total={participants.length}
+        showRealNames={showRealNames}
+      />
+      <ContestParticipantsReadOnly
+        contestName="Long Drive"
+        participants={ldParticipants}
+        total={participants.length}
+        showRealNames={showRealNames}
+      />
 
       {DAYS.map((d) => (
         <div key={d.day} className="bg-white rounded-xl border border-gray-200 p-3 space-y-3">

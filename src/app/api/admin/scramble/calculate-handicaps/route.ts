@@ -15,7 +15,7 @@ const SCRAMBLE_WEIGHTS: Record<number, number[]> = {
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 
 interface TeeContext {
-  source: "contest_tee" | "hole_tee" | "trip_default";
+  source: "contest_tee" | "white_tee" | "hole_tee" | "trip_default";
   tee_name: string | null;
   course_rating: number;
   slope_rating: number;
@@ -61,6 +61,35 @@ async function fetchTeeContext(
     };
   }
 
+  // Look up the trip's course once — used both to prefer the White tee (current
+  // policy: scramble Course Handicaps come off the White tee) and as the final
+  // default fallback. A mixed per-hole tee assignment has no single rating, so we
+  // deliberately anchor the whole team to one tee rather than an arbitrary hole's.
+  const { data: trip } = await admin
+    .from("trip_settings")
+    .select("course_id")
+    .eq("id", tripId)
+    .single();
+
+  if (trip?.course_id) {
+    const { data: whiteTee } = await admin
+      .from("course_tees")
+      .select("tee_name, course_rating, slope_rating, par")
+      .eq("course_id", trip.course_id)
+      .ilike("tee_name", "white")
+      .maybeSingle();
+
+    if (whiteTee) {
+      return {
+        source: "white_tee",
+        tee_name: whiteTee.tee_name ?? null,
+        course_rating: whiteTee.course_rating,
+        slope_rating: whiteTee.slope_rating,
+        par: whiteTee.par,
+      };
+    }
+  }
+
   const { data: holeTee } = await admin
     .from("contest_hole_tees")
     .select("tee:course_tees!inner(tee_name, course_rating, slope_rating, par)")
@@ -78,12 +107,6 @@ async function fetchTeeContext(
       par: t.par,
     };
   }
-
-  const { data: trip } = await admin
-    .from("trip_settings")
-    .select("course_id")
-    .eq("id", tripId)
-    .single();
 
   if (trip?.course_id) {
     const { data: defaultTee } = await admin

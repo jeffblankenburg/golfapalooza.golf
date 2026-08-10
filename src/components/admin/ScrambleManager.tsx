@@ -37,7 +37,7 @@ interface Contest {
 }
 
 interface TeeContext {
-  source: "contest_tee" | "hole_tee" | "trip_default";
+  source: "contest_tee" | "white_tee" | "hole_tee" | "trip_default";
   tee_name: string | null;
   course_rating: number;
   slope_rating: number;
@@ -1090,6 +1090,7 @@ function CalculateHandicapsButton({
 
   const teeSourceLabel: Record<TeeContext["source"], string> = {
     contest_tee: "contest tee",
+    white_tee: "White tee",
     hole_tee: "per-hole tee",
     trip_default: "trip default tee",
   };

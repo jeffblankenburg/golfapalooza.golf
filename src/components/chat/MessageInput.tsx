@@ -204,9 +204,11 @@ export function MessageInput({
     // Otherwise Enter inserts a new line (default textarea behavior).
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Shared upload path for every image source — file picker, camera, clipboard
+  // paste, and drag-drop. Compresses, uploads to the chat-images bucket, then
+  // fires the message with the current text as a caption.
+  const uploadAndSendImage = async (file: File) => {
+    if (!file.type.startsWith("image/")) return;
 
     setUploading(true);
     setActivePanel(null);
@@ -219,19 +221,20 @@ export function MessageInput({
       // of the original.
       let blob: Blob = file;
       let ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
-      if (file.type.startsWith("image/")) {
-        try {
-          const compressed = await compressImage(file, 1280, 0.8);
-          blob = compressed.blob;
-          ext = "jpg";
-        } catch (err) {
-          // Compression failed — fall back to original. Better to send a
-          // big file than to lose the message.
-          console.warn("Chat image compression failed; uploading original.", err);
-        }
+      try {
+        const compressed = await compressImage(file, 1280, 0.8);
+        blob = compressed.blob;
+        ext = "jpg";
+      } catch (err) {
+        // Compression failed — fall back to original. Better to send a
+        // big file than to lose the message.
+        console.warn("Chat image compression failed; uploading original.", err);
       }
 
-      const baseName = file.name.replace(/\.[^.]+$/, "");
+      // Pasted/dropped images often have no name (e.g. "image.png" or blank),
+      // so fall back to a stable default for the storage key.
+      const rawName = file.name && file.name !== "image.png" ? file.name : "pasted-image";
+      const baseName = rawName.replace(/\.[^.]+$/, "") || "image";
       const fileName = `${roomId}/${Date.now()}-${baseName}.${ext}`;
       const { data, error } = await supabase.storage
         .from("chat-images")
@@ -259,6 +262,38 @@ export function MessageInput({
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) await uploadAndSendImage(file);
+  };
+
+  // Clipboard paste — grab the first image on the clipboard and upload it.
+  // Works for phone screenshots and desktop copy-image. Text pastes fall
+  // through to the textarea's default handling untouched.
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (uploading) return;
+    const item = Array.from(e.clipboardData.items).find((it) =>
+      it.type.startsWith("image/"),
+    );
+    const file = item?.getAsFile();
+    if (file) {
+      e.preventDefault();
+      void uploadAndSendImage(file);
+    }
+  };
+
+  // Drag-and-drop from the desktop — same upload path.
+  const handleDrop = (e: React.DragEvent<HTMLTextAreaElement>) => {
+    if (uploading) return;
+    const file = Array.from(e.dataTransfer.files).find((f) =>
+      f.type.startsWith("image/"),
+    );
+    if (file) {
+      e.preventDefault();
+      void uploadAndSendImage(file);
     }
   };
 
@@ -534,6 +569,9 @@ export function MessageInput({
               updateMentionState(text, el.selectionStart ?? text.length);
             }}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
             onFocus={() => {
               if (activePanel === "menu") setActivePanel(null);
             }}

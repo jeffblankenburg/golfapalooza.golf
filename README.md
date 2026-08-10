@@ -148,7 +148,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - GIF picker (Giphy integration)
 - Typing indicators
 - Read receipts and unread counts
-- Image sharing
+- Image sharing — camera, photo library, clipboard paste, or drag-and-drop; images are auto-compressed before upload
 - Push notification on new messages
 
 ### Photo & Video Gallery

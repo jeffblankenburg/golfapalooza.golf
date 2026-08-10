@@ -35,12 +35,14 @@ export async function GET(request: NextRequest) {
 
   const admin = createAdminClient();
 
-  // Fetch all participants for this trip
+  // Fetch roster participants for this trip. on_roster=true is the single source
+  // for "who's attending" — a user can have an event_participants row (even with a
+  // likelihood %) without being on the roster, so filter on on_roster, not likelihood.
   const { data: participants } = await admin
     .from("event_participants")
     .select("user_id, user:users!inner(id, display_name, full_name)")
     .eq("trip_id", tripId)
-    .not("likelihood", "is", null);
+    .eq("on_roster", true);
 
   const playerIds = (participants || []).map((p) => p.user_id);
 
@@ -122,12 +124,12 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
 
-  // Get all participants
+  // Get roster participants (see GET — filter on on_roster, not likelihood)
   const { data: participants } = await admin
     .from("event_participants")
     .select("user_id")
     .eq("trip_id", trip_id)
-    .not("likelihood", "is", null);
+    .eq("on_roster", true);
 
   const playerIds = (participants || []).map((p) => p.user_id);
   if (playerIds.length === 0) {

@@ -35,11 +35,15 @@ export async function GET(request: Request) {
 
   const adminClient = createAdminClient();
 
-  // Get event participants
+  // Get event participants — only those on the active roster. A user can have an
+  // event_participants row without being on the roster (e.g. RSVP'd no, or added
+  // then removed); on_roster=true is the single source for "who's attending", so
+  // only they are eligible for room assignment.
   const { data: participants, error: partError } = await adminClient
     .from("event_participants")
     .select("user_id, user:users(id, display_name, full_name, avatar_url)")
-    .eq("trip_id", tripId);
+    .eq("trip_id", tripId)
+    .eq("on_roster", true);
 
   if (partError) {
     return NextResponse.json({ error: partError.message }, { status: 500 });

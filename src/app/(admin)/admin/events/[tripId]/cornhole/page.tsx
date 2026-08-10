@@ -7,6 +7,7 @@ import { CollapsibleSection } from "@/components/admin/CollapsibleSection";
 import { ContestParticipants } from "@/components/admin/ContestParticipants";
 import { CornholeDoublesManager } from "@/components/admin/CornholeDoublesManager";
 import { CornholeBracketManager } from "@/components/admin/CornholeBracketManager";
+import { VisibilityToggle } from "@/components/admin/VisibilityToggle";
 import { computeChampionId } from "@/lib/bracket/champion";
 import { BTN_BACK } from "@/lib/ui/buttons";
 
@@ -21,6 +22,8 @@ export default function CornholeAdminPage() {
   const [doublesLocked, setDoublesLocked] = useState(false);
   const [singlesResult, setSinglesResult] = useState<string | null>(null);
   const [doublesResult, setDoublesResult] = useState<string | null>(null);
+  const [singlesBracketPublishedAt, setSinglesBracketPublishedAt] = useState<string | null>(null);
+  const [doublesBracketPublishedAt, setDoublesBracketPublishedAt] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -44,11 +47,13 @@ export default function CornholeAdminPage() {
     if (singles) {
       setSinglesContestId(singles.id);
       setSinglesLocked(!!singles.winners_locked_at);
+      setSinglesBracketPublishedAt(singles.bracket_published_at ?? null);
       fetchResultText(singles.id).then(setSinglesResult);
     }
     if (doubles) {
       setDoublesContestId(doubles.id);
       setDoublesLocked(!!doubles.winners_locked_at);
+      setDoublesBracketPublishedAt(doubles.bracket_published_at ?? null);
       fetchResultText(doubles.id).then(setDoublesResult);
     }
   }, [tripId]);
@@ -176,6 +181,14 @@ export default function CornholeAdminPage() {
           )
         }
         iconColor={singlesLocked ? "text-amber-700" : undefined}
+        badge={singlesContestId && (
+          <VisibilityToggle
+            kind="bracket"
+            contestId={singlesContestId}
+            publishedAt={singlesBracketPublishedAt}
+            onChanged={fetchContests}
+          />
+        )}
       >
         <CornholeBracketManager tripId={tripId} contestType="cornhole_singles" onChampionCrowned={fetchContests} />
       </CollapsibleSection>
@@ -196,6 +209,14 @@ export default function CornholeAdminPage() {
           )
         }
         iconColor={doublesLocked ? "text-amber-700" : undefined}
+        badge={doublesContestId && (
+          <VisibilityToggle
+            kind="bracket"
+            contestId={doublesContestId}
+            publishedAt={doublesBracketPublishedAt}
+            onChanged={fetchContests}
+          />
+        )}
       >
         <CornholeBracketManager tripId={tripId} contestType="cornhole_doubles" onChampionCrowned={fetchContests} />
       </CollapsibleSection>

@@ -20,6 +20,19 @@ export async function GET(request: Request) {
   try {
     const adminClient = createAdminClient();
 
+    // Bracket visibility gate: admins reveal the bracket to players via the
+    // per-contest bracket_published_at flag. Until then, players/spectators see
+    // the "coming soon" empty state (same shape as a not-yet-generated bracket).
+    const { data: contest } = await adminClient
+      .from("contests")
+      .select("bracket_published_at")
+      .eq("id", contestId)
+      .single();
+
+    if (!contest?.bracket_published_at) {
+      return NextResponse.json({ matches: [], nameMap: {} });
+    }
+
     const { data: matches, error } = await adminClient
       .from("cornhole_bracket_matches")
       .select("*")

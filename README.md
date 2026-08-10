@@ -137,6 +137,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Singles final is a best-of-3 series (admin records each game; the bracket advances only when one player reaches 2 wins)
 - Real-time bracket updates with polling
 - "Show real names" toggle (only when full names exist)
+- Brackets are hidden from players until an admin publishes them (per-tournament visibility toggle on each bracket accordion); unpublished brackets show a "coming soon" state to players and spectators
 
 ### Chat
 - Direct messages and group conversations
@@ -351,7 +352,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Skins winner management
 - Calcutta auction management (bids, prizes, payouts)
 - Pick'em game management
-- Cornhole bracket management
+- Cornhole bracket management (per-tournament "Shared/Hidden" visibility toggle to reveal each bracket to players)
 
 ### Gallery Management
 - Photo/video moderation

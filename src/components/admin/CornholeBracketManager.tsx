@@ -58,6 +58,7 @@ export function CornholeBracketManager({
     onConfirm: () => void;
   } | null>(null);
   const [locked, setLocked] = useState(false);
+  const [bracketLocked, setBracketLocked] = useState(false);
   const [bracketFormat, setBracketFormat] = useState<BracketFormat>("double-elimination");
 
   const isSingles = contestType === "cornhole_singles";
@@ -71,6 +72,7 @@ export function CornholeBracketManager({
     );
     setContestId(c?.id || null);
     setLocked(!!c?.winners_locked_at);
+    setBracketLocked(!!c?.bracket_locked_at);
     if (c?.bracket_format) {
       setBracketFormat(c.bracket_format as BracketFormat);
     }
@@ -142,13 +144,38 @@ export function CornholeBracketManager({
         setConfirmModal(null);
         if (!contestId) return;
         setSaving("reset");
-        await fetch(`/api/admin/cornhole/bracket?contest_id=${contestId}`, {
+        const res = await fetch(`/api/admin/cornhole/bracket?contest_id=${contestId}`, {
           method: "DELETE",
         });
-        setMatches([]);
+        if (res.ok) {
+          setMatches([]);
+        } else {
+          // Rejected (e.g. bracket locked out from under us) — re-sync from server.
+          await fetchBracket(contestId);
+        }
         setSaving(null);
       },
     });
+  };
+
+  // Lock / unlock the bracket structure (blocks regenerate + reset; winner
+  // advancement stays enabled). Non-destructive, so no confirmation needed.
+  const handleToggleBracketLock = async () => {
+    if (!contestId) return;
+    const next = !bracketLocked;
+    setSaving("lock");
+    setBracketLocked(next); // optimistic
+    try {
+      const res = await fetch(`/api/admin/contests/${contestId}/lock-bracket`, {
+        method: next ? "POST" : "DELETE",
+      });
+      if (!res.ok) setBracketLocked(!next); // revert on failure
+    } catch (err) {
+      console.error("Toggle bracket lock error:", err);
+      setBracketLocked(!next);
+    } finally {
+      setSaving(null);
+    }
   };
 
   // Cascade clear a match and its downstream state (shared by un-advance,
@@ -489,37 +516,64 @@ export function CornholeBracketManager({
           <span className="font-semibold text-gray-800">
             {DOUBLES_FORMAT_OPTIONS.find((o) => o.value === bracketFormat)?.label || bracketFormat}
           </span>
-          {!locked && <span className="text-gray-400"> · reset bracket to change</span>}
+          {!locked && !bracketLocked && <span className="text-gray-400"> · reset bracket to change</span>}
         </div>
       )}
 
-      {/* Action buttons (hidden when locked) */}
+      {/* Action buttons (hidden when winners are locked) */}
       {!locked && (
-        <div className="flex gap-2 mb-4">
+        <div className="mb-4 space-y-2">
           {matches.length === 0 ? (
             <button
               onClick={handleGenerate}
               disabled={saving === "generate" || participantCount < 2}
-              className="flex-1 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg active:bg-green-700 disabled:opacity-50"
+              className="w-full py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg active:bg-green-700 disabled:opacity-50"
             >
               {saving === "generate" ? "Generating..." : "Generate Bracket"}
             </button>
           ) : (
             <>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleGenerate}
+                  disabled={!!saving || bracketLocked}
+                  className="flex-1 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg active:bg-green-700 disabled:opacity-50"
+                >
+                  {saving === "generate" ? "Regenerating..." : "Regenerate (Reshuffle)"}
+                </button>
+                <button
+                  onClick={handleReset}
+                  disabled={!!saving || bracketLocked}
+                  className="py-2.5 px-4 bg-red-50 text-red-600 text-sm font-semibold rounded-lg active:bg-red-100 disabled:opacity-50"
+                >
+                  Reset
+                </button>
+              </div>
               <button
-                onClick={handleGenerate}
+                onClick={handleToggleBracketLock}
                 disabled={!!saving}
-                className="flex-1 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg active:bg-green-700 disabled:opacity-50"
+                className={`w-full flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold rounded-lg disabled:opacity-50 ${
+                  bracketLocked
+                    ? "bg-amber-100 text-amber-700 active:bg-amber-200"
+                    : "bg-gray-100 text-gray-700 active:bg-gray-200"
+                }`}
               >
-                {saving === "generate" ? "Regenerating..." : "Regenerate (Reshuffle)"}
+                {bracketLocked ? (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 018 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                )}
+                {bracketLocked ? "Unlock Brackets" : "Lock Brackets"}
               </button>
-              <button
-                onClick={handleReset}
-                disabled={!!saving}
-                className="py-2.5 px-4 bg-red-50 text-red-600 text-sm font-semibold rounded-lg active:bg-red-100 disabled:opacity-50"
-              >
-                Reset
-              </button>
+              {bracketLocked && (
+                <p className="text-xs text-amber-600 px-1">
+                  Bracket locked. Regenerate and Reset are disabled — recording match winners still works. Unlock to reshuffle.
+                </p>
+              )}
             </>
           )}
         </div>

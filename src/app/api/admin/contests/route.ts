@@ -60,6 +60,7 @@ export async function GET(request: Request) {
     winners_locked_at: c.winners_locked_at,
     tee_sheet_published_at: c.tee_sheet_published_at ?? null,
     bracket_published_at: c.bracket_published_at ?? null,
+    bracket_locked_at: c.bracket_locked_at ?? null,
     bracket_format: c.bracket_format ?? "double-elimination",
     participant_count:
       Array.isArray(c.contest_participants) && c.contest_participants.length > 0

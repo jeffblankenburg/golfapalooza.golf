@@ -110,12 +110,21 @@ export async function POST(request: Request) {
     // Determine contest type
     const { data: contest, error: contestError } = await adminClient
       .from("contests")
-      .select("id, contest_type, bracket_format")
+      .select("id, contest_type, bracket_format, bracket_locked_at")
       .eq("id", contest_id)
       .single();
 
     if (contestError || !contest) {
       return NextResponse.json({ error: "Contest not found" }, { status: 404 });
+    }
+
+    // Bracket structure lock: guards against accidental regeneration while the
+    // tournament is being played. Admin must explicitly unlock first.
+    if (contest.bracket_locked_at) {
+      return NextResponse.json(
+        { error: "Bracket is locked. Unlock it before regenerating." },
+        { status: 409 }
+      );
     }
 
     // For doubles, allow caller to set/change format on this generation.
@@ -313,6 +322,21 @@ export async function DELETE(request: Request) {
 
   try {
     const adminClient = createAdminClient();
+
+    // Bracket structure lock: refuse to wipe a locked bracket.
+    const { data: contest } = await adminClient
+      .from("contests")
+      .select("bracket_locked_at")
+      .eq("id", contestId)
+      .single();
+
+    if (contest?.bracket_locked_at) {
+      return NextResponse.json(
+        { error: "Bracket is locked. Unlock it before resetting." },
+        { status: 409 }
+      );
+    }
+
     // Clear linkages first to avoid FK conflicts
     await adminClient
       .from("cornhole_bracket_matches")

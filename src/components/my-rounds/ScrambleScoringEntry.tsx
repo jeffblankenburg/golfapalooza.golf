@@ -41,6 +41,7 @@ interface ScrambleScoringEntryProps {
   roundId?: string;
   initialTeamScores?: Record<number, number>;
   initialRoundPlayerIds?: string[];
+  contestBadges?: Record<number, string[]>; // hole_number -> daily-contest labels
 }
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -65,6 +66,7 @@ export default function ScrambleScoringEntry({
   roundId: existingRoundId,
   initialTeamScores,
   initialRoundPlayerIds,
+  contestBadges,
 }: ScrambleScoringEntryProps) {
   const visibleHoles = allHoles.filter((h) => {
     if (roundType === "9-front") return h.hole_number <= 9;
@@ -366,6 +368,7 @@ export default function ScrambleScoringEntry({
         onClose={onClose}
         teeColor={teeColor}
         saveStatus={saveStatus}
+        contestBadges={contestBadges}
         startingHole={(() => {
           if (typeof window === "undefined" || !roundId) return undefined;
           try {

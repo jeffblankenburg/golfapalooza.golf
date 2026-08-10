@@ -38,6 +38,7 @@ export default function LiveScoringResumePage() {
     roundType: string;
     format: string;
     teeColor: string | null;
+    contestBadges: Record<number, string[]>;
     // Scramble-only: one team score per hole + the roster rows we fan it out to.
     scrambleTeamScores: Record<number, number>;
     scrambleRoundPlayerIds: string[];
@@ -55,6 +56,7 @@ export default function LiveScoringResumePage() {
       const json = await res.json();
       const round = json.round;
       const holes = json.holes || [];
+      const contestBadges: Record<number, string[]> = json.contest_holes || {};
 
       const course = Array.isArray(round.course) ? round.course[0] : round.course;
       const roundPlayers = round.round_players || [];
@@ -132,6 +134,7 @@ export default function LiveScoringResumePage() {
         roundType: round.round_type,
         format: round.format || "individual",
         teeColor: roundTee?.tee_color || null,
+        contestBadges,
         scrambleTeamScores,
         scrambleRoundPlayerIds,
         scrambleMembers,
@@ -157,6 +160,7 @@ export default function LiveScoringResumePage() {
         courseName={data.courseName}
         roundId={roundId}
         teeColor={data.teeColor}
+        contestBadges={data.contestBadges}
         initialTeamScores={data.scrambleTeamScores}
         initialRoundPlayerIds={data.scrambleRoundPlayerIds}
         onClose={() => {
@@ -178,6 +182,7 @@ export default function LiveScoringResumePage() {
       initialScores={data.initialScores}
       initialPutts={data.initialPutts}
       initialPlayerMap={data.initialPlayerMap}
+      contestBadges={data.contestBadges}
       onClose={() => {
         router.push("/my-rounds");
         router.refresh();

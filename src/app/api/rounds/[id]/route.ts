@@ -8,6 +8,7 @@ import { getEffectiveUserId } from "@/lib/simulator";
 import { checkIsAdmin } from "@/lib/permissions-server";
 import { canManageRound } from "@/lib/rounds/access";
 import { notifyFavoritesRoundCompleted } from "@/lib/favorites/fanout";
+import { getDailyContestHolesForRound } from "@/lib/winners/daily-contest-holes";
 
 // GET - Fetch round with full details
 export async function GET(
@@ -85,11 +86,21 @@ export async function GET(
   }
 
   const adminUser = await checkIsAdmin();
+
+  // Daily-contest holes for this round's trip day (matched by course + date),
+  // surfaced as badges in the live scoring view. Best-effort — never blocks
+  // the round load.
+  const contestHoles = await getDailyContestHolesForRound(adminClient, {
+    course_id: round.course_id,
+    round_date: round.round_date,
+  }).catch(() => ({}));
+
   return NextResponse.json({
     round,
     holes: holes || [],
     current_user_id: effectiveUserId,
     is_admin: !!adminUser,
+    contest_holes: contestHoles,
   });
 }
 

@@ -23,6 +23,12 @@ interface NoWinnerRecord {
   contest_type: string;
 }
 
+interface HoleRecord {
+  day_number: number;
+  contest_type: string;
+  hole_number: number;
+}
+
 // Long Putt always has a winner; CTP and LD can be declared no-winner.
 const NO_WINNER_VALUE = "__no_winner__";
 const NO_WINNER_TYPES = new Set(["ctp_front", "ctp_back", "long_drive"]);
@@ -45,6 +51,11 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
   // Tracks contests where admin explicitly declared "no winner". Key
   // shape matches `winnerKey`. Mutually exclusive with `winners`.
   const [noWinners, setNoWinners] = useState<Set<string>>(new Set());
+  // Hosting hole per (day, contest_type), keyed like `winnerKey`. Independent
+  // of winner state — set up front. Empty string / absent = unassigned.
+  const [holeAssignments, setHoleAssignments] = useState<Record<string, number>>({});
+  // hole_number → par for the trip's course, for the "Hole 7 · Par 3" hints.
+  const [holePars, setHolePars] = useState<Record<number, number>>({});
   const [eventDays, setEventDays] = useState<EventDay[]>([]);
   const [scrambleDayNumbers, setScrambleDayNumbers] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
@@ -146,14 +157,40 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
     }
     setNoWinners(nw);
 
+    const holeMap: Record<string, number> = {};
+    for (const h of (data.holes || []) as HoleRecord[]) {
+      holeMap[winnerKey(h.day_number, h.contest_type)] = h.hole_number;
+    }
+    setHoleAssignments(holeMap);
+
     setLoading(false);
+  }, [tripId]);
+
+  // Load the trip's course holes so the hole picker can show par hints.
+  const fetchCourseHoles = useCallback(async () => {
+    try {
+      const sumRes = await fetch(`/api/admin/events/${tripId}/summary`);
+      const sum = await sumRes.json();
+      const courseId = sum?.trip?.course_id ?? sum?.course_id;
+      if (!courseId) return;
+      const holeRes = await fetch(`/api/admin/course?course_id=${courseId}`);
+      const holeData = await holeRes.json();
+      const pars: Record<number, number> = {};
+      for (const h of (holeData.holes || []) as { hole_number: number; par: number }[]) {
+        if (h.hole_number != null && h.par != null) pars[h.hole_number] = h.par;
+      }
+      setHolePars(pars);
+    } catch {
+      // Par hints are a nicety — the picker still works without them.
+    }
   }, [tripId]);
 
   useEffect(() => {
     fetchEventDays();
     fetchScrambleDays();
     fetchData();
-  }, [fetchEventDays, fetchScrambleDays, fetchData]);
+    fetchCourseHoles();
+  }, [fetchEventDays, fetchScrambleDays, fetchData, fetchCourseHoles]);
 
   // Listen for event days changes and contests changes
   useEffect(() => {
@@ -231,6 +268,38 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
     setSaving(null);
   };
 
+  const setHole = async (day: number, contestType: string, holeNumber: number | null) => {
+    const key = winnerKey(day, contestType);
+    const prev = holeAssignments[key];
+    setHoleAssignments((p) => {
+      const next = { ...p };
+      if (holeNumber == null) delete next[key];
+      else next[key] = holeNumber;
+      return next;
+    });
+
+    try {
+      await fetch("/api/admin/daily-winners", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trip_id: tripId,
+          day_number: day,
+          contest_type: contestType,
+          hole_number: holeNumber,
+        }),
+      });
+    } catch {
+      // Revert on error
+      setHoleAssignments((p) => {
+        const next = { ...p };
+        if (prev == null) delete next[key];
+        else next[key] = prev;
+        return next;
+      });
+    }
+  };
+
   const handleReset = async () => {
     try {
       const res = await fetch(`/api/admin/daily-winners?trip_id=${tripId}`, { method: "DELETE" });
@@ -305,13 +374,14 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
             const isNoWinner = noWinners.has(key);
             const canDeclareNoWinner = NO_WINNER_TYPES.has(ct.type);
             const selectValue = isNoWinner ? NO_WINNER_VALUE : selectedUserId;
+            const assignedHole = holeAssignments[key];
 
             return (
-              <div key={ct.type} className="flex items-center gap-3">
+              <div key={ct.type} className="flex items-center gap-2">
                 <label className="text-xs text-gray-500 w-24 flex-shrink-0">
                   {ct.label}
                 </label>
-                <div className="relative flex-1">
+                <div className="relative flex-1 min-w-0">
                   <select
                     value={selectValue}
                     onChange={(e) => {
@@ -336,6 +406,28 @@ export function DailyWinnersManager({ tripId }: { tripId: string }) {
                     ))}
                   </select>
                   <svg className="w-4 h-4 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+                {/* Hosting hole — independent of winner state. */}
+                <div className="relative w-24 flex-shrink-0">
+                  <select
+                    value={assignedHole ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setHole(d.day, ct.type, v === "" ? null : parseInt(v, 10));
+                    }}
+                    className="w-full text-sm border border-gray-200 rounded-lg py-1.5 pl-2 pr-6 bg-white focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none appearance-none"
+                    title="Hole hosting this contest"
+                  >
+                    <option value="">Hole…</option>
+                    {Array.from({ length: 18 }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>
+                        {holePars[n] ? `${n} · Par ${holePars[n]}` : `Hole ${n}`}
+                      </option>
+                    ))}
+                  </select>
+                  <svg className="w-4 h-4 text-gray-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>

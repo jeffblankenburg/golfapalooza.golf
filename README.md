@@ -111,6 +111,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Long Drive
 - Long Putt
 - Winners organized by event day
+- Each contest can be assigned to a specific hole; the hole shows on the Daily Games page (e.g. "Long Drive · Hole 12") and as a 🎯 badge on that hole in the live scoring view (matched by course + date)
 
 ### 100 Feet
 - Closest to 100 feet from the pin contest
@@ -349,6 +350,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 
 ### Daily Games & Contests
 - Daily winner recording (CTP, Long Drive, Long Putt)
+- Per-contest hosting-hole assignment (hole picker with par hints alongside each day's winner)
 - 100 Feet distance tracking
 - Skins winner management
 - Calcutta auction management (bids, prizes, payouts)

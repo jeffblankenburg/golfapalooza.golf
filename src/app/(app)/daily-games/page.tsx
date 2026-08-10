@@ -54,7 +54,7 @@ export default async function DailyGamesPage() {
     adminClient
       .from("contests")
       .select(
-        "id, day_number, contest_type, declared_no_winner, contest_winners(user_id, user:users!contest_winners_user_id_fkey(display_name, avatar_url)), buy_in_cost_item:cost_items!contests_buy_in_cost_item_id_fkey(cost)",
+        "id, day_number, contest_type, declared_no_winner, hole_number, contest_winners(user_id, user:users!contest_winners_user_id_fkey(display_name, avatar_url)), buy_in_cost_item:cost_items!contests_buy_in_cost_item_id_fkey(cost)",
       )
       .eq("trip_id", trip.id)
       .in("contest_type", ["ctp_front", "ctp_back", "long_drive", "long_putt"])
@@ -77,6 +77,7 @@ export default async function DailyGamesPage() {
     day_number: number;
     contest_type: string;
     declared_no_winner: boolean;
+    hole_number: number | null;
     contest_winners: Array<{
       user_id: string;
       user: { display_name: string; avatar_url: string | null } | { display_name: string; avatar_url: string | null }[] | null;
@@ -152,8 +153,17 @@ export default async function DailyGamesPage() {
   };
 
   const contestLabels: Record<string, string> = {
-    ctp_front: "Closest to Pin — Front 9",
-    ctp_back: "Closest to Pin — Back 9",
+    ctp_front: "Closest to Pin - Front 9",
+    ctp_back: "Closest to Pin - Back 9",
+    long_drive: "Long Drive",
+    long_putt: "Long Putt",
+  };
+
+  // Used when a hole is assigned — the hole disambiguates the two CTPs, so the
+  // Front 9 / Back 9 tag is dropped: e.g. "Closest to Pin Hole 1".
+  const contestBaseNames: Record<string, string> = {
+    ctp_front: "Closest to Pin",
+    ctp_back: "Closest to Pin",
     long_drive: "Long Drive",
     long_putt: "Long Putt",
   };
@@ -227,7 +237,11 @@ export default async function DailyGamesPage() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{contestLabels[contestType]}</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {row?.hole_number != null
+                        ? `${contestBaseNames[contestType]} - Hole ${row.hole_number}`
+                        : contestLabels[contestType]}
+                    </p>
                     {hasWinner && u ? (
                       <div className="flex items-center gap-1.5 mt-0.5">
                         {u.avatar_url ? (

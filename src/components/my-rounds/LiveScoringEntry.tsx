@@ -69,6 +69,7 @@ interface LiveScoringEntryProps {
   initialScores?: Record<string, Record<number, number>>;
   initialPutts?: Record<string, Record<number, number>>;
   initialPlayerMap?: Record<string, string>; // userId -> roundPlayerId
+  contestBadges?: Record<number, string[]>; // hole_number -> daily-contest labels
 }
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -95,6 +96,7 @@ export default function LiveScoringEntry({
   initialScores,
   initialPutts,
   initialPlayerMap,
+  contestBadges,
 }: LiveScoringEntryProps) {
   // If the effective tee differs (composition tee), fetch resolved holes on mount
   const [resolvedHoles, setResolvedHoles] = useState<HoleInfo[] | null>(null);
@@ -627,6 +629,7 @@ export default function LiveScoringEntry({
       onClose={onClose}
       teeColor={teeColor}
       saveStatus={saveStatus}
+      contestBadges={contestBadges}
       // Restore the hole the user was on if iOS reloaded the page. Stored
       // per-round so concurrent rounds don't clobber each other.
       startingHole={(() => {

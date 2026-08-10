@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     adminClient
       .from("contests")
       .select(
-        "id, contest_type, day_number, declared_no_winner, contest_winners(user_id, user:users!contest_winners_user_id_fkey(id, display_name, full_name, avatar_url))",
+        "id, contest_type, day_number, declared_no_winner, hole_number, contest_winners(user_id, user:users!contest_winners_user_id_fkey(id, display_name, full_name, avatar_url))",
       )
       .eq("trip_id", tripId)
       .in("contest_type", ["ctp_front", "ctp_back", "long_drive", "long_putt"]),
@@ -47,8 +47,14 @@ export async function GET(request: Request) {
   type WinnerRow = { user_id: string };
   const winners: Array<{ day_number: number; contest_type: string; user_id: string }> = [];
   const noWinners: Array<{ day_number: number; contest_type: string }> = [];
+  // Assigned hole per (day, contest_type). Independent of winner state — the
+  // hole is set up front, before anyone has won.
+  const holes: Array<{ day_number: number; contest_type: string; hole_number: number }> = [];
   for (const c of contestsRes.data || []) {
     if (c.day_number == null) continue;
+    if (c.hole_number != null) {
+      holes.push({ day_number: c.day_number, contest_type: c.contest_type, hole_number: c.hole_number });
+    }
     if (c.declared_no_winner) {
       noWinners.push({ day_number: c.day_number, contest_type: c.contest_type });
       continue;
@@ -78,7 +84,7 @@ export async function GET(request: Request) {
     .filter((p): p is NonNullable<typeof p> => !!p)
     .sort((a, b) => a.display_name.localeCompare(b.display_name));
 
-  return NextResponse.json({ winners, no_winners: noWinners, participants });
+  return NextResponse.json({ winners, no_winners: noWinners, holes, participants });
 }
 
 export async function PUT(request: Request) {
@@ -88,7 +94,8 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const { trip_id, day_number, contest_type, user_id, no_winner } = await request.json();
+    const { trip_id, day_number, contest_type, user_id, no_winner, hole_number } =
+      await request.json();
 
     if (!trip_id || !day_number || !contest_type) {
       return NextResponse.json(
@@ -96,7 +103,19 @@ export async function PUT(request: Request) {
         { status: 400 },
       );
     }
-    if (!no_winner && !user_id) {
+    // A request either sets the hosting hole (hole_number provided, winner
+    // fields absent) or picks a winner / declares no-winner. The two concerns
+    // are independent — the hole is configured before anyone wins.
+    const isHoleOnly =
+      hole_number !== undefined && user_id === undefined && no_winner === undefined;
+    if (isHoleOnly) {
+      if (hole_number !== null && (typeof hole_number !== "number" || hole_number < 1 || hole_number > 18)) {
+        return NextResponse.json(
+          { error: "hole_number must be an integer 1-18 or null" },
+          { status: 400 },
+        );
+      }
+    } else if (!no_winner && !user_id) {
       return NextResponse.json(
         { error: "user_id is required when no_winner is not true" },
         { status: 400 },
@@ -117,6 +136,17 @@ export async function PUT(request: Request) {
         { error: `No matching contest for day ${day_number} ${contest_type}` },
         { status: 400 },
       );
+    }
+
+    // Hole-only update: set/clear the hosting hole and return. No winner
+    // materialization needed — pots don't depend on the hole.
+    if (isHoleOnly) {
+      const { error: holeErr } = await adminClient
+        .from("contests")
+        .update({ hole_number: hole_number ?? null })
+        .eq("id", contest.id);
+      if (holeErr) return NextResponse.json({ error: holeErr.message }, { status: 500 });
+      return NextResponse.json({ success: true });
     }
 
     // declared_no_winner and contest_winners are mutually exclusive.

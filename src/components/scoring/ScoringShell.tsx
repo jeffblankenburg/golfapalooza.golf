@@ -70,6 +70,10 @@ interface ScoringShellProps {
   // Tee color for the round (used for map markers on non-composition tees)
   teeColor?: string | null;
 
+  // Optional daily-contest badges per hole (hole_number → labels like ["CTP"]).
+  // Rendered as a chip in the header on the matching hole.
+  contestBadges?: Record<number, string[]>;
+
   // Save status (shown as slide-down banner below the header)
   saveStatus?: SaveStatus;
 
@@ -91,6 +95,7 @@ export default function ScoringShell({
   teeColor: roundTeeColor,
   saveStatus = "idle",
   onHoleChange,
+  contestBadges,
 }: ScoringShellProps) {
   // Mixed tee colors → per-hole color in scorecard & map markers.
   const isCompositionTee = useMemo(() => {
@@ -237,6 +242,22 @@ export default function ScoringShell({
           </tbody>
         </table>
       </div>
+
+      {/* Daily-contest strip — shown when the current hole hosts a contest
+          (CTP / Long Drive / Long Putt) for this round's trip day. */}
+      {contestBadges?.[hole.hole_number]?.length ? (
+        <div className="flex items-center justify-center flex-wrap gap-1.5 py-1.5 bg-teal-50 border-t border-teal-100 shrink-0 px-3">
+          {contestBadges[hole.hole_number].map((label) => (
+            <span
+              key={label}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white text-teal-700 text-xs font-bold border border-teal-200"
+            >
+              <span aria-hidden>🎯</span>
+              {label}
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       {/* Status banners (verified, closed, etc.) */}
       {statusBanner}

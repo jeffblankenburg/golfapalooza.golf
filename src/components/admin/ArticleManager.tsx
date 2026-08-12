@@ -149,14 +149,18 @@ export function ArticleManager({ tripId, currentUserId }: { tripId: string; curr
     // Determine publish_at value
     if (publishMode === "draft") {
       payload.publish_at = null;
+    } else if (publishMode === "now") {
+      // "Publish Now" means now — ignore any date left in the Schedule field
+      // (it's pre-filled from an existing schedule when editing). Publishing a
+      // scheduled/draft article stamps the current time; editing an already-live
+      // article ("Save Changes") omits publish_at to keep its original date.
+      if (!isAlreadyPublished) {
+        payload.publish_at = new Date().toISOString();
+      }
     } else if (publishAt) {
-      // Explicit schedule date always wins (past dates for imports, future for scheduling)
+      // Schedule mode: explicit date wins (future = scheduling, past = backdated import)
       payload.publish_at = new Date(publishAt).toISOString();
-    } else if (publishMode === "now" && !isAlreadyPublished) {
-      // No schedule date, publishing now for the first time
-      payload.publish_at = new Date().toISOString();
     }
-    // If already published with no schedule date change, publish_at is omitted (keeps original)
 
     await fetch("/api/admin/articles", {
       method: editId ? "PUT" : "POST",

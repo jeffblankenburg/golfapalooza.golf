@@ -673,6 +673,19 @@ function Accordion({
   children: React.ReactNode;
 }) {
   const contentRef = useRef<HTMLDivElement>(null);
+  const [contentHeight, setContentHeight] = useState(0);
+
+  // Measure the real content height so bios (and other sections) of any length
+  // are never clipped. Re-measure on content changes (e.g. async image loads).
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const measure = () => setContentHeight(el.scrollHeight);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [children]);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -696,10 +709,10 @@ function Accordion({
         </svg>
       </button>
       <div
-        ref={contentRef}
-        className={`overflow-hidden transition-all duration-200 ${isOpen ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"}`}
+        className={`overflow-hidden transition-all duration-200 ${isOpen ? "opacity-100" : "opacity-0"}`}
+        style={{ maxHeight: isOpen ? contentHeight : 0 }}
       >
-        <div className="px-4 pb-4">{children}</div>
+        <div ref={contentRef} className="px-4 pb-4">{children}</div>
       </div>
     </div>
   );

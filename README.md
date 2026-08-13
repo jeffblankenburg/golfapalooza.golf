@@ -178,6 +178,11 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - View counts displayed in admin
 - Latest article card on home page with hero image
 
+### Shirt Guide
+- Per-day list of the shirts to wear at the event, each with a photo, name, and optional notes
+- Grouped by day; shirts without a photo show a placeholder
+- Reachable from the "Shirt Guide" home-page quick link (hidden until an admin posts at least one shirt for the event)
+
 ### Polls
 - Admin-authored polls with single-choice, multi-choice, or free-text questions
 - Same audience targeting as announcements (everyone, current event, custom)
@@ -347,6 +352,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Notebook notes with categories and pinning
 - Announcement broadcasting with scheduling
 - Polls with single/multi/free-text questions, audience targeting, anonymity toggle, scheduling, and reopen support
+- Shirt Guide editor — add/edit/delete daily shirts with photo upload and drag-free up/down reordering (gated by `manage_event_settings`)
 
 ### Daily Games & Contests
 - Daily winner recording (CTP, Long Drive, Long Putt)

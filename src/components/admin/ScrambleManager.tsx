@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { BottomDrawer } from "@/components/admin/BottomDrawer";
 import { BTN_BACK, BTN_DESTRUCTIVE, BTN_PRIMARY } from "@/lib/ui/buttons";
@@ -889,29 +889,54 @@ export function ScrambleManager({ tripId, contestId: externalContestId }: { trip
                         </tr>
                       </thead>
                       <tbody>
-                        {breakdown.members.map((m) => (
-                          <tr key={m.user_id} className="border-b border-gray-100 last:border-b-0">
-                            <td className="py-1 text-gray-700">
-                              {m.display_name}
-                              {m.handicap_source === "missing" && (
-                                <span className="ml-1 text-amber-600" title="No handicap on file — treated as 0">⚠</span>
-                              )}
-                              {m.handicap_source === "live" && (
-                                <span className="ml-1 text-blue-500" title="Live handicap (no event-locked snapshot)">·</span>
-                              )}
-                            </td>
-                            <td className="py-1 text-right tabular-nums text-gray-600">
-                              {m.handicap_index != null ? m.handicap_index.toFixed(1) : "—"}
-                            </td>
-                            <td className="py-1 text-right tabular-nums text-gray-700">{m.course_handicap}</td>
-                            <td className="py-1 text-right tabular-nums text-gray-500">
-                              {Math.round(m.weight * 100)}%
-                            </td>
-                            <td className="py-1 text-right tabular-nums text-gray-700">
-                              {m.contribution.toFixed(2)}
-                            </td>
-                          </tr>
-                        ))}
+                        {breakdown.members.map((m) => {
+                          // Per-player Course Handicap derivation, using the
+                          // team's tee: CH = HI × (Slope/113) + (Rating − Par).
+                          // Kept raw (unrounded) — the team handicap weights the
+                          // raw values. Shown so the CH column is auditable.
+                          const c = tee ? tee.course_rating - tee.par : 0;
+                          const hasCH = tee && m.handicap_index != null;
+                          return (
+                            <Fragment key={m.user_id}>
+                              <tr>
+                                <td className="pt-1 text-gray-700">
+                                  {m.display_name}
+                                  {m.handicap_source === "missing" && (
+                                    <span className="ml-1 text-amber-600" title="No handicap on file — treated as 0">⚠</span>
+                                  )}
+                                  {m.handicap_source === "live" && (
+                                    <span className="ml-1 text-blue-500" title="Live handicap (no event-locked snapshot)">·</span>
+                                  )}
+                                </td>
+                                <td className="pt-1 text-right tabular-nums text-gray-600">
+                                  {m.handicap_index != null ? m.handicap_index.toFixed(1) : "—"}
+                                </td>
+                                <td className="pt-1 text-right tabular-nums text-gray-700">{m.course_handicap.toFixed(2)}</td>
+                                <td className="pt-1 text-right tabular-nums text-gray-500">
+                                  {Math.round(m.weight * 100)}%
+                                </td>
+                                <td className="pt-1 text-right tabular-nums text-gray-700">
+                                  {m.contribution.toFixed(2)}
+                                </td>
+                              </tr>
+                              <tr className="border-b border-gray-100 last:border-b-0">
+                                <td colSpan={5} className="pb-1 font-mono text-[0.625rem] text-gray-400 leading-snug">
+                                  {hasCH && tee ? (
+                                    <>
+                                      CH = {m.handicap_index!.toFixed(1)} &times; ({tee.slope_rating}/113)
+                                      {" "}
+                                      {c >= 0 ? "+" : "−"} {Math.abs(c).toFixed(1)}
+                                      {" = "}
+                                      {m.course_handicap.toFixed(2)}
+                                    </>
+                                  ) : (
+                                    <>No handicap on file &rarr; plays at CH {m.course_handicap.toFixed(2)}</>
+                                  )}
+                                </td>
+                              </tr>
+                            </Fragment>
+                          );
+                        })}
                         <tr>
                           <td colSpan={4} className="pt-1.5 text-right text-gray-500 font-medium">
                             Sum → rounded
@@ -1136,6 +1161,16 @@ function CalculateHandicapsButton({
           <p className="font-mono text-[0.6875rem] bg-blue-100/50 rounded px-2 py-1 inline-block">
             Course HC = HI &times; (Slope / 113) + (Rating &minus; Par)
           </p>
+          {tee && (
+            <p className="font-mono text-[0.6875rem] text-blue-700 leading-snug">
+              This tee: HI &times; ({tee.slope_rating} / 113) + ({tee.course_rating.toFixed(1)} &minus; {tee.par})
+              {" = "}
+              HI &times; {(tee.slope_rating / 113).toFixed(3)}
+              {" "}
+              {tee.course_rating - tee.par >= 0 ? "+" : "−"} {Math.abs(tee.course_rating - tee.par).toFixed(1)}
+              {", rounded to the nearest whole stroke."}
+            </p>
+          )}
           <p>
             Course Handicaps are sorted lowest to highest, then weighted by team size:
           </p>

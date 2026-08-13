@@ -660,6 +660,12 @@ export default async function HomePage() {
   if (!isFeatureVisible("rooms", visCtx, effectiveDate)) hiddenQuickLinks.push("/rooms");
   if (!optionsDeadline) hiddenQuickLinks.push("/options");
   if (!(await userHasClosedPolls(adminClient, effectiveUserId))) hiddenQuickLinks.push("/polls");
+  // Shirt Guide only appears once an admin has posted at least one shirt.
+  const { count: shirtCount } = await adminClient
+    .from("event_shirts")
+    .select("id", { count: "exact", head: true })
+    .eq("trip_id", trip.id);
+  if (!shirtCount) hiddenQuickLinks.push("/shirt-guide");
 
   return (
     <HomeContent

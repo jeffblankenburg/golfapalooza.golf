@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkIsAdmin } from "@/lib/permissions-server";
-import { calculateCourseHandicap } from "@/lib/golf/calculator";
+import { calculateCourseHandicapRaw } from "@/lib/golf/calculator";
 
 // Scramble handicap weights by team size (sorted best player first).
 // Each set sums to ~50% of combined Course Handicaps.
@@ -215,7 +215,7 @@ async function buildBreakdown(
         display_name: m.display_name ?? "Unknown",
         handicap_index: entry ? entry.hi : null,
         handicap_source: (entry?.source ?? "missing") as "event" | "live" | "missing",
-        course_handicap: calculateCourseHandicap(hi, tee.slope_rating, tee.course_rating, tee.par),
+        course_handicap: calculateCourseHandicapRaw(hi, tee.slope_rating, tee.course_rating, tee.par),
       };
     });
 

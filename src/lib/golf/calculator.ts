@@ -29,8 +29,26 @@ export function calculateDifferential(
 }
 
 /**
- * Calculate Course Handicap
+ * Calculate Course Handicap (raw / unrounded)
  * Formula: Handicap Index x (Slope Rating / 113) + (Course Rating - Par)
+ *
+ * The WHS Course Handicap is normally rounded to a whole number, and that's
+ * what stroke allocation / net double bogey need — use `calculateCourseHandicap`
+ * for those. The scramble team-handicap weighting instead sums the raw values,
+ * so it uses this unrounded variant to avoid compounding rounding error.
+ */
+export function calculateCourseHandicapRaw(
+  handicapIndex: number,
+  slopeRating: number,
+  courseRating: number,
+  par: number
+): number {
+  return handicapIndex * (slopeRating / 113) + (courseRating - par);
+}
+
+/**
+ * Calculate Course Handicap (rounded — WHS standard)
+ * Formula: round( Handicap Index x (Slope Rating / 113) + (Course Rating - Par) )
  */
 export function calculateCourseHandicap(
   handicapIndex: number,
@@ -38,8 +56,7 @@ export function calculateCourseHandicap(
   courseRating: number,
   par: number
 ): number {
-  const courseHandicap = handicapIndex * (slopeRating / 113) + (courseRating - par);
-  return Math.round(courseHandicap);
+  return Math.round(calculateCourseHandicapRaw(handicapIndex, slopeRating, courseRating, par));
 }
 
 /**

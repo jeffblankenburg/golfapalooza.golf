@@ -139,6 +139,15 @@ export function CourseManager({
 
   // Tee editing
   const [editingTee, setEditingTee] = useState<TeeData | null>(null);
+  // Raw string drafts for the numeric tee fields. Binding the number inputs
+  // straight to `editingTee.<n>.toString()` and coercing every keystroke with
+  // `parseFloat(v) || default` meant a transiently-empty or partial field
+  // (e.g. clearing "70.1" to retype) snapped to the default and the 800ms
+  // autosave could persist that default — clobbering the real value. We hold
+  // the raw text here and only write a number into editingTee when it parses.
+  const [teeRatingStr, setTeeRatingStr] = useState("");
+  const [teeSlopeStr, setTeeSlopeStr] = useState("");
+  const [teeParStr, setTeeParStr] = useState("");
   const [showAddTee, setShowAddTee] = useState(false);
   const [newTeeName, setNewTeeName] = useState("");
   const [newTeeColor, setNewTeeColor] = useState<string | null>(null);
@@ -276,6 +285,17 @@ export function CourseManager({
     }
     teeTabInitialized.current = true;
   }, [tees, selectedTeeId]);
+
+  // Open a tee in the editor, seeding the raw numeric drafts from its current
+  // values. Binding the number inputs to these strings (rather than
+  // re-deriving from editingTee every keystroke) lets a field be cleared or
+  // held mid-edit without snapping to a default — see teeRatingStr above.
+  const beginEditTee = useCallback((t: TeeData) => {
+    setEditingTee({ ...t });
+    setTeeRatingStr(t.course_rating?.toString() ?? "");
+    setTeeSlopeStr(t.slope_rating?.toString() ?? "");
+    setTeeParStr(t.par?.toString() ?? "");
+  }, []);
 
   async function switchTee(teeId: string) {
     // Flush pending auto-saves for the outgoing tee + its holes before we
@@ -922,13 +942,13 @@ export function CourseManager({
                   onClick={async (e) => {
                     e.stopPropagation();
                     await flushSave("tee");
-                    setEditingTee({ ...tee });
+                    beginEditTee(tee);
                   }}
                   onKeyDown={async (e) => {
                     if (e.key === "Enter") {
                       e.stopPropagation();
                       await flushSave("tee");
-                      setEditingTee({ ...tee });
+                      beginEditTee(tee);
                     }
                   }}
                   className="ml-1 w-5 h-5 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 cursor-pointer"
@@ -995,9 +1015,11 @@ export function CourseManager({
               />
               <Field
                 label="Par"
-                value={editingTee.par.toString()}
+                value={teeParStr}
                 onChange={(v) => {
-                  setEditingTee({ ...editingTee, par: parseInt(v) || 72 });
+                  setTeeParStr(v);
+                  const n = parseInt(v, 10);
+                  if (!Number.isNaN(n)) setEditingTee((prev) => (prev ? { ...prev, par: n } : prev));
                   scheduleSave("tee");
                 }}
                 type="number"
@@ -1006,24 +1028,22 @@ export function CourseManager({
             <div className="grid grid-cols-2 gap-3">
               <Field
                 label="Rating"
-                value={editingTee.course_rating.toString()}
+                value={teeRatingStr}
                 onChange={(v) => {
-                  setEditingTee({
-                    ...editingTee,
-                    course_rating: parseFloat(v) || 72.0,
-                  });
+                  setTeeRatingStr(v);
+                  const n = parseFloat(v);
+                  if (!Number.isNaN(n)) setEditingTee((prev) => (prev ? { ...prev, course_rating: n } : prev));
                   scheduleSave("tee");
                 }}
                 type="number"
               />
               <Field
                 label="Slope"
-                value={editingTee.slope_rating.toString()}
+                value={teeSlopeStr}
                 onChange={(v) => {
-                  setEditingTee({
-                    ...editingTee,
-                    slope_rating: parseInt(v) || 113,
-                  });
+                  setTeeSlopeStr(v);
+                  const n = parseInt(v, 10);
+                  if (!Number.isNaN(n)) setEditingTee((prev) => (prev ? { ...prev, slope_rating: n } : prev));
                   scheduleSave("tee");
                 }}
                 type="number"

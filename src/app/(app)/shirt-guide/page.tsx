@@ -34,16 +34,17 @@ export default async function ShirtGuidePage() {
         .order("created_at", { ascending: true })
     : { data: [] as Shirt[] };
 
-  // Group consecutive shirts by day, preserving the admin-defined order.
-  const days: { label: string; shirts: Shirt[] }[] = [];
+  // Group shirts by day label — every shirt sharing a day lands under one
+  // heading even when their sort_orders interleave with other days. Days are
+  // ordered by their first-seen shirt (the query is already sorted by
+  // sort_order), and shirts keep that order within each day.
+  const dayMap = new Map<string, Shirt[]>();
   for (const shirt of (shirts as Shirt[]) || []) {
-    const last = days[days.length - 1];
-    if (last && last.label === shirt.day_label) {
-      last.shirts.push(shirt);
-    } else {
-      days.push({ label: shirt.day_label, shirts: [shirt] });
-    }
+    const list = dayMap.get(shirt.day_label);
+    if (list) list.push(shirt);
+    else dayMap.set(shirt.day_label, [shirt]);
   }
+  const days = [...dayMap.entries()].map(([label, shirts]) => ({ label, shirts }));
 
   return (
     <div className="px-4 pt-6 pb-8">

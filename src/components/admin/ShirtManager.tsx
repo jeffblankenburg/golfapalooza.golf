@@ -95,16 +95,22 @@ export function ShirtManager({ tripId }: { tripId: string }) {
     if (!res.ok) await load(); // revert to server truth on failure
   };
 
-  // Swap this shirt with its neighbor in the flat ordered list.
-  const move = async (index: number, dir: -1 | 1) => {
-    const other = index + dir;
-    if (other < 0 || other >= shirts.length) return;
-    const a = shirts[index];
-    const b = shirts[other];
-    const reordered = [...shirts];
-    reordered[index] = b;
-    reordered[other] = a;
-    setShirts(reordered); // optimistic
+  // Reorder within a day by swapping this shirt's sort_order with the
+  // adjacent shirt in the same day group. Day grouping is by label (see
+  // `dayGroups`), so cross-day moves aren't needed — days order by their
+  // first shirt's sort_order.
+  const move = async (dayShirts: Shirt[], indexInDay: number, dir: -1 | 1) => {
+    const other = indexInDay + dir;
+    if (other < 0 || other >= dayShirts.length) return;
+    const a = dayShirts[indexInDay];
+    const b = dayShirts[other];
+    // Optimistically swap their sort_order values; the grouped render sorts
+    // by sort_order so this reflects immediately.
+    setShirts((prev) =>
+      prev.map((s) =>
+        s.id === a.id ? { ...s, sort_order: b.sort_order } : s.id === b.id ? { ...s, sort_order: a.sort_order } : s,
+      ),
+    );
     await Promise.all([
       fetch("/api/admin/shirts", {
         method: "PUT",
@@ -119,6 +125,20 @@ export function ShirtManager({ tripId }: { tripId: string }) {
     ]);
     await load();
   };
+
+  // Group shirts by day label (not by adjacency), so every shirt sharing a
+  // day appears under one heading even if their sort_orders interleave with
+  // other days. Days are ordered by their earliest shirt's sort_order.
+  const dayGroups: [string, Shirt[]][] = (() => {
+    const sorted = [...shirts].sort((a, b) => a.sort_order - b.sort_order);
+    const map = new Map<string, Shirt[]>();
+    for (const s of sorted) {
+      const list = map.get(s.day_label);
+      if (list) list.push(s);
+      else map.set(s.day_label, [s]);
+    }
+    return [...map.entries()];
+  })();
 
   const uploadPhoto = async (file: File) => {
     setUploading(true);
@@ -157,78 +177,77 @@ export function ShirtManager({ tripId }: { tripId: string }) {
           No shirts yet. Add the first one to build this event&rsquo;s guide.
         </p>
       ) : (
-        <div className="space-y-2">
-          {shirts.map((shirt, i) => {
-            const isDayStart = i === 0 || shirts[i - 1].day_label !== shirt.day_label;
-            return (
-              <div key={shirt.id}>
-                {isDayStart && (
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-4 mb-1">
-                    {shirt.day_label}
-                  </p>
-                )}
-                <div className="flex items-center gap-3 p-2 bg-white border border-gray-200 rounded-xl">
-                  <div className="w-14 h-14 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                    {shirt.image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={shirt.image_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z" />
-                      </svg>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">{shirt.name}</p>
-                    {shirt.description && (
-                      <p className="text-xs text-gray-500 truncate">{shirt.description}</p>
-                    )}
-                  </div>
-                  <div className="flex flex-col">
+        <div className="space-y-4">
+          {dayGroups.map(([label, dayShirts]) => (
+            <div key={label}>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                {label}
+              </p>
+              <div className="space-y-2">
+                {dayShirts.map((shirt, idx) => (
+                  <div key={shirt.id} className="flex items-center gap-3 p-2 bg-white border border-gray-200 rounded-xl">
+                    <div className="w-14 h-14 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                      {shirt.image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={shirt.image_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z" />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 truncate">{shirt.name}</p>
+                      {shirt.description && (
+                        <p className="text-xs text-gray-500 truncate">{shirt.description}</p>
+                      )}
+                    </div>
+                    <div className="flex flex-col">
+                      <button
+                        onClick={() => move(dayShirts, idx, -1)}
+                        disabled={idx === 0}
+                        className="p-1 text-gray-400 disabled:opacity-30 active:text-gray-700"
+                        aria-label="Move up"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                      </button>
+                      <button
+                        onClick={() => move(dayShirts, idx, 1)}
+                        disabled={idx === dayShirts.length - 1}
+                        className="p-1 text-gray-400 disabled:opacity-30 active:text-gray-700"
+                        aria-label="Move down"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      </button>
+                    </div>
                     <button
-                      onClick={() => move(i, -1)}
-                      disabled={i === 0}
-                      className="p-1 text-gray-400 disabled:opacity-30 active:text-gray-700"
-                      aria-label="Move up"
+                      onClick={() => {
+                        setError(null);
+                        setEditing({
+                          id: shirt.id,
+                          day_label: shirt.day_label,
+                          name: shirt.name,
+                          description: shirt.description || "",
+                          image_url: shirt.image_url,
+                        });
+                      }}
+                      className="p-2 text-gray-400 active:text-green-600"
+                      aria-label="Edit"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                     </button>
                     <button
-                      onClick={() => move(i, 1)}
-                      disabled={i === shirts.length - 1}
-                      className="p-1 text-gray-400 disabled:opacity-30 active:text-gray-700"
-                      aria-label="Move down"
+                      onClick={() => setConfirmDelete(shirt)}
+                      className="p-2 text-gray-400 active:text-red-600"
+                      aria-label="Delete"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                     </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      setError(null);
-                      setEditing({
-                        id: shirt.id,
-                        day_label: shirt.day_label,
-                        name: shirt.name,
-                        description: shirt.description || "",
-                        image_url: shirt.image_url,
-                      });
-                    }}
-                    className="p-2 text-gray-400 active:text-green-600"
-                    aria-label="Edit"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                  </button>
-                  <button
-                    onClick={() => setConfirmDelete(shirt)}
-                    className="p-2 text-gray-400 active:text-red-600"
-                    aria-label="Delete"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                  </button>
-                </div>
+                ))}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
 

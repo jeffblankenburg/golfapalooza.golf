@@ -25,13 +25,14 @@ export async function GET() {
 
   const admin = createAdminClient();
 
-  // Scramble rounds keep their own home-page treatment; only individual live
-  // rounds are watchable here.
+  // Both individual and personal scramble rounds are watchable here. (Event
+  // scramble CONTESTS live in scramble_teams, not `rounds`, and keep their own
+  // "Score Day X" home-page card — they never appear in this feed.)
   const { data: rounds, error } = await admin
     .from("rounds")
     .select(
       `
-      id, round_type, created_at, created_by,
+      id, round_type, format, created_at, created_by,
       course:courses(id, name),
       round_players(
         id, user_id, guest_name, player_position,
@@ -40,7 +41,7 @@ export async function GET() {
     `
     )
     .eq("status", "in_progress")
-    .eq("format", "individual")
+    .in("format", ["individual", "scramble"])
     .order("created_at", { ascending: false })
     .order("player_position", { referencedTable: "round_players", ascending: true });
 
@@ -64,6 +65,7 @@ export async function GET() {
   type R = {
     id: string;
     round_type: string;
+    format: string;
     created_at: string;
     created_by: string | null;
     course: { id: string; name: string } | { id: string; name: string }[] | null;
@@ -131,9 +133,11 @@ export async function GET() {
     return {
       round_id: r.id,
       round_type: r.round_type,
+      format: r.format,
       created_at: r.created_at,
       created_by: r.created_by,
       creator_name: r.created_by ? creatorById.get(r.created_by) || null : null,
+      course_id: course?.id || null,
       course_name: course?.name || "Unknown",
       thru: thruByRound.get(r.id) || 0,
       players,

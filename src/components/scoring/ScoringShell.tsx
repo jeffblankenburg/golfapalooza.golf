@@ -110,6 +110,23 @@ export default function ScoringShell({
   const [currentHoleIndex, setCurrentHoleIndex] = useState(initialIndex);
   const [mapOpen, setMapOpen] = useState(false);
 
+  // The shell and the map drawer are fixed overlays that must sit *below* the
+  // top nav (HeaderBar, z-60). A hardcoded `top-14` breaks whenever the real
+  // top chrome is taller than 56px — e.g. the admin SimulatorBanner pushes the
+  // header down, or a device safe-area does — leaving the drawer's close
+  // controls tucked under the nav. Measure the actual header bottom instead.
+  const [topOffset, setTopOffset] = useState<number | null>(null);
+  useEffect(() => {
+    const measure = () => {
+      const header = document.querySelector("header");
+      const bottom = header?.getBoundingClientRect().bottom;
+      setTopOffset(bottom && bottom > 0 ? Math.round(bottom) : null);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [mapOpen]);
+
   // Music drawer reserves a strip just above the BottomNav while playing.
   // Shrink the shell so the strip stays visible. `useMusicPlayerOptional`
   // returns null outside the provider so this works in any embedding.
@@ -134,8 +151,8 @@ export default function ScoringShell({
 
   return (
     <div
-      className="fixed top-14 left-0 right-0 z-50 bg-white flex flex-col"
-      style={{ bottom: bottomReserved }}
+      className="fixed left-0 right-0 z-50 bg-white flex flex-col"
+      style={{ top: topOffset ?? "3.5rem", bottom: bottomReserved }}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-white shrink-0">
@@ -350,6 +367,7 @@ export default function ScoringShell({
         onClose={() => setMapOpen(false)}
         isCompositionTee={isCompositionTee}
         roundTeeColor={roundTeeColor}
+        topOffset={topOffset}
         bottomReserved={musicVisible ? MUSIC_MINI_HEIGHT : "0px"}
       />
     </div>

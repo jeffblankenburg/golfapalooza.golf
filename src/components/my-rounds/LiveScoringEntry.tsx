@@ -9,6 +9,7 @@ import { subscribeToRound } from "@/lib/realtime/round-channel";
 import { TEE_HEX_COLORS } from "@/lib/utils/tee-colors";
 import { RoundComments } from "@/components/rounds/RoundComments";
 import { ScoreMark } from "@/components/scoring/ScoreMark";
+import { OtherGroupsOverlay } from "@/components/my-rounds/OtherGroupsOverlay";
 
 interface Player {
   // Stable per-player key for local state. For Loozers this is their user_id;
@@ -268,7 +269,9 @@ export default function LiveScoringEntry({
 
   const scheduleSave = useCallback(() => {
     if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
-    flushTimerRef.current = setTimeout(flushSaves, 600);
+    // 900ms so rapid +/- taps (e.g. tapping up to a triple bogey) coalesce
+    // into a single save instead of firing — and racing — on every tap.
+    flushTimerRef.current = setTimeout(flushSaves, 900);
   }, [flushSaves]);
 
   // Flush on unmount
@@ -652,6 +655,7 @@ export default function LiveScoringEntry({
       }}
       headerRight={
         <div className="flex items-center gap-2 text-xs">
+          {roundId && <OtherGroupsOverlay currentRoundId={roundId} courseId={courseId ?? null} />}
           <span
             className={
               liveStatus === "live"

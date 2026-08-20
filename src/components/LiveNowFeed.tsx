@@ -13,9 +13,11 @@ interface LivePlayer {
 interface LiveRound {
   round_id: string;
   round_type: string;
+  format: string;
   created_at: string;
   created_by: string | null;
   creator_name: string | null;
+  course_id: string | null;
   course_name: string;
   thru: number;
   players: LivePlayer[];
@@ -102,8 +104,15 @@ export function LiveNowFeed() {
             </div>
 
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold text-gray-900 truncate">
-                {r.players.map((p) => p.display_name).join(", ") || "Round"}
+              <div className="text-sm font-semibold text-gray-900 truncate flex items-center gap-1.5">
+                <span className="truncate">
+                  {r.players.map((p) => p.display_name).join(", ") || "Round"}
+                </span>
+                {r.format === "scramble" && (
+                  <span className="flex-shrink-0 text-[0.5625rem] font-bold uppercase tracking-wide bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">
+                    Scramble
+                  </span>
+                )}
               </div>
               <div className="text-xs text-gray-500 truncate">{r.course_name}</div>
               <div className="text-[0.6875rem] text-gray-400 truncate">

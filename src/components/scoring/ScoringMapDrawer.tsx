@@ -24,6 +24,10 @@ interface ScoringMapDrawerProps {
   onClose: () => void;
   isCompositionTee: boolean;
   roundTeeColor?: string | null;
+  // Measured bottom edge (px) of the top nav chrome — the drawer starts here so
+  // its close controls never tuck under the header (which may be taller than
+  // 56px with the SimulatorBanner or a device safe-area). Falls back to 3.5rem.
+  topOffset?: number | null;
   // Extra reserved space above the BottomNav (e.g., when the music mini-player
   // is showing). The drawer ends just above this strip so the strip stays
   // visible behind it.
@@ -43,6 +47,7 @@ export function ScoringMapDrawer({
   onClose,
   isCompositionTee,
   roundTeeColor,
+  topOffset = null,
   bottomReserved = "0px",
 }: ScoringMapDrawerProps) {
   const [override, setOverride] = useState<number | null>(null);
@@ -130,19 +135,23 @@ export function ScoringMapDrawer({
 
   return (
     <div
-      className={`fixed top-14 inset-x-0 z-[55] bg-white flex flex-col transition-transform duration-300 ease-out ${
+      className={`fixed inset-x-0 z-[55] bg-white flex flex-col transition-transform duration-300 ease-out ${
         isOpen ? "translate-y-0" : "translate-y-full pointer-events-none"
       }`}
       style={{
+        top: topOffset ?? "3.5rem",
         bottom: bottomReserved,
         transform: isOpen ? `translateY(${dragOffset}px)` : undefined,
         transition: dragOffset > 0 ? "none" : undefined,
       }}
       aria-hidden={!isOpen}
     >
-      {/* Drag handle + close */}
+      {/* Drag handle + explicit close button. The handle alone wasn't a
+          discoverable way out (looked like decoration), so a labeled ✕ button
+          sits at the top-right of this bar and is always tappable. The bar has
+          its own height so the button never overlaps the hole-nav row below. */}
       <div
-        className="shrink-0 pt-2 pb-1 flex justify-center bg-white"
+        className="shrink-0 relative flex items-center justify-center bg-white min-h-[2.75rem]"
         onTouchStart={onHandleTouchStart}
         onTouchMove={onHandleTouchMove}
         onTouchEnd={onHandleTouchEnd}
@@ -153,6 +162,17 @@ export function ScoringMapDrawer({
           aria-label="Close map"
           className="w-12 h-1.5 rounded-full bg-gray-300 active:bg-gray-400"
         />
+        <button
+          type="button"
+          onClick={closeDrawer}
+          aria-label="Close map"
+          className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 rounded-full bg-gray-900/85 text-white text-xs font-semibold pl-2 pr-2.5 py-1 shadow-lg active:bg-gray-900"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+          Close
+        </button>
       </div>
 
       {/* Hole nav header */}

@@ -820,7 +820,9 @@ export function LiveScorer({
 
   const scheduleSave = useCallback(() => {
     if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
-    flushTimerRef.current = setTimeout(flushSaves, 600);
+    // 900ms so rapid +/- taps (e.g. tapping up to a triple bogey) coalesce
+    // into a single save instead of firing — and racing — on every tap.
+    flushTimerRef.current = setTimeout(flushSaves, 900);
   }, [flushSaves]);
 
   // Flush on unmount

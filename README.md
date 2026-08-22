@@ -336,6 +336,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Charge and payment recording per user
 - Transaction ledger with trip and lifetime views
 - Balance summary across all participants
+- **Payout Denominations** (`/admin/financials/denominations`) — cash-planning sheet for the trip's payouts. Each prize row shows its exact pot total and a bill breakdown; bills always sum to the pot (no round-up). Set a **payee count** per prize to seed a payee-aware suggestion, then **tap any row's bills to hand-pick denominations** in an editor that only saves when the selected bills match the pot. Payee counts and manual breakdowns persist per event; a cash-inventory table tallies total bills needed vs. in hand, with a Print view.
 
 ### Course Management
 - Course search and creation

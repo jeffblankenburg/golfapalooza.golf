@@ -170,6 +170,124 @@ function splitPerDay(
   return multiply(splitGreedy(perDay, allowed), dayCount);
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Manual-control model (exact-sum). The row's pot is authoritative; the bill
+// breakdown must sum to it. `suggestExactDenoms` seeds a mix that sums to the
+// (whole-dollar) pot exactly — payee-aware so shares stay splittable — and the
+// admin can override it entirely via the editor. No round-up inflation.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Whole-dollar target for bill math (payouts are paid in whole bills). */
+export function denomTarget(total: number): number {
+  return Math.max(0, Math.round(total));
+}
+
+/** Greedy fill of `target` dollars from `denoms`; returns the map + any part
+ *  that couldn't be represented (e.g. $1–$4 left when $1 is disabled). */
+function greedyExact(
+  target: number,
+  denoms: readonly number[],
+): { map: Map<number, number>; remaining: number } {
+  const map = new Map<number, number>();
+  let remaining = target;
+  for (const d of [...denoms].sort((a, b) => b - a)) {
+    if (d <= 0) continue;
+    const count = Math.floor(remaining / d);
+    if (count > 0) {
+      map.set(d, count);
+      remaining -= count * d;
+    }
+  }
+  return { map, remaining };
+}
+
+/** Suggest a bill mix that sums to the pot exactly (whole dollars). When a
+ *  payee count is known, prefer bills no larger than one payee's share so the
+ *  cash divides cleanly; fall back to the full set to finish the total. */
+export function suggestExactDenoms(
+  total: number,
+  allowed: readonly number[] = ALL_DENOMS,
+  payeeCount?: number | null,
+): Map<number, number> {
+  const target = denomTarget(total);
+  if (target <= 0 || allowed.length === 0) return new Map();
+
+  let denoms = allowed;
+  if (payeeCount && payeeCount > 0) {
+    const perPayee = Math.floor(target / payeeCount);
+    const capped = allowed.filter((d) => d <= perPayee);
+    if (capped.length > 0) denoms = capped;
+  }
+
+  const first = greedyExact(target, denoms);
+  if (first.remaining === 0) return first.map;
+
+  // Couldn't finish with the (capped) set — cover the rest with the full set.
+  const rest = greedyExact(first.remaining, allowed);
+  for (const [d, c] of rest.map) first.map.set(d, (first.map.get(d) || 0) + c);
+  return first.map;
+}
+
+/** Parse a stored { "20": 3 } override into a numeric denom→count Map. */
+export function overrideToMap(
+  override: Record<string, number> | null | undefined,
+): Map<number, number> {
+  const map = new Map<number, number>();
+  if (!override) return map;
+  for (const [k, v] of Object.entries(override)) {
+    const d = Number(k);
+    const c = Number(v);
+    if (Number.isFinite(d) && d > 0 && Number.isFinite(c) && c > 0) map.set(d, Math.round(c));
+  }
+  return map;
+}
+
+/** Serialize a denom→count Map back to the stored { "20": 3 } shape. */
+export function mapToOverride(map: Map<number, number>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [d, c] of map) if (c > 0) out[String(d)] = c;
+  return out;
+}
+
+export interface EffectiveSplit {
+  /** The bills to bring for this row. */
+  map: Map<number, number>;
+  /** Sum of the bills. */
+  billedTotal: number;
+  /** Whole-dollar target the bills should equal. */
+  target: number;
+  /** true when the admin hand-picked this breakdown. */
+  isOverride: boolean;
+  /** target − billedTotal. >0 means the bills fall short of the pot. */
+  shortfall: number;
+}
+
+/**
+ * The effective bill breakdown for a row: the admin's override when present,
+ * otherwise a suggestion that sums to the pot exactly. Always reports the
+ * whole-dollar target and any shortfall so the UI can flag mismatches.
+ */
+export function effectiveSplitForRow(
+  row: {
+    total: number;
+    payee_count?: number | null;
+    denomination_override?: Record<string, number> | null;
+  },
+  allowedDenoms: readonly number[] = ALL_DENOMS,
+): EffectiveSplit {
+  const target = denomTarget(row.total);
+  const override = overrideToMap(row.denomination_override);
+  const map = override.size > 0 ? override : suggestExactDenoms(row.total, allowedDenoms, row.payee_count);
+  const billedTotal = totalFromDenom(map);
+  return {
+    map,
+    billedTotal,
+    target,
+    isOverride: override.size > 0,
+    shortfall: target - billedTotal,
+  };
+}
+
 export function splitForRow(
   row: {
     label: string;

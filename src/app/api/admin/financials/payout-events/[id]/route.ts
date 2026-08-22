@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkPermissionAccess } from "@/lib/permissions-server";
 import { loadPayoutSheet } from "@/lib/payout-events/compute";
+import { denomTarget, overrideToMap, totalFromDenom } from "@/lib/payout-events/denominations";
 
 /**
  * @swagger
@@ -37,13 +38,15 @@ export async function PUT(
     "is_payout",
     "contest_id",
     "notes",
+    "payee_count",
+    "denomination_override",
   ] as const;
 
   const adminClient = createAdminClient();
 
   const { data: existing, error: fetchErr } = await adminClient
     .from("payout_sheet_events")
-    .select("id, contest_id")
+    .select("id, contest_id, trip_id")
     .eq("id", id)
     .single();
   if (fetchErr || !existing) {
@@ -51,6 +54,25 @@ export async function PUT(
   }
   const targetContestId =
     "contest_id" in body && body.contest_id !== undefined ? body.contest_id : existing.contest_id;
+
+  // A hand-picked denomination override must sum to the row's exact pot
+  // (whole dollars). Reject mismatches so a bad payload can never persist a
+  // breakdown that under/over-pays — the UI already blocks this, this is the
+  // server-side backstop. `null` (clear override) skips the check.
+  if ("denomination_override" in body && body.denomination_override != null) {
+    const sheet = await loadPayoutSheet(adminClient, existing.trip_id);
+    const current = sheet.find((r) => r.id === id);
+    if (current) {
+      const target = denomTarget(current.total);
+      const billed = totalFromDenom(overrideToMap(body.denomination_override));
+      if (billed !== target) {
+        return NextResponse.json(
+          { error: `Denominations total $${billed} but the pot is $${target}. They must match.` },
+          { status: 400 },
+        );
+      }
+    }
+  }
 
   const rowUpdates: Record<string, unknown> = {};
   for (const key of ROW_FIELDS) {

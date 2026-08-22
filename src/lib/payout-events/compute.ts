@@ -40,6 +40,17 @@ export interface PayoutSheetEvent {
   is_payout: boolean;
   notes: string | null;
   /**
+   * How many payouts this prize makes (admin-set). Seeds the suggested bill
+   * mix on the Payout Denominations page. null = unset.
+   */
+  payee_count: number | null;
+  /**
+   * Admin hand-picked bill breakdown as { denom: count }. null = use the
+   * auto suggestion. When set it's the source of truth and the UI/validation
+   * enforces that it sums to the row's pot total.
+   */
+  denomination_override: Record<string, number> | null;
+  /**
    * Per-place split for the contest's pot. Sourced from the linked
    * contest (issue #124 Phase F dropped the row-level column).
    * null for non-payout rows (Lodge) or unconfigured contests.
@@ -266,6 +277,9 @@ function projectRow(raw: RawJoinedRow): PayoutSheetEvent {
     day_count: raw.day_count,
     is_payout: raw.is_payout,
     notes: raw.notes,
+    payee_count: raw.payee_count ?? null,
+    denomination_override:
+      (raw.denomination_override as Record<string, number> | null) ?? null,
     payout_splits,
     cost_item_id: contest?.buy_in_cost_item_id ?? null,
     contest_id: raw.contest_id,
@@ -280,7 +294,7 @@ export async function loadPayoutSheet(
   const { data: events, error } = await client
     .from("payout_sheet_events")
     .select(
-      "id, trip_id, label, sort_order, participant_source, source_ref, source_filter, amount_per_participant, day_count, is_payout, notes, contest_id, contest:contests(id, name, contest_type, day_number, parent_contest_id, buy_in_cost_item_id, payout_splits, declared_no_winner, contest_winners(user_id), buy_in_cost_item:cost_items!contests_buy_in_cost_item_id_fkey(cost))",
+      "id, trip_id, label, sort_order, participant_source, source_ref, source_filter, amount_per_participant, day_count, is_payout, notes, payee_count, denomination_override, contest_id, contest:contests(id, name, contest_type, day_number, parent_contest_id, buy_in_cost_item_id, payout_splits, declared_no_winner, contest_winners(user_id), buy_in_cost_item:cost_items!contests_buy_in_cost_item_id_fkey(cost))",
     )
     .eq("trip_id", tripId)
     .order("sort_order");

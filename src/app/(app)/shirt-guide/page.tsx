@@ -2,6 +2,7 @@ import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSimulating, getEffectiveTripId } from "@/lib/simulator";
 import { AdminLink } from "@/components/AdminLink";
+import { ShirtCard } from "@/components/shirt-guide/ShirtCard";
 
 interface Shirt {
   id: string;
@@ -67,32 +68,12 @@ export default async function ShirtGuidePage() {
               </h2>
               <div className="space-y-3">
                 {day.shirts.map((shirt) => (
-                  <div
+                  <ShirtCard
                     key={shirt.id}
-                    className="flex gap-4 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
-                  >
-                    <div className="w-24 h-24 flex-shrink-0 bg-gray-100 flex items-center justify-center">
-                      {shirt.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={shirt.image_url}
-                          alt={shirt.name}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <svg className="w-9 h-9 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z" />
-                        </svg>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0 py-3 pr-3 self-center">
-                      <p className="font-semibold text-gray-900">{shirt.name}</p>
-                      {shirt.description && (
-                        <p className="text-sm text-gray-500 mt-0.5">{shirt.description}</p>
-                      )}
-                    </div>
-                  </div>
+                    name={shirt.name}
+                    description={shirt.description}
+                    imageUrl={shirt.image_url}
+                  />
                 ))}
               </div>
             </div>

@@ -104,10 +104,16 @@ export function PayoutDenominationsTab() {
     }
   }, [fetchRows]);
 
+  // Only actual payouts belong on the cash sheet. Pass-through rows
+  // (is_payout=false — money collected to cover an event, e.g. Lodge / KGB
+  // entry) aren't paid out to a winner, so they're excluded here (they stay
+  // on the payout-events editor).
+  const payoutRows = useMemo(() => rows.filter((r) => r.is_payout), [rows]);
+
   const perRowSplit = useMemo(
     () =>
-      rows.map((r) => ({ row: r, eff: effectiveSplitForRow(r, allowedDenoms) })),
-    [rows, allowedDenoms],
+      payoutRows.map((r) => ({ row: r, eff: effectiveSplitForRow(r, allowedDenoms) })),
+    [payoutRows, allowedDenoms],
   );
 
   const totalNeededByDenom = useMemo(
@@ -119,8 +125,8 @@ export function PayoutDenominationsTab() {
   // billed sum — those match now except when a row can't be represented in the
   // enabled bills (shortfall), which we flag per-row.
   const grandTotal = useMemo(
-    () => rows.reduce((s, r) => s + r.total, 0),
-    [rows],
+    () => payoutRows.reduce((s, r) => s + r.total, 0),
+    [payoutRows],
   );
 
   function toggleExcluded(d: number) {
@@ -146,7 +152,7 @@ export function PayoutDenominationsTab() {
     );
   }
 
-  if (rows.length === 0) {
+  if (payoutRows.length === 0) {
     return (
       <div className="px-4 py-12 text-center text-sm text-gray-500">
         No payout events configured.{" "}
@@ -225,11 +231,6 @@ export function PayoutDenominationsTab() {
                       ? ` · ${fmt(denomTarget(row.total) / row.payee_count)}/payee`
                       : ""}
                   </div>
-                  {!row.is_payout && (
-                    <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[0.625rem] uppercase tracking-wide">
-                      pass-through
-                    </span>
-                  )}
                 </td>
 
                 {/* Payee count — editable */}

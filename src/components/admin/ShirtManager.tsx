@@ -23,6 +23,20 @@ type Draft = {
 
 const EMPTY_DRAFT: Draft = { id: null, day_label: "", name: "", description: "", image_url: null };
 
+// Group shirts by day label (not by adjacency), so every shirt sharing a day
+// falls under one heading even if sort_orders interleave. Days are ordered by
+// their earliest shirt's sort_order (first appearance in sort order).
+function groupByDay(shirts: Shirt[]): [string, Shirt[]][] {
+  const sorted = [...shirts].sort((a, b) => a.sort_order - b.sort_order);
+  const map = new Map<string, Shirt[]>();
+  for (const s of sorted) {
+    const list = map.get(s.day_label);
+    if (list) list.push(s);
+    else map.set(s.day_label, [s]);
+  }
+  return [...map.entries()];
+}
+
 export function ShirtManager({ tripId }: { tripId: string }) {
   const [shirts, setShirts] = useState<Shirt[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,19 +140,32 @@ export function ShirtManager({ tripId }: { tripId: string }) {
     await load();
   };
 
-  // Group shirts by day label (not by adjacency), so every shirt sharing a
-  // day appears under one heading even if their sort_orders interleave with
-  // other days. Days are ordered by their earliest shirt's sort_order.
-  const dayGroups: [string, Shirt[]][] = (() => {
-    const sorted = [...shirts].sort((a, b) => a.sort_order - b.sort_order);
-    const map = new Map<string, Shirt[]>();
-    for (const s of sorted) {
-      const list = map.get(s.day_label);
-      if (list) list.push(s);
-      else map.set(s.day_label, [s]);
-    }
-    return [...map.entries()];
-  })();
+  // Reorder an entire day (category) above/below its neighbour. Days order by
+  // their earliest shirt's sort_order, so we swap the two day blocks and
+  // renumber every shirt sequentially, preserving within-day order.
+  const moveDay = async (dayIndex: number, dir: -1 | 1) => {
+    const groups = groupByDay(shirts);
+    const other = dayIndex + dir;
+    if (other < 0 || other >= groups.length) return;
+    const reordered = [...groups];
+    [reordered[dayIndex], reordered[other]] = [reordered[other], reordered[dayIndex]];
+    const prevOrder = new Map(shirts.map((s) => [s.id, s.sort_order]));
+    const renumbered = reordered.flatMap(([, s]) => s).map((s, i) => ({ ...s, sort_order: i }));
+    setShirts(renumbered); // optimistic — render re-sorts by sort_order
+    const changed = renumbered.filter((s) => prevOrder.get(s.id) !== s.sort_order);
+    await Promise.all(
+      changed.map((s) =>
+        fetch("/api/admin/shirts", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: s.id, sort_order: s.sort_order }),
+        }),
+      ),
+    );
+    await load();
+  };
+
+  const dayGroups = groupByDay(shirts);
 
   const uploadPhoto = async (file: File) => {
     setUploading(true);
@@ -178,11 +205,31 @@ export function ShirtManager({ tripId }: { tripId: string }) {
         </p>
       ) : (
         <div className="space-y-4">
-          {dayGroups.map(([label, dayShirts]) => (
+          {dayGroups.map(([label, dayShirts], dayIndex) => (
             <div key={label}>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                {label}
-              </p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  {label}
+                </p>
+                <div className="flex items-center">
+                  <button
+                    onClick={() => moveDay(dayIndex, -1)}
+                    disabled={dayIndex === 0}
+                    className="p-1 text-gray-400 disabled:opacity-30 active:text-gray-700"
+                    aria-label={`Move ${label} up`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                  </button>
+                  <button
+                    onClick={() => moveDay(dayIndex, 1)}
+                    disabled={dayIndex === dayGroups.length - 1}
+                    className="p-1 text-gray-400 disabled:opacity-30 active:text-gray-700"
+                    aria-label={`Move ${label} down`}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+                </div>
+              </div>
               <div className="space-y-2">
                 {dayShirts.map((shirt, idx) => (
                   <div key={shirt.id} className="flex items-center gap-3 p-2 bg-white border border-gray-200 rounded-xl">

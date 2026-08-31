@@ -69,7 +69,7 @@ export async function loadLoozerProfile(
     { data: bioData },
     { data: song },
     { data: teamMemberships },
-    { count: eventsAttendedCount },
+    { data: attendedRows },
     { data: activeTrip },
   ] = await Promise.all([
     queryClient
@@ -125,13 +125,16 @@ export async function loadLoozerProfile(
       .not("round_players.final_gross_score", "is", null)
       .order("round_date", { ascending: false })
       .limit(10),
-    // Single source: every trip the user is rostered for. Historical
-    // workbook rows were unified into event_participants by migration 00133.
+    // Every trip year the user is rostered for. Historical workbook rows
+    // were unified into event_participants by migration 00133. Counts
+    // DISTINCT trip YEARS (a year may carry >1 trip, e.g. 2026's live event
+    // + '🧪 Test Event' sandbox); 'test'/'draft' sandboxes are excluded.
     adminClient
       .from("event_participants")
-      .select("trip_id", { count: "exact", head: true })
+      .select("trip_settings!inner(trip_year, status)")
       .eq("user_id", userId)
-      .eq("on_roster", true),
+      .eq("on_roster", true)
+      .in("trip_settings.status", ["active", "archived"]),
     // Active trip — needed for the during-event room number badge below.
     // Routed through getEffectiveTripId so admin sim mode sees the test event.
     (async () => {
@@ -146,6 +149,15 @@ export async function loadLoozerProfile(
   ]);
 
   if (profileError || !profile) return null;
+
+  // Distinct trip years the user attended (a year may carry >1 trip; the
+  // '🧪 Test Event' sandbox is already filtered out by the query above).
+  const eventsAttendedYears = new Set<number>();
+  for (const r of attendedRows || []) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const trip: any = Array.isArray(r.trip_settings) ? r.trip_settings[0] : r.trip_settings;
+    if (trip?.trip_year != null) eventsAttendedYears.add(trip.trip_year);
+  }
 
   const sponsorId = (profile as { sponsor_id: string | null }).sponsor_id;
   let sponsor: { id: string; display_name: string; avatar_url: string | null } | null = null;
@@ -295,7 +307,7 @@ export async function loadLoozerProfile(
     scorecards,
     isFounder: profileOut.is_founder === true,
     sponsor,
-    eventsAttended: eventsAttendedCount ?? 0,
+    eventsAttended: eventsAttendedYears.size,
     currentRoomNumber,
   };
 }

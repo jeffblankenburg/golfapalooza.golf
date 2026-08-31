@@ -49,12 +49,17 @@ export async function loadLoozerList(
             .eq("trip_id", activeTrip.id)
             .eq("on_roster", true)
         : Promise.resolve({ data: [] as { user_id: string }[] }),
-      // Lifetime roster signal across every trip — single source for the
-      // events_attended count (modern + historical now both live here).
+      // Lifetime roster signal — single source for the events_attended
+      // count (modern + historical both live here). Counts DISTINCT trip
+      // YEARS, not raw rows: a year can carry >1 trip (e.g. 2026 has both
+      // the live event and the '🧪 Test Event' sandbox), and that must
+      // still be a single attended year. Only 'active'/'archived' trips
+      // count — 'test'/'draft' sandboxes are excluded outright.
       adminClient
         .from("event_participants")
-        .select("user_id, trip_id")
-        .eq("on_roster", true),
+        .select("user_id, trip_settings!inner(trip_year, status)")
+        .eq("on_roster", true)
+        .in("trip_settings.status", ["active", "archived"]),
     ]);
 
   const bioUserIds = new Set(
@@ -63,8 +68,18 @@ export async function loadLoozerList(
       .map((b) => b.user_id),
   );
   const attendingUserIds = new Set((roster || []).map((r) => r.user_id));
+  // Count distinct (user, trip_year) pairs so a year with multiple trips
+  // still counts once. The embedded trip_settings is a to-one relation.
   const attendanceCounts = new Map<string, number>();
+  const seenUserYear = new Set<string>();
   for (const r of rosterAll || []) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const trip: any = Array.isArray(r.trip_settings) ? r.trip_settings[0] : r.trip_settings;
+    const year = trip?.trip_year;
+    if (year == null) continue;
+    const key = `${r.user_id}:${year}`;
+    if (seenUserYear.has(key)) continue;
+    seenUserYear.add(key);
     attendanceCounts.set(r.user_id, (attendanceCounts.get(r.user_id) || 0) + 1);
   }
 

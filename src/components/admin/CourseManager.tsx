@@ -1396,6 +1396,7 @@ function HoleRow({
                 tabIndex={holeIndex + 1}
                 value={hole.par}
                 onChange={(e) => onUpdate("par", e.target.value)}
+                onFocus={(e) => e.target.select()}
                 className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center"
               />
             </div>
@@ -1406,6 +1407,7 @@ function HoleRow({
                 tabIndex={totalHoles + holeIndex + 1}
                 value={hole.handicap_index}
                 onChange={(e) => onUpdate("handicap_index", e.target.value)}
+                onFocus={(e) => e.target.select()}
                 className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center"
               />
             </div>
@@ -1416,6 +1418,7 @@ function HoleRow({
                 tabIndex={totalHoles * 2 + holeIndex + 1}
                 value={hole.yards}
                 onChange={(e) => onUpdate("yards", e.target.value)}
+                onFocus={(e) => e.target.select()}
                 className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-center"
               />
             </div>

@@ -183,6 +183,7 @@ export default function HoleEditor({ courseId, teeId, holes, onSaved }: HoleEdit
                         const v = parseInt(e.target.value);
                         if (!isNaN(v)) updateHole(idx, "par", v);
                       }}
+                      onFocus={(e) => e.target.select()}
                       tabIndex={tabIdx(idx, 0)}
                       className="w-full text-center bg-white border border-gray-200 rounded px-1 py-1.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
@@ -198,6 +199,7 @@ export default function HoleEditor({ courseId, teeId, holes, onSaved }: HoleEdit
                         const v = parseInt(e.target.value);
                         if (!isNaN(v)) updateHole(idx, "handicap_index", v);
                       }}
+                      onFocus={(e) => e.target.select()}
                       tabIndex={tabIdx(idx, 1)}
                       className={`w-full text-center bg-white border rounded px-1 py-1.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent ${
                         hdcpDuplicate ? "border-red-400 bg-red-50" : "border-gray-200"
@@ -210,6 +212,7 @@ export default function HoleEditor({ courseId, teeId, holes, onSaved }: HoleEdit
                       inputMode="numeric"
                       value={hole.yards ?? ""}
                       onChange={(e) => updateHole(idx, "yards", e.target.value ? parseInt(e.target.value) : null)}
+                      onFocus={(e) => e.target.select()}
                       tabIndex={tabIdx(idx, 2)}
                       className="w-full text-center bg-white border border-gray-200 rounded px-1 py-1.5 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       placeholder="—"

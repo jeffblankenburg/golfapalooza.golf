@@ -44,7 +44,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Guest players — add someone who isn't in the app by typing their name (at round creation or mid-round via "Add player"). Their strokes and putts are tracked and their scorecard is saved like any other player. Guests are unattached to any account, have no handicap, and never appear in handicap calculations or on anyone's profile.
 - Course search with tee selection per player
 - 18-hole, Front 9, and Back 9 round types
-- **Scramble format** — at round creation, choose "Own ball" (everyone plays their own ball) or "Scramble" (the whole group plays one team ball). Scramble rounds use a dedicated live scorer with a single team score per hole (no per-player entry, no putts), stay in sync across devices like any round, and are **excluded from every player's handicap** and from the personal avg/best stats and the global Recent Rounds feed. While in progress they DO appear in the home-page **Live Now** feed (badged "Scramble," watchable by anyone) — only the completed-rounds/stats surfaces exclude them. They appear in each player's round history badged "Scramble," and the round detail page collapses to a single Team card.
+- **Scramble format** — at round creation, choose "Own ball" (everyone plays their own ball) or "Scramble" (the whole group plays one team ball). Scramble rounds use a dedicated live scorer with a single team score per hole (no per-player entry, no putts), stay in sync across devices like any round, and are **excluded from every player's handicap** and from the personal avg/best stats. They DO appear in the global Recent Rounds feed, collapsed to a single card per round (badged "Scramble," team members listed) rather than one identical card per member. While in progress they also appear in the home-page **Live Now** feed (badged "Scramble," watchable by anyone). The live scorer also shows the **Other groups overlay** ("Groups N" button) when another group is out on the same course at the same time. Only handicap and personal avg/best stats exclude scrambles. They appear in each player's round history badged "Scramble," and the round detail page collapses to a single Team card.
 - Full scorecard view with 9-hole and 18-hole totals
 - Putt tracking per hole with totals on round detail
 - Co-equal round ownership — every player in a round can edit scores, complete the round, add/remove other players, and delete the round (with confirmation). The original "creator" is shown as the attribution but no longer gates any action.
@@ -175,6 +175,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Admin publishes articles with markdown content
 - Featured images from the gallery
 - Draft, scheduled, and published states
+- **Publish notification** — a "Notify all Loozers when this publishes" checkbox (default on) sends one push to every active Loozer the first time the article goes live, whether published immediately or at its scheduled time (via the `articles-publish` cron). Fires exactly once per article; editing an already-published article never re-notifies. Deep-links to the article from both the push and the in-app notification drawer.
 - Article readership tracking (who read what, when)
 - View counts displayed in admin
 - Latest article card on home page with hero image

@@ -24,6 +24,7 @@ interface RecentRound {
   is_incomplete: boolean;
   holes_played: number;
   expected_holes: number;
+  is_scramble?: boolean;
 }
 
 // Relative label for when a round was *played* — always keyed off round_date
@@ -114,8 +115,13 @@ export function RecentRoundsFeed() {
 
                   {/* Loozer + course/tee */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">
-                      {r.player.display_name}
+                    <p className="text-sm font-semibold text-gray-900 truncate flex items-center gap-1.5">
+                      <span className="truncate">{r.player.display_name}</span>
+                      {r.is_scramble && (
+                        <span className="flex-shrink-0 text-[0.5625rem] font-bold uppercase tracking-wide text-green-700 bg-green-100 rounded px-1 py-px">
+                          Scramble
+                        </span>
+                      )}
                     </p>
                     <p className="text-[0.6875rem] text-gray-500 truncate flex items-center gap-1">
                       <span

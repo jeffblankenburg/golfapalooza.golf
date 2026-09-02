@@ -11,6 +11,7 @@ interface Article {
   title: string;
   content: string;
   publish_at: string | null;
+  notify_on_publish?: boolean;
   created_at: string;
   updated_at: string;
   featured_image_url: string | null;
@@ -49,6 +50,7 @@ export function ArticleManager({ tripId, currentUserId }: { tripId: string; curr
   const [authorId, setAuthorId] = useState<string>(currentUserId);
   const [featuredImage, setFeaturedImage] = useState<ArticleImageValue | null>(null);
   const [publishAt, setPublishAt] = useState<string>("");
+  const [notifyOnPublish, setNotifyOnPublish] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; title: string } | null>(null);
   const [page, setPage] = useState(0);
@@ -83,6 +85,7 @@ export function ArticleManager({ tripId, currentUserId }: { tripId: string; curr
     setAuthorId(currentUserId);
     setFeaturedImage(null);
     setPublishAt("");
+    setNotifyOnPublish(true);
 
     setMode("list");
   };
@@ -121,6 +124,7 @@ export function ArticleManager({ tripId, currentUserId }: { tripId: string; curr
     }
 
     setPublishAt(article.publish_at ? new Date(article.publish_at).toISOString().slice(0, 16) : "");
+    setNotifyOnPublish(article.notify_on_publish ?? true);
 
     setMode("edit");
   };
@@ -144,6 +148,7 @@ export function ArticleManager({ tripId, currentUserId }: { tripId: string; curr
       featured_image_source: featuredImage?.source || null,
       featured_image_focal_x: featuredImage?.focalX ?? 50,
       featured_image_focal_y: featuredImage?.focalY ?? 50,
+      notify_on_publish: notifyOnPublish,
     };
 
     // Determine publish_at value
@@ -261,6 +266,23 @@ export function ArticleManager({ tripId, currentUserId }: { tripId: string; curr
             className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
           />
         </div>
+
+        {/* Notify toggle */}
+        <label className="flex items-start gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={notifyOnPublish}
+            onChange={(e) => setNotifyOnPublish(e.target.checked)}
+            className="mt-0.5 w-4 h-4 accent-green-600"
+          />
+          <span className="text-sm text-gray-700">
+            Notify all Loozers when this publishes
+            <span className="block text-xs text-gray-400">
+              Sends one push to everyone the first time the article goes live (on publish or at its
+              scheduled time). Editing an already-published article never re-notifies.
+            </span>
+          </span>
+        </label>
 
         {/* Action buttons */}
         <div className="flex flex-col gap-2">

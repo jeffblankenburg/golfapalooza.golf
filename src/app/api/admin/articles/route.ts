@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveUserId } from "@/lib/simulator";
 import { checkPermissionAccess } from "@/lib/permissions-server";
+import { maybeNotifyArticlePublished } from "@/lib/articles/notify";
 
 /** Extract storage path from a gallery-media public URL */
 function extractStoragePath(url: string): string | null {
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await admin
     .from("articles")
     .select(`
-      id, title, content, publish_at, created_at, updated_at,
+      id, title, content, publish_at, created_at, updated_at, notify_on_publish,
       featured_image_url, featured_image_source, featured_image_focal_x, featured_image_focal_y,
       author:users!articles_author_id_fkey(id, display_name, avatar_url),
       featured_image:gallery_items!articles_featured_image_id_fkey(id, media_url, thumbnail_url)
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
   const {
     trip_id, title, content, featured_image_id, featured_image_url,
     featured_image_source, featured_image_focal_x, featured_image_focal_y, publish_at,
-    author_id,
+    author_id, notify_on_publish,
   } = body;
 
   if (!trip_id || !title?.trim()) {
@@ -95,6 +96,7 @@ export async function POST(request: NextRequest) {
       featured_image_focal_x: featured_image_focal_x ?? 50,
       featured_image_focal_y: featured_image_focal_y ?? 50,
       publish_at: publish_at || null,
+      notify_on_publish: notify_on_publish ?? true,
     })
     .select()
     .single();
@@ -102,6 +104,10 @@ export async function POST(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // If this was created already-published, notify everyone now. Draft/scheduled
+  // articles are a no-op here — the cron picks them up when they go live.
+  await maybeNotifyArticlePublished(admin, data.id);
 
   return NextResponse.json(data, { status: 201 });
 }
@@ -117,7 +123,7 @@ export async function PUT(request: NextRequest) {
   const {
     id, title, content, featured_image_id, featured_image_url,
     featured_image_source, featured_image_focal_x, featured_image_focal_y, publish_at,
-    author_id,
+    author_id, notify_on_publish,
   } = body;
 
   if (!id) {
@@ -138,6 +144,7 @@ export async function PUT(request: NextRequest) {
   if (content !== undefined) updates.content = content;
   if (publish_at !== undefined) updates.publish_at = publish_at || null;
   if (author_id !== undefined && author_id) updates.author_id = author_id;
+  if (notify_on_publish !== undefined) updates.notify_on_publish = notify_on_publish;
 
   // Handle image field updates
   if (featured_image_source !== undefined) {
@@ -173,6 +180,11 @@ export async function PUT(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // Fire the publish push if this edit just took the article live (e.g.
+  // "Publish Now" on a draft). Self-guards: no-op for drafts, future-dated
+  // articles, opted-out articles, or ones already notified.
+  await maybeNotifyArticlePublished(admin, id);
 
   return NextResponse.json(data);
 }

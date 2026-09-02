@@ -42,6 +42,7 @@ export async function GET(request: Request) {
     .select(`
       id,
       round_type,
+      format,
       round_date,
       completed_at,
       course:courses(id, name),
@@ -55,9 +56,12 @@ export async function GET(request: Request) {
       )
     `)
     .eq("status", "completed")
-    // Scramble rounds are a single team ball — one card per member with an
-    // identical gross would spam the feed, and it isn't a personal score.
-    .eq("format", "individual")
+    // Include personal scrambles too. The team ball is one score, so below we
+    // collapse each scramble round to a SINGLE "Scramble" card (badged, team
+    // members listed) rather than emitting one identical card per member.
+    // Handicap and My-Rounds stats exclude scrambles on their own — this feed
+    // is just a scorecard list, so they belong here.
+    .in("format", ["individual", "scramble"])
     .order("round_date", { ascending: false })
     .order("completed_at", { ascending: false, nullsFirst: false })
     .order("player_position", { referencedTable: "round_players", ascending: true })
@@ -80,6 +84,7 @@ export async function GET(request: Request) {
   type Round = {
     id: string;
     round_type: string;
+    format: string;
     round_date: string;
     completed_at: string | null;
     course: { id: string; name: string } | { id: string; name: string }[] | null;
@@ -144,30 +149,73 @@ export async function GET(request: Request) {
     is_incomplete: boolean;
     holes_played: number;
     expected_holes: number;
+    is_scramble: boolean;
   }[] = [];
+
+  // Per-nine / 18 par for a player's tee. Shared by the individual and
+  // scramble card builders below.
+  const computePar = (roundType: string, teeId: string | null, teePar: number): number => {
+    if (roundType === "18" || !teeId) return teePar;
+    const split = nineHoleParByTee.get(teeId);
+    if (split) return roundType === "9-back" ? split.back : split.front;
+    return Math.round(teePar / 2);
+  };
+  const firstUser = (p: Player) => (p.user ? (Array.isArray(p.user) ? p.user[0] : p.user) : null);
+  const firstTee = (p: Player) => (p.tee ? (Array.isArray(p.tee) ? p.tee[0] : p.tee) : null);
 
   for (const r of list) {
     const course = r.course
       ? (Array.isArray(r.course) ? r.course[0] : r.course)
       : null;
 
+    if (r.format === "scramble") {
+      // Collapse the whole team ball to ONE card. Every member's row carries
+      // the identical team gross, so pick a representative row for score/tee
+      // and list the members' names. Badged is_scramble so the UI can mark it
+      // as a team score rather than a personal round.
+      const members = (r.round_players || []).filter((p) => {
+        const u = firstUser(p);
+        return u && !u.is_system && !u.is_financial_only;
+      });
+      const rep = members.find((p) => p.final_gross_score != null);
+      if (!rep) continue;
+
+      const names = members.map((p) => firstUser(p)?.display_name).filter(Boolean) as string[];
+      const tee = firstTee(rep);
+      const par = computePar(r.round_type, rep.tee_id, tee?.par ?? 72);
+      const gross = rep.final_gross_score as number;
+      const holesPlayed = holesByPlayer.get(rep.id) || 0;
+
+      cards.push({
+        round_id: r.id,
+        round_player_id: rep.id,
+        round_type: r.round_type,
+        round_date: r.round_date,
+        completed_at: r.completed_at,
+        player: { id: rep.id, display_name: names.join(", ") || "Scramble team", avatar_url: null },
+        course_name: course?.name || "Unknown",
+        tee_name: tee?.tee_name || null,
+        tee_color: tee?.tee_color || null,
+        gross_score: gross,
+        par,
+        score_to_par: gross - par,
+        is_incomplete: isRoundIncomplete(r.round_type, holesPlayed, gross != null),
+        holes_played: holesPlayed,
+        expected_holes: expectedHoleCount(r.round_type),
+        is_scramble: true,
+      });
+
+      if (cards.length >= limit) break;
+      continue;
+    }
+
     for (const p of r.round_players || []) {
-      const u = p.user ? (Array.isArray(p.user) ? p.user[0] : p.user) : null;
+      const u = firstUser(p);
       if (!u || u.is_system || u.is_financial_only) continue;
       if (p.final_gross_score == null) continue;
 
-      const tee = p.tee ? (Array.isArray(p.tee) ? p.tee[0] : p.tee) : null;
-      const teePar = tee?.par ?? 72;
-
-      let par = teePar;
-      if (r.round_type !== "18" && p.tee_id) {
-        const split = nineHoleParByTee.get(p.tee_id);
-        if (split) {
-          par = r.round_type === "9-back" ? split.back : split.front;
-        } else {
-          par = Math.round(teePar / 2);
-        }
-      }
+      const tee = firstTee(p);
+      const par = computePar(r.round_type, p.tee_id, tee?.par ?? 72);
 
       const gross = p.final_gross_score;
       const holesPlayed = holesByPlayer.get(p.id) || 0;
@@ -187,6 +235,7 @@ export async function GET(request: Request) {
         is_incomplete: isRoundIncomplete(r.round_type, holesPlayed, gross != null),
         holes_played: holesPlayed,
         expected_holes: expectedHoleCount(r.round_type),
+        is_scramble: false,
       });
 
       if (cards.length >= limit) break;

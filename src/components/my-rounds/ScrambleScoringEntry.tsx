@@ -7,6 +7,7 @@ import { DragHandle } from "@/components/DragHandle";
 import { subscribeToRound } from "@/lib/realtime/round-channel";
 import { RoundComments } from "@/components/rounds/RoundComments";
 import { ScoreMark } from "@/components/scoring/ScoreMark";
+import { OtherGroupsOverlay } from "@/components/my-rounds/OtherGroupsOverlay";
 
 // Scramble scoring for a personal round: the whole group plays ONE team ball,
 // so there is a single score per hole. We persist that team score by fanning it
@@ -392,6 +393,7 @@ export default function ScrambleScoringEntry({
         }}
         headerRight={
           <div className="flex items-center gap-2 text-xs">
+            {roundId && <OtherGroupsOverlay currentRoundId={roundId} courseId={courseId ?? null} />}
             <span
               className={
                 liveStatus === "live"

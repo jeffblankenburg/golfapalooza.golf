@@ -80,6 +80,16 @@ const STORAGE_KEY_SHUFFLE = "golfapalooza_player_shuffle";
 const STORAGE_KEY_PLAYING = "golfapalooza_player_playing";
 const STORAGE_KEY_TIME = "golfapalooza_player_time";
 
+// Fallback media-notification artwork (the app icon) for songs with no art.
+// A well-formed, multi-size artwork array keeps Android's background media
+// notification "sticky": a bare notification (empty artwork) gets reclaimed by
+// the OS far sooner, which is a big reason background playback dies on Android.
+// iOS simply uses whatever art is present, so this is additive there.
+const FALLBACK_ARTWORK: MediaImage[] = [
+  { src: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+  { src: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
+];
+
 function loadStoredNumber(key: string, fallback: number): number {
   if (typeof window === "undefined") return fallback;
   const v = localStorage.getItem(key);
@@ -501,14 +511,43 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Report playback position to the OS media notification. This is a
+  // read-only signal (it cannot affect audio) but it makes Android treat the
+  // session as active media — giving the notification a scrubber and, crucially,
+  // keeping background playback alive longer. Feature-detected + guarded so it
+  // no-ops on iOS/older browsers and never throws on invalid state.
+  const updatePositionState = useCallback(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    if (typeof navigator.mediaSession.setPositionState !== "function") return;
+    const audio = audioRef.current;
+    if (!audio) return;
+    const dur = audio.duration;
+    if (!Number.isFinite(dur) || dur <= 0) return;
+    try {
+      navigator.mediaSession.setPositionState({
+        duration: dur,
+        playbackRate: audio.playbackRate || 1,
+        position: Math.min(Math.max(audio.currentTime, 0), dur),
+      });
+    } catch {
+      // Some browsers throw on transiently-invalid state; ignore.
+    }
+  }, []);
+
   // ── Event listeners on audio element ───────────────────────────────────
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const onTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const onDurationChange = () => setDuration(audio.duration || 0);
+    const onTimeUpdate = () => {
+      setCurrentTime(audio.currentTime);
+      updatePositionState();
+    };
+    const onDurationChange = () => {
+      setDuration(audio.duration || 0);
+      updatePositionState();
+    };
     const onEnded = () => advanceToNext();
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
@@ -526,7 +565,7 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("pause", onPause);
     };
-  }, [advanceToNext]);
+  }, [advanceToNext, updatePositionState]);
 
   // ── Persist player state to localStorage ────────────────────────────────
 
@@ -584,9 +623,12 @@ export function MusicPlayerContextProvider({ children }: { children: ReactNode }
       title: currentSong.title,
       artist: currentSong.tagged_user?.display_name || "Golfapalooza",
       album: "Golfapalooza",
+      // Song art first (Android picks the best size), always backed by the app
+      // icon so the notification is never artwork-less — a bare notification is
+      // reclaimed by Android sooner, killing background playback.
       artwork: currentSong.art_url
-        ? [{ src: currentSong.art_url, sizes: "512x512", type: "image/jpeg" }]
-        : [],
+        ? [{ src: currentSong.art_url, sizes: "512x512", type: "image/jpeg" }, ...FALLBACK_ARTWORK]
+        : FALLBACK_ARTWORK,
     });
 
     navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";

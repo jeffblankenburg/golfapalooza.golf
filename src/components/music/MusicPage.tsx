@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useMusicPlayer, type Song } from "@/contexts/MusicPlayerContext";
 import ReactMarkdown from "react-markdown";
 import { PinnedNoteButton } from "@/components/notebook/PinnedNoteButton";
+import { AndroidBackgroundAudioHint } from "@/components/music/AndroidBackgroundAudioHint";
 
 function formatTime(seconds: number): string {
   if (!seconds || !isFinite(seconds)) return "0:00";
@@ -78,6 +79,7 @@ export function MusicPage({ initialSongs, headerAction }: { initialSongs: Song[]
         {headerAction}
         <PinnedNoteButton pinnedTo="music" />
       </div>
+      <AndroidBackgroundAudioHint />
       {/* Now Playing */}
       {currentSong && (
         <div className="mb-6">

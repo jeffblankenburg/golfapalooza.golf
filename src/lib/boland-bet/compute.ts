@@ -115,9 +115,13 @@ export async function getBolandBet(
       }
     }
 
-    // Restrict scores to this contest's foursomes so we don't pick up a later
-    // day's Hole #1. `kgb_cup_hole_scores.foursome_id` is a derived foursome id
-    // (= the team-1 pair id); `scorer_id` identifies the individual player.
+    // Read Hole #1 scores the SAME way the admin scoring grid renders them:
+    // scoped to the foursome each player currently belongs to. A player's
+    // score row (foursome_id = derived foursome = team-1 pair id) only counts
+    // if that player is a current member of that foursome's pairs. This ignores
+    // orphaned rows left behind when a player was moved between pairs/foursomes
+    // — those are invisible in the (foursome-scoped) admin grid, so counting
+    // them here would show a score the admin can't see or clear.
     const { data: teams } = await admin
       .from("ryder_cup_teams")
       .select("id, team_number")
@@ -127,19 +131,36 @@ export async function getBolandBet(
     if (teamIds.length > 0) {
       const { data: pairs } = await admin
         .from("ryder_cup_pairs")
-        .select("id, team_id, sort_order")
+        .select("id, team_id, sort_order, player_a_id, player_b_id, player_c_id")
         .in("team_id", teamIds);
-      const foursomeIds = deriveFoursomes(pairs || [], teams || []).map((f) => f.id);
+      const foursomes = deriveFoursomes(pairs || [], teams || []);
+      const foursomeIds = foursomes.map((f) => f.id);
+
+      // Map each current player → the foursome they belong to.
+      const pairById = new Map((pairs || []).map((p) => [p.id as string, p]));
+      const foursomeByPlayer = new Map<string, string>();
+      for (const f of foursomes) {
+        for (const pairId of [f.pair_team1_id, f.pair_team2_id]) {
+          const p = pairById.get(pairId);
+          if (!p) continue;
+          for (const memberId of [p.player_a_id, p.player_b_id, p.player_c_id]) {
+            if (memberId) foursomeByPlayer.set(memberId as string, f.id);
+          }
+        }
+      }
 
       if (foursomeIds.length > 0) {
         const { data: scores } = await admin
           .from("kgb_cup_hole_scores")
-          .select("scorer_id, strokes")
+          .select("foursome_id, scorer_id, strokes")
           .in("foursome_id", foursomeIds)
           .eq("hole_number", 1)
           .eq("scorer_type", "player");
         for (const s of scores || []) {
-          scoreByUser.set(s.scorer_id as string, s.strokes as number);
+          // Only count a score stored under the player's current foursome.
+          if (foursomeByPlayer.get(s.scorer_id as string) === s.foursome_id) {
+            scoreByUser.set(s.scorer_id as string, s.strokes as number);
+          }
         }
       }
     }

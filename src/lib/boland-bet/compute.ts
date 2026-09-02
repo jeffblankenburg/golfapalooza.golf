@@ -3,11 +3,11 @@ import { deriveFoursomes } from "@/lib/kgb-cup/derive-foursomes";
 
 // The Boland Bet is a side bet keyed entirely off each opted-in player's
 // individual gross score on Hole #1 of the KGB Cup:
-//   • par or better  → the player wins $20
+//   • par or better  → the player wins $10
 //   • bogey or worse → Boland keeps their $10 bet
 // Balances are shown from the players' perspective (positive = players up on
 // Boland). The bet is opted into on the /options page like any other option.
-const WIN_AMOUNT = 20; // par or better
+const WIN_AMOUNT = 10; // par or better
 const LOSS_AMOUNT = 10; // bogey or worse (Boland keeps the bet)
 
 export type BolandBetResult = "win" | "loss" | "pending";
@@ -18,6 +18,7 @@ export type BolandBetLine = {
   score: number | null; // gross strokes on Hole #1, null until scored
   result: BolandBetResult;
   balance: number; // +WIN_AMOUNT / -LOSS_AMOUNT / 0 while pending
+  paid: boolean; // Boland has paid this winner (only meaningful for wins)
 };
 
 export type BolandBet = {
@@ -80,6 +81,13 @@ export async function getBolandBet(
   const nameById = new Map(
     (userRows || []).map((u) => [u.id as string, (u.display_name as string) || "Loozer"])
   );
+
+  // 3b. Which winners Boland has already paid (presence of a row = paid).
+  const { data: paymentRows } = await admin
+    .from("boland_bet_payments")
+    .select("user_id")
+    .eq("trip_id", trip.id);
+  const paidIds = new Set((paymentRows || []).map((p) => p.user_id as string));
 
   // 4. The first (earliest-day) KGB Cup / ryder_cup contest.
   const { data: contests } = await admin
@@ -180,7 +188,14 @@ export async function getBolandBet(
         balance = -LOSS_AMOUNT;
       }
     }
-    return { userId: uid, displayName: nameById.get(uid) || "Loozer", score, result, balance };
+    return {
+      userId: uid,
+      displayName: nameById.get(uid) || "Loozer",
+      score,
+      result,
+      balance,
+      paid: paidIds.has(uid),
+    };
   });
 
   // Wins first, then losses, then still-to-play — each group alphabetical.
@@ -192,4 +207,22 @@ export async function getBolandBet(
   const total = lines.reduce((sum, l) => sum + l.balance, 0);
 
   return { optionName: option.name || "Boland Bet", par, lines, total };
+}
+
+/**
+ * True when the given user is Pat Boland — the only person allowed to mark
+ * winners paid. Identified by display name (there's exactly one Boland), matched
+ * with an admin client so RLS can't hide the row. Pass a simulator-effective id.
+ */
+export async function isBolandUser(
+  admin: SupabaseClient,
+  userId: string
+): Promise<boolean> {
+  const { data } = await admin
+    .from("users")
+    .select("id")
+    .eq("id", userId)
+    .ilike("display_name", "%boland%")
+    .maybeSingle();
+  return !!data;
 }

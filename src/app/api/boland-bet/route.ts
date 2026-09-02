@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getEffectiveTripId } from "@/lib/simulator";
-import { getBolandBet } from "@/lib/boland-bet/compute";
+import { getEffectiveTripId, getEffectiveUserId } from "@/lib/simulator";
+import { getBolandBet, isBolandUser } from "@/lib/boland-bet/compute";
 
 /**
  * @swagger
@@ -29,7 +29,7 @@ export async function GET() {
 
   const admin = createAdminClient();
   const tripId = await getEffectiveTripId();
-  if (!tripId) return NextResponse.json({ bet: null });
+  if (!tripId) return NextResponse.json({ bet: null, viewerIsBoland: false });
 
   const { data: trip } = await admin
     .from("trip_settings")
@@ -37,6 +37,9 @@ export async function GET() {
     .eq("id", tripId)
     .single();
 
-  const bet = trip ? await getBolandBet(admin, trip) : null;
-  return NextResponse.json({ bet });
+  const [bet, viewerIsBoland] = await Promise.all([
+    trip ? getBolandBet(admin, trip) : Promise.resolve(null),
+    isBolandUser(admin, await getEffectiveUserId(user.id)),
+  ]);
+  return NextResponse.json({ bet, viewerIsBoland });
 }

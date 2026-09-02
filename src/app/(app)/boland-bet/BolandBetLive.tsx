@@ -8,9 +8,20 @@ import type { BolandBet } from "@/lib/boland-bet/compute";
  * Renders the Boland Bet standings and keeps them live: subscribes to Hole #1
  * writes on `kgb_cup_hole_scores` and re-fetches the computed standings on any
  * change (INSERT/UPDATE/DELETE). Falls back gracefully to the SSR snapshot.
+ *
+ * When the viewer is Pat Boland, each winning line gets a persistent "Paid"
+ * checkbox he can toggle to track who he's paid out; nobody else sees it.
  */
-export function BolandBetLive({ initialBet }: { initialBet: BolandBet | null }) {
+export function BolandBetLive({
+  initialBet,
+  initialViewerIsBoland,
+}: {
+  initialBet: BolandBet | null;
+  initialViewerIsBoland: boolean;
+}) {
   const [bet, setBet] = useState<BolandBet | null>(initialBet);
+  const [viewerIsBoland, setViewerIsBoland] = useState(initialViewerIsBoland);
+  const [savingId, setSavingId] = useState<string | null>(null);
   const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -22,6 +33,7 @@ export function BolandBetLive({ initialBet }: { initialBet: BolandBet | null }) 
         if (!res.ok) return;
         const data = await res.json();
         setBet(data.bet ?? null);
+        setViewerIsBoland(!!data.viewerIsBoland);
       } catch {
         // keep last-known standings on transient failure
       }
@@ -48,12 +60,46 @@ export function BolandBetLive({ initialBet }: { initialBet: BolandBet | null }) 
     };
   }, []);
 
+  async function togglePaid(userId: string, nextPaid: boolean) {
+    // Optimistic flip; revert on failure.
+    setBet((prev) =>
+      prev
+        ? {
+            ...prev,
+            lines: prev.lines.map((l) => (l.userId === userId ? { ...l, paid: nextPaid } : l)),
+          }
+        : prev
+    );
+    setSavingId(userId);
+    try {
+      const res = await fetch("/api/boland-bet/paid", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, paid: nextPaid }),
+      });
+      if (!res.ok) throw new Error("save failed");
+    } catch {
+      setBet((prev) =>
+        prev
+          ? {
+              ...prev,
+              lines: prev.lines.map((l) =>
+                l.userId === userId ? { ...l, paid: !nextPaid } : l
+              ),
+            }
+          : prev
+      );
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   return (
     <div className="px-4 pt-6 pb-8">
       <h1 className="text-2xl font-bold text-gray-900">Boland Bet</h1>
       <p className="text-sm text-gray-500 mt-1">
         Every player in the bet is on the line for their Hole&nbsp;#1 score in the KGB Cup
-        {bet?.par != null ? ` (par ${bet.par})` : ""}. Par or better wins&nbsp;$20; bogey or worse
+        {bet?.par != null ? ` (par ${bet.par})` : ""}. Par or better wins&nbsp;$10; bogey or worse
         and Boland keeps the&nbsp;$10 bet.
       </p>
 
@@ -68,6 +114,7 @@ export function BolandBetLive({ initialBet }: { initialBet: BolandBet | null }) 
             <span className="flex-1">Player</span>
             <span className="w-10 text-center">#1</span>
             <span className="w-16 text-right">Balance</span>
+            {viewerIsBoland && <span className="w-12 text-center">Paid</span>}
           </div>
 
           {/* Lines */}
@@ -98,11 +145,27 @@ export function BolandBetLive({ initialBet }: { initialBet: BolandBet | null }) 
                   }`}
                 >
                   {line.result === "win"
-                    ? "+$20"
+                    ? "+$10"
                     : line.result === "loss"
                       ? "−$10"
                       : "—"}
                 </span>
+                {viewerIsBoland && (
+                  <span className="w-12 flex items-center justify-center">
+                    {line.result === "win" ? (
+                      <input
+                        type="checkbox"
+                        checked={line.paid}
+                        disabled={savingId === line.userId}
+                        onChange={(e) => togglePaid(line.userId, e.target.checked)}
+                        aria-label={`Mark ${line.displayName} paid`}
+                        className="h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500 disabled:opacity-50"
+                      />
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -122,6 +185,7 @@ export function BolandBetLive({ initialBet }: { initialBet: BolandBet | null }) 
             >
               {bet.total > 0 ? "+" : bet.total < 0 ? "−" : ""}${Math.abs(bet.total)}
             </span>
+            {viewerIsBoland && <span className="w-12" />}
           </div>
         </div>
       )}

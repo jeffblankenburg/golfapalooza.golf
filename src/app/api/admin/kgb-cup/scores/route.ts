@@ -159,7 +159,16 @@ export async function GET(request: Request) {
   }
 }
 
-// PUT - Batch upsert hole scores
+// PUT - Batch upsert hole scores, and/or delete cleared ones.
+// `deletions` carries the composite keys of cells the admin emptied — since
+// `strokes` is NOT NULL, "clearing" a score means removing its row.
+type ScoreKey = {
+  foursome_id: string;
+  hole_number: number;
+  scorer_type: string;
+  scorer_id: string;
+};
+
 export async function PUT(request: Request) {
   const admin = await checkIsAdmin();
   if (!admin) {
@@ -167,37 +176,57 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const { scores } = await request.json();
+    const body = await request.json();
+    const scores = Array.isArray(body.scores) ? body.scores : [];
+    const deletions: ScoreKey[] = Array.isArray(body.deletions) ? body.deletions : [];
 
-    if (!scores || !Array.isArray(scores) || scores.length === 0) {
-      return NextResponse.json({ error: "scores array is required" }, { status: 400 });
+    if (scores.length === 0 && deletions.length === 0) {
+      return NextResponse.json({ error: "scores or deletions is required" }, { status: 400 });
     }
 
     const adminClient = createAdminClient();
 
-    const { error: upsertError } = await adminClient
-      .from("kgb_cup_hole_scores")
-      .upsert(
-        scores.map(
-          (s: {
-            foursome_id: string;
-            hole_number: number;
-            scorer_type: string;
-            scorer_id: string;
-            strokes: number;
-          }) => ({
-            foursome_id: s.foursome_id,
-            hole_number: s.hole_number,
-            scorer_type: s.scorer_type,
-            scorer_id: s.scorer_id,
-            strokes: s.strokes,
-          })
-        ),
-        { onConflict: "foursome_id,hole_number,scorer_type,scorer_id" }
-      );
+    if (scores.length > 0) {
+      const { error: upsertError } = await adminClient
+        .from("kgb_cup_hole_scores")
+        .upsert(
+          scores.map(
+            (s: ScoreKey & { strokes: number }) => ({
+              foursome_id: s.foursome_id,
+              hole_number: s.hole_number,
+              scorer_type: s.scorer_type,
+              scorer_id: s.scorer_id,
+              strokes: s.strokes,
+            })
+          ),
+          { onConflict: "foursome_id,hole_number,scorer_type,scorer_id" }
+        );
 
-    if (upsertError) {
-      return NextResponse.json({ error: upsertError.message }, { status: 500 });
+      if (upsertError) {
+        return NextResponse.json({ error: upsertError.message }, { status: 500 });
+      }
+    }
+
+    if (deletions.length > 0) {
+      // Delete each emptied cell by its composite key. Bounded by how many
+      // cells the admin cleared in one debounce window (a handful).
+      const results = await Promise.all(
+        deletions.map((d) =>
+          adminClient
+            .from("kgb_cup_hole_scores")
+            .delete()
+            .match({
+              foursome_id: d.foursome_id,
+              hole_number: d.hole_number,
+              scorer_type: d.scorer_type,
+              scorer_id: d.scorer_id,
+            })
+        )
+      );
+      const delError = results.find((r) => r.error)?.error;
+      if (delError) {
+        return NextResponse.json({ error: delError.message }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ success: true });

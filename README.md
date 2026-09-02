@@ -92,6 +92,7 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Section-by-section point tracking
 - Real-time scoreboard and group results
 - Contest tee assignments per hole
+- **Boland Bet** — a Hole #1 side bet opted into on the /options page. Its own page (`/boland-bet`, reachable via a home-page quick link that appears once the "Boland Bet" option exists) lists every opted-in Loozer, their gross score on Hole #1 of the KGB Cup, and each line's balance: par or better wins $20, bogey or worse loses the $10 bet — with a running net total at the bottom. Uses the first (earliest-day) KGB Cup round; players show as pending until their Hole #1 score is entered.
 
 ### Scramble Contests (Daily Team Events)
 - 4-man scramble teams with drag-and-drop assignment

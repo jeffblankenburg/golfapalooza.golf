@@ -77,6 +77,16 @@ const allQuickLinks = [
     ),
   },
   {
+    href: "/boland-bet",
+    label: "Boland Bet",
+    color: "bg-amber-50 text-amber-700",
+    // Gated via hiddenQuickLinks: only shows once the Boland Bet option exists.
+    requiresContest: null,
+    icon: (
+      <SvgIcon src="/noun-dollar-8198053.svg" />
+    ),
+  },
+  {
     href: "/skins",
     label: "Skins",
     color: "bg-lime-50 text-lime-700",

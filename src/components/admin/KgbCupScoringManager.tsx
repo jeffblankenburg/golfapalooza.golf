@@ -117,6 +117,8 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
   const [lifecycleLoading, setLifecycleLoading] = useState(false);
 
   const dirtyScoresRef = useRef<Map<string, { foursome_id: string; hole_number: number; scorer_type: string; scorer_id: string; strokes: number }>>(new Map());
+  // Cells the admin emptied — persisted as row deletions (strokes is NOT NULL).
+  const dirtyDeletesRef = useRef<Map<string, { foursome_id: string; hole_number: number; scorer_type: string; scorer_id: string }>>(new Map());
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -215,16 +217,18 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
   // Auto-save logic
   const flushSaves = useCallback(async () => {
     const scoresToSave = Array.from(dirtyScoresRef.current.values());
-    if (scoresToSave.length === 0) return;
+    const scoresToDelete = Array.from(dirtyDeletesRef.current.values());
+    if (scoresToSave.length === 0 && scoresToDelete.length === 0) return;
 
     dirtyScoresRef.current.clear();
+    dirtyDeletesRef.current.clear();
     setSaveStatus("saving");
 
     try {
       const res = await fetch("/api/admin/kgb-cup/scores", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scores: scoresToSave }),
+        body: JSON.stringify({ scores: scoresToSave, deletions: scoresToDelete }),
       });
 
       if (res.ok) {
@@ -236,11 +240,17 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
         for (const s of scoresToSave) {
           dirtyScoresRef.current.set(`${s.foursome_id}-${s.hole_number}-${s.scorer_type}-${s.scorer_id}`, s);
         }
+        for (const d of scoresToDelete) {
+          dirtyDeletesRef.current.set(`${d.foursome_id}-${d.hole_number}-${d.scorer_type}-${d.scorer_id}`, d);
+        }
       }
     } catch {
       setSaveStatus("error");
       for (const s of scoresToSave) {
         dirtyScoresRef.current.set(`${s.foursome_id}-${s.hole_number}-${s.scorer_type}-${s.scorer_id}`, s);
+      }
+      for (const d of scoresToDelete) {
+        dirtyDeletesRef.current.set(`${d.foursome_id}-${d.hole_number}-${d.scorer_type}-${d.scorer_id}`, d);
       }
     }
   }, []);
@@ -253,15 +263,17 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
   // Flush on unmount
   useEffect(() => {
     const dirtyScores = dirtyScoresRef;
+    const dirtyDeletes = dirtyDeletesRef;
     return () => {
       if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
       const scoresToSave = Array.from(dirtyScores.current.values());
-      if (scoresToSave.length > 0) {
+      const scoresToDelete = Array.from(dirtyDeletes.current.values());
+      if (scoresToSave.length > 0 || scoresToDelete.length > 0) {
         fetch("/api/admin/kgb-cup/scores", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scores: scoresToSave }),
+          body: JSON.stringify({ scores: scoresToSave, deletions: scoresToDelete }),
         });
       }
     };
@@ -288,13 +300,27 @@ export function KgbCupScoringManager({ tripId }: { tripId: string }) {
       return filtered;
     });
 
+    const key = `${foursomeId}-${holeNumber}-${scorerType}-${scorerId}`;
     if (strokes !== undefined) {
-      dirtyScoresRef.current.set(`${foursomeId}-${holeNumber}-${scorerType}-${scorerId}`, {
+      // A (re)entered value cancels any pending delete for the same cell.
+      dirtyDeletesRef.current.delete(key);
+      dirtyScoresRef.current.set(key, {
         foursome_id: foursomeId,
         hole_number: holeNumber,
         scorer_type: scorerType,
         scorer_id: scorerId,
         strokes,
+      });
+      scheduleSave();
+    } else {
+      // Cleared cell → drop any pending upsert and queue a delete so the empty
+      // state actually persists (otherwise the old score reappears on reload).
+      dirtyScoresRef.current.delete(key);
+      dirtyDeletesRef.current.set(key, {
+        foursome_id: foursomeId,
+        hole_number: holeNumber,
+        scorer_type: scorerType,
+        scorer_id: scorerId,
       });
       scheduleSave();
     }

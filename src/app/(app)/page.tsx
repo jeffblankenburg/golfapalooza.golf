@@ -666,6 +666,13 @@ export default async function HomePage() {
     .select("id", { count: "exact", head: true })
     .eq("trip_id", trip.id);
   if (!shirtCount) hiddenQuickLinks.push("/shirt-guide");
+  // Boland Bet only appears once the "Boland Bet" option exists on /options.
+  const { count: bolandCount } = await adminClient
+    .from("trip_options")
+    .select("id", { count: "exact", head: true })
+    .eq("trip_id", trip.id)
+    .ilike("name", "%boland%");
+  if (!bolandCount) hiddenQuickLinks.push("/boland-bet");
 
   return (
     <HomeContent

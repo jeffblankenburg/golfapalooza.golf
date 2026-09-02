@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveTripId, getEffectiveUserId } from "@/lib/simulator";
-import { isBolandUser } from "@/lib/boland-bet/compute";
+import { canManageBolandPayouts } from "@/lib/boland-bet/compute";
 
 /**
  * @swagger
@@ -13,7 +13,7 @@ import { isBolandUser } from "@/lib/boland-bet/compute";
  *     description: >
  *       Toggles whether Pat Boland has paid a winning player. Presence of a
  *       `boland_bet_payments` row = paid; setting `paid:false` deletes it. Only
- *       the user identified as Boland may call this (simulator-aware).
+ *       Boland or an app admin may call this (simulator-aware).
  *     requestBody:
  *       required: true
  *       content:
@@ -50,8 +50,8 @@ export async function POST(request: Request) {
   }
 
   const effectiveUserId = await getEffectiveUserId(user.id);
-  if (!(await isBolandUser(admin, effectiveUserId))) {
-    return NextResponse.json({ error: "Only Boland can mark payouts" }, { status: 403 });
+  if (!(await canManageBolandPayouts(admin, effectiveUserId))) {
+    return NextResponse.json({ error: "Only Boland or an admin can mark payouts" }, { status: 403 });
   }
 
   if (paid) {

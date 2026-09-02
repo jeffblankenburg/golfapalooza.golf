@@ -9,18 +9,19 @@ import type { BolandBet } from "@/lib/boland-bet/compute";
  * writes on `kgb_cup_hole_scores` and re-fetches the computed standings on any
  * change (INSERT/UPDATE/DELETE). Falls back gracefully to the SSR snapshot.
  *
- * When the viewer is Pat Boland, each winning line gets a persistent "Paid"
- * checkbox he can toggle to track who he's paid out; nobody else sees it.
+ * When the viewer can manage payouts (Pat Boland or an admin), each winning
+ * line gets a persistent "Paid" checkbox to track who's been paid; nobody else
+ * sees it.
  */
 export function BolandBetLive({
   initialBet,
-  initialViewerIsBoland,
+  initialCanManage,
 }: {
   initialBet: BolandBet | null;
-  initialViewerIsBoland: boolean;
+  initialCanManage: boolean;
 }) {
   const [bet, setBet] = useState<BolandBet | null>(initialBet);
-  const [viewerIsBoland, setViewerIsBoland] = useState(initialViewerIsBoland);
+  const [canManage, setCanManage] = useState(initialCanManage);
   const [savingId, setSavingId] = useState<string | null>(null);
   const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -33,7 +34,7 @@ export function BolandBetLive({
         if (!res.ok) return;
         const data = await res.json();
         setBet(data.bet ?? null);
-        setViewerIsBoland(!!data.viewerIsBoland);
+        setCanManage(!!data.canManage);
       } catch {
         // keep last-known standings on transient failure
       }
@@ -114,7 +115,7 @@ export function BolandBetLive({
             <span className="flex-1">Player</span>
             <span className="w-10 text-center">#1</span>
             <span className="w-16 text-right">Balance</span>
-            {viewerIsBoland && <span className="w-12 text-center">Paid</span>}
+            {canManage && <span className="w-12 text-center">Paid</span>}
           </div>
 
           {/* Lines */}
@@ -150,7 +151,7 @@ export function BolandBetLive({
                       ? "−$10"
                       : "—"}
                 </span>
-                {viewerIsBoland && (
+                {canManage && (
                   <span className="w-12 flex items-center justify-center">
                     {line.result === "win" ? (
                       <input
@@ -185,7 +186,7 @@ export function BolandBetLive({
             >
               {bet.total > 0 ? "+" : bet.total < 0 ? "−" : ""}${Math.abs(bet.total)}
             </span>
-            {viewerIsBoland && <span className="w-12" />}
+            {canManage && <span className="w-12" />}
           </div>
         </div>
       )}

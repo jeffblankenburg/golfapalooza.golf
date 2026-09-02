@@ -30,10 +30,16 @@ export type BolandBet = {
 
 // Mirrors the option-completeness truthiness used elsewhere on the home page:
 // a checkbox opt-in is `true`, but tolerate select/string/array shapes too.
+// The Boland Bet is a Yes/No *select*, so an explicit "No" is stored as the
+// string "no" (not a deleted row) — treat those negatives as NOT opted in.
+const NEGATIVE_SELECTIONS = new Set(["no", "false", "0", "n", "none", "off"]);
 function isOptedIn(value: unknown): boolean {
   if (value === null || value === undefined || value === false) return false;
   if (Array.isArray(value)) return value.length > 0;
-  if (typeof value === "string") return value.trim() !== "";
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    return v !== "" && !NEGATIVE_SELECTIONS.has(v);
+  }
   return true;
 }
 
@@ -210,19 +216,21 @@ export async function getBolandBet(
 }
 
 /**
- * True when the given user is Pat Boland — the only person allowed to mark
- * winners paid. Identified by display name (there's exactly one Boland), matched
- * with an admin client so RLS can't hide the row. Pass a simulator-effective id.
+ * True when the given user may mark Boland Bet winners paid — i.e. Pat Boland
+ * himself (identified by display name; there's exactly one Boland) or any app
+ * admin. Matched with an admin client so RLS can't hide the row. Pass a
+ * simulator-effective id.
  */
-export async function isBolandUser(
+export async function canManageBolandPayouts(
   admin: SupabaseClient,
   userId: string
 ): Promise<boolean> {
   const { data } = await admin
     .from("users")
-    .select("id")
+    .select("display_name, is_admin")
     .eq("id", userId)
-    .ilike("display_name", "%boland%")
     .maybeSingle();
-  return !!data;
+  if (!data) return false;
+  if (data.is_admin) return true;
+  return (data.display_name as string | null)?.toLowerCase().includes("boland") ?? false;
 }

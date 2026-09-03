@@ -293,14 +293,14 @@ export default function ScoringShell({
       <div className="relative shrink-0">
         {courseStrip}
         <div
-          className={`${courseStrip ? "absolute inset-0" : "relative"} z-10 flex items-center justify-center gap-1.5 text-xs font-medium transition-opacity duration-300 ${
+          className={`${courseStrip ? "absolute inset-0" : "relative min-h-[1.5rem]"} z-10 flex items-center justify-center gap-1.5 py-1 text-xs font-medium transition-opacity duration-300 ${
             saveStatus === "idle"
-              ? `opacity-0 pointer-events-none ${courseStrip ? "" : "h-0 overflow-hidden"}`
+              ? "opacity-0 pointer-events-none"
               : saveStatus === "saving"
-                ? "opacity-100 bg-blue-50/95 text-blue-600 py-1"
+                ? "opacity-100 bg-blue-50/95 text-blue-600"
                 : saveStatus === "saved"
-                  ? "opacity-100 bg-green-50/95 text-green-600 py-1"
-                  : "opacity-100 bg-red-50/95 text-red-600 py-1"
+                  ? "opacity-100 bg-green-50/95 text-green-600"
+                  : "opacity-100 bg-red-50/95 text-red-600"
           }`}
           aria-live="polite"
         >

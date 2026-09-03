@@ -312,7 +312,7 @@ function LeaderboardPopup({
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-white rounded-t-3xl p-5 pb-6 animate-slide-up max-h-[70vh] overflow-y-auto">
+      <div className="relative w-full max-w-lg bg-white rounded-t-3xl p-5 pb-[calc(4rem+env(safe-area-inset-bottom)+1.5rem)] animate-slide-up max-h-[70vh] overflow-y-auto">
         <DragHandle onClose={onClose} className="mb-4" />
 
         {/* Tab switcher */}

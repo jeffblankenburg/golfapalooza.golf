@@ -173,8 +173,15 @@ export async function GET(request: Request) {
     holeScores[s.team_id][s.hole_number] = s.strokes;
   }
 
-  // Calculate skins
-  const skinTeams = teams.map((t) => ({ id: t.id, team_handicap: t.team_handicap }));
+  // Calculate skins. Net skins use the ADJUSTED team handicap (lowest team on
+  // the day shifted to 0), same as the standings/scorecards — never the raw
+  // team_handicap, which would hand extra strokes on the easy holes and change
+  // who wins the skin. Mirrors the offset in ScorecardsContent + bspitw-scoring.
+  const lowestHC = Math.min(...teams.map((t) => t.team_handicap ?? 0));
+  const skinTeams = teams.map((t) => ({
+    id: t.id,
+    team_handicap: Math.max(0, (t.team_handicap ?? 0) - lowestHC),
+  }));
   const result = calcSkins(skinTeams, holes, holeScores);
 
   // Distribute the day's pot using the whole-dollar algorithm. Returns

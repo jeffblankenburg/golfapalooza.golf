@@ -123,6 +123,22 @@ export async function GET(request: Request) {
       .select("team_id, hole_number, strokes")
       .in("team_id", teamIds);
 
+    // Fetch this day's tee times so the board can be ordered by tee time
+    // before any scores are entered.
+    let teeTimeQuery = adminClient
+      .from("tee_times")
+      .select("scramble_team_id, tee_time")
+      .eq("trip_id", contest.trip_id)
+      .in("scramble_team_id", teamIds);
+    if (contest.day_number != null) {
+      teeTimeQuery = teeTimeQuery.eq("day_number", contest.day_number);
+    }
+    const { data: teeTimes } = await teeTimeQuery;
+    const teeTimeByTeam = new Map<string, string | null>();
+    for (const tt of teeTimes || []) {
+      if (tt.scramble_team_id) teeTimeByTeam.set(tt.scramble_team_id, tt.tee_time);
+    }
+
     // Build leaderboard
     const scoresByTeam = new Map<
       string,
@@ -168,15 +184,34 @@ export async function GET(request: Request) {
         par_through: parThrough,
         rel_par: relPar,
         scores: scoresByHole,
+        tee_time: teeTimeByTeam.get(team.id) ?? null,
         verified_at: (team as { verified_at?: string | null }).verified_at ?? null,
       };
     });
 
-    // Sort by rel_par ascending (best first), ties broken by most holes completed
-    leaderboard.sort((a, b) => {
-      if (a.rel_par !== b.rel_par) return a.rel_par - b.rel_par;
-      return b.holes_completed - a.holes_completed;
-    });
+    // Before any scores are entered, order by tee time (earliest first) so the
+    // initial standings mirror the tee sheet. Once any team has a score, switch
+    // to the live ranking: rel_par ascending (best first), ties broken by most
+    // holes completed.
+    const anyScores = (scores?.length ?? 0) > 0;
+    if (anyScores) {
+      leaderboard.sort((a, b) => {
+        if (a.rel_par !== b.rel_par) return a.rel_par - b.rel_par;
+        return b.holes_completed - a.holes_completed;
+      });
+    } else {
+      leaderboard.sort((a, b) => {
+        if (a.tee_time && b.tee_time) {
+          if (a.tee_time !== b.tee_time) return a.tee_time.localeCompare(b.tee_time);
+        } else if (a.tee_time) {
+          return -1;
+        } else if (b.tee_time) {
+          return 1;
+        }
+        // No tee time on either (or identical) — fall back to first member name.
+        return (a.members[0] ?? "").localeCompare(b.members[0] ?? "");
+      });
+    }
 
     const holes = (teeAssignments || [])
       .map((ta) => ({ hole_number: ta.hole_number, par: parMap.get(ta.hole_number) ?? 4 }))

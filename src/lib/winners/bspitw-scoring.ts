@@ -144,10 +144,23 @@ export async function computeBspitwLeaderboard(
     }
   }
 
+  // Adjusted team handicap, per the standings: within each scramble day the
+  // lowest-handicap team is shifted to 0, so every team plays off the gap to
+  // that low team. Mirrors calcNetScore in ScrambleManager — Net (and therefore
+  // under-par) must use Adj Hdcp, never the raw team_handicap.
+  const lowestHcByContest: Record<string, number> = {};
+  for (const t of teams) {
+    const hc = t.team_handicap ?? 0;
+    if (lowestHcByContest[t.contest_id] === undefined || hc < lowestHcByContest[t.contest_id]) {
+      lowestHcByContest[t.contest_id] = hc;
+    }
+  }
+
   // Under-par points
   for (const t of teams) {
     if (t.gross_score === null) continue;
-    const netScore = t.gross_score - t.team_handicap;
+    const adjHandicap = Math.max(0, (t.team_handicap ?? 0) - (lowestHcByContest[t.contest_id] ?? 0));
+    const netScore = t.gross_score - adjHandicap;
     const underPar = Math.max(0, t.course_par - netScore);
     if (underPar === 0) continue;
 

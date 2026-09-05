@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveDate, getEffectiveUserId } from "@/lib/simulator";
 import { getPickemEntryFee } from "@/lib/pickem/entry-fee";
+import { fetchContestPicks } from "@/lib/pickem/picks";
 
 // GET - Fetch games, user's picks, and leaderboard
 export async function GET(request: Request) {
@@ -37,16 +38,14 @@ export async function GET(request: Request) {
 
     const tripId = contestRow?.trip_id;
 
-    const [gamesRes, allPicksRes, participantsRes, entryFeeRes, contestSplitsRes] = await Promise.all([
+    const [gamesRes, contestPicks, participantsRes, entryFeeRes, contestSplitsRes] = await Promise.all([
       adminClient
         .from("pickem_games")
         .select("*")
         .eq("contest_id", contestId)
         .order("game_time")
         .order("sort_order"),
-      adminClient
-        .from("pickem_picks")
-        .select("game_id, user_id, picked_team, tiebreaker_total"),
+      fetchContestPicks(adminClient, contestId),
       adminClient
         .from("event_participants")
         .select("user_id, user:users!event_participants_user_id_fkey(id, display_name, full_name, avatar_url)")
@@ -62,9 +61,7 @@ export async function GET(request: Request) {
     ]);
 
     const games = gamesRes.data || [];
-    const allPicks = allPicksRes.data || [];
-    const gameIds = new Set(games.map((g) => g.id));
-    const contestPicks = allPicks.filter((p) => gameIds.has(p.game_id));
+    // contestPicks is already scoped to this contest by fetchContestPicks.
 
     // User's own picks (always visible)
     const myPicks = contestPicks.filter((p) => p.user_id === effectiveUserId);

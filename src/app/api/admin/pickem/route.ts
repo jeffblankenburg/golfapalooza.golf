@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkPermissionAccess } from "@/lib/permissions-server";
 import { getPickemEntryFee } from "@/lib/pickem/entry-fee";
+import { fetchContestPicks } from "@/lib/pickem/picks";
 
 // GET - Fetch all games for a contest, plus settings and participants
 export async function GET(request: Request) {
@@ -29,7 +30,7 @@ export async function GET(request: Request) {
 
     const tripId = contestRow?.trip_id;
 
-    const [gamesRes, settingsRes, entryFeeRes, contestSplitsRes, participantsRes, picksRes] = await Promise.all([
+    const [gamesRes, settingsRes, entryFeeRes, contestSplitsRes, participantsRes, contestPicks] = await Promise.all([
       adminClient
         .from("pickem_games")
         .select("*")
@@ -56,14 +57,11 @@ export async function GET(request: Request) {
         .from("contest_participants")
         .select("user_id, user:users!contest_participants_user_id_fkey(id, display_name, full_name, avatar_url)")
         .eq("contest_id", contestId),
-      adminClient
-        .from("pickem_picks")
-        .select("game_id, user_id, picked_team, tiebreaker_total"),
+      fetchContestPicks(adminClient, contestId),
     ]);
 
-    // Filter picks to only those for games in this contest
-    const gameIds = new Set((gamesRes.data || []).map((g) => g.id));
-    const contestPicks = (picksRes.data || []).filter((p) => gameIds.has(p.game_id));
+    // contestPicks is already scoped to this contest by fetchContestPicks
+    // (paginates past PostgREST's 1000-row cap; see lib/pickem/picks).
 
     // Get payment status
     const { data: payments } = await adminClient

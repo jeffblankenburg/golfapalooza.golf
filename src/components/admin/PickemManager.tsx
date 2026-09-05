@@ -882,7 +882,7 @@ export function PickemManager({ tripId }: { tripId: string }) {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{s.display_name}</p>
                     <p className="text-xs text-gray-400">
-                      {s.correct}/{s.decided} correct
+                      {s.total}/{games.length} picked · {s.correct}/{s.decided} correct
                       {s.tiebreaker_total !== null && ` · TB: ${s.tiebreaker_total}`}
                       {s.tiebreaker_diff !== null && ` (off by ${s.tiebreaker_diff})`}
                     </p>

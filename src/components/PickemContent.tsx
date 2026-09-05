@@ -70,7 +70,13 @@ export function PickemContent({
 
   const fetchData = useCallback(async () => {
     const res = await fetch(`/api/pickem?contest_id=${contestId}`);
+    // Never clobber existing state on a bad response. A transient GET failure
+    // (cold start, auth refresh, network blip) returns an error payload with no
+    // `games`/`my_picks`, and blindly setting those to [] wipes the user's picks
+    // from the UI even though they're safely saved in the DB.
+    if (!res.ok) return;
     const data = await res.json();
+    if (!Array.isArray(data.games)) return;
     setGames(data.games || []);
     setMyPicks(data.my_picks || []);
     setLeaderboard(data.leaderboard || []);
@@ -141,7 +147,14 @@ export function PickemContent({
     if (!existingPick) return;
 
     setSaving(gameId);
-    await fetch("/api/pickem", {
+
+    // Optimistic update — mirror submitPick so we never blow away local state
+    // with a refetch on the happy path (that was wiping all picks).
+    setMyPicks((prev) =>
+      prev.map((p) => (p.game_id === gameId ? { ...p, tiebreaker_total: total } : p))
+    );
+
+    const res = await fetch("/api/pickem", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -150,7 +163,15 @@ export function PickemContent({
         tiebreaker_total: total,
       }),
     });
-    await fetchData();
+
+    if (res.ok) {
+      setSavedIndicator(gameId);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = setTimeout(() => setSavedIndicator(null), 1500);
+    } else {
+      // Revert to server truth only on failure.
+      await fetchData();
+    }
     setSaving(null);
   };
 

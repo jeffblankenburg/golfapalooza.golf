@@ -64,6 +64,7 @@ export function PickemContent({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [tab, setTab] = useState<"picks" | "leaderboard">("picks");
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [savedIndicator, setSavedIndicator] = useState<string | null>(null);
   const [whiteyAvatar, setWhiteyAvatar] = useState<string | null>(null);
   const savedTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -177,13 +178,8 @@ export function PickemContent({
 
   const getMyPick = (gameId: string) => myPicks.find((p) => p.game_id === gameId);
 
-  const isPickCorrect = (pick: Pick, game: Game): boolean | null => {
-    if (!game.winning_team || game.away_score === null || game.home_score === null) return null;
-    const margin = game.home_score - game.away_score;
-    const homeSpread = game.favorite === "home" ? game.spread : -game.spread;
-    const homeCovers = margin + homeSpread > 0;
-    return pick.picked_team === "home" ? homeCovers : !homeCovers;
-  };
+  const isPickCorrect = (pick: Pick, game: Game): boolean | null =>
+    pickResult(pick.picked_team, game);
 
   const formatTime = (iso: string) => {
     const d = new Date(iso);
@@ -514,32 +510,57 @@ export function PickemContent({
               <div className="divide-y divide-gray-100">
                 {leaderboard.map((entry) => {
                   const isMe = entry.user_id === effectiveUserId;
+                  // Picks are only present once games lock (the API withholds
+                  // them beforehand), so rows are only expandable post-lock —
+                  // no picks are ever revealed early.
+                  const revealed = Array.isArray(entry.picks);
+                  const isExpanded = revealed && expandedUserId === entry.user_id;
                   return (
-                    <div
-                      key={entry.user_id}
-                      className={`flex items-center gap-3 px-4 py-3 ${isMe ? "bg-green-50" : ""}`}
-                    >
-                      <span className="w-6 text-center text-sm font-bold text-gray-400">
-                        {entry.rank}
-                      </span>
-                      {entry.avatar_url ? (
-                        <img src={entry.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-500">
-                          {entry.display_name[0]?.toUpperCase()}
+                    <div key={entry.user_id}>
+                      <button
+                        type="button"
+                        disabled={!revealed}
+                        onClick={() =>
+                          setExpandedUserId((cur) => (cur === entry.user_id ? null : entry.user_id))
+                        }
+                        className={`w-full flex items-center gap-3 px-4 py-3 text-left ${isMe ? "bg-green-50" : ""} ${revealed ? "active:bg-gray-50" : "cursor-default"}`}
+                        aria-expanded={isExpanded}
+                      >
+                        <span className="w-6 text-center text-sm font-bold text-gray-400">
+                          {entry.rank}
+                        </span>
+                        {entry.avatar_url ? (
+                          <img src={entry.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-500">
+                            {entry.display_name[0]?.toUpperCase()}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium truncate ${isMe ? "text-green-800" : "text-gray-900"}`}>
+                            {entry.display_name}
+                            {isMe && <span className="text-xs text-green-600 ml-1">(you)</span>}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            {entry.picks_count}/{totalGames} picked
+                            {games.some((g) => g.is_locked) && entry.tiebreaker_total !== null && ` · TB: ${entry.tiebreaker_total}`}
+                          </p>
                         </div>
+                        <span className="text-2xl font-bold text-green-700">{entry.correct}</span>
+                        {revealed && (
+                          <svg
+                            className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        )}
+                      </button>
+                      {isExpanded && (
+                        <PlayerPicksDetail entry={entry} games={games} />
                       )}
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium truncate ${isMe ? "text-green-800" : "text-gray-900"}`}>
-                          {entry.display_name}
-                          {isMe && <span className="text-xs text-green-600 ml-1">(you)</span>}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {entry.picks_count}/{totalGames} picked
-                          {games.some((g) => g.is_locked) && entry.tiebreaker_total !== null && ` · TB: ${entry.tiebreaker_total}`}
-                        </p>
-                      </div>
-                      <span className="text-2xl font-bold text-green-700">{entry.correct}</span>
                     </div>
                   );
                 })}
@@ -548,6 +569,100 @@ export function PickemContent({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// Against-the-spread result for a picked side. null = game not final yet.
+function pickResult(pickedTeam: string, game: Game): boolean | null {
+  if (!game.winning_team || game.away_score === null || game.home_score === null) return null;
+  const margin = game.home_score - game.away_score;
+  const homeSpread = game.favorite === "home" ? game.spread : -game.spread;
+  const homeCovers = margin + homeSpread > 0;
+  return pickedTeam === "home" ? homeCovers : !homeCovers;
+}
+
+// Expanded leaderboard detail: a player's picks with their result, and the
+// games they picked that haven't finished yet. Only rendered post-lock (the
+// API withholds `entry.picks` until then), so no picks are revealed early.
+function PlayerPicksDetail({
+  entry,
+  games,
+}: {
+  entry: LeaderboardEntry;
+  games: Game[];
+}) {
+  const pickByGame = new Map((entry.picks || []).map((p) => [p.game_id, p.picked_team]));
+  // Walk games in their display order so the detail matches the Picks tab.
+  const rows = games
+    .map((g) => ({ game: g, picked: pickByGame.get(g.id) }))
+    .filter((r): r is { game: Game; picked: string } => r.picked !== undefined);
+
+  const pending = rows.filter((r) => !r.game.winning_team);
+
+  if (rows.length === 0) {
+    return (
+      <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-400">
+        No picks to show.
+      </div>
+    );
+  }
+
+  const teamName = (g: Game, side: string) => (side === "home" ? g.home_team : g.away_team);
+
+  return (
+    <div className="bg-gray-50 border-t border-gray-100 px-4 py-2">
+      <div className="flex items-center justify-between py-1.5">
+        <span className="text-[0.625rem] uppercase tracking-wider font-bold text-gray-400">
+          Picks
+        </span>
+        <span className="text-[0.625rem] uppercase tracking-wider font-bold text-gray-400">
+          {entry.correct} correct
+          {pending.length > 0 && ` · ${pending.length} not final`}
+        </span>
+      </div>
+      <div className="divide-y divide-gray-100">
+        {rows.map(({ game, picked }) => {
+          const result = pickResult(picked, game);
+          const pickedName = teamName(game, picked);
+          const otherName = teamName(game, picked === "home" ? "away" : "home");
+          const scoreLabel =
+            game.away_score !== null && game.home_score !== null
+              ? `${game.away_score}–${game.home_score}`
+              : null;
+          return (
+            <div key={game.id} className="flex items-center gap-2 py-2">
+              <span
+                className={`w-4 text-center text-sm font-bold ${
+                  result === true
+                    ? "text-green-600"
+                    : result === false
+                    ? "text-red-500"
+                    : "text-gray-300"
+                }`}
+              >
+                {result === true ? "✓" : result === false ? "✗" : "•"}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {pickedName}
+                  {game.is_tiebreaker && (
+                    <span className="text-[0.625rem] uppercase text-gray-400 ml-1">TB</span>
+                  )}
+                </p>
+                <p className="text-xs text-gray-400 truncate">over {otherName}</p>
+              </div>
+              <span
+                className={`text-xs font-medium whitespace-nowrap ${
+                  result === null ? "text-amber-600" : "text-gray-400"
+                }`}
+              >
+                {result === null ? "Not final" : scoreLabel}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

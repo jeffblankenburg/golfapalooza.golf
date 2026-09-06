@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getStrokesOnHole, sortByDifficulty } from "@/lib/golf/stroke-distribution";
+import { adjustedTeamHandicap, getStrokesOnHole, sortByDifficulty } from "@/lib/golf/stroke-distribution";
 
 export async function GET(request: Request) {
   const authedClient = await createClient();
@@ -161,10 +161,20 @@ export async function GET(request: Request) {
       scoreLookup[s.team_id][s.hole_number] = s.strokes;
     }
 
-    // Build net scores
+    // Build net scores using the ADJUSTED handicap (contest's lowest team plays
+    // off scratch), never raw team_handicap — matches the leaderboard net display
+    // and resolveScrambleWinner. See adjustedTeamHandicap.
+    const lowestHc = Math.min(
+      ...normalizedTeams
+        .filter((t) => t.gross_score !== null)
+        .map((t) => t.team_handicap ?? 0)
+    );
     const teamNets: { id: string; net: number; handicap: number }[] = normalizedTeams
       .filter((t) => t.gross_score !== null)
-      .map((t) => ({ id: t.id, net: t.gross_score! - t.team_handicap, handicap: t.team_handicap }));
+      .map((t) => {
+        const adj = adjustedTeamHandicap(t.team_handicap ?? 0, lowestHc);
+        return { id: t.id, net: t.gross_score! - adj, handicap: adj };
+      });
 
     teamNets.sort((a, b) => a.net - b.net);
 

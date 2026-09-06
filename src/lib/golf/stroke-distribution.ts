@@ -18,6 +18,23 @@ export function sortByDifficulty(holes: HoleWithHandicap[]): HoleWithHandicap[] 
 }
 
 /**
+ * Adjusted team handicap for a scramble: within a contest the lowest-handicap
+ * team is shifted to scratch (0), so every team plays off the gap to that low
+ * team. Net scores AND all tiebreak stroke math MUST use this — never the raw
+ * `team_handicap`. Mirrors `calcNetScore` in ScrambleManager and the adjustment
+ * in `bspitw-scoring.ts`.
+ *
+ * @param teamHandicap - This team's raw `team_handicap`.
+ * @param lowestTeamHandicap - The minimum `team_handicap` across all teams in the contest.
+ */
+export function adjustedTeamHandicap(
+  teamHandicap: number,
+  lowestTeamHandicap: number
+): number {
+  return Math.max(0, teamHandicap - lowestTeamHandicap);
+}
+
+/**
  * Calculate how many handicap strokes a team gets on a specific hole.
  *
  * @param teamHandicap - The team's total handicap strokes

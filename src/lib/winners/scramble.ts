@@ -3,12 +3,14 @@
  */
 
 import { SupabaseClient } from "@supabase/supabase-js";
-import { getStrokesOnHole, sortByDifficulty, HoleWithHandicap } from "@/lib/golf/stroke-distribution";
+import { adjustedTeamHandicap, getStrokesOnHole, sortByDifficulty, HoleWithHandicap } from "@/lib/golf/stroke-distribution";
 
 interface TeamResult {
   id: string;
   gross_score: number;
   team_handicap: number;
+  /** team_handicap shifted so the contest's lowest team plays off scratch. */
+  adj_handicap: number;
   net_score: number;
   member_user_ids: string[];
 }
@@ -48,16 +50,23 @@ export async function resolveScrambleWinner(
 
   if (memberErr) throw new Error(memberErr.message);
 
-  // Build team results with net scores
-  const teamResults: TeamResult[] = teams.map((t) => ({
-    id: t.id,
-    gross_score: t.gross_score,
-    team_handicap: t.team_handicap,
-    net_score: t.gross_score - t.team_handicap,
-    member_user_ids: (members || [])
-      .filter((m) => m.team_id === t.id)
-      .map((m) => m.user_id),
-  }));
+  // Build team results with net scores. Net + tiebreak strokes use the
+  // ADJUSTED handicap (contest's lowest team plays off scratch), never raw
+  // team_handicap — see adjustedTeamHandicap.
+  const lowestHc = Math.min(...teams.map((t) => t.team_handicap ?? 0));
+  const teamResults: TeamResult[] = teams.map((t) => {
+    const adj_handicap = adjustedTeamHandicap(t.team_handicap ?? 0, lowestHc);
+    return {
+      id: t.id,
+      gross_score: t.gross_score,
+      team_handicap: t.team_handicap,
+      adj_handicap,
+      net_score: t.gross_score - adj_handicap,
+      member_user_ids: (members || [])
+        .filter((m) => m.team_id === t.id)
+        .map((m) => m.user_id),
+    };
+  });
 
   // Sort by net score ascending
   teamResults.sort((a, b) => a.net_score - b.net_score);
@@ -210,7 +219,7 @@ async function breakScrambleTie(
     for (const team of tiedTeams) {
       const gross = scoreLookup[team.id]?.[hole.hole_number];
       if (gross === undefined) continue;
-      const strokes = getStrokesOnHole(team.team_handicap, hole.hole_number, sortedHoles);
+      const strokes = getStrokesOnHole(team.adj_handicap, hole.hole_number, sortedHoles);
       netScores.push({ team, net: gross - strokes, gross });
     }
 

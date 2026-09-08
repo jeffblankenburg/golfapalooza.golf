@@ -4,9 +4,6 @@ import "./globals.css";
 import { ActivityTracker } from "@/components/ActivityTracker";
 import { SplashFader } from "@/components/SplashFader";
 import { WakeLockKeeper } from "@/components/WakeLockKeeper";
-import { MusicPlayerProvider } from "@/components/MusicPlayerProvider";
-import { ChatDrawerProvider } from "@/contexts/ChatDrawerContext";
-import { ChatDrawer } from "@/components/chat/ChatDrawer";
 
 const SPLASH_CSS = `
 #app-splash {
@@ -151,15 +148,10 @@ export default function RootLayout({
         <SplashFader />
         <ActivityTracker />
         <WakeLockKeeper />
-        {/* Universal music player + chat drawer — single instances cover
-            every layout so playback continues and the chat surface is
-            reachable wherever their icons show. */}
-        <MusicPlayerProvider>
-          <ChatDrawerProvider>
-            {children}
-            <ChatDrawer />
-          </ChatDrawerProvider>
-        </MusicPlayerProvider>
+        {/* Root is deliberately bare beyond global load/utility bits. The legacy
+            app's chat/music chrome lives in <LegacyChrome> within the legacy
+            route-group layouts, so the /new (v2) app inherits none of it. */}
+        {children}
       </body>
     </html>
   );

@@ -1,0 +1,91 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(23, 33, 29, 0.45);
+  backdrop-filter: blur(2px);
+  animation: fade 0.15s ease-out;
+}
+
+.card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--card, #ffffff);
+  color: var(--ink, #17211c);
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 22px 50px -20px rgba(0, 0, 0, 0.55);
+  animation: pop 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.title {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  font-size: 1.2rem;
+  margin: 0 0 8px;
+}
+
+.message {
+  color: var(--ink-soft, #59635b);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0 0 20px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.cancel,
+.confirm {
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-family: var(--font-libre), sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}
+.cancel {
+  background: transparent;
+  color: var(--ink-soft, #59635b);
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+}
+.cancel:hover {
+  color: var(--ink, #17211c);
+}
+.confirm {
+  background: var(--brand, #0a5c36);
+  color: #fff;
+}
+.confirm:hover {
+  filter: brightness(1.06);
+}
+.destructive {
+  background: #b3261e;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

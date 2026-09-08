@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AdminNav } from "@/components/AdminNav";
 import { HeaderBar } from "@/components/HeaderBar";
+import { LegacyChrome } from "@/components/LegacyChrome";
 import { SimulatorBanner } from "@/components/SimulatorBanner";
 import { hasAnyPermission } from "@/lib/permissions";
 import { getSimUserId, getSimDate, getEffectiveTripId, isSimulatingTrip } from "@/lib/simulator";
@@ -78,6 +79,7 @@ export default async function AdminLayout({
     .not("type", "in", '("chat_message","chat_mention")');
 
   return (
+    <LegacyChrome>
     <div className="min-h-dvh pb-20">
       {showBanner && (
         <SimulatorBanner
@@ -96,5 +98,6 @@ export default async function AdminLayout({
       <main>{children}</main>
       <AdminNav isAdmin={isAdmin} permissions={permissions} activeTripId={activeTrip?.id || null} activeTripYear={activeTrip?.trip_year || null} />
     </div>
+    </LegacyChrome>
   );
 }

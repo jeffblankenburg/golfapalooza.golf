@@ -5,6 +5,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { HeaderBar } from "@/components/HeaderBar";
 import { SimulatorBanner } from "@/components/SimulatorBanner";
 import { AppShell } from "@/components/AppShell";
+import { LegacyChrome } from "@/components/LegacyChrome";
 import { FavoritesProvider } from "@/components/favorites/FavoritesContext";
 import { RouteProgress } from "@/components/RouteProgress";
 import { getSimDate, getSimUserId, getEffectiveUserId, isSimulating, isSimulatingTrip } from "@/lib/simulator";
@@ -108,6 +109,7 @@ export default async function AppLayout({
   );
 
   return (
+    <LegacyChrome>
     <AppShell>
       {/* Issue #138. Server-rendered root font-size override drives every
           rem-based text size in the app. Injected inside body so there's
@@ -137,5 +139,6 @@ export default async function AppLayout({
       </main>
       <BottomNav isAdmin={isAdmin || hasAnyPermission(simulating ? (profile?.permissions as Record<string, boolean> | null) : realPermissions)} />
     </AppShell>
+    </LegacyChrome>
   );
 }

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { hasAnyPermission } from "@/lib/permissions";
+import { LegacyChrome } from "@/components/LegacyChrome";
 
 // Chrome-less route group: no HeaderBar / AdminNav / BottomNav. Used by
 // full-screen admin tools (e.g. the walk-up player) that own the whole
@@ -32,5 +33,9 @@ export default async function FullscreenLayout({
     redirect("/");
   }
 
-  return <div className="min-h-dvh bg-white">{children}</div>;
+  return (
+    <LegacyChrome withChat={false}>
+      <div className="min-h-dvh bg-white">{children}</div>
+    </LegacyChrome>
+  );
 }

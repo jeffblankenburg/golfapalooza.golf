@@ -1,0 +1,990 @@
+/*
+ * /new design system — quiet golf, LIGHT. Optimized for reading in bright
+ * sunlight: a soft off-white background (bright but glare-reduced vs pure white)
+ * with high-contrast dark-green ink. The org's --brand tints accents (monogram,
+ * section labels, active states) while the bright base stays constant across
+ * tenants. Playfair Display headlines over Libre Franklin. Minimal ornament.
+ */
+
+.wrap {
+  --brand: #0a5c36; /* org color, set inline; used for accents only */
+  --paper: #f6f6f1; /* soft off-white — bright, low glare */
+  --card: #ffffff;
+  --ink: #17211c; /* near-black green — body/headlines */
+  --ink-soft: #59635b;
+  --line: rgba(23, 33, 29, 0.12);
+  --line-strong: rgba(23, 33, 29, 0.22);
+
+  min-height: 100dvh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.shell {
+  position: relative;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+/* Full-screen bar; its content aligns to the 400px column. */
+.header {
+  border-bottom: 1px solid var(--line);
+}
+.headerInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 18px 20px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.flagMark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: var(--brand);
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--brand) 40%, transparent);
+}
+
+.brandLogo {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: contain;
+}
+
+.brandName {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  font-size: 1.1rem;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chip {
+  font-size: 0.58rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+/* ── Page ───────────────────────────────────────────────────────────────── */
+.page {
+  padding: 40px 20px 72px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+/* Org home leads with the logo — tighter under the header. */
+.orgPage {
+  padding-top: 20px;
+}
+
+.eyebrow {
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--brand);
+  margin-bottom: 16px;
+}
+
+.title {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  font-size: clamp(2.1rem, 8vw, 2.8rem);
+  line-height: 1.04;
+  margin: 0;
+  color: var(--ink);
+}
+
+.lede {
+  margin-top: 14px;
+  color: var(--ink-soft);
+  font-size: 0.94rem;
+  line-height: 1.55;
+  max-width: 38ch;
+}
+
+.rule {
+  height: 1px;
+  background: var(--line);
+  margin: 32px 0 20px;
+}
+
+/* ── Org cards ──────────────────────────────────────────────────────────── */
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  animation: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.card:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px -16px rgba(23, 33, 29, 0.4);
+}
+.card:active {
+  transform: translateY(0);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.monogram {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  font-size: 1.25rem;
+  color: #fff;
+  background: var(--brand);
+}
+
+/* Org logo in place of the initial monogram, when the org has one. Contain, not
+   cover, so the whole mark shows rather than getting cropped to the circle. */
+.monogramImg {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: contain;
+}
+
+.orgName {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  font-size: 1.22rem;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.role {
+  margin-top: 3px;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-soft);
+}
+
+.arrow {
+  margin-left: auto;
+  color: var(--ink-soft);
+  transition: transform 0.18s ease;
+}
+.card:hover .arrow {
+  transform: translateX(2px);
+}
+
+.events {
+  margin: 15px 0 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+}
+
+.event {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.9rem;
+}
+.eventName {
+  color: var(--ink);
+}
+.eventStatus {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-soft);
+}
+.eventEmpty {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+/* ── Empty state / invite ───────────────────────────────────────────────── */
+.empty {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 36px 24px;
+  text-align: center;
+  background: var(--card);
+}
+.emptyTitle {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.emptyText {
+  margin-top: 8px;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+/* ── Back link + sections (org page) ────────────────────────────────────── */
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-soft);
+  text-decoration: none;
+  margin-bottom: 22px;
+}
+.back:hover {
+  color: var(--ink);
+}
+
+.section {
+  margin-top: 32px;
+}
+.sectionLabel {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--brand);
+  margin-bottom: 14px;
+}
+.placeholder {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  background: var(--card);
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+/* ── Standard page title row with a circular + action (bottom-aligned) ───── */
+.titleRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.circleAdd {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 0; /* flex-end drops it to the title's bottom line */
+  border-radius: 50%;
+  border: none;
+  background: var(--brand);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  text-decoration: none;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+.circleAdd:hover {
+  filter: brightness(1.06);
+}
+.circleAdd:active {
+  transform: translateY(1px);
+}
+/* Smaller variant for a section header (across from a section label). */
+.circleAddSm {
+  composes: circleAdd;
+  width: 22px;
+  height: 22px;
+  margin-bottom: 0;
+}
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+/* ── Admin area tile grid (group / event administration) ─────────────────── */
+.adminGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+.adminTile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  min-height: 78px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  text-decoration: none;
+  color: var(--ink);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.adminTile:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
+}
+.adminTileStub {
+  opacity: 0.72;
+}
+.adminTileStub:hover {
+  transform: none;
+  border-color: var(--line);
+}
+.adminTileLabel {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.adminTileDesc {
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+.soonBadge {
+  align-self: flex-start;
+  margin-top: auto;
+  font-size: 0.54rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+/* ── Buttons + create-group form ────────────────────────────────────────── */
+/* Compact, auto-width CTA for the groups list (not a full-width block). */
+.newGroupBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 28px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--brand);
+  color: #fff;
+  font-family: var(--font-libre), sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+.newGroupBtn:hover {
+  filter: brightness(1.06);
+}
+.newGroupBtn:active {
+  transform: translateY(1px);
+}
+
+.createBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: 12px;
+  border: none;
+  background: var(--brand);
+  color: #fff;
+  font-family: var(--font-libre), sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+.createBtn:hover {
+  filter: brightness(1.06);
+}
+.createBtn:active {
+  transform: translateY(1px);
+}
+
+.createBtnGhost {
+  composes: createBtn;
+  background: transparent;
+  color: var(--brand);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.createBtnGhost:hover {
+  filter: none;
+  background: rgba(23, 33, 29, 0.03);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin-top: 8px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-soft);
+}
+.optional {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink-soft);
+  opacity: 0.7;
+}
+.input {
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: 11px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--font-libre), sans-serif;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.input:focus {
+  border-color: var(--brand);
+}
+.input::placeholder {
+  color: rgba(89, 99, 91, 0.55);
+}
+
+.logoRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.logoPreview {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  font-size: 1.6rem;
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+  padding: 0;
+}
+.fileBtn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 9px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--font-libre), sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.fileBtn:hover {
+  background: rgba(23, 33, 29, 0.03);
+}
+
+/* Compact group identity bar on the active-event home. */
+.groupBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.groupBarLogo {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: contain;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.groupBarName {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.eventHero {
+  margin-bottom: 8px;
+}
+.dateRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+.dateText {
+  color: var(--ink-soft);
+  font-size: 0.94rem;
+}
+.countdown {
+  flex: none;
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 22%, transparent);
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+
+.orgHead {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.orgHeadText {
+  min-width: 0;
+}
+.orgLogo {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  /* Show the whole logo — never crop a crest to fill the circle. */
+  object-fit: contain;
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  font-size: 1.5rem;
+}
+.orgActionsRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+/* Second column block on a page that already opened with .page (no top pad). */
+.pageContinued {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 0 20px 72px;
+}
+
+.orgTitleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+.orgActions {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+.settingsLink {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.settingsLink:hover {
+  color: var(--ink);
+  border-color: var(--ink-soft);
+}
+
+.colorRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.swatch {
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 11px;
+  background: none;
+  cursor: pointer;
+}
+.swatchHint {
+  font-size: 0.84rem;
+  color: var(--ink-soft);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+.cancel {
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding: 8px;
+}
+.cancel:hover {
+  color: var(--ink);
+}
+.formError {
+  color: #b3261e;
+  font-size: 0.85rem;
+}
+
+.spacer {
+  height: 20px;
+}
+
+/* ── Accordion (custom domains) ─────────────────────────────────────────── */
+.accordion {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+.accordionSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  list-style: none;
+  padding: 14px 16px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink);
+}
+.accordionSummary::-webkit-details-marker {
+  display: none;
+}
+.chev {
+  color: var(--ink-soft);
+  transition: transform 0.18s ease;
+}
+details[open] .chev {
+  transform: rotate(180deg);
+}
+.accordionBody {
+  padding: 0 16px 16px;
+}
+
+/* ── Custom domains ─────────────────────────────────────────────────────── */
+.domainList {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.domainCard {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+.domainRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dnsBlock {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.dnsHint {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin: 0 0 10px;
+}
+.dnsRecord {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+  font-size: 0.82rem;
+}
+.dnsCell {
+  color: var(--ink-soft);
+}
+.copyBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-soft);
+  padding: 2px 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.copyBtn:hover {
+  color: var(--brand);
+}
+
+/* ── Members ────────────────────────────────────────────────────────────── */
+.memberList {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.memberRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+.memberAvatar {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  background: var(--brand);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.memberMeta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.memberName {
+  font-size: 0.9rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.memberYou {
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+.roleSelect {
+  flex: none;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink);
+  font-size: 0.78rem;
+  text-transform: capitalize;
+}
+.roleBadge {
+  flex: none;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+.inviteForm {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.inviteForm .input {
+  flex: 1;
+}
+.inviteNotice {
+  margin-top: 10px;
+  font-size: 0.82rem;
+  color: var(--brand);
+  word-break: break-word;
+}
+.domainHost {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.badgeVerified,
+.badgePending {
+  flex: none;
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+.badgeVerified {
+  color: #0a5c36;
+  background: rgba(10, 92, 54, 0.12);
+}
+.badgePending {
+  color: #8a6d1f;
+  background: rgba(203, 162, 78, 0.16);
+}
+.removeBtn {
+  flex: none;
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px;
+}
+.removeBtn:hover {
+  color: #b3261e;
+}
+.domainAdd {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.domainAdd .input {
+  flex: 1;
+}
+
+.instructions {
+  margin-top: 20px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+}
+.instructionsTitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-soft);
+  margin: 0 0 10px;
+}
+.instructionsList {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.code {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.8rem;
+  background: rgba(23, 33, 29, 0.06);
+  padding: 1px 6px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+.instructionsNote {
+  margin: 12px 0 0;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
+}

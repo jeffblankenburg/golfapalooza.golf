@@ -55,12 +55,14 @@ export default async function EventHome({
       {event ? (
         <>
           <div className={styles.eventHero}>
-            <h1 className={styles.title}>{event.name}</h1>
-            <div className={styles.dateRow}>
+            <h1 className={`${styles.title} ${styles.eventTitle}`}>{event.name}</h1>
+          </div>
+          {(range || event.start_date) && (
+            <div className={styles.dateBand}>
               {range && <span className={styles.dateText}>{range}</span>}
               {event.start_date && <Countdown start={event.start_date} end={event.end_date} />}
             </div>
-          </div>
+          )}
 
           <div className={styles.section}>
             <p className={styles.sectionLabel}>Standings</p>

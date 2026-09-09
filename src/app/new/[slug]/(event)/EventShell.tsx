@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import styles from "./event-shell.module.css";
+/* eslint-disable @next/next/no-img-element */
 
 type DrawerKey = "chat" | "photos" | "music" | "rounds" | "profile" | "notifications";
 
@@ -23,10 +24,14 @@ const DRAWERS: Record<DrawerKey, { title: string; body: string }> = {
 export default function EventShell({
   slug,
   isAdmin,
+  orgName,
+  logoUrl,
   children,
 }: {
   slug: string;
   isAdmin: boolean;
+  orgName: string;
+  logoUrl: string | null;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState<DrawerKey | null>(null);
@@ -56,13 +61,21 @@ export default function EventShell({
             <circle cx="6" cy="21" r="1.4" />
           </TopIcon>
         </div>
+        <Link href={`/new/${slug}`} className={styles.topLogo} aria-label={orgName}>
+          {logoUrl ? (
+            <img src={logoUrl} alt="" />
+          ) : (
+            <span className={styles.topLogoMono}>{orgName.charAt(0).toUpperCase()}</span>
+          )}
+        </Link>
+
         <div className={styles.topGroup}>
+          <TopIcon label="Notifications" active={open === "notifications"} onClick={() => toggle("notifications")}>
+            <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0" />
+          </TopIcon>
           <TopIcon label="Profile" active={open === "profile"} onClick={() => toggle("profile")}>
             <circle cx="12" cy="8" r="4" />
             <path d="M4 21a8 8 0 0116 0" />
-          </TopIcon>
-          <TopIcon label="Notifications" active={open === "notifications"} onClick={() => toggle("notifications")}>
-            <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0" />
           </TopIcon>
         </div>
       </header>

@@ -21,7 +21,12 @@ export default async function EventLayout({
   const isAdmin = org.role === "owner" || org.role === "admin";
 
   return (
-    <EventShell slug={slug} isAdmin={isAdmin}>
+    <EventShell
+      slug={slug}
+      isAdmin={isAdmin}
+      orgName={org.name}
+      logoUrl={org.logo_url}
+    >
       {children}
     </EventShell>
   );

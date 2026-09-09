@@ -92,6 +92,14 @@
   max-width: 400px;
   margin: 0 auto;
 }
+/* Two widths: a 400px column on phones, a wide container that fills large
+   screens. Nothing in between. */
+@media (min-width: 1000px) {
+  .page {
+    max-width: min(92vw, 1200px);
+    padding: 48px 40px 96px;
+  }
+}
 /* Org home leads with the logo — tighter under the header. */
 .orgPage {
   padding-top: 20px;
@@ -109,10 +117,14 @@
 .title {
   font-family: var(--font-playfair), Georgia, serif;
   font-weight: 600;
-  font-size: clamp(2.1rem, 8vw, 2.8rem);
+  font-size: 2.5rem;
   line-height: 1.04;
   margin: 0;
   color: var(--ink);
+}
+/* Event name only — tinted with the group's brand color. */
+.eventTitle {
+  color: var(--brand);
 }
 
 .lede {
@@ -131,8 +143,8 @@
 
 /* ── Org cards ──────────────────────────────────────────────────────────── */
 .cards {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 12px;
 }
 
@@ -349,7 +361,7 @@
 /* ── Admin area tile grid (group / event administration) ─────────────────── */
 .adminGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 10px;
   margin-top: 12px;
 }
@@ -576,29 +588,39 @@
 .eventHero {
   margin-bottom: 8px;
 }
-.dateRow {
+/* Striped band across the page holding the dates + countdown. Negative margins
+   bleed it to the page's content-box edges (matching .page horizontal padding). */
+.dateBand {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 14px;
+  margin: 18px -20px 0;
+  padding: 5px 20px;
+  border-top: 1px solid color-mix(in srgb, var(--brand) 45%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--brand) 45%, transparent);
+  background: color-mix(in srgb, var(--brand) 25%, transparent);
+}
+@media (min-width: 1000px) {
+  .dateBand {
+    margin-left: -40px;
+    margin-right: -40px;
+    padding-left: 40px;
+    padding-right: 40px;
+  }
 }
 .dateText {
-  color: var(--ink-soft);
+  color: var(--ink);
+  font-weight: 500;
   font-size: 0.94rem;
 }
 .countdown {
   flex: none;
-  display: inline-block;
   white-space: nowrap;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--brand);
-  background: color-mix(in srgb, var(--brand) 9%, transparent);
-  border: 1px solid color-mix(in srgb, var(--brand) 22%, transparent);
-  border-radius: 999px;
-  padding: 5px 12px;
 }
 
 .orgHead {

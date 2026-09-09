@@ -24,34 +24,72 @@ export async function GET(
 
   const url = new URL(request.url);
   const before = url.searchParams.get("before");
+  const after = url.searchParams.get("after");
+  const around = url.searchParams.get("around");
   const limit = Math.min(Number(url.searchParams.get("limit")) || PAGE, 100);
 
-  let q = a.admin
-    .from("v2_chat_messages")
-    .select(
-      "id, room_id, sender_id, content, image_url, reply_to_id, created_at, sender:v2_profiles!v2_chat_messages_sender_id_fkey(display_name, avatar_url), reactions:v2_chat_reactions(emoji, user_id)",
-    )
-    .eq("room_id", roomId)
-    .order("created_at", { ascending: false })
-    .limit(limit + 1);
-  if (before) q = q.lt("created_at", before);
+  const SELECT =
+    "id, room_id, sender_id, content, image_url, reply_to_id, created_at, sender:v2_profiles!v2_chat_messages_sender_id_fkey(display_name, avatar_url), reactions:v2_chat_reactions(emoji, user_id)";
 
-  const [msgRes, hiddenRes] = await Promise.all([
-    q,
-    a.admin
-      .from("v2_chat_hidden_messages")
-      .select("message_id")
-      .eq("user_id", a.userId),
-  ]);
-
+  const hiddenRes = await a.admin
+    .from("v2_chat_hidden_messages")
+    .select("message_id")
+    .eq("user_id", a.userId);
   const hidden = new Set((hiddenRes.data || []).map((h) => h.message_id));
-  const rows = (msgRes.data || []).filter((m) => !hidden.has(m.id));
-  const hasMore = rows.length > limit;
-  const page = hasMore ? rows.slice(0, limit) : rows;
-  const nextCursor = hasMore ? page[page.length - 1].created_at : null;
 
-  // Resolve reply parents in one extra query (self-referential embeds are
-  // direction-ambiguous, so we attach reply_to manually).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let page: any[] = [];
+  let nextCursor: string | null = null; // older
+  let newerCursor: string | null = null; // newer
+  let hasMore = false; // older exist
+  let hasNewer = false; // newer exist
+  let newerCount = 0; // how many messages are newer than the target (around mode)
+
+  if (around) {
+    // Load a window centered on a target message (for deep-linking from search).
+    const { data: target } = await a.admin
+      .from("v2_chat_messages")
+      .select("created_at")
+      .eq("id", around)
+      .eq("room_id", roomId)
+      .maybeSingle();
+    const at = target?.created_at ?? new Date().toISOString();
+    const HALF = 25;
+    const [olderRes, newerRes, newerCountRes] = await Promise.all([
+      a.admin.from("v2_chat_messages").select(SELECT).eq("room_id", roomId).lte("created_at", at).order("created_at", { ascending: false }).limit(HALF + 1),
+      a.admin.from("v2_chat_messages").select(SELECT).eq("room_id", roomId).gt("created_at", at).order("created_at", { ascending: true }).limit(HALF + 1),
+      a.admin.from("v2_chat_messages").select("id", { count: "exact", head: true }).eq("room_id", roomId).gt("created_at", at),
+    ]);
+    const older = (olderRes.data || []).filter((m) => !hidden.has(m.id));
+    const newer = (newerRes.data || []).filter((m) => !hidden.has(m.id));
+    hasMore = older.length > HALF;
+    hasNewer = newer.length > HALF;
+    newerCount = newerCountRes.count ?? 0;
+    const olderPage = hasMore ? older.slice(0, HALF) : older;
+    const newerPage = hasNewer ? newer.slice(0, HALF) : newer;
+    page = [...olderPage.slice().reverse(), ...newerPage]; // ascending
+    nextCursor = page.length ? page[0].created_at : null;
+    newerCursor = page.length ? page[page.length - 1].created_at : null;
+  } else if (after) {
+    // Forward pagination (scrolling down toward newer, after an "around" load).
+    const res = await a.admin.from("v2_chat_messages").select(SELECT).eq("room_id", roomId).gt("created_at", after).order("created_at", { ascending: true }).limit(limit + 1);
+    const rows = (res.data || []).filter((m) => !hidden.has(m.id));
+    hasNewer = rows.length > limit;
+    page = hasNewer ? rows.slice(0, limit) : rows;
+    newerCursor = page.length ? page[page.length - 1].created_at : after;
+  } else {
+    // Newest page, or older via `before`.
+    let q = a.admin.from("v2_chat_messages").select(SELECT).eq("room_id", roomId).order("created_at", { ascending: false }).limit(limit + 1);
+    if (before) q = q.lt("created_at", before);
+    const res = await q;
+    const rows = (res.data || []).filter((m) => !hidden.has(m.id));
+    hasMore = rows.length > limit;
+    const p = hasMore ? rows.slice(0, limit) : rows;
+    nextCursor = hasMore ? p[p.length - 1].created_at : null;
+    page = p.slice().reverse(); // ascending
+  }
+
+  // Resolve reply parents (self-referential embeds are direction-ambiguous).
   const parentIds = [...new Set(page.map((m) => m.reply_to_id).filter(Boolean))] as string[];
   if (parentIds.length) {
     const { data: parents } = await a.admin
@@ -59,17 +97,10 @@ export async function GET(
       .select("id, content, image_url, sender:v2_profiles!v2_chat_messages_sender_id_fkey(display_name)")
       .in("id", parentIds);
     const byId = new Map((parents || []).map((p) => [p.id, p]));
-    for (const m of page as (typeof page[number] & { reply_to?: unknown })[]) {
-      if (m.reply_to_id) m.reply_to = byId.get(m.reply_to_id) ?? null;
-    }
+    for (const m of page) if (m.reply_to_id) m.reply_to = byId.get(m.reply_to_id) ?? null;
   }
 
-  // Return ascending (oldest→newest) so the client can append/prepend naturally.
-  return NextResponse.json({
-    messages: page.slice().reverse(),
-    nextCursor,
-    hasMore,
-  });
+  return NextResponse.json({ messages: page, nextCursor, newerCursor, hasMore, hasNewer, newerCount });
 }
 
 export async function POST(

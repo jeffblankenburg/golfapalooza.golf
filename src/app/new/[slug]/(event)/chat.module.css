@@ -860,3 +860,108 @@
 .tapbackAction:active {
   background: rgba(23, 33, 29, 0.08);
 }
+
+/* ══ Room-list bottom bar: search + compose ══════════════════════════════════ */
+.listBar {
+  flex: none;
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--card);
+}
+.searchWrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 20px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+.searchClear {
+  flex: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: 0 2px;
+}
+.composeBtn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--brand);
+  color: #fff;
+  cursor: pointer;
+}
+.composeBtn:active {
+  opacity: 0.9;
+}
+
+/* Message-search results. */
+.searchSender {
+  font-weight: 600;
+  color: var(--ink);
+}
+.hl {
+  background: color-mix(in srgb, var(--brand) 28%, transparent);
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+/* Deep-link highlight flash when jumping to a message from search. */
+@keyframes hlPulse {
+  0% { background: color-mix(in srgb, var(--brand) 26%, transparent); }
+  100% { background: transparent; }
+}
+.msgRow[data-hl] {
+  border-radius: 12px;
+  animation: hlPulse 2.2s ease-out;
+}
+
+/* Jump-to-newest pill (shown when deep-linked 100+ messages back). */
+.room {
+  position: relative;
+}
+.jumpNewest {
+  position: absolute;
+  right: 12px;
+  bottom: 66px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.3);
+}
+.jumpNewest:active {
+  transform: scale(0.97);
+}

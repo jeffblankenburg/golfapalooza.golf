@@ -96,12 +96,12 @@ function renderContent(content: string): React.ReactNode[] {
 }
 
 export default function ChatDrawer({ orgId, userId }: { orgId: string; userId: string }) {
-  const [roomId, setRoomId] = useState<string | null>(null);
+  const [openRoom, setOpenRoom] = useState<{ roomId: string; target: string | null } | null>(null);
   const [rooms, setRooms] = useState<RoomSummary[] | null>(null);
   const [composing, setComposing] = useState(false);
 
   useEffect(() => {
-    if (roomId !== null || composing) return;
+    if (openRoom !== null || composing) return;
     let cancelled = false;
     (async () => {
       try {
@@ -115,7 +115,7 @@ export default function ChatDrawer({ orgId, userId }: { orgId: string; userId: s
     return () => {
       cancelled = true;
     };
-  }, [roomId, composing, orgId]);
+  }, [openRoom, composing, orgId]);
 
   if (composing) {
     return (
@@ -124,16 +124,32 @@ export default function ChatDrawer({ orgId, userId }: { orgId: string; userId: s
         onCancel={() => setComposing(false)}
         onCreated={(id) => {
           setComposing(false);
-          setRoomId(id);
+          setOpenRoom({ roomId: id, target: null });
         }}
       />
     );
   }
-  if (roomId) {
-    const room = rooms?.find((r) => r.id === roomId) || null;
-    return <Room key={roomId} roomId={roomId} room={room} userId={userId} onBack={() => setRoomId(null)} />;
+  if (openRoom) {
+    const room = rooms?.find((r) => r.id === openRoom.roomId) || null;
+    return (
+      <Room
+        key={`${openRoom.roomId}:${openRoom.target || ""}`}
+        roomId={openRoom.roomId}
+        target={openRoom.target}
+        room={room}
+        userId={userId}
+        onBack={() => setOpenRoom(null)}
+      />
+    );
   }
-  return <RoomList rooms={rooms} onOpen={setRoomId} onNew={() => setComposing(true)} />;
+  return (
+    <RoomList
+      rooms={rooms}
+      onOpen={(id, target) => setOpenRoom({ roomId: id, target: target ?? null })}
+      onNew={() => setComposing(true)}
+      orgId={orgId}
+    />
+  );
 }
 
 /* ── New conversation ─────────────────────────────────────────────────────── */
@@ -237,58 +253,154 @@ function NewChat({
 }
 
 /* ── Room list ────────────────────────────────────────────────────────────── */
+interface SearchResult {
+  messageId: string;
+  roomId: string;
+  roomName: string;
+  roomAvatar: string | null;
+  senderName: string;
+  snippet: string;
+  createdAt: string;
+}
+
+function highlight(text: string, q: string): React.ReactNode {
+  const i = text.toLowerCase().indexOf(q.toLowerCase());
+  if (i < 0) return text;
+  return (
+    <>
+      {text.slice(0, i)}
+      <span className={styles.hl}>{text.slice(i, i + q.length)}</span>
+      {text.slice(i + q.length)}
+    </>
+  );
+}
+
 function RoomList({
   rooms,
   onOpen,
   onNew,
+  orgId,
 }: {
   rooms: RoomSummary[] | null;
-  onOpen: (id: string) => void;
+  onOpen: (id: string, target?: string) => void;
   onNew: () => void;
+  orgId: string;
 }) {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<{ q: string; items: SearchResult[] } | null>(null);
+  const query = q.trim();
+  const searching = query.length >= 2;
+  // Only treat results as current when they match the active query (else "Searching…").
+  const current = results && results.q === query ? results.items : null;
+
+  // Debounced message-content search.
+  useEffect(() => {
+    if (query.length < 2) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/v2/chat/search?orgId=${orgId}&q=${encodeURIComponent(query)}`);
+        const d = res.ok ? await res.json() : { results: [] };
+        if (!cancelled) setResults({ q: query, items: d.results || [] });
+      } catch {
+        if (!cancelled) setResults({ q: query, items: [] });
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [query, orgId]);
+
   return (
     <div className={styles.roomListWrap}>
-      <div className={styles.listHeader}>
-        <span className={styles.listTitle}>Messages</span>
-        <button type="button" className={styles.newBtn} onClick={onNew} aria-label="New message">
-          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-            <path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" />
-          </svg>
-        </button>
-      </div>
-      {rooms === null ? (
+      {searching ? (
+        current === null ? (
+          <p className={styles.loading}>Searching…</p>
+        ) : current.length === 0 ? (
+          <p className={styles.loading}>No messages found.</p>
+        ) : (
+          <div className={styles.roomList}>
+            {current.map((r) => (
+              <button key={r.messageId} className={styles.roomRow} onClick={() => onOpen(r.roomId, r.messageId)}>
+                {r.roomAvatar ? (
+                  <img src={r.roomAvatar} alt="" className={styles.roomAvatar} />
+                ) : (
+                  <span className={styles.roomAvatarFallback}>{r.roomName.charAt(0).toUpperCase()}</span>
+                )}
+                <span className={styles.roomMeta}>
+                  <span className={styles.roomName}>{r.roomName}</span>
+                  <span className={styles.roomPreview}>
+                    <span className={styles.searchSender}>{r.senderName}: </span>
+                    {highlight(r.snippet, query)}
+                  </span>
+                </span>
+                <span className={styles.roomRight}>
+                  <span className={styles.roomTime}>{roomStamp(r.createdAt)}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )
+      ) : rooms === null ? (
         <p className={styles.loading}>Loading…</p>
       ) : rooms.length === 0 ? (
         <p className={styles.loading}>No conversations yet.</p>
       ) : (
         <div className={styles.roomList}>
           {rooms.map((r) => {
-        const preview = r.lastMessage
-          ? r.lastMessage.content || (r.lastMessage.imageUrl ? "📷 Photo" : "")
-          : "";
-        return (
-          <button key={r.id} className={styles.roomRow} onClick={() => onOpen(r.id)}>
-            {r.avatarUrl ? (
-              <img src={r.avatarUrl} alt="" className={styles.roomAvatar} />
-            ) : (
-              <span className={styles.roomAvatarFallback}>{(r.name || "?").charAt(0).toUpperCase()}</span>
-            )}
-            <span className={styles.roomMeta}>
-              <span className={styles.roomName}>
-                {r.isPinned && <span className={styles.pin} aria-hidden>📌 </span>}
-                {r.name || "Conversation"}
-              </span>
-              <span className={styles.roomPreview}>{preview}</span>
-            </span>
-            <span className={styles.roomRight}>
-              {r.lastMessage && <span className={styles.roomTime}>{roomStamp(r.lastMessage.createdAt)}</span>}
-              {r.unread > 0 && <span className={styles.roomUnread}>{r.unread > 99 ? "99+" : r.unread}</span>}
-            </span>
-          </button>
+            const preview = r.lastMessage
+              ? r.lastMessage.content || (r.lastMessage.imageUrl ? "📷 Photo" : "")
+              : "";
+            return (
+              <button key={r.id} className={styles.roomRow} onClick={() => onOpen(r.id)}>
+                {r.avatarUrl ? (
+                  <img src={r.avatarUrl} alt="" className={styles.roomAvatar} />
+                ) : (
+                  <span className={styles.roomAvatarFallback}>{(r.name || "?").charAt(0).toUpperCase()}</span>
+                )}
+                <span className={styles.roomMeta}>
+                  <span className={styles.roomName}>
+                    {r.isPinned && <span className={styles.pin} aria-hidden>📌 </span>}
+                    {r.name || "Conversation"}
+                  </span>
+                  <span className={styles.roomPreview}>{preview}</span>
+                </span>
+                <span className={styles.roomRight}>
+                  {r.lastMessage && <span className={styles.roomTime}>{roomStamp(r.lastMessage.createdAt)}</span>}
+                  {r.unread > 0 && <span className={styles.roomUnread}>{r.unread > 99 ? "99+" : r.unread}</span>}
+                </span>
+              </button>
             );
           })}
         </div>
       )}
+
+      {/* Bottom bar: search message content + compose (iMessage-inspired). */}
+      <div className={styles.listBar}>
+        <div className={styles.searchWrap}>
+          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden>
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4.3-4.3" />
+          </svg>
+          <input
+            className={styles.searchInput}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search messages"
+          />
+          {q && (
+            <button type="button" className={styles.searchClear} onClick={() => setQ("")} aria-label="Clear search">
+              ×
+            </button>
+          )}
+        </div>
+        <button type="button" className={styles.composeBtn} onClick={onNew} aria-label="New message">
+          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }
@@ -298,17 +410,24 @@ function Room({
   roomId,
   room,
   userId,
+  target,
   onBack,
 }: {
   roomId: string;
   room: RoomSummary | null;
   userId: string;
+  target: string | null;
   onBack: () => void;
 }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const [newerCursor, setNewerCursor] = useState<string | null>(null);
+  const [hasNewer, setHasNewer] = useState(false);
+  const [loadingNewer, setLoadingNewer] = useState(false);
+  const [farBack, setFarBack] = useState(false);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -330,6 +449,8 @@ function Room({
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const restore = useRef<number | null>(null);
+  const hasNewerRef = useRef(false);
+  const scrolledToTarget = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const mentionMap = useRef<Map<string, string>>(new Map()); // "@Name" -> userId
@@ -361,17 +482,23 @@ function Room({
     setMessages(d.messages || []);
     setHasMore(!!d.hasMore);
     setCursor(d.nextCursor);
+    setHasNewer(false);
+    hasNewerRef.current = false;
+    setNewerCursor(null);
     const last = d.messages?.[d.messages.length - 1];
     if (last) markRead(last.id);
   }, [roomId, markRead]);
 
-  // Initial load + members.
+  // Initial load (around a target message when deep-linked, else newest) + members.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        const msgUrl = target
+          ? `/api/v2/chat/rooms/${roomId}/messages?around=${encodeURIComponent(target)}`
+          : `/api/v2/chat/rooms/${roomId}/messages`;
         const [msgRes, roomRes] = await Promise.all([
-          fetch(`/api/v2/chat/rooms/${roomId}/messages`),
+          fetch(msgUrl),
           fetch(`/api/v2/chat/rooms/${roomId}`),
         ]);
         const d = msgRes.ok ? await msgRes.json() : { messages: [], hasMore: false, nextCursor: null };
@@ -380,10 +507,14 @@ function Room({
         setMessages(d.messages || []);
         setHasMore(!!d.hasMore);
         setCursor(d.nextCursor);
+        setHasNewer(!!d.hasNewer);
+        hasNewerRef.current = !!d.hasNewer;
+        setNewerCursor(d.newerCursor ?? null);
+        setFarBack((d.newerCount ?? 0) > 100);
         if (rd.members?.length) setMembers(rd.members);
         setReady(true);
         const last = d.messages?.[d.messages.length - 1];
-        if (last) markRead(last.id);
+        if (last && !target) markRead(last.id);
       } catch {
         if (!cancelled) setReady(true);
       }
@@ -391,10 +522,22 @@ function Room({
     return () => {
       cancelled = true;
     };
-  }, [roomId, markRead]);
+  }, [roomId, target, markRead]);
 
+  // Position on first render: scroll to the target message (deep-link) or bottom.
   useLayoutEffect(() => {
-    if (ready && restore.current === null) scrollToBottom();
+    if (!ready || restore.current !== null) return;
+    if (target && !scrolledToTarget.current) {
+      const el = scrollRef.current?.querySelector(`[data-mid="${target}"]`) as HTMLElement | null;
+      if (el) {
+        el.scrollIntoView({ block: "center" });
+        scrolledToTarget.current = true;
+        setHighlightId(target);
+        setTimeout(() => setHighlightId(null), 2200);
+        return;
+      }
+    }
+    if (!target) scrollToBottom();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
@@ -423,6 +566,9 @@ function Room({
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "v2_chat_messages", filter: `room_id=eq.${roomId}` },
         async (payload) => {
+          // If we're viewing an older window (deep-linked), don't append newer
+          // messages out of order — they load when the user scrolls down.
+          if (hasNewerRef.current) return;
           const row = payload.new as Msg;
           if (!row.sender) {
             const { data } = await supabase
@@ -522,18 +668,40 @@ function Room({
 
   async function onScroll() {
     const el = scrollRef.current;
-    if (!el || loadingOlder || !hasMore || !cursor) return;
-    if (el.scrollTop > 60) return;
-    setLoadingOlder(true);
-    restore.current = el.scrollHeight;
-    try {
-      const res = await fetch(`/api/v2/chat/rooms/${roomId}/messages?before=${encodeURIComponent(cursor)}`);
-      const d = res.ok ? await res.json() : { messages: [], hasMore: false, nextCursor: null };
-      setMessages((cur) => [...(d.messages || []), ...cur]);
-      setHasMore(!!d.hasMore);
-      setCursor(d.nextCursor);
-    } finally {
-      setLoadingOlder(false);
+    if (!el) return;
+    // Older messages when near the top.
+    if (el.scrollTop <= 60 && hasMore && cursor && !loadingOlder) {
+      setLoadingOlder(true);
+      restore.current = el.scrollHeight;
+      try {
+        const res = await fetch(`/api/v2/chat/rooms/${roomId}/messages?before=${encodeURIComponent(cursor)}`);
+        const d = res.ok ? await res.json() : { messages: [], hasMore: false, nextCursor: null };
+        setMessages((c) => [...(d.messages || []), ...c]);
+        setHasMore(!!d.hasMore);
+        setCursor(d.nextCursor);
+      } finally {
+        setLoadingOlder(false);
+      }
+      return;
+    }
+    // Newer messages when near the bottom (after a deep-linked "around" load).
+    if (
+      hasNewer &&
+      newerCursor &&
+      !loadingNewer &&
+      el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    ) {
+      setLoadingNewer(true);
+      try {
+        const res = await fetch(`/api/v2/chat/rooms/${roomId}/messages?after=${encodeURIComponent(newerCursor)}`);
+        const d = res.ok ? await res.json() : { messages: [], hasNewer: false, newerCursor: null };
+        setMessages((c) => [...c, ...(d.messages || [])]);
+        setHasNewer(!!d.hasNewer);
+        hasNewerRef.current = !!d.hasNewer;
+        setNewerCursor(d.newerCursor ?? null);
+      } finally {
+        setLoadingNewer(false);
+      }
     }
   }
 
@@ -544,6 +712,12 @@ function Room({
       restore.current = null;
     }
   }, [messages]);
+
+  async function jumpToNewest() {
+    setFarBack(false);
+    await loadLatest();
+    requestAnimationFrame(() => scrollToBottom("auto"));
+  }
 
   // Convert tracked "@Name" tokens to wire markup on send.
   function buildContent(raw: string): string {
@@ -858,9 +1032,9 @@ function Room({
             agg.set(r.emoji, e);
           }
           return (
-            <div key={m.id}>
+            <div key={m.id} data-mid={m.id}>
               {showDay && <div className={styles.dayDivider}>{dayOf(m.created_at)}</div>}
-              <div className={styles.msgRow} data-mine={mine || undefined}>
+              <div className={styles.msgRow} data-mine={mine || undefined} data-hl={highlightId === m.id || undefined}>
                 <div className={styles.msgCol}>
                   {!mine && !grouped && (
                     <div className={styles.msgHead}>
@@ -992,6 +1166,15 @@ function Room({
           );
         })}
       </div>
+
+      {farBack && hasNewer && (
+        <button type="button" className={styles.jumpNewest} onClick={jumpToNewest} aria-label="Jump to newest">
+          <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M12 5v14M19 12l-7 7-7-7" />
+          </svg>
+          Newest
+        </button>
+      )}
 
       {typing.length > 0 && (
         <div className={styles.typing}>

@@ -23,7 +23,7 @@
 }
 
 .title {
-  font-family: var(--font-playfair), Georgia, serif;
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
   font-weight: 600;
   font-size: 1.2rem;
   margin: 0 0 8px;

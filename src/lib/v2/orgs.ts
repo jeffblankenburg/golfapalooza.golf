@@ -22,6 +22,22 @@ export async function isOrgAdmin(
   return !!data && (data.role === "owner" || data.role === "admin");
 }
 
+/** True when the user is an active member (any role) of the org. */
+export async function isOrgMember(
+  admin: SupabaseClient,
+  userId: string,
+  orgId: string
+): Promise<boolean> {
+  const { data } = await admin
+    .from("v2_memberships")
+    .select("id")
+    .eq("org_id", orgId)
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .maybeSingle();
+  return !!data;
+}
+
 /**
  * Normalize a user-entered custom domain to a bare lowercase hostname, or null
  * if it isn't a valid domain. Strips scheme/path/trailing dot.

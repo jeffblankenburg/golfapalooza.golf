@@ -1,9 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { v2BrowserClient } from "@/lib/v2/supabase-browser";
+import { syncBadge } from "@/lib/v2/badge";
+import { pushPermission, subscribeToV2Push } from "@/lib/v2/push-client";
+import ProfileDrawer from "./ProfileDrawer";
+import NotificationDrawer from "./NotificationDrawer";
+import ChatDrawer from "./ChatDrawer";
 import styles from "./event-shell.module.css";
 /* eslint-disable @next/next/no-img-element */
+
+const CHAT_TYPES = ["chat_message", "chat_mention"];
 
 type DrawerKey = "chat" | "photos" | "music" | "rounds" | "profile" | "notifications";
 
@@ -12,7 +20,7 @@ const DRAWERS: Record<DrawerKey, { title: string; body: string }> = {
   photos: { title: "Photos", body: "The photo gallery will live here." },
   music: { title: "Music", body: "The jukebox will live here." },
   rounds: { title: "My Rounds", body: "Round tracking & scoring will live here." },
-  profile: { title: "Profile", body: "Your profile & groups will live here." },
+  profile: { title: "Profile", body: "" },
   notifications: { title: "Notifications", body: "Your notifications will live here." },
 };
 
@@ -23,24 +31,100 @@ const DRAWERS: Record<DrawerKey, { title: string; body: string }> = {
  */
 export default function EventShell({
   slug,
+  orgId,
+  userId,
   isAdmin,
   orgName,
   logoUrl,
+  userAvatarUrl,
+  initialUnreadCount,
   children,
 }: {
   slug: string;
+  orgId: string;
+  userId: string;
   isAdmin: boolean;
   orgName: string;
   logoUrl: string | null;
+  userAvatarUrl: string | null;
+  initialUnreadCount: number;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState<DrawerKey | null>(null);
-  const toggle = (k: DrawerKey) => setOpen((cur) => (cur === k ? null : k));
+  const [unread, setUnread] = useState(initialUnreadCount);
+  const toggle = (k: DrawerKey) => {
+    // Opening notifications marks everything read (the drawer does the write).
+    if (k === "notifications") setUnread(0);
+    setOpen((cur) => (cur === k ? null : k));
+  };
+
+  // Refetch the authoritative unread count (used after read/delete events).
+  const refetchUnread = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/v2/notifications?orgId=${orgId}`);
+      if (res.ok) setUnread((await res.json()).unread ?? 0);
+    } catch {
+      /* ignore */
+    }
+  }, [orgId]);
+
+  // Live bell (mirrors the legacy HeaderBar): INSERT bumps the badge unless the
+  // drawer is open (then it's read on arrival); UPDATE/DELETE recompute the count.
+  useEffect(() => {
+    const supabase = v2BrowserClient();
+    const channel = supabase
+      .channel(`v2-notif-${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "v2_notifications", filter: `user_id=eq.${userId}` },
+        (payload) => {
+          const n = payload.new as { org_id: string; type: string };
+          if (n.org_id !== orgId || CHAT_TYPES.includes(n.type)) return;
+          setOpen((cur) => {
+            if (cur !== "notifications") setUnread((u) => u + 1);
+            return cur;
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "v2_notifications", filter: `user_id=eq.${userId}` },
+        () => refetchUnread(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "v2_notifications", filter: `user_id=eq.${userId}` },
+        () => refetchUnread(),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, orgId, refetchUnread]);
+
+  // Keep the OS app-icon badge in sync with the unread count.
+  useEffect(() => {
+    syncBadge(unread);
+  }, [unread]);
+
+  // Auto-refresh the push subscription on mount if permission is already granted
+  // (mirrors the legacy HeaderBar — keeps already-opted-in users subscribed).
+  useEffect(() => {
+    if (pushPermission() === "granted") subscribeToV2Push().catch(() => {});
+  }, []);
 
   return (
     <>
       {/* ── Top bar ─────────────────────────────────────────────────────── */}
       <header className={styles.topbar}>
+        <Link href={`/new/${slug}`} className={styles.topLogo} aria-label={orgName}>
+          {logoUrl ? (
+            <img src={logoUrl} alt="" />
+          ) : (
+            <span className={styles.topLogoMono}>{orgName.charAt(0).toUpperCase()}</span>
+          )}
+        </Link>
+
         <div className={styles.topGroup}>
           <TopIcon label="Chat" active={open === "chat"} onClick={() => toggle("chat")}>
             <path d="M8 10h8M8 14h5M21 12a8 8 0 01-11.5 7.2L3 21l1.8-6.5A8 8 0 1121 12z" />
@@ -60,23 +144,31 @@ export default function EventShell({
             <path d="M6 4h11l-2.5 3L17 10H6" />
             <circle cx="6" cy="21" r="1.4" />
           </TopIcon>
-        </div>
-        <Link href={`/new/${slug}`} className={styles.topLogo} aria-label={orgName}>
-          {logoUrl ? (
-            <img src={logoUrl} alt="" />
+          <span className={styles.bellWrap}>
+            <TopIcon label="Notifications" active={open === "notifications"} onClick={() => toggle("notifications")}>
+              <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0" />
+            </TopIcon>
+            {unread > 0 && (
+              <span className={styles.bellBadge}>{unread > 99 ? "99+" : unread}</span>
+            )}
+          </span>
+          {userAvatarUrl ? (
+            <button
+              type="button"
+              className={styles.iconBtn}
+              data-active={open === "profile"}
+              onClick={() => toggle("profile")}
+              aria-label="Profile"
+              aria-pressed={open === "profile"}
+            >
+              <img src={userAvatarUrl} alt="" className={styles.avatarIcon} />
+            </button>
           ) : (
-            <span className={styles.topLogoMono}>{orgName.charAt(0).toUpperCase()}</span>
+            <TopIcon label="Profile" active={open === "profile"} onClick={() => toggle("profile")}>
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 21a8 8 0 0116 0" />
+            </TopIcon>
           )}
-        </Link>
-
-        <div className={styles.topGroup}>
-          <TopIcon label="Notifications" active={open === "notifications"} onClick={() => toggle("notifications")}>
-            <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0" />
-          </TopIcon>
-          <TopIcon label="Profile" active={open === "profile"} onClick={() => toggle("profile")}>
-            <circle cx="12" cy="8" r="4" />
-            <path d="M4 21a8 8 0 0116 0" />
-          </TopIcon>
         </div>
       </header>
 
@@ -94,8 +186,20 @@ export default function EventShell({
             </svg>
           </button>
         </div>
-        <div className={styles.drawerBody}>
-          {open && <p className={styles.drawerStub}>{DRAWERS[open].body}</p>}
+        <div className={styles.drawerBody} data-flush={open === "chat" || undefined}>
+          {open === "profile" ? (
+            <ProfileDrawer active={open === "profile"} />
+          ) : open === "notifications" ? (
+            <NotificationDrawer
+              active={open === "notifications"}
+              orgId={orgId}
+              onClose={() => setOpen(null)}
+            />
+          ) : open === "chat" ? (
+            <ChatDrawer orgId={orgId} userId={userId} />
+          ) : (
+            open && <p className={styles.drawerStub}>{DRAWERS[open].body}</p>
+          )}
         </div>
       </section>
 

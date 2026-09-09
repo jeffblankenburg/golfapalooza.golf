@@ -3,7 +3,8 @@
  * sunlight: a soft off-white background (bright but glare-reduced vs pure white)
  * with high-contrast dark-green ink. The org's --brand tints accents (monogram,
  * section labels, active states) while the bright base stays constant across
- * tenants. Playfair Display headlines over Libre Franklin. Minimal ornament.
+ * tenants. Libre Franklin everywhere for readability; Playfair Display serif is
+ * reserved for the single event title. Minimal ornament.
  */
 
 .wrap {
@@ -67,7 +68,7 @@
 }
 
 .brandName {
-  font-family: var(--font-playfair), Georgia, serif;
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
   font-weight: 600;
   font-size: 1.1rem;
   letter-spacing: 0.01em;
@@ -87,17 +88,17 @@
 }
 
 /* ── Page ───────────────────────────────────────────────────────────────── */
+/* Fill the viewport at every width — the horizontal gutter is a constant 20px at
+   all sizes, so no wider margin ever "kicks in" at a breakpoint. Only the top/
+   bottom padding grows on larger screens. */
 .page {
-  padding: 40px 20px 72px;
-  max-width: 400px;
+  padding: 40px 10px 72px;
+  width: 100%;
   margin: 0 auto;
 }
-/* Two widths: a 400px column on phones, a wide container that fills large
-   screens. Nothing in between. */
-@media (min-width: 1000px) {
+@media (min-width: 600px) {
   .page {
-    max-width: min(92vw, 1200px);
-    padding: 48px 40px 96px;
+    padding: 48px 10px 96px;
   }
 }
 /* Org home leads with the logo — tighter under the header. */
@@ -115,15 +116,16 @@
 }
 
 .title {
-  font-family: var(--font-playfair), Georgia, serif;
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
   font-weight: 600;
   font-size: 2.5rem;
   line-height: 1.04;
   margin: 0;
   color: var(--ink);
 }
-/* Event name only — tinted with the group's brand color. */
+/* Event name only — the sole serif in the app, tinted with the group's brand. */
 .eventTitle {
+  font-family: var(--font-playfair), Georgia, serif;
   color: var(--brand);
 }
 
@@ -181,7 +183,7 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-family: var(--font-playfair), Georgia, serif;
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
   font-weight: 600;
   font-size: 1.25rem;
   color: #fff;
@@ -199,7 +201,7 @@
 }
 
 .orgName {
-  font-family: var(--font-playfair), Georgia, serif;
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
   font-weight: 600;
   font-size: 1.22rem;
   letter-spacing: 0.01em;
@@ -267,7 +269,7 @@
   background: var(--card);
 }
 .emptyTitle {
-  font-family: var(--font-playfair), Georgia, serif;
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
   font-size: 1.3rem;
   font-weight: 600;
   color: var(--ink);
@@ -390,7 +392,7 @@
   border-color: var(--line);
 }
 .adminTileLabel {
-  font-family: var(--font-playfair), Georgia, serif;
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
   font-size: 1rem;
   font-weight: 600;
 }
@@ -530,7 +532,7 @@
   display: grid;
   place-items: center;
   color: #fff;
-  font-family: var(--font-playfair), Georgia, serif;
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
   font-weight: 600;
   font-size: 1.6rem;
   background-size: cover;
@@ -570,14 +572,14 @@
   object-fit: contain;
   display: grid;
   place-items: center;
-  font-family: var(--font-playfair), Georgia, serif;
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
   font-weight: 600;
   font-size: 0.95rem;
 }
 .groupBarName {
   flex: 1;
   min-width: 0;
-  font-family: var(--font-playfair), Georgia, serif;
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
   font-weight: 600;
   font-size: 1.05rem;
   color: var(--ink);
@@ -595,19 +597,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: 18px -20px 0;
-  padding: 5px 20px;
+  margin: 18px -10px 0;
+  padding: 5px 10px;
   border-top: 1px solid color-mix(in srgb, var(--brand) 45%, transparent);
   border-bottom: 1px solid color-mix(in srgb, var(--brand) 45%, transparent);
   background: color-mix(in srgb, var(--brand) 25%, transparent);
-}
-@media (min-width: 1000px) {
-  .dateBand {
-    margin-left: -40px;
-    margin-right: -40px;
-    padding-left: 40px;
-    padding-right: 40px;
-  }
 }
 .dateText {
   color: var(--ink);
@@ -640,7 +634,7 @@
   border-radius: 50%;
   /* Show the whole logo — never crop a crest to fill the circle. */
   object-fit: contain;
-  font-family: var(--font-playfair), Georgia, serif;
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
   font-weight: 600;
   font-size: 1.5rem;
 }
@@ -1009,4 +1003,909 @@ details[open] .chev {
   .card {
     animation: none;
   }
+}
+
+/* ══ Event-home modules ═══════════════════════════════════════════════════════
+   Each module is a labeled block in the home stack. The `preview` tag marks a
+   stub with no live data source yet. Cards share the quiet-golf card language:
+   white surface, hairline border, generous radius. */
+.module {
+  margin-top: 15px;
+}
+.moduleHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.moduleHead .sectionLabel {
+  margin-bottom: 0;
+}
+.previewTag {
+  flex: none;
+  font-size: 0.54rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-soft);
+  border: 1px dashed var(--line-strong);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* 1 · Birthdays — festive gradient card with floating balloons (only shown when
+   it's actually someone's birthday). Mirrors the legacy banner. */
+.birthdayStack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.birthdayLink {
+  display: block;
+  text-decoration: none;
+  border-radius: 16px;
+  transition: transform 0.1s ease;
+}
+.birthdayLink:active {
+  transform: scale(0.98);
+}
+.birthdayCard {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(90deg, #fce7f3 0%, #fefce8 50%, #cffafe 100%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.birthdayBalloons {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.balloon {
+  position: absolute;
+  bottom: 0;
+  left: var(--left);
+  font-size: var(--size);
+  line-height: 1;
+  animation: birthdayRise var(--dur) linear var(--delay) infinite;
+  animation-fill-mode: backwards;
+  will-change: transform, opacity, bottom;
+}
+@keyframes birthdayRise {
+  0% { bottom: -20%; opacity: 0; transform: rotate(-6deg); }
+  15% { opacity: 0.55; }
+  50% { transform: rotate(6deg); }
+  85% { opacity: 0.4; }
+  100% { bottom: 120%; opacity: 0; transform: rotate(-6deg); }
+}
+.birthdayAvatar,
+.birthdayAvatarFallback {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #fff, 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+.birthdayAvatar {
+  object-fit: cover;
+}
+.birthdayAvatarFallback {
+  display: grid;
+  place-items: center;
+  background: #fbcfe8;
+  color: #be185d;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.birthdayContent {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+.birthdayTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.3;
+}
+.birthdaySubtitle {
+  font-size: 0.85rem;
+  color: #4b5563;
+  line-height: 1.3;
+  margin-top: 2px;
+}
+
+/* 2 · Current Article — full-bleed header image with the title + date overlaid
+   on a bottom scrim, then the opening sentences below (mirrors the legacy home
+   article card). */
+.articleCard {
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  overflow: hidden;
+}
+.articleImage {
+  position: relative;
+  height: 144px;
+  /* Placeholder wash shows through when no image is set (stub). */
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--brand) 30%, var(--paper)),
+    color-mix(in srgb, var(--brand) 8%, var(--paper)));
+}
+/* Direct child only — must not match the author avatar nested in the overlay. */
+.articleImage > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.articleImageScrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.72) 0%,
+    rgba(0, 0, 0, 0.2) 45%,
+    transparent 75%
+  );
+}
+.articleImageText {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16px;
+}
+.articleOverlayTitle {
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+.articleDate {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+.articleExcerptWrap {
+  padding: 14px 16px 16px;
+}
+.articleExcerpt {
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* Author (avatar + name) inline with the date, on the image scrim. */
+.articleMeta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+}
+.articleMetaAvatar,
+.articleMetaAvatarFallback {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.85);
+}
+.articleMetaAvatar {
+  object-fit: cover;
+}
+.articleMetaAvatarFallback {
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+.articleMetaAuthor {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+.articleAuthorGroup {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto; /* date stays left; author cluster pushes to the right edge */
+}
+
+/* 3 · Registration — bold brand CTA shown until the user RSVPs. Whole box is the
+   brand color with white type + a gentle attention pulse (mirrors legacy home). */
+.rsvpPrompt {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  cursor: pointer;
+  padding: 22px 20px;
+  border-radius: 16px;
+  background: var(--brand);
+  box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--brand) 70%, transparent);
+  animation: rsvpPulse 2.5s ease-in-out infinite;
+  transition: transform 0.1s ease;
+}
+.rsvpPrompt:active {
+  transform: scale(0.98);
+}
+@keyframes rsvpPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.82; }
+}
+.rsvpEyebrow {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 2px;
+}
+.rsvpBig {
+  display: block;
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  color: #fff;
+}
+.rsvpHint {
+  display: block;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.72);
+  margin-top: 4px;
+}
+
+/* Responded state — "Responses" accordion (mirrors legacy participants card). */
+.rsvpCard {
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  overflow: hidden;
+}
+.rsvpAccordionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+.rsvpAccordionHead:active {
+  background: rgba(23, 33, 29, 0.04);
+}
+.rsvpAccordionTitle {
+  font-weight: 700;
+  color: var(--ink);
+}
+.rsvpCount {
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.rsvpChevron {
+  color: var(--ink-soft);
+  transition: transform 0.2s ease;
+}
+.rsvpChevron[data-open] {
+  transform: rotate(180deg);
+}
+.rsvpYours {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  border-top: 1px solid var(--line);
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+.rsvpYours:active {
+  background: rgba(23, 33, 29, 0.04);
+}
+.rsvpYoursLabel {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-soft);
+}
+.rsvpYoursValue {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.rsvpDot {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--ink-soft);
+}
+.rsvpDot[data-likelihood="99"] { background: #16a34a; }
+.rsvpDot[data-likelihood="75"] { background: #65a30d; }
+.rsvpDot[data-likelihood="50"] { background: #d97706; }
+.rsvpDot[data-likelihood="25"] { background: #b91c1c; }
+.rsvpGroups {
+  border-top: 1px solid var(--line);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.rsvpLoading {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+.rsvpGroupLabel {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-soft);
+  margin-bottom: 8px;
+}
+.rsvpChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.rsvpChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 5%, var(--card));
+  border: 1px solid var(--line);
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+.rsvpChipAvatar,
+.rsvpChipFallback {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.rsvpChipFallback {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--brand) 16%, var(--paper));
+  color: var(--brand);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+/* Picker options (inside the modal). */
+.rsvpOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rsvpOption {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.rsvpOption[data-selected] {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 6%, var(--card));
+}
+.rsvpOption:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.rsvpOptionDot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.rsvpOptionDot[data-likelihood="99"] {
+  background: #16a34a;
+}
+.rsvpOptionDot[data-likelihood="75"] {
+  background: #65a30d;
+}
+.rsvpOptionDot[data-likelihood="50"] {
+  background: #d97706;
+}
+.rsvpOptionDot[data-likelihood="25"] {
+  background: #b91c1c;
+}
+.rsvpOptionText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.rsvpOptionLabel {
+  font-weight: 700;
+  color: var(--ink);
+}
+.rsvpOptionSub {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+.rsvpCheck {
+  flex: none;
+  color: var(--brand);
+  font-weight: 800;
+}
+.rsvpClear {
+  margin-top: 4px;
+  padding: 10px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.rsvpClear:hover {
+  color: #b91c1c;
+}
+.rsvpClear:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 4 · Store — external merch link card. */
+.storeCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  text-decoration: none;
+  transition: transform 0.1s ease, border-color 0.15s ease;
+}
+.storeCard:active {
+  transform: scale(0.98);
+}
+.storeIcon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--brand) 12%, var(--paper));
+  color: var(--brand);
+}
+.storeTitle {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.storeArrow {
+  flex: none;
+  color: var(--ink-soft);
+}
+
+/* 5 · Activity feed — unified list of recent events (rounds, photos, songs, …). */
+.feedList {
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  overflow: hidden;
+}
+.feedRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  text-decoration: none;
+  color: inherit;
+}
+.feedRow + .feedRow {
+  border-top: 1px solid var(--line);
+}
+a.feedRow:active {
+  background: rgba(23, 33, 29, 0.04);
+}
+.feedThumb {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.feedIcon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--brand) 12%, var(--paper));
+  color: var(--brand);
+}
+.feedText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.feedTitle {
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.feedSub {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.feedMeta {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  margin-top: 1px;
+}
+
+/* 6 · Sponsors — display-only carousel (mirrors legacy fake-ad carousel). */
+.adFrame {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  aspect-ratio: 3 / 1;
+}
+.adFrame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.adDots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.adDot {
+  width: 6px;
+  height: 6px;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 999px;
+  background: var(--line-strong);
+  transition: width 0.2s ease, background 0.2s ease;
+}
+.adDot[data-active] {
+  width: 16px;
+  background: var(--brand);
+}
+
+/* ══ Birthday calendar page ═══════════════════════════════════════════════════ */
+.calHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.calBack {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font-size: 1.1rem;
+  text-decoration: none;
+}
+.calBack:active {
+  background: rgba(23, 33, 29, 0.06);
+}
+.calTitle {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.calMonth {
+  margin-top: 22px;
+}
+.calMonthLabel {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--brand);
+  margin-bottom: 10px;
+}
+.calList {
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  overflow: hidden;
+}
+.calRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+.calRow + .calRow {
+  border-top: 1px solid var(--line);
+}
+.calRow[data-today] {
+  background: linear-gradient(90deg, #fce7f3 0%, #fefce8 55%, #cffafe 100%);
+}
+.calAvatar,
+.calAvatarFallback {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+}
+.calAvatar {
+  object-fit: cover;
+}
+.calAvatarFallback {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--brand) 14%, var(--paper));
+  color: var(--brand);
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.calWho {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.calName {
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.calAge {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+.calDate {
+  flex: none;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+}
+
+/* ══ Profile drawer (settings form) ═══════════════════════════════════════════ */
+.profileForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.profileAvatarRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 4px;
+}
+.profileAvatar,
+.profileAvatarFallback {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.profileAvatarFallback {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--brand) 16%, var(--paper));
+  color: var(--brand);
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+.profileName {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.profileTwoCol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 11px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--font-libre), sans-serif;
+  font-size: 1rem;
+  line-height: 1.45;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.15s ease;
+}
+.textarea:focus {
+  border-color: var(--brand);
+}
+.readonlyValue {
+  padding: 13px 14px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--ink) 4%, var(--card));
+  color: var(--ink-soft);
+  font-size: 1rem;
+}
+.profileToggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 4px 0;
+}
+.profileToggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--brand);
+}
+.profileActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  padding-bottom: 8px;
+}
+.signOutBtn {
+  padding: 12px;
+  border-radius: 11px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: #b91c1c;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.signOutBtn:hover {
+  border-color: #b91c1c;
+}
+
+/* ══ Notification drawer ══════════════════════════════════════════════════════ */
+.notifList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.notifClear {
+  align-self: flex-end;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  padding: 2px 4px;
+}
+.notifClear:hover {
+  color: #b91c1c;
+}
+.notifRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+}
+.notifRow[data-clickable] {
+  cursor: pointer;
+}
+.notifRow[data-clickable]:active {
+  background: rgba(23, 33, 29, 0.04);
+}
+.notifRow[data-unread] {
+  border-color: color-mix(in srgb, var(--brand) 40%, transparent);
+  background: color-mix(in srgb, var(--brand) 5%, var(--card));
+}
+.notifDot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+.notifDot[data-type="announcement"] { background: #d97706; }
+.notifDot[data-type="article"] { background: #0284c7; }
+.notifDot[data-type="poll"] { background: #7c3aed; }
+.notifText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.notifTitle {
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.3;
+}
+.notifBody {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  line-height: 1.35;
+}
+.notifTime {
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+.notifDelete {
+  flex: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 0 2px;
+}
+.notifDelete:hover {
+  color: var(--ink);
 }

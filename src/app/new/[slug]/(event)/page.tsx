@@ -3,6 +3,7 @@ import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
 import styles from "@/app/new/new.module.css";
 import Countdown from "./Countdown";
+import HomeModules from "./HomeModules";
 
 interface EventRow {
   id: string;
@@ -64,14 +65,15 @@ export default async function EventHome({
             </div>
           )}
 
-          <div className={styles.section}>
-            <p className={styles.sectionLabel}>Standings</p>
-            <div className={styles.placeholder}>Contest standings will appear here.</div>
-          </div>
-          <div className={styles.section}>
-            <p className={styles.sectionLabel}>Schedule</p>
-            <div className={styles.placeholder}>The event schedule will appear here.</div>
-          </div>
+          <HomeModules
+            orgId={org.id}
+            eventId={event.id}
+            userId={ctx.userId}
+            slug={slug}
+            eventName={event.name}
+            storeUrl={org.store_url}
+            storeLabel={org.store_label}
+          />
         </>
       ) : (
         <div className={styles.eventHero}>

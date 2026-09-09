@@ -23,6 +23,8 @@ export default async function GroupSettingsPage({
       initialName={org.name}
       initialColor={org.primary_color || "#0a5c36"}
       initialLogo={org.logo_url}
+      initialStoreUrl={org.store_url}
+      initialStoreLabel={org.store_label}
     />
   );
 }

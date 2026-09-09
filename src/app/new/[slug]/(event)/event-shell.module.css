@@ -43,6 +43,36 @@
   color: var(--brand);
   background: color-mix(in srgb, var(--brand) 10%, transparent);
 }
+.bellWrap {
+  position: relative;
+  display: inline-flex;
+}
+.bellBadge {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--card);
+}
+.avatarIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+.iconBtn[data-active="true"] .avatarIcon {
+  box-shadow: 0 0 0 2px var(--brand);
+}
 
 .topLogo {
   flex: none;
@@ -66,7 +96,7 @@
   place-items: center;
   background: var(--brand);
   color: #fff;
-  font-family: var(--font-playfair), Georgia, serif;
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
   font-weight: 600;
   font-size: 1.4rem;
 }
@@ -120,7 +150,7 @@
   border-bottom: 1px solid var(--line);
 }
 .drawerTitle {
-  font-family: var(--font-playfair), Georgia, serif;
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
   font-weight: 600;
   font-size: 1.15rem;
   color: var(--ink);
@@ -139,6 +169,14 @@
   flex: 1;
   overflow-y: auto;
   padding: 24px 20px;
+  min-height: 0;
+}
+/* Chat manages its own scroll + pinned composer, so the body is flush. */
+.drawerBody[data-flush] {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .drawerStub {
   color: var(--ink-soft);

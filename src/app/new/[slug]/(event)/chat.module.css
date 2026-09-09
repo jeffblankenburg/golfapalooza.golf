@@ -1,0 +1,288 @@
+/* Chat drawer — room list + room view. Inherits the /new theme vars (--brand,
+   --ink, --card, --line, --paper) from the .wrap ancestor. */
+
+.loading {
+  padding: 24px 20px;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+/* ── Room list ────────────────────────────────────────────────────────────── */
+.roomList {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+.roomRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+.roomRow:active {
+  background: rgba(23, 33, 29, 0.05);
+}
+.roomAvatar,
+.roomAvatarFallback {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.roomAvatarFallback {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--brand) 16%, var(--paper));
+  color: var(--brand);
+  font-weight: 700;
+  font-size: 1.15rem;
+}
+.roomMeta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.roomName {
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pin {
+  font-size: 0.8rem;
+}
+.roomPreview {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.roomUnread {
+  flex: none;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+
+/* ── Room view ────────────────────────────────────────────────────────────── */
+.room {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.roomHeader {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+}
+.backBtn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+  border-radius: 8px;
+}
+.backBtn:active {
+  background: rgba(23, 33, 29, 0.06);
+}
+.roomHeaderName {
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px 12px 4px;
+  display: flex;
+  flex-direction: column;
+}
+.olderSpinner,
+.historyStart {
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  padding: 8px 0;
+}
+.dayDivider {
+  align-self: center;
+  margin: 10px 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.msgRow {
+  display: flex;
+  margin-top: 2px;
+}
+.msgRow[data-mine] {
+  justify-content: flex-end;
+}
+.msgCol {
+  display: flex;
+  flex-direction: column;
+  max-width: 82%;
+  min-width: 0;
+}
+.msgRow[data-mine] .msgCol {
+  align-items: flex-end;
+}
+/* Avatar + name together, above the group. */
+.msgHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 3px 2px;
+}
+.msgAvatar,
+.msgAvatarFallback {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.msgAvatarFallback {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--brand) 16%, var(--paper));
+  color: var(--brand);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.msgSender {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.bubble {
+  padding: 8px 12px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--ink) 6%, var(--card));
+  color: var(--ink);
+  border: 1px solid var(--line);
+  line-height: 1.35;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.bubble[data-mine] {
+  background: var(--brand);
+  color: #fff;
+  border-color: transparent;
+}
+.bubble[data-pending] {
+  opacity: 0.6;
+}
+.bubbleText {
+  white-space: pre-wrap;
+  font-size: 0.95rem;
+}
+.mention {
+  font-weight: 700;
+  color: var(--brand);
+}
+.bubble[data-mine] .mention {
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link {
+  color: var(--brand);
+  text-decoration: underline;
+  word-break: break-all;
+}
+.bubble[data-mine] .link {
+  color: #fff;
+}
+.bubbleImage {
+  display: block;
+  max-width: 100%;
+  border-radius: 12px;
+  margin: -2px 0;
+}
+.msgTime {
+  font-size: 0.62rem;
+  color: var(--ink-soft);
+  margin: 2px 6px 0;
+}
+
+/* ── Composer ─────────────────────────────────────────────────────────────── */
+.inputBar {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--card);
+}
+.input {
+  flex: 1;
+  min-width: 0;
+  max-height: 120px;
+  padding: 9px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-libre), sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  resize: none;
+  outline: none;
+}
+.input:focus {
+  border-color: var(--brand);
+}
+.sendBtn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--brand);
+  color: #fff;
+  cursor: pointer;
+}
+.sendBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

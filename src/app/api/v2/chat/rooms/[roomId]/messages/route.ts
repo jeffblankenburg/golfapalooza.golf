@@ -1,0 +1,123 @@
+import { NextResponse } from "next/server";
+import { resolveRoomAccess } from "@/lib/v2/chat";
+import { sendV2Notifications } from "@/lib/v2/notifications";
+
+/**
+ * Messages for a room.
+ *   GET  ?before=<ISO>&limit=  — newest-first page; `before` pages BACK through
+ *        the full history (lazy scrollback). Returns nextCursor (oldest in page)
+ *        + hasMore. Excludes the caller's hidden messages.
+ *   POST { content?, imageUrl?, replyToId? } — send; unhides the room for all
+ *        members and notifies the others (chat_message).
+ * Auth: bearer (native) or cookie (web); room-membership gated.
+ */
+
+const PAGE = 30;
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ roomId: string }> },
+) {
+  const { roomId } = await params;
+  const a = await resolveRoomAccess(request, roomId);
+  if ("error" in a) return NextResponse.json({ error: a.error }, { status: a.status });
+
+  const url = new URL(request.url);
+  const before = url.searchParams.get("before");
+  const limit = Math.min(Number(url.searchParams.get("limit")) || PAGE, 100);
+
+  let q = a.admin
+    .from("v2_chat_messages")
+    .select(
+      "id, room_id, sender_id, content, image_url, reply_to_id, created_at, sender:v2_profiles!v2_chat_messages_sender_id_fkey(display_name, avatar_url), reactions:v2_chat_reactions(emoji, user_id)",
+    )
+    .eq("room_id", roomId)
+    .order("created_at", { ascending: false })
+    .limit(limit + 1);
+  if (before) q = q.lt("created_at", before);
+
+  const [msgRes, hiddenRes] = await Promise.all([
+    q,
+    a.admin
+      .from("v2_chat_hidden_messages")
+      .select("message_id")
+      .eq("user_id", a.userId),
+  ]);
+
+  const hidden = new Set((hiddenRes.data || []).map((h) => h.message_id));
+  const rows = (msgRes.data || []).filter((m) => !hidden.has(m.id));
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  const nextCursor = hasMore ? page[page.length - 1].created_at : null;
+
+  // Return ascending (oldest→newest) so the client can append/prepend naturally.
+  return NextResponse.json({
+    messages: page.slice().reverse(),
+    nextCursor,
+    hasMore,
+  });
+}
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ roomId: string }> },
+) {
+  const { roomId } = await params;
+  const a = await resolveRoomAccess(request, roomId);
+  if ("error" in a) return NextResponse.json({ error: a.error }, { status: a.status });
+
+  let body: { content?: string; imageUrl?: string; replyToId?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
+  const content = (body.content || "").trim() || null;
+  const imageUrl = body.imageUrl || null;
+  if (!content && !imageUrl) {
+    return NextResponse.json({ error: "Message is empty" }, { status: 400 });
+  }
+
+  const { data: msg, error } = await a.admin
+    .from("v2_chat_messages")
+    .insert({
+      room_id: roomId,
+      sender_id: a.userId,
+      content,
+      image_url: imageUrl,
+      reply_to_id: body.replyToId || null,
+    })
+    .select(
+      "id, room_id, sender_id, content, image_url, reply_to_id, created_at, sender:v2_profiles!v2_chat_messages_sender_id_fkey(display_name, avatar_url)",
+    )
+    .maybeSingle();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Un-hide the room for everyone (a new message resurfaces it) + notify others.
+  const { data: members } = await a.admin
+    .from("v2_chat_room_members")
+    .select("user_id")
+    .eq("room_id", roomId);
+  const others = (members || []).map((m) => m.user_id).filter((id) => id !== a.userId);
+
+  await a.admin
+    .from("v2_chat_room_members")
+    .update({ hidden_at: null })
+    .eq("room_id", roomId)
+    .not("hidden_at", "is", null);
+
+  if (others.length) {
+    const sender = Array.isArray(msg?.sender) ? msg?.sender[0] : msg?.sender;
+    const senderName = sender?.display_name || "Someone";
+    const preview = content ? content.slice(0, 80) : "📷 Photo";
+    await sendV2Notifications(a.admin, others, {
+      orgId: a.room.org_id,
+      type: "chat_message",
+      title: a.room.name || senderName,
+      body: `${senderName}: ${preview}`,
+      data: { url: `/new/${a.room.org_id}/chat/${roomId}`, roomId },
+    }).catch(() => {});
+  }
+
+  return NextResponse.json({ message: msg });
+}

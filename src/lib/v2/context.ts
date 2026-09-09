@@ -14,6 +14,8 @@ export interface PlatformOrg {
   logo_url: string | null;
   primary_color: string | null;
   secondary_color: string | null;
+  store_url: string | null;
+  store_label: string | null;
   role: OrgRole;
 }
 
@@ -37,7 +39,7 @@ export async function getPlatformContext(): Promise<PlatformContext | null> {
   const { data: memberships } = await supabase
     .from("v2_memberships")
     .select(
-      "role, org:v2_organizations(id, name, slug, logo_url, primary_color, secondary_color)"
+      "role, org:v2_organizations(id, name, slug, logo_url, primary_color, secondary_color, store_url, store_label)"
     )
     .eq("user_id", user.id)
     .eq("status", "active");

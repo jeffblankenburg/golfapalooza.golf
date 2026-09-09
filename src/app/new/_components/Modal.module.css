@@ -31,7 +31,7 @@
   padding: 18px 20px 12px;
 }
 .title {
-  font-family: var(--font-playfair), Georgia, serif;
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
   font-weight: 600;
   font-size: 1.25rem;
   margin: 0;

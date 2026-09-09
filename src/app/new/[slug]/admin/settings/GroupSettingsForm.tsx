@@ -12,16 +12,22 @@ export default function GroupSettingsForm({
   initialName,
   initialColor,
   initialLogo,
+  initialStoreUrl,
+  initialStoreLabel,
 }: {
   orgId: string;
   slug: string;
   initialName: string;
   initialColor: string;
   initialLogo: string | null;
+  initialStoreUrl: string | null;
+  initialStoreLabel: string | null;
 }) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
   const [color, setColor] = useState(initialColor);
+  const [storeUrl, setStoreUrl] = useState(initialStoreUrl || "");
+  const [storeLabel, setStoreLabel] = useState(initialStoreLabel || "");
   const [logo, setLogo] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(initialLogo);
   const [saving, setSaving] = useState(false);
@@ -43,7 +49,12 @@ export default function GroupSettingsForm({
       const res = await fetch(`/api/v2/orgs/${orgId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), primary_color: color }),
+        body: JSON.stringify({
+          name: name.trim(),
+          primary_color: color,
+          store_url: storeUrl.trim() || null,
+          store_label: storeLabel.trim() || null,
+        }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -146,6 +157,38 @@ export default function GroupSettingsForm({
             />
             <span className={styles.swatchHint}>Tints your group&apos;s accents.</span>
           </div>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="storeUrl">
+            Store link
+          </label>
+          <input
+            id="storeUrl"
+            className={styles.input}
+            value={storeUrl}
+            onChange={(e) => setStoreUrl(e.target.value)}
+            placeholder="https://your-shop.com"
+            inputMode="url"
+          />
+          <p className={styles.swatchHint}>
+            External merch shop. Leave blank to hide the Store card.
+          </p>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="storeLabel">
+            Store label
+          </label>
+          <input
+            id="storeLabel"
+            className={styles.input}
+            value={storeLabel}
+            onChange={(e) => setStoreLabel(e.target.value)}
+            placeholder="Get the gear"
+            maxLength={60}
+          />
+          <p className={styles.swatchHint}>Optional headline for the card.</p>
         </div>
 
         <DomainsManager orgId={orgId} />

@@ -38,6 +38,7 @@ export default function EventShell({
   logoUrl,
   userAvatarUrl,
   initialUnreadCount,
+  initialChatUnread,
   children,
 }: {
   slug: string;
@@ -48,14 +49,30 @@ export default function EventShell({
   logoUrl: string | null;
   userAvatarUrl: string | null;
   initialUnreadCount: number;
+  initialChatUnread: number;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState<DrawerKey | null>(null);
   const [unread, setUnread] = useState(initialUnreadCount);
+  const [chatUnread, setChatUnread] = useState(initialChatUnread);
+
+  const refetchChatUnread = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/v2/chat/unread?orgId=${orgId}`);
+      if (res.ok) setChatUnread((await res.json()).unread ?? 0);
+    } catch {
+      /* ignore */
+    }
+  }, [orgId]);
+
   const toggle = (k: DrawerKey) => {
     // Opening notifications marks everything read (the drawer does the write).
     if (k === "notifications") setUnread(0);
-    setOpen((cur) => (cur === k ? null : k));
+    setOpen((cur) => {
+      // Closing chat: read receipts may have changed — refresh the badge.
+      if (cur === "chat" && k === "chat") refetchChatUnread();
+      return cur === k ? null : k;
+    });
   };
 
   // Refetch the authoritative unread count (used after read/delete events).
@@ -113,6 +130,30 @@ export default function EventShell({
     if (pushPermission() === "granted") subscribeToV2Push().catch(() => {});
   }, []);
 
+  // Live chat badge: a new message in any of my rooms (RLS-scoped) bumps/refreshes
+  // the top-nav chat count even when the drawer is closed.
+  useEffect(() => {
+    const supabase = v2BrowserClient();
+    const channel = supabase
+      .channel(`v2-chat-badge-${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "v2_chat_messages" },
+        (payload) => {
+          const n = payload.new as { sender_id: string };
+          if (n.sender_id === userId) return;
+          setOpen((cur) => {
+            if (cur !== "chat") refetchChatUnread();
+            return cur;
+          });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, refetchChatUnread]);
+
   return (
     <>
       {/* ── Top bar ─────────────────────────────────────────────────────── */}
@@ -126,9 +167,14 @@ export default function EventShell({
         </Link>
 
         <div className={styles.topGroup}>
-          <TopIcon label="Chat" active={open === "chat"} onClick={() => toggle("chat")}>
-            <path d="M8 10h8M8 14h5M21 12a8 8 0 01-11.5 7.2L3 21l1.8-6.5A8 8 0 1121 12z" />
-          </TopIcon>
+          <span className={styles.bellWrap}>
+            <TopIcon label="Chat" active={open === "chat"} onClick={() => toggle("chat")}>
+              <path d="M8 10h8M8 14h5M21 12a8 8 0 01-11.5 7.2L3 21l1.8-6.5A8 8 0 1121 12z" />
+            </TopIcon>
+            {chatUnread > 0 && (
+              <span className={styles.bellBadge}>{chatUnread > 99 ? "99+" : chatUnread}</span>
+            )}
+          </span>
           <TopIcon label="Photos" active={open === "photos"} onClick={() => toggle("photos")}>
             <rect x="3" y="5" width="18" height="14" rx="2" />
             <circle cx="8.5" cy="10" r="1.5" />

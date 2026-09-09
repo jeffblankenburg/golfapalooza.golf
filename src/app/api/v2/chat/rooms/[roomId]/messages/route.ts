@@ -50,6 +50,20 @@ export async function GET(
   const page = hasMore ? rows.slice(0, limit) : rows;
   const nextCursor = hasMore ? page[page.length - 1].created_at : null;
 
+  // Resolve reply parents in one extra query (self-referential embeds are
+  // direction-ambiguous, so we attach reply_to manually).
+  const parentIds = [...new Set(page.map((m) => m.reply_to_id).filter(Boolean))] as string[];
+  if (parentIds.length) {
+    const { data: parents } = await a.admin
+      .from("v2_chat_messages")
+      .select("id, content, image_url, sender:v2_profiles!v2_chat_messages_sender_id_fkey(display_name)")
+      .in("id", parentIds);
+    const byId = new Map((parents || []).map((p) => [p.id, p]));
+    for (const m of page as (typeof page[number] & { reply_to?: unknown })[]) {
+      if (m.reply_to_id) m.reply_to = byId.get(m.reply_to_id) ?? null;
+    }
+  }
+
   // Return ascending (oldest→newest) so the client can append/prepend naturally.
   return NextResponse.json({
     messages: page.slice().reverse(),
@@ -109,14 +123,39 @@ export async function POST(
   if (others.length) {
     const sender = Array.isArray(msg?.sender) ? msg?.sender[0] : msg?.sender;
     const senderName = sender?.display_name || "Someone";
-    const preview = content ? content.slice(0, 80) : "📷 Photo";
-    await sendV2Notifications(a.admin, others, {
-      orgId: a.room.org_id,
-      type: "chat_message",
-      title: a.room.name || senderName,
-      body: `${senderName}: ${preview}`,
-      data: { url: `/new/${a.room.org_id}/chat/${roomId}`, roomId },
-    }).catch(() => {});
+    // Strip mention markup for the preview: "@[Name](id)" → "@Name".
+    const clean = content ? content.replace(/@\[([^\]]+)\]\([^)]+\)/g, "@$1") : "";
+    const preview = clean ? clean.slice(0, 80) : "📷 Photo";
+    const link = { url: `/new/${a.room.org_id}/chat/${roomId}`, roomId };
+
+    // Mentioned users get chat_mention; everyone else chat_message.
+    const mentioned = new Set<string>();
+    if (content) {
+      for (const m of content.matchAll(/@\[[^\]]+\]\(([^)]+)\)/g)) mentioned.add(m[1]);
+    }
+    const mentionedOthers = others.filter((id) => mentioned.has(id));
+    const plainOthers = others.filter((id) => !mentioned.has(id));
+
+    await Promise.all([
+      mentionedOthers.length
+        ? sendV2Notifications(a.admin, mentionedOthers, {
+            orgId: a.room.org_id,
+            type: "chat_mention",
+            title: a.room.name || senderName,
+            body: `${senderName} mentioned you: ${preview}`,
+            data: link,
+          })
+        : Promise.resolve(),
+      plainOthers.length
+        ? sendV2Notifications(a.admin, plainOthers, {
+            orgId: a.room.org_id,
+            type: "chat_message",
+            title: a.room.name || senderName,
+            body: `${senderName}: ${preview}`,
+            data: link,
+          })
+        : Promise.resolve(),
+    ]).catch(() => {});
   }
 
   return NextResponse.json({ message: msg });

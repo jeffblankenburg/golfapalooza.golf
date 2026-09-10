@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { v2BrowserClient } from "@/lib/v2/supabase-browser";
+import ImageLightbox from "./ImageLightbox";
 import styles from "./chat.module.css";
 /* eslint-disable @next/next/no-img-element */
 
@@ -440,6 +441,7 @@ function Room({
   const [reactionDetail, setReactionDetail] = useState<{ messageId: string; emoji: string } | null>(null);
   const [replyTo, setReplyTo] = useState<Msg | null>(null);
   const [staged, setStaged] = useState<{ file: File; preview: string } | null>(null);
+  const [lightbox, setLightbox] = useState<{ id: string; src: string } | null>(null);
   const [mention, setMention] = useState<{ query: string; start: number } | null>(null);
   const [typing, setTyping] = useState<string[]>([]);
   const longPress = useRef<{ timer: ReturnType<typeof setTimeout> | null; fired: boolean }>({
@@ -946,6 +948,16 @@ function Room({
   const nameFor = (id: string) =>
     members.find((m) => m.userId === id)?.displayName || (id === userId ? "You" : "Member");
 
+  // Long-press an image → open the tapback (tap opens the lightbox instead).
+  function imageDown(messageId: string) {
+    longPress.current.fired = false;
+    longPress.current.timer = setTimeout(() => {
+      longPress.current.fired = true;
+      setReactionDetail(null);
+      setTapbackFor(messageId);
+    }, 450);
+  }
+
   // Long-press a reaction badge → show who reacted; a normal tap toggles it.
   function badgeDown(messageId: string, emoji: string) {
     longPress.current.fired = false;
@@ -1122,7 +1134,24 @@ function Room({
                           </span>
                         </span>
                       )}
-                      {m.image_url && <img src={m.image_url} alt="" className={styles.bubbleImage} />}
+                      {m.image_url && (
+                        <img
+                          src={m.image_url}
+                          alt=""
+                          className={styles.bubbleImage}
+                          onPointerDown={() => imageDown(m.id)}
+                          onPointerUp={badgeUp}
+                          onPointerLeave={badgeUp}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (longPress.current.fired) {
+                              longPress.current.fired = false;
+                              return;
+                            }
+                            if (!m.pending) setLightbox({ id: m.id, src: m.image_url! });
+                          }}
+                        />
+                      )}
                       {m.content && <span className={styles.bubbleText}>{renderContent(m.content)}</span>}
                     </div>
                   </div>
@@ -1361,6 +1390,27 @@ function Room({
           </svg>
         </button>
       </div>
+
+      {lightbox &&
+        (() => {
+          const lm = messages.find((m) => m.id === lightbox.id);
+          const agg = new Map<string, { count: number; mine: boolean }>();
+          for (const r of lm?.reactions || []) {
+            const e = agg.get(r.emoji) || { count: 0, mine: false };
+            e.count += 1;
+            if (r.user_id === userId) e.mine = true;
+            agg.set(r.emoji, e);
+          }
+          const reactions = [...agg.entries()].map(([emoji, v]) => ({ emoji, ...v }));
+          return (
+            <ImageLightbox
+              src={lightbox.src}
+              reactions={reactions}
+              onReact={(emoji) => toggleReaction(lightbox.id, emoji)}
+              onClose={() => setLightbox(null)}
+            />
+          );
+        })()}
     </div>
   );
 }

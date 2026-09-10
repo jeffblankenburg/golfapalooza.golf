@@ -8,6 +8,7 @@ import { pushPermission, subscribeToV2Push } from "@/lib/v2/push-client";
 import ProfileDrawer from "./ProfileDrawer";
 import NotificationDrawer from "./NotificationDrawer";
 import ChatDrawer from "./ChatDrawer";
+import PhotosDrawer from "./PhotosDrawer";
 import styles from "./event-shell.module.css";
 /* eslint-disable @next/next/no-img-element */
 
@@ -232,7 +233,7 @@ export default function EventShell({
             </svg>
           </button>
         </div>
-        <div className={styles.drawerBody} data-flush={open === "chat" || undefined}>
+        <div className={styles.drawerBody} data-flush={open === "chat" || open === "photos" || undefined}>
           {open === "profile" ? (
             <ProfileDrawer active={open === "profile"} />
           ) : open === "notifications" ? (
@@ -243,6 +244,8 @@ export default function EventShell({
             />
           ) : open === "chat" ? (
             <ChatDrawer orgId={orgId} userId={userId} />
+          ) : open === "photos" ? (
+            <PhotosDrawer orgId={orgId} userId={userId} isAdmin={isAdmin} />
           ) : (
             open && <p className={styles.drawerStub}>{DRAWERS[open].body}</p>
           )}

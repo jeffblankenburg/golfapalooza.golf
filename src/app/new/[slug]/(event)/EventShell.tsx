@@ -2,24 +2,27 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { v2BrowserClient } from "@/lib/v2/supabase-browser";
+import { v2RealtimeClient } from "@/lib/v2/supabase-browser";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { syncBadge } from "@/lib/v2/badge";
 import { pushPermission, subscribeToV2Push } from "@/lib/v2/push-client";
 import ProfileDrawer from "./ProfileDrawer";
 import NotificationDrawer from "./NotificationDrawer";
 import ChatDrawer from "./ChatDrawer";
 import PhotosDrawer from "./PhotosDrawer";
+import { useV2Music } from "./MusicProvider";
 import styles from "./event-shell.module.css";
 /* eslint-disable @next/next/no-img-element */
 
 const CHAT_TYPES = ["chat_message", "chat_mention"];
 
-type DrawerKey = "chat" | "photos" | "music" | "rounds" | "profile" | "notifications";
+// Music is NOT a shared-drawer key — it owns its own persistent overlay
+// (mini-player + expandable) via MusicProvider so audio survives close/nav.
+type DrawerKey = "chat" | "photos" | "rounds" | "profile" | "notifications";
 
 const DRAWERS: Record<DrawerKey, { title: string; body: string }> = {
   chat: { title: "Chat", body: "Group chat will live here." },
   photos: { title: "Photos", body: "The photo gallery will live here." },
-  music: { title: "Music", body: "The jukebox will live here." },
   rounds: { title: "My Rounds", body: "Round tracking & scoring will live here." },
   profile: { title: "Profile", body: "" },
   notifications: { title: "Notifications", body: "Your notifications will live here." },
@@ -56,6 +59,7 @@ export default function EventShell({
   const [open, setOpen] = useState<DrawerKey | null>(null);
   const [unread, setUnread] = useState(initialUnreadCount);
   const [chatUnread, setChatUnread] = useState(initialChatUnread);
+  const music = useV2Music();
 
   const refetchChatUnread = useCallback(async () => {
     try {
@@ -69,12 +73,41 @@ export default function EventShell({
   const toggle = (k: DrawerKey) => {
     // Opening notifications marks everything read (the drawer does the write).
     if (k === "notifications") setUnread(0);
-    setOpen((cur) => {
-      // Closing chat: read receipts may have changed — refresh the badge.
-      if (cur === "chat" && k === "chat") refetchChatUnread();
-      return cur === k ? null : k;
-    });
+    const willOpen = open !== k;
+    // Closing chat: read receipts may have changed — refresh the badge.
+    if (open === "chat" && k === "chat") refetchChatUnread();
+    // Announce so the music overlay steps aside — one full-screen surface at a time.
+    if (willOpen && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("ui:drawer-open", { detail: { name: k } }));
+    }
+    setOpen(willOpen ? k : null);
   };
+
+  // When music expands (it broadcasts), close whatever shared drawer is open.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ name?: string }>).detail;
+      if (detail?.name === "music") setOpen(null);
+    };
+    window.addEventListener("ui:drawer-open", handler);
+    return () => window.removeEventListener("ui:drawer-open", handler);
+  }, []);
+
+  // Open a drawer on request from elsewhere (e.g. an Activity-feed row linking to
+  // its source: a photo opens Photos, a song opens Music).
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const name = (e as CustomEvent<{ name?: string }>).detail?.name;
+      if (name === "music") {
+        music.expandDrawer();
+      } else if (name && name in DRAWERS) {
+        window.dispatchEvent(new CustomEvent("ui:drawer-open", { detail: { name } }));
+        setOpen(name as DrawerKey);
+      }
+    };
+    window.addEventListener("ui:open-drawer", handler);
+    return () => window.removeEventListener("ui:open-drawer", handler);
+  }, [music]);
 
   // Refetch the authoritative unread count (used after read/delete events).
   const refetchUnread = useCallback(async () => {
@@ -89,34 +122,41 @@ export default function EventShell({
   // Live bell (mirrors the legacy HeaderBar): INSERT bumps the badge unless the
   // drawer is open (then it's read on arrival); UPDATE/DELETE recompute the count.
   useEffect(() => {
-    const supabase = v2BrowserClient();
-    const channel = supabase
-      .channel(`v2-notif-${userId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "v2_notifications", filter: `user_id=eq.${userId}` },
-        (payload) => {
-          const n = payload.new as { org_id: string; type: string };
-          if (n.org_id !== orgId || CHAT_TYPES.includes(n.type)) return;
-          setOpen((cur) => {
-            if (cur !== "notifications") setUnread((u) => u + 1);
-            return cur;
-          });
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "v2_notifications", filter: `user_id=eq.${userId}` },
-        () => refetchUnread(),
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "v2_notifications", filter: `user_id=eq.${userId}` },
-        () => refetchUnread(),
-      )
-      .subscribe();
+    let cancelled = false;
+    let sb: Awaited<ReturnType<typeof v2RealtimeClient>> | null = null;
+    let channel: RealtimeChannel | null = null;
+    (async () => {
+      sb = await v2RealtimeClient();
+      if (cancelled) return;
+      channel = sb
+        .channel(`v2-notif-${userId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "v2_notifications", filter: `user_id=eq.${userId}` },
+          (payload) => {
+            const n = payload.new as { org_id: string; type: string };
+            if (n.org_id !== orgId || CHAT_TYPES.includes(n.type)) return;
+            setOpen((cur) => {
+              if (cur !== "notifications") setUnread((u) => u + 1);
+              return cur;
+            });
+          },
+        )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "v2_notifications", filter: `user_id=eq.${userId}` },
+          () => refetchUnread(),
+        )
+        .on(
+          "postgres_changes",
+          { event: "DELETE", schema: "public", table: "v2_notifications", filter: `user_id=eq.${userId}` },
+          () => refetchUnread(),
+        )
+        .subscribe();
+    })();
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (sb && channel) sb.removeChannel(channel);
     };
   }, [userId, orgId, refetchUnread]);
 
@@ -134,24 +174,31 @@ export default function EventShell({
   // Live chat badge: a new message in any of my rooms (RLS-scoped) bumps/refreshes
   // the top-nav chat count even when the drawer is closed.
   useEffect(() => {
-    const supabase = v2BrowserClient();
-    const channel = supabase
-      .channel(`v2-chat-badge-${userId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "v2_chat_messages" },
-        (payload) => {
-          const n = payload.new as { sender_id: string };
-          if (n.sender_id === userId) return;
-          setOpen((cur) => {
-            if (cur !== "chat") refetchChatUnread();
-            return cur;
-          });
-        },
-      )
-      .subscribe();
+    let cancelled = false;
+    let sb: Awaited<ReturnType<typeof v2RealtimeClient>> | null = null;
+    let channel: RealtimeChannel | null = null;
+    (async () => {
+      sb = await v2RealtimeClient();
+      if (cancelled) return;
+      channel = sb
+        .channel(`v2-chat-badge-${userId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "v2_chat_messages" },
+          (payload) => {
+            const n = payload.new as { sender_id: string };
+            if (n.sender_id === userId) return;
+            setOpen((cur) => {
+              if (cur !== "chat") refetchChatUnread();
+              return cur;
+            });
+          },
+        )
+        .subscribe();
+    })();
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (sb && channel) sb.removeChannel(channel);
     };
   }, [userId, refetchChatUnread]);
 
@@ -181,7 +228,7 @@ export default function EventShell({
             <circle cx="8.5" cy="10" r="1.5" />
             <path d="M21 16l-5-5-9 8" />
           </TopIcon>
-          <TopIcon label="Music" active={open === "music"} onClick={() => toggle("music")}>
+          <TopIcon label="Music" active={music.isDrawerExpanded} onClick={() => music.toggleDrawer()}>
             <path d="M9 18V6l10-2v12" />
             <circle cx="6" cy="18" r="3" />
             <circle cx="16" cy="16" r="3" />

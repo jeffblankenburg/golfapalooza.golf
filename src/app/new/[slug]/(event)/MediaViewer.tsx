@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { v2BrowserClient } from "@/lib/v2/supabase-browser";
+import { v2RealtimeClient } from "@/lib/v2/supabase-browser";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 /* eslint-disable @next/next/no-img-element */
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -340,23 +341,30 @@ function CommentsSheet({ itemId, onClose, onCountChange }: { itemId: string; onC
   }, [itemId, scrollBottom, onCountChange]);
 
   useEffect(() => {
-    const supabase = v2BrowserClient();
-    const channel = supabase
-      .channel(`v2-gallery-comments-${itemId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "v2_gallery_comments", filter: `item_id=eq.${itemId}` },
-        async () => {
-          const res = await fetch(`/api/v2/gallery/${itemId}/comments`);
-          const d = res.ok ? await res.json() : { comments: [] };
-          setComments(d.comments || []);
-          onCountChange((d.comments || []).length);
-          scrollBottom(true);
-        },
-      )
-      .subscribe();
+    let cancelled = false;
+    let sb: Awaited<ReturnType<typeof v2RealtimeClient>> | null = null;
+    let channel: RealtimeChannel | null = null;
+    (async () => {
+      sb = await v2RealtimeClient();
+      if (cancelled) return;
+      channel = sb
+        .channel(`v2-gallery-comments-${itemId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "v2_gallery_comments", filter: `item_id=eq.${itemId}` },
+          async () => {
+            const res = await fetch(`/api/v2/gallery/${itemId}/comments`);
+            const d = res.ok ? await res.json() : { comments: [] };
+            setComments(d.comments || []);
+            onCountChange((d.comments || []).length);
+            scrollBottom(true);
+          },
+        )
+        .subscribe();
+    })();
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (sb && channel) sb.removeChannel(channel);
     };
   }, [itemId, scrollBottom, onCountChange]);
 

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getPlatformContext } from "@/lib/v2/context";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import EventShell from "./EventShell";
+import MusicProvider from "./MusicProvider";
 
 /**
  * Wraps the member-facing event experience in the fixed top-bar/bottom-nav shell.
@@ -58,18 +59,20 @@ export default async function EventLayout({
   }
 
   return (
-    <EventShell
-      slug={slug}
-      orgId={org.id}
-      userId={ctx.userId}
-      isAdmin={isAdmin}
-      orgName={org.name}
-      logoUrl={org.logo_url}
-      userAvatarUrl={meRes.data?.avatar_url ?? null}
-      initialUnreadCount={unreadRes.count ?? 0}
-      initialChatUnread={initialChatUnread}
-    >
-      {children}
-    </EventShell>
+    <MusicProvider orgId={org.id}>
+      <EventShell
+        slug={slug}
+        orgId={org.id}
+        userId={ctx.userId}
+        isAdmin={isAdmin}
+        orgName={org.name}
+        logoUrl={org.logo_url}
+        userAvatarUrl={meRes.data?.avatar_url ?? null}
+        initialUnreadCount={unreadRes.count ?? 0}
+        initialChatUnread={initialChatUnread}
+      >
+        {children}
+      </EventShell>
+    </MusicProvider>
   );
 }

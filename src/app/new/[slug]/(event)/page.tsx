@@ -4,6 +4,7 @@ import { getPlatformContext } from "@/lib/v2/context";
 import styles from "@/app/new/new.module.css";
 import Countdown from "./Countdown";
 import HomeModules from "./HomeModules";
+import PwaInstallBanner from "./PwaInstallBanner";
 
 interface EventRow {
   id: string;
@@ -53,6 +54,7 @@ export default async function EventHome({
 
   return (
     <div className={`${styles.page} ${styles.orgPage}`}>
+      <PwaInstallBanner appName={org.name} />
       {event ? (
         <>
           <div className={styles.eventHero}>

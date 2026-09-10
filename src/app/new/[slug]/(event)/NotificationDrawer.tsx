@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { v2BrowserClient } from "@/lib/v2/supabase-browser";
+import { v2RealtimeClient } from "@/lib/v2/supabase-browser";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { timeAgo } from "@/lib/v2/activity";
 import { subscribeToV2Push } from "@/lib/v2/push-client";
 import styles from "@/app/new/new.module.css";
@@ -62,28 +63,35 @@ export default function NotificationDrawer({
   // read on arrival, since the user is looking at them). Mirrors the legacy drawer.
   useEffect(() => {
     if (!active) return;
-    const supabase = v2BrowserClient();
-    const channel = supabase
-      .channel("v2-notif-drawer")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "v2_notifications" },
-        (payload) => {
-          const n = payload.new as Notif & { org_id: string };
-          if (n.org_id !== orgId || CHAT_TYPES.includes(n.type)) return;
-          setItems((cur) =>
-            cur.some((x) => x.id === n.id) ? cur : [{ ...n, read: true }, ...cur],
-          );
-          fetch("/api/v2/notifications", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ orgId, ids: [n.id] }),
-          }).catch(() => {});
-        },
-      )
-      .subscribe();
+    let cancelled = false;
+    let sb: Awaited<ReturnType<typeof v2RealtimeClient>> | null = null;
+    let channel: RealtimeChannel | null = null;
+    (async () => {
+      sb = await v2RealtimeClient();
+      if (cancelled) return;
+      channel = sb
+        .channel("v2-notif-drawer")
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "v2_notifications" },
+          (payload) => {
+            const n = payload.new as Notif & { org_id: string };
+            if (n.org_id !== orgId || CHAT_TYPES.includes(n.type)) return;
+            setItems((cur) =>
+              cur.some((x) => x.id === n.id) ? cur : [{ ...n, read: true }, ...cur],
+            );
+            fetch("/api/v2/notifications", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ orgId, ids: [n.id] }),
+            }).catch(() => {});
+          },
+        )
+        .subscribe();
+    })();
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (sb && channel) sb.removeChannel(channel);
     };
   }, [active, orgId]);
 

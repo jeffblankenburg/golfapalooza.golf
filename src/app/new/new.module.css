@@ -1542,7 +1542,21 @@ details[open] .chev {
 .feedRow + .feedRow {
   border-top: 1px solid var(--line);
 }
-a.feedRow:active {
+/* .feedRow renders as <a>, <button>, or <div>; reset button chrome. */
+button.feedRow {
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+a.feedRow,
+button.feedRow {
+  cursor: pointer;
+}
+a.feedRow:active,
+button.feedRow:active {
   background: rgba(23, 33, 29, 0.04);
 }
 .feedThumb {
@@ -1587,6 +1601,118 @@ a.feedRow:active {
   color: var(--ink-soft);
   margin-top: 1px;
 }
+.feedEmpty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+}
+.feedEmptyText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.feedEmptyTitle {
+  font-weight: 600;
+  color: var(--ink);
+}
+.feedEmptySub {
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--ink-soft);
+  margin-top: 1px;
+}
+
+/* Per-kind feed row templates (compact: leading visual + name/status + accessory). */
+.feedAvatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+.feedAvatarFallback {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--brand) 14%, var(--paper));
+  color: var(--brand);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.feedMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.feedName {
+  font-weight: 600;
+  font-size: 0.86rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.feedAction {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.feedActionDot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-soft);
+}
+.feedActionDot[data-likelihood="99"] { background: #16a34a; }
+.feedActionDot[data-likelihood="75"] { background: #65a30d; }
+.feedActionDot[data-likelihood="50"] { background: #d97706; }
+.feedActionDot[data-likelihood="25"] { background: #b91c1c; }
+.feedActionSub {
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.feedTime {
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+  margin-top: 1px;
+}
+.feedScore {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding-left: 8px;
+}
+.feedScoreNum {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+.feedToPar {
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.feedToPar[data-sign="under"] { color: #16a34a; }
+.feedToPar[data-sign="over"] { color: #b91c1c; }
+.feedToPar[data-sign="even"] { color: var(--ink-soft); }
 
 /* 6 · Sponsors — display-only carousel (mirrors legacy fake-ad carousel). */
 .adFrame {

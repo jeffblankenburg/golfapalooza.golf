@@ -3,11 +3,15 @@ import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgMember } from "@/lib/v2/orgs";
 
 /**
- * GET /api/v2/chat/members?orgId= — active org members (excluding the caller),
- * for starting a new DM/group. Auth: bearer/cookie; org-membership gated.
+ * GET /api/v2/chat/members?orgId=&includeSelf= — active org members.
+ * By default the caller is excluded (for starting a new DM/group);
+ * pass includeSelf=1 to include the caller (e.g. photo tagging, where a
+ * Loozer must be able to tag/un-tag themselves). Auth: bearer/cookie; org-gated.
  */
 export async function GET(request: Request) {
-  const orgId = new URL(request.url).searchParams.get("orgId");
+  const url = new URL(request.url);
+  const orgId = url.searchParams.get("orgId");
+  const includeSelf = url.searchParams.get("includeSelf") === "1";
   const { userId } = await v2GetUser(request);
   if (!userId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   if (!orgId) return NextResponse.json({ error: "orgId required" }, { status: 400 });
@@ -24,7 +28,7 @@ export async function GET(request: Request) {
     .eq("status", "active");
 
   const members = (data || [])
-    .filter((m) => m.user_id !== userId)
+    .filter((m) => includeSelf || m.user_id !== userId)
     .map((m) => {
       const p = Array.isArray(m.member) ? m.member[0] : m.member;
       return {

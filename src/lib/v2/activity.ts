@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** Unified activity-feed model for v2. Forward-only: features append as events happen. */
 
-export type ActivityKind = "round" | "photo" | "song" | "article" | "announcement";
+export type ActivityKind = "round" | "photo" | "song" | "article" | "announcement" | "rsvp";
 
 export interface ActivityRow {
   id: string;
@@ -12,6 +12,7 @@ export interface ActivityRow {
   image_url: string | null;
   link: string | null;
   created_at: string;
+  metadata: Record<string, unknown> | null;
   actor: { display_name: string; avatar_url: string | null } | null;
 }
 

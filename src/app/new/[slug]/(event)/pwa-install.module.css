@@ -1,0 +1,71 @@
+/* Home-page PWA install nudge. Inherits the org theme vars from the .page
+   ancestor (--brand/--card/--ink/--line), so it matches every org's palette. */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--line));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--brand) 6%, var(--card));
+}
+.icon {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  color: var(--brand);
+}
+.body {
+  flex: 1;
+  min-width: 0;
+}
+.title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.sub {
+  margin: 2px 0 0;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+.share {
+  display: inline-grid;
+  place-items: center;
+  vertical-align: -2px;
+  margin: 0 3px;
+  color: var(--ink-soft);
+}
+.install {
+  flex: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.install:active {
+  transform: scale(0.97);
+}
+.close {
+  flex: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--ink-soft);
+  padding: 4px;
+  border-radius: 8px;
+}
+.close:active {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}

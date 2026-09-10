@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { v2BrowserClient } from "@/lib/v2/supabase-browser";
+import { v2RealtimeClient } from "@/lib/v2/supabase-browser";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { compressImage, compressVideo, extractVideoFrame } from "@/lib/v2/gallery-compress";
 import { extractExifDate, extractVideoDate } from "@/lib/v2/gallery-exif";
 import MediaViewer, { type ViewerItem, type ViewerUser } from "./MediaViewer";
@@ -128,7 +129,7 @@ export default function PhotosDrawer({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const res = await fetch(`/api/v2/chat/members?orgId=${orgId}`);
+      const res = await fetch(`/api/v2/chat/members?orgId=${orgId}&includeSelf=1`);
       const d = res.ok ? await res.json() : { members: [] };
       if (cancelled) return;
       setAllUsers(
@@ -187,21 +188,28 @@ export default function PhotosDrawer({
 
   // Realtime: prepend new items only when no filters narrow the view.
   useEffect(() => {
-    const supabase = v2BrowserClient();
-    const channel = supabase
-      .channel(`v2-gallery-${orgId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "v2_gallery_items", filter: `org_id=eq.${orgId}` },
-        (payload) => {
-          if (filtersActive) return;
-          const it = payload.new as Item;
-          setItems((cur) => (cur.some((x) => x.id === it.id) ? cur : [it, ...cur]));
-        },
-      )
-      .subscribe();
+    let cancelled = false;
+    let sb: Awaited<ReturnType<typeof v2RealtimeClient>> | null = null;
+    let channel: RealtimeChannel | null = null;
+    (async () => {
+      sb = await v2RealtimeClient();
+      if (cancelled) return;
+      channel = sb
+        .channel(`v2-gallery-${orgId}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "v2_gallery_items", filter: `org_id=eq.${orgId}` },
+          (payload) => {
+            if (filtersActive) return;
+            const it = payload.new as Item;
+            setItems((cur) => (cur.some((x) => x.id === it.id) ? cur : [it, ...cur]));
+          },
+        )
+        .subscribe();
+    })();
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (sb && channel) sb.removeChannel(channel);
     };
   }, [orgId, filtersActive]);
 

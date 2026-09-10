@@ -562,7 +562,15 @@ function Room({
   // Realtime: messages + reactions.
   useEffect(() => {
     const supabase = supabaseRef.current;
-    const channel = supabase
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    (async () => {
+      // Ensure the realtime socket carries the user's JWT, or RLS-gated
+      // postgres_changes deliver nothing (the socket would join as anon).
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (data.session) supabase.realtime.setAuth(data.session.access_token);
+      channel = supabase
       .channel(`v2-chat-${roomId}`)
       .on(
         "postgres_changes",
@@ -621,28 +629,38 @@ function Room({
         },
       )
       .subscribe();
+    })();
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
     };
   }, [roomId, userId, mergeIncoming, markRead, scrollToBottom]);
 
   // Typing presence.
   useEffect(() => {
     const supabase = supabaseRef.current;
-    const ch = supabase.channel(`v2-chat-typing-${roomId}`, { config: { presence: { key: userId } } });
-    ch.on("presence", { event: "sync" }, () => {
-      const state = ch.presenceState() as Record<string, { typing?: boolean; name?: string }[]>;
-      const names: string[] = [];
-      for (const [key, metas] of Object.entries(state)) {
-        if (key === userId) continue;
-        const meta = metas[0];
-        if (meta?.typing && meta.name) names.push(meta.name);
-      }
-      setTyping(names);
-    }).subscribe();
-    typingChan.current = ch;
+    let cancelled = false;
+    let ch: ReturnType<typeof supabase.channel> | null = null;
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (data.session) supabase.realtime.setAuth(data.session.access_token);
+      ch = supabase.channel(`v2-chat-typing-${roomId}`, { config: { presence: { key: userId } } });
+      ch.on("presence", { event: "sync" }, () => {
+        const state = ch!.presenceState() as Record<string, { typing?: boolean; name?: string }[]>;
+        const names: string[] = [];
+        for (const [key, metas] of Object.entries(state)) {
+          if (key === userId) continue;
+          const meta = metas[0];
+          if (meta?.typing && meta.name) names.push(meta.name);
+        }
+        setTyping(names);
+      }).subscribe();
+      typingChan.current = ch;
+    })();
     return () => {
-      supabase.removeChannel(ch);
+      cancelled = true;
+      if (ch) supabase.removeChannel(ch);
       typingChan.current = null;
     };
   }, [roomId, userId]);

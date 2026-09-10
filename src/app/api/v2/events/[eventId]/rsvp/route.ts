@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgMember } from "@/lib/v2/orgs";
+import { logActivity } from "@/lib/v2/activity";
 
 /**
  * RSVP for an event. Mirrors the legacy model: a member sets their attendance
@@ -14,6 +15,12 @@ import { isOrgMember } from "@/lib/v2/orgs";
  */
 
 const LIKELIHOODS = [25, 50, 75, 99];
+const LIKELIHOOD_LABEL: Record<number, string> = {
+  99: "Attending",
+  75: "Probable",
+  50: "Questionable",
+  25: "Doubtful",
+};
 
 async function resolve(request: Request, eventId: string) {
   const { userId } = await v2GetUser(request);
@@ -99,6 +106,16 @@ export async function POST(
   }
   const onRoster = likelihood === 99;
 
+  // Pre-read prior likelihood so we log only a *genuine change* (not a re-confirm
+  // of the same level). Any move between levels is feed-worthy.
+  const { data: prior } = await g.admin
+    .from("v2_event_participants")
+    .select("likelihood")
+    .eq("event_id", eventId)
+    .eq("user_id", g.userId)
+    .maybeSingle();
+  const priorLikelihood = (prior?.likelihood as number | undefined) ?? null;
+
   const { error } = await g.admin.from("v2_event_participants").upsert(
     {
       event_id: eventId,
@@ -112,6 +129,20 @@ export async function POST(
     { onConflict: "event_id,user_id" },
   );
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Activity feed: a row per genuine likelihood change. Title is the status only
+  // ("Attending 99%") — the feed renders the actor's name + avatar itself.
+  if (priorLikelihood !== likelihood) {
+    await logActivity(g.admin, {
+      orgId: g.orgId,
+      eventId,
+      kind: "rsvp",
+      actorId: g.userId,
+      title: `${LIKELIHOOD_LABEL[likelihood as number]} ${likelihood}%`,
+      refId: eventId,
+      metadata: { likelihood },
+    }).catch(() => {});
+  }
 
   return NextResponse.json({
     likelihood,

@@ -26,13 +26,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not a member" }, { status: 403 });
   }
 
-  const { data: me } = await admin
-    .from("v2_profiles")
-    .select("display_name")
-    .eq("id", userId)
-    .maybeSingle();
-  const name = me?.display_name || "Someone";
-  const title = count > 1 ? `${name} uploaded ${count} photos` : `${name} added a photo`;
+  // Title is the action only — the feed renders the actor's name itself.
+  const title = count > 1 ? `uploaded ${count} photos` : `added a photo`;
 
   await logActivity(admin, {
     orgId: body.orgId,

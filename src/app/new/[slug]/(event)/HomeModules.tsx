@@ -105,7 +105,7 @@ export default async function HomeModules({
       .eq("active", true),
     supabase
       .from("v2_activity")
-      .select("id, kind, title, subtitle, image_url, link, created_at, actor:v2_profiles(display_name, avatar_url)")
+      .select("id, kind, title, subtitle, image_url, link, created_at, metadata, actor:v2_profiles(display_name, avatar_url)")
       .eq("org_id", orgId)
       .order("created_at", { ascending: false })
       .limit(15),
@@ -153,7 +153,7 @@ export default async function HomeModules({
         initialResponseCount={responseCount}
       />
       <StoreModule storeUrl={storeUrl} storeLabel={storeLabel} />
-      <ActivityFeed items={activity} />
+      <ActivityFeed initialItems={activity} orgId={orgId} />
       <AdCarousel ads={ads} />
     </>
   );

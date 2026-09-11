@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
+import { loadResolvedFeatures } from "@/lib/v2/features-server";
+import { isFeatureVisible } from "@/lib/v2/features";
 import styles from "@/app/new/new.module.css";
 import Countdown from "./Countdown";
 import HomeModules from "./HomeModules";
@@ -52,6 +54,11 @@ export default async function EventHome({
   const event = data as EventRow | null;
   const range = event ? dateRange(event.start_date, event.end_date) : null;
 
+  // Home modules that mirror a registry feature honor its visibility.
+  const isAdmin = org.role === "owner" || org.role === "admin";
+  const resolved = await loadResolvedFeatures(supabase, org.id, event?.id ?? null);
+  const articlesVisible = isFeatureVisible(resolved, "articles", isAdmin);
+
   return (
     <div className={`${styles.page} ${styles.orgPage}`}>
       <PwaInstallBanner appName={org.name} />
@@ -77,6 +84,7 @@ export default async function EventHome({
             storeLabel={org.store_label}
             storeEnabled={org.store_enabled}
             nameDisplay={org.name_display}
+            articlesVisible={articlesVisible}
           />
         </>
       ) : (

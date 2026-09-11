@@ -4,6 +4,7 @@ import { v2ServerClient } from "@/lib/v2/supabase";
 import EventShell from "./EventShell";
 import MusicProvider from "./MusicProvider";
 import { NameModeProvider } from "./NameMode";
+import { buildEventNav, isFeatureVisible, resolveFeatures, type FeatureRow } from "@/lib/v2/features";
 
 /**
  * Wraps the member-facing event experience in the fixed top-bar/bottom-nav shell.
@@ -24,7 +25,7 @@ export default async function EventLayout({
   const isAdmin = org.role === "owner" || org.role === "admin";
 
   const supabase = await v2ServerClient();
-  const [meRes, unreadRes, chatMineRes] = await Promise.all([
+  const [meRes, unreadRes, chatMineRes, activeEventRes] = await Promise.all([
     supabase.from("v2_profiles").select("avatar_url").eq("id", ctx.userId).maybeSingle(),
     supabase
       .from("v2_notifications")
@@ -34,7 +35,41 @@ export default async function EventLayout({
       .eq("read", false)
       .not("type", "in", "(chat_message,chat_mention)"),
     supabase.from("v2_chat_room_members").select("room_id, hidden_at").eq("user_id", ctx.userId),
+    supabase
+      .from("v2_events")
+      .select("id")
+      .eq("org_id", org.id)
+      .eq("status", "active")
+      .order("start_date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
+
+  // Resolve the feature registry into the shell nav (bottom-bar pins + "Everything"
+  // launcher) and Music visibility. Group-wide features (Articles, Music…) apply
+  // even with no active event; event overrides layer on when one exists. Degrades
+  // to empty nav / Music-on if the registry table isn't present yet (data null).
+  let pinned: ReturnType<typeof buildEventNav>["pinned"] = [];
+  let launcher: ReturnType<typeof buildEventNav>["launcher"] = [];
+  let musicEnabled = true;
+  let chatEnabled = true;
+  let photosEnabled = true;
+  const activeEventId = (activeEventRes.data?.id as string | undefined) ?? null;
+  const featFilter = activeEventId
+    ? `event_id.is.null,event_id.eq.${activeEventId}`
+    : "event_id.is.null";
+  const { data: featRows } = await supabase
+    .from("v2_event_features")
+    .select(
+      "feature_key, event_id, visibility, pinned, nav_order, label_override, public, availability, available_from, available_until",
+    )
+    .eq("org_id", org.id)
+    .or(featFilter);
+  const resolved = resolveFeatures((featRows as FeatureRow[] | null) ?? [], activeEventId ?? "");
+  ({ pinned, launcher } = buildEventNav(slug, resolved, isAdmin));
+  musicEnabled = isFeatureVisible(resolved, "music", isAdmin);
+  chatEnabled = isFeatureVisible(resolved, "chat", isAdmin);
+  photosEnabled = isFeatureVisible(resolved, "photos", isAdmin);
 
   // Initial chat unread across my rooms (bounded recent window, like the badge API).
   let initialChatUnread = 0;
@@ -72,6 +107,11 @@ export default async function EventLayout({
         userAvatarUrl={meRes.data?.avatar_url ?? null}
         initialUnreadCount={unreadRes.count ?? 0}
         initialChatUnread={initialChatUnread}
+        pinned={pinned}
+        launcher={launcher}
+        musicEnabled={musicEnabled}
+        chatEnabled={chatEnabled}
+        photosEnabled={photosEnabled}
       >
         {children}
       </EventShell>

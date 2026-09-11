@@ -62,6 +62,7 @@ export default async function HomeModules({
   storeLabel,
   storeEnabled,
   nameDisplay,
+  articlesVisible,
 }: {
   orgId: string;
   eventId: string;
@@ -72,6 +73,7 @@ export default async function HomeModules({
   storeLabel: string | null;
   storeEnabled: boolean;
   nameDisplay: NameMode;
+  articlesVisible: boolean;
 }) {
   const supabase = await v2ServerClient();
 
@@ -161,7 +163,7 @@ export default async function HomeModules({
   return (
     <>
       <BirthdayBanner birthdays={birthdays} slug={slug} />
-      <ArticleModule article={article} slug={slug} />
+      {articlesVisible && <ArticleModule article={article} slug={slug} />}
       <RsvpModule
         eventId={eventId}
         eventName={eventName}

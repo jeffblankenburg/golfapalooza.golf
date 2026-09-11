@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import Modal from "@/app/new/_components/Modal";
 import { formatPhone } from "@/lib/v2/phone";
+import type { NameMode } from "@/lib/v2/profile";
 import styles from "@/app/new/new.module.css";
 
 interface Member {
@@ -11,6 +12,10 @@ interface Member {
   role: "owner" | "admin" | "member";
   status: string;
   display_name: string;
+  first_name: string | null;
+  last_name: string | null;
+  nickname: string | null;
+  birthdate: string | null;
   avatar_url: string | null;
 }
 interface Invite {
@@ -26,17 +31,45 @@ type Confirm =
   | { kind: "removeMember"; id: string; label: string }
   | { kind: "revokeInvite"; id: string; label: string };
 
+const fullName = (m: { first_name: string | null; last_name: string | null }) =>
+  [m.first_name, m.last_name].filter(Boolean).join(" ").trim();
+
+/** Primary / secondary name lines per the org's name-display mode. */
+function displayLines(m: Member, mode: NameMode): { primary: string; secondary: string | null } {
+  const full = fullName(m);
+  if (mode === "real") {
+    const primary = full || m.display_name || "Member";
+    const nick = (m.nickname || "").trim();
+    return { primary, secondary: nick && nick !== primary ? nick : null };
+  }
+  // nickname mode: display_name is already nickname-preferred.
+  const primary = m.display_name || m.nickname || full || "Member";
+  return { primary, secondary: full && full !== primary ? full : null };
+}
+
+/** Sort key: last name (real mode) or nickname (nickname mode), then a fallback. */
+function sortKey(m: Member, mode: NameMode): string {
+  const k =
+    mode === "real"
+      ? (m.last_name || "").trim() || (m.first_name || "").trim() || m.display_name
+      : (m.nickname || "").trim() || m.display_name || fullName(m);
+  return k.toLowerCase();
+}
+
 export default function MembersManager({
   orgId,
   currentUserId,
   currentRole,
+  nameMode,
 }: {
   orgId: string;
   currentUserId: string;
   currentRole: "owner" | "admin" | "member";
+  nameMode: NameMode;
 }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
+  const [query, setQuery] = useState("");
   const [phone, setPhone] = useState("");
   const [inviteRole, setInviteRole] = useState("member");
   const [iFirst, setIFirst] = useState("");
@@ -49,6 +82,16 @@ export default function MembersManager({
   const [error, setError] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
+
+  // Edit-member modal state.
+  const [editing, setEditing] = useState<Member | null>(null);
+  const [eFirst, setEFirst] = useState("");
+  const [eLast, setELast] = useState("");
+  const [eNick, setENick] = useState("");
+  const [eBday, setEBday] = useState("");
+  const [eRole, setERole] = useState<"owner" | "admin" | "member">("member");
+  const [eBusy, setEBusy] = useState(false);
+  const [eError, setEError] = useState<string | null>(null);
 
   const fetchMembers = useCallback(async (): Promise<Member[]> => {
     const r = await fetch(`/api/v2/orgs/${orgId}/members`);
@@ -76,14 +119,64 @@ export default function MembersManager({
   const roleOptions =
     currentRole === "owner" ? ["owner", "admin", "member"] : ["admin", "member"];
 
-  async function changeRole(userId: string, role: string) {
-    setError(null);
+  const sorted = useMemo(
+    () => [...members].sort((a, b) => sortKey(a, nameMode).localeCompare(sortKey(b, nameMode))),
+    [members, nameMode],
+  );
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return sorted;
+    return sorted.filter((m) =>
+      [m.first_name, m.last_name, m.nickname, m.display_name]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(q),
+    );
+  }, [sorted, query]);
+
+  function openEdit(m: Member) {
+    setEditing(m);
+    setEFirst(m.first_name || "");
+    setELast(m.last_name || "");
+    setENick(m.nickname || "");
+    setEBday(m.birthdate || "");
+    setERole(m.role);
+    setEError(null);
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editing || eBusy) return;
+    const isSelf = editing.user_id === currentUserId;
+    const canManage = !isSelf && (currentRole === "owner" || editing.role !== "owner");
+    setEBusy(true);
+    setEError(null);
+    const body: {
+      user_id: string;
+      role?: string;
+      profile: { first_name: string; last_name: string; nickname: string; birthdate: string | null };
+    } = {
+      user_id: editing.user_id,
+      profile: {
+        first_name: eFirst,
+        last_name: eLast,
+        nickname: eNick,
+        birthdate: eBday || null,
+      },
+    };
+    if (canManage && eRole !== editing.role) body.role = eRole;
     const res = await fetch(`/api/v2/orgs/${orgId}/members`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: userId, role }),
+      body: JSON.stringify(body),
     });
-    if (!res.ok) setError((await res.json().catch(() => ({}))).error || "Could not change role");
+    setEBusy(false);
+    if (!res.ok) {
+      setEError((await res.json().catch(() => ({}))).error || "Could not save");
+      return;
+    }
+    setEditing(null);
     setMembers(await fetchMembers());
   }
 
@@ -146,6 +239,10 @@ export default function MembersManager({
     setInvites(await fetchInvites());
   }
 
+  const editingSelf = editing?.user_id === currentUserId;
+  const editingCanManage =
+    !!editing && !editingSelf && (currentRole === "owner" || editing.role !== "owner");
+
   return (
     <>
       <div className={styles.titleRow}>
@@ -168,54 +265,47 @@ export default function MembersManager({
 
       <div className={styles.section}>
         <p className={styles.sectionLabel}>People ({members.length})</p>
+        <input
+          className={`${styles.input} ${styles.memberSearch}`}
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search members"
+          aria-label="Search members"
+        />
         <ul className={styles.memberList}>
-          {members.map((m) => {
+          {filtered.map((m) => {
             const isSelf = m.user_id === currentUserId;
-            const canManage =
-              !isSelf && (currentRole === "owner" || m.role !== "owner");
+            const { primary, secondary } = displayLines(m, nameMode);
             return (
-              <li key={m.user_id} className={styles.memberRow}>
-                {m.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={m.avatar_url} alt="" className={styles.memberAvatar} />
-                ) : (
-                  <span className={styles.memberAvatar}>{m.display_name.charAt(0).toUpperCase()}</span>
-                )}
-                <div className={styles.memberMeta}>
-                  <span className={styles.memberName}>
-                    {m.display_name}
-                    {isSelf && <span className={styles.memberYou}> (you)</span>}
-                  </span>
-                </div>
-                {canManage ? (
-                  <>
-                    <select
-                      className={styles.roleSelect}
-                      value={m.role}
-                      onChange={(e) => changeRole(m.user_id, e.target.value)}
-                    >
-                      {roleOptions.map((r) => (
-                        <option key={r} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      className={styles.removeBtn}
-                      onClick={() =>
-                        setConfirm({ kind: "removeMember", id: m.user_id, label: m.display_name })
-                      }
-                    >
-                      Remove
-                    </button>
-                  </>
-                ) : (
+              <li key={m.user_id} className={styles.memberRow} style={{ padding: 0, border: "none" }}>
+                <button type="button" className={styles.memberRowBtn} onClick={() => openEdit(m)}>
+                  {m.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={m.avatar_url} alt="" className={styles.memberAvatar} />
+                  ) : (
+                    <span className={styles.memberAvatar}>{primary.charAt(0).toUpperCase()}</span>
+                  )}
+                  <div className={styles.memberMeta}>
+                    <span className={styles.memberName}>
+                      {primary}
+                      {isSelf && <span className={styles.memberYou}> (you)</span>}
+                    </span>
+                    {secondary && <span className={styles.memberSub}>{secondary}</span>}
+                  </div>
                   <span className={styles.roleBadge}>{m.role}</span>
-                )}
+                  <svg className={styles.arrow} width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
               </li>
             );
           })}
+          {filtered.length === 0 && (
+            <p className={styles.dnsHint} style={{ marginTop: 0 }}>
+              No members match &ldquo;{query}&rdquo;.
+            </p>
+          )}
         </ul>
       </div>
 
@@ -263,6 +353,69 @@ export default function MembersManager({
           </ul>
         )}
       </div>
+
+      {/* ── Edit member ─────────────────────────────────────────────────── */}
+      <Modal open={!!editing} title="Edit member" onClose={() => setEditing(null)}>
+        <form className={styles.form} onSubmit={saveEdit}>
+          <div className={styles.field}>
+            <label className={styles.label}>First name</label>
+            <input className={styles.input} value={eFirst} onChange={(e) => setEFirst(e.target.value)} maxLength={40} autoFocus />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Last name</label>
+            <input className={styles.input} value={eLast} onChange={(e) => setELast(e.target.value)} maxLength={40} />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>
+              Nickname <span className={styles.optional}>(optional)</span>
+            </label>
+            <input className={styles.input} value={eNick} onChange={(e) => setENick(e.target.value)} maxLength={40} />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>
+              Birthdate <span className={styles.optional}>(optional)</span>
+            </label>
+            <input className={styles.input} type="date" value={eBday} onChange={(e) => setEBday(e.target.value)} />
+          </div>
+          {editingCanManage && (
+            <div className={styles.field}>
+              <label className={styles.label}>Role</label>
+              <select
+                className={styles.roleSelect}
+                value={eRole}
+                onChange={(e) => setERole(e.target.value as "owner" | "admin" | "member")}
+              >
+                {roleOptions.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {eError && <p className={styles.formError}>{eError}</p>}
+          <div className={styles.memberEditActions}>
+            <button type="submit" className={styles.createBtn} disabled={eBusy}>
+              {eBusy ? "Saving…" : "Save changes"}
+            </button>
+            {editingCanManage && (
+              <button
+                type="button"
+                className={styles.removeBtn}
+                onClick={() => {
+                  const m = editing;
+                  if (m) {
+                    setEditing(null);
+                    setConfirm({ kind: "removeMember", id: m.user_id, label: displayLines(m, nameMode).primary });
+                  }
+                }}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        </form>
+      </Modal>
 
       <Modal open={inviteOpen} title="Invite someone" onClose={() => setInviteOpen(false)}>
         <p className={styles.dnsHint} style={{ marginTop: 0 }}>

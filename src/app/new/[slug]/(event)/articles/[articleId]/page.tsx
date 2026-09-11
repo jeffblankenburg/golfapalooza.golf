@@ -4,6 +4,8 @@ import ReactMarkdown from "react-markdown";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
 import { pickName } from "@/lib/v2/profile";
+import { loadResolvedFeatures } from "@/lib/v2/features-server";
+import { isFeatureVisible } from "@/lib/v2/features";
 import styles from "@/app/new/new.module.css";
 /* eslint-disable @next/next/no-img-element */
 
@@ -41,6 +43,12 @@ export default async function ArticlePage({
   if (!org) redirect("/new");
 
   const supabase = await v2ServerClient();
+
+  // Respect the Articles feature toggle (redirect if it's off for this viewer).
+  const isAdmin = org.role === "owner" || org.role === "admin";
+  const resolved = await loadResolvedFeatures(supabase, org.id, null);
+  if (!isFeatureVisible(resolved, "articles", isAdmin)) redirect(`/new/${slug}`);
+
   const { data } = await supabase
     .from("v2_articles")
     .select(
@@ -60,11 +68,11 @@ export default async function ArticlePage({
 
   return (
     <div className={`${styles.page} ${styles.orgPage}`}>
-      <Link href={`/new/${slug}`} className={styles.back}>
+      <Link href={`/new/${slug}/articles`} className={styles.back}>
         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 19l-7-7 7-7" />
         </svg>
-        Back
+        Articles
       </Link>
 
       <article className={styles.articleDetail}>
@@ -80,16 +88,16 @@ export default async function ArticlePage({
 
         <h1 className={styles.articleDetailTitle}>{a.title}</h1>
 
-        <div className={styles.articleMeta}>
-          {dateText && <span className={styles.articleDate}>{dateText}</span>}
+        <div className={styles.articleDetailByline}>
+          {dateText && <span className={styles.articleBylineDate}>{dateText}</span>}
           {authorName && (
-            <span className={styles.articleAuthorGroup}>
+            <span className={styles.articleBylineAuthorGroup}>
               {author?.avatar_url ? (
-                <img className={styles.articleMetaAvatar} src={author.avatar_url} alt="" />
+                <img className={styles.articleBylineAvatar} src={author.avatar_url} alt="" />
               ) : (
-                <span className={styles.articleMetaAvatarFallback}>{authorName[0]?.toUpperCase() || "?"}</span>
+                <span className={styles.articleBylineAvatarFallback}>{authorName[0]?.toUpperCase() || "?"}</span>
               )}
-              <span className={styles.articleMetaAuthor}>{authorName}</span>
+              <span className={styles.articleBylineAuthor}>{authorName}</span>
             </span>
           )}
         </div>

@@ -70,6 +70,7 @@ export default async function EventAdmin({
         <p className={styles.sectionLabel}>Event administration</p>
         <AdminGrid
           items={[
+            { label: "Features", href: `/new/${slug}/admin/events/${eventId}/features`, desc: "Turn features on, pin & rename them" },
             { label: "Contests", desc: "Scramble, Skins, Pick'em, Calcutta, Cornhole…" },
             { label: "Tee Times", desc: "Groups & start times" },
             { label: "Teams", desc: "Team assignments" },

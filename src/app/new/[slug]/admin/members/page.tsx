@@ -30,6 +30,7 @@ export default async function MembersPage({
         orgId={org.id}
         currentUserId={ctx.userId}
         currentRole={org.role}
+        nameMode={org.name_display}
       />
     </div>
   );

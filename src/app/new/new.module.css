@@ -2259,3 +2259,284 @@ button.feedRow:active {
 .notifSwitch[data-on] .notifSwitchKnob {
   transform: translateX(18px);
 }
+
+/* ── Feature registry config (admin/events/[id]/features) ─────────────────── */
+.featIntro {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 4px 0 22px;
+}
+.featBucket {
+  margin-top: 26px;
+}
+.featBucketHead {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--brand);
+  margin-bottom: 10px;
+}
+.featList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.featRow {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px 14px;
+}
+.featRowMain {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.featIcon {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--brand) 10%, var(--paper));
+  color: var(--brand);
+}
+.featRow[data-off="true"] .featIcon {
+  background: color-mix(in srgb, var(--ink) 6%, var(--paper));
+  color: var(--ink-soft);
+}
+.featText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.featLabel {
+  font-weight: 650;
+  font-size: 0.95rem;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.featBlurb {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin-top: 2px;
+  line-height: 1.35;
+}
+.featChip {
+  flex: none;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 8%, var(--paper));
+  color: var(--ink-soft);
+}
+.featChipOn {
+  background: color-mix(in srgb, var(--brand) 16%, var(--paper));
+  color: var(--brand);
+}
+.featSub {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.featSubRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.featSubText {
+  min-width: 0;
+}
+.featSubLabel {
+  font-weight: 600;
+  font-size: 0.86rem;
+  color: var(--ink);
+}
+.featSubHint {
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+  margin-top: 1px;
+}
+.featLabelInput {
+  width: 100%;
+}
+.featSaveBar {
+  position: sticky;
+  bottom: 0;
+  margin-top: 24px;
+  padding: 14px 0;
+  background: linear-gradient(to top, var(--paper) 70%, transparent);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.featPinCount {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+/* Articles index — vertical stack of the featured-style cards. */
+.articleList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+/* Members admin — clickable rows, secondary name line, search. */
+.memberRowBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+.memberRowBtn:active {
+  background: rgba(23, 33, 29, 0.05);
+}
+.memberSub {
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 1px;
+}
+.memberSearch {
+  margin: 4px 0 14px;
+}
+.memberEditActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+/* Three-state feature visibility control (Off / Everyone / Admins). */
+.segmented {
+  flex: none;
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--paper);
+}
+.segmentBtn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 6px 11px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.segmentBtn + .segmentBtn {
+  border-left: 1px solid var(--line);
+}
+.segmentBtn[data-on] {
+  background: var(--brand);
+  color: #fff;
+}
+
+/* Single cycling visibility pill (tap: Off → Everyone → Admins → Off). */
+.cycleBtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  justify-content: center;
+  min-width: 104px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cycleBtn[data-state="everyone"] {
+  background: var(--brand);
+  color: #fff;
+  border-color: transparent;
+}
+.cycleBtn[data-state="admins"] {
+  background: #b45309;
+  color: #fff;
+  border-color: transparent;
+}
+.cycleDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+}
+.cycleBtn[data-state="off"] .cycleDot {
+  opacity: 0.4;
+}
+
+/* Article reading-page byline — dark text on the light page (NOT the card scrim). */
+.articleDetailByline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.articleBylineAvatar,
+.articleBylineAvatarFallback {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+}
+.articleBylineAvatar {
+  object-fit: cover;
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+.articleBylineAvatarFallback {
+  display: grid;
+  place-items: center;
+  background: var(--brand);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+.articleBylineAuthor {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1;
+}
+.articleBylineDate {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  line-height: 1;
+}
+/* Date stays left; the author cluster (avatar + name) pushes to the right edge. */
+.articleBylineAuthorGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}

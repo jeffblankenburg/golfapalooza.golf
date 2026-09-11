@@ -11,6 +11,8 @@ import NotificationDrawer from "./NotificationDrawer";
 import ChatDrawer from "./ChatDrawer";
 import PhotosDrawer from "./PhotosDrawer";
 import { useV2Music } from "./MusicProvider";
+import FeatureIcon from "@/app/new/_components/FeatureIcon";
+import type { NavFeature, LauncherGroup } from "@/lib/v2/features";
 import styles from "./event-shell.module.css";
 /* eslint-disable @next/next/no-img-element */
 
@@ -43,6 +45,11 @@ export default function EventShell({
   userAvatarUrl,
   initialUnreadCount,
   initialChatUnread,
+  pinned,
+  launcher,
+  musicEnabled,
+  chatEnabled,
+  photosEnabled,
   children,
 }: {
   slug: string;
@@ -54,9 +61,15 @@ export default function EventShell({
   userAvatarUrl: string | null;
   initialUnreadCount: number;
   initialChatUnread: number;
+  pinned: NavFeature[];
+  launcher: LauncherGroup[];
+  musicEnabled: boolean;
+  chatEnabled: boolean;
+  photosEnabled: boolean;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState<DrawerKey | null>(null);
+  const [everythingOpen, setEverythingOpen] = useState(false);
   const [unread, setUnread] = useState(initialUnreadCount);
   const [chatUnread, setChatUnread] = useState(initialChatUnread);
   // A notification/activity deep-link target for a drawer (room or photo id),
@@ -79,6 +92,7 @@ export default function EventShell({
     // Manual open is never a deep-link — drop any stale room/photo target so a
     // reopened drawer doesn't jump back to a previously deep-linked item.
     setDeepLink((d) => (d.room || d.photo ? {} : d));
+    setEverythingOpen(false);
     const willOpen = open !== k;
     // Closing chat: read receipts may have changed — refresh the badge.
     if (open === "chat" && k === "chat") refetchChatUnread();
@@ -89,11 +103,29 @@ export default function EventShell({
     setOpen(willOpen ? k : null);
   };
 
-  // When music expands (it broadcasts), close whatever shared drawer is open.
+  // Open/close the "Everything" launcher (bottom sheet), coordinating with the
+  // drawers and the music overlay so only one full-screen surface shows at once.
+  const openEverything = () => {
+    setDeepLink((d) => (d.room || d.photo ? {} : d));
+    const willOpen = !everythingOpen;
+    if (willOpen && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("ui:drawer-open", { detail: { name: "everything" } }));
+    }
+    setEverythingOpen(willOpen);
+  };
+
+  // Coordinate surfaces: opening the launcher closes any drawer; opening a drawer
+  // (or expanding music) closes the launcher. Music also owns the shared drawers.
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ name?: string }>).detail;
-      if (detail?.name === "music") setOpen(null);
+      const name = (e as CustomEvent<{ name?: string }>).detail?.name;
+      if (!name) return;
+      if (name === "everything") {
+        setOpen(null);
+      } else {
+        setEverythingOpen(false);
+        if (name === "music") setOpen(null);
+      }
     };
     window.addEventListener("ui:drawer-open", handler);
     return () => window.removeEventListener("ui:drawer-open", handler);
@@ -114,7 +146,11 @@ export default function EventShell({
     // Defer state changes out of the effect body (avoids cascading-render lint).
     const raf = requestAnimationFrame(() => {
       if (target === "music") {
-        music.expandDrawer();
+        if (musicEnabled) music.expandDrawer();
+      } else if (target === "chat" && !chatEnabled) {
+        /* chat is off for this viewer */
+      } else if (target === "photos" && !photosEnabled) {
+        /* photos is off for this viewer */
       } else if (target in DRAWERS) {
         setDeepLink({ room, photo });
         window.dispatchEvent(new CustomEvent("ui:drawer-open", { detail: { name: target } }));
@@ -122,7 +158,7 @@ export default function EventShell({
       }
     });
     return () => cancelAnimationFrame(raf);
-  }, [music]);
+  }, [music, musicEnabled, chatEnabled, photosEnabled]);
 
   // Open a drawer on request from elsewhere (an Activity-feed row or an in-app
   // notification tap). detail may carry a deep target (room/photo).
@@ -131,7 +167,11 @@ export default function EventShell({
       const detail = (e as CustomEvent<{ name?: string; room?: string; photo?: string }>).detail;
       const name = detail?.name;
       if (name === "music") {
-        music.expandDrawer();
+        if (musicEnabled) music.expandDrawer();
+      } else if (name === "chat" && !chatEnabled) {
+        /* off */
+      } else if (name === "photos" && !photosEnabled) {
+        /* off */
       } else if (name && name in DRAWERS) {
         if (detail?.room || detail?.photo) setDeepLink({ room: detail.room, photo: detail.photo });
         window.dispatchEvent(new CustomEvent("ui:drawer-open", { detail: { name } }));
@@ -140,7 +180,7 @@ export default function EventShell({
     };
     window.addEventListener("ui:open-drawer", handler);
     return () => window.removeEventListener("ui:open-drawer", handler);
-  }, [music]);
+  }, [music, musicEnabled, chatEnabled, photosEnabled]);
 
   // Refetch the authoritative unread count (used after read/delete events).
   const refetchUnread = useCallback(async () => {
@@ -248,24 +288,30 @@ export default function EventShell({
         </Link>
 
         <div className={styles.topGroup}>
-          <span className={styles.bellWrap}>
-            <TopIcon label="Chat" active={open === "chat"} onClick={() => toggle("chat")}>
-              <path d="M8 10h8M8 14h5M21 12a8 8 0 01-11.5 7.2L3 21l1.8-6.5A8 8 0 1121 12z" />
+          {chatEnabled && (
+            <span className={styles.bellWrap}>
+              <TopIcon label="Chat" active={open === "chat"} onClick={() => toggle("chat")}>
+                <path d="M8 10h8M8 14h5M21 12a8 8 0 01-11.5 7.2L3 21l1.8-6.5A8 8 0 1121 12z" />
+              </TopIcon>
+              {chatUnread > 0 && (
+                <span className={styles.bellBadge}>{chatUnread > 99 ? "99+" : chatUnread}</span>
+              )}
+            </span>
+          )}
+          {photosEnabled && (
+            <TopIcon label="Photos" active={open === "photos"} onClick={() => toggle("photos")}>
+              <rect x="3" y="5" width="18" height="14" rx="2" />
+              <circle cx="8.5" cy="10" r="1.5" />
+              <path d="M21 16l-5-5-9 8" />
             </TopIcon>
-            {chatUnread > 0 && (
-              <span className={styles.bellBadge}>{chatUnread > 99 ? "99+" : chatUnread}</span>
-            )}
-          </span>
-          <TopIcon label="Photos" active={open === "photos"} onClick={() => toggle("photos")}>
-            <rect x="3" y="5" width="18" height="14" rx="2" />
-            <circle cx="8.5" cy="10" r="1.5" />
-            <path d="M21 16l-5-5-9 8" />
-          </TopIcon>
-          <TopIcon label="Music" active={music.isDrawerExpanded} onClick={() => music.toggleDrawer()}>
-            <path d="M9 18V6l10-2v12" />
-            <circle cx="6" cy="18" r="3" />
-            <circle cx="16" cy="16" r="3" />
-          </TopIcon>
+          )}
+          {musicEnabled && (
+            <TopIcon label="Music" active={music.isDrawerExpanded} onClick={() => music.toggleDrawer()}>
+              <path d="M9 18V6l10-2v12" />
+              <circle cx="6" cy="18" r="3" />
+              <circle cx="16" cy="16" r="3" />
+            </TopIcon>
+          )}
           <TopIcon label="Rounds" active={open === "rounds"} onClick={() => toggle("rounds")}>
             <path d="M6 21V3" strokeLinecap="round" />
             <path d="M6 4h11l-2.5 3L17 10H6" />
@@ -347,6 +393,40 @@ export default function EventShell({
         </div>
       </section>
 
+      {/* ── "Everything" launcher (bottom sheet over content, below the bars) ── */}
+      <div
+        className={styles.backdrop}
+        data-open={everythingOpen}
+        onClick={() => setEverythingOpen(false)}
+        aria-hidden
+      />
+      <section className={styles.drawer} data-open={everythingOpen} aria-hidden={!everythingOpen}>
+        <div className={styles.drawerHead}>
+          <span className={styles.drawerTitle}>Everything</span>
+          <button type="button" className={styles.drawerClose} onClick={() => setEverythingOpen(false)} aria-label="Close">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className={styles.drawerBody}>
+          {launcher.length === 0 ? (
+            <p className={styles.drawerStub}>Nothing here yet — an admin can turn on features from the event settings.</p>
+          ) : (
+            launcher.map((group) => (
+              <div key={group.bucketKey} className={styles.launchGroup}>
+                <p className={styles.launchHead}>{group.bucketLabel}</p>
+                <div className={styles.launchList}>
+                  {group.features.map((f) => (
+                    <LaunchItem key={f.key} feature={f} onNavigate={() => setEverythingOpen(false)} />
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
       {/* ── Bottom nav (admin-configurable; gear pinned far right) ──────── */}
       <nav className={styles.bottomnav}>
         <Link href={`/new/${slug}`} className={styles.navBtn}>
@@ -355,10 +435,42 @@ export default function EventShell({
           </svg>
           Home
         </Link>
-        {/* Stub slots — the admin will pick these based on contests/activities. */}
-        <NavStub label="Scores" />
-        <NavStub label="Schedule" />
-        <NavStub label="More" />
+        {/* Admin-pinned features (≤3) from the event's feature registry. */}
+        {pinned.map((f) =>
+          f.active && f.href ? (
+            <Link key={f.key} href={f.href} className={styles.navBtn}>
+              <FeatureIcon name={f.icon} size={22} />
+              {f.label}
+            </Link>
+          ) : (
+            <button
+              key={f.key}
+              type="button"
+              className={styles.navBtn}
+              disabled
+              aria-label={`${f.label}${f.lockReason ? ` (${f.lockReason})` : ""}`}
+            >
+              <FeatureIcon name={f.icon} size={22} />
+              {f.label}
+            </button>
+          ),
+        )}
+        <button
+          type="button"
+          className={styles.navBtn}
+          data-active={everythingOpen || undefined}
+          onClick={openEverything}
+          aria-label="Everything"
+          aria-pressed={everythingOpen}
+        >
+          <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden>
+            <rect x="4" y="4" width="6" height="6" rx="1.4" />
+            <rect x="14" y="4" width="6" height="6" rx="1.4" />
+            <rect x="4" y="14" width="6" height="6" rx="1.4" />
+            <rect x="14" y="14" width="6" height="6" rx="1.4" />
+          </svg>
+          Everything
+        </button>
         {isAdmin && (
           <Link href={`/new/${slug}/admin`} className={`${styles.navBtn} ${styles.navGear}`}>
             <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
@@ -400,11 +512,30 @@ function TopIcon({
   );
 }
 
-function NavStub({ label }: { label: string }) {
+function LaunchItem({ feature, onNavigate }: { feature: NavFeature; onNavigate: () => void }) {
+  const inner = (
+    <>
+      <span className={styles.launchIcon}>
+        <FeatureIcon name={feature.icon} size={22} />
+      </span>
+      <span className={styles.launchText}>
+        <span className={styles.launchLabel}>{feature.label}</span>
+        <span className={styles.launchBlurb}>{feature.blurb}</span>
+      </span>
+      {feature.adminOnly && <span className={styles.launchLock}>Admins</span>}
+      {feature.lockReason && <span className={styles.launchLock}>{feature.lockReason}</span>}
+    </>
+  );
+  if (feature.active && feature.href) {
+    return (
+      <Link href={feature.href} className={styles.launchItem} onClick={onNavigate}>
+        {inner}
+      </Link>
+    );
+  }
   return (
-    <button type="button" className={styles.navBtn} disabled aria-label={`${label} (coming soon)`}>
-      <span className={styles.navStubDot} aria-hidden />
-      {label}
-    </button>
+    <div className={styles.launchItem} data-locked aria-disabled>
+      {inner}
+    </div>
   );
 }

@@ -41,14 +41,17 @@ export default function RsvpModule({
   eventName,
   initialLikelihood,
   initialResponseCount,
+  initialAttendingCount,
 }: {
   eventId: string;
   eventName: string;
   initialLikelihood: Likelihood | null;
   initialResponseCount: number;
+  initialAttendingCount: number;
 }) {
   const [likelihood, setLikelihood] = useState<Likelihood | null>(initialLikelihood);
   const [responseCount, setResponseCount] = useState(initialResponseCount);
+  const [attendingCount, setAttendingCount] = useState(initialAttendingCount);
   const [participants, setParticipants] = useState<Participant[] | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [open, setOpen] = useState(false);
@@ -62,6 +65,7 @@ export default function RsvpModule({
       const d = await res.json();
       setParticipants(d.participants || []);
       setResponseCount(d.responseCount ?? 0);
+      setAttendingCount(d.attendingCount ?? 0);
       setLikelihood(d.likelihood ?? null);
     } catch {
       /* ignore */
@@ -125,6 +129,9 @@ export default function RsvpModule({
           <button type="button" className={styles.rsvpAccordionHead} onClick={toggleExpanded}>
             <span className={styles.rsvpAccordionTitle}>
               Responses <span className={styles.rsvpCount}>({responseCount})</span>
+              <span className={styles.rsvpAttending}>
+                Attending <span className={styles.rsvpCount}>({attendingCount})</span>
+              </span>
             </span>
             <svg
               className={styles.rsvpChevron}

@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     admin
       .from("v2_songs")
       .select(
-        "id, title, mp3_url, art_url, art_thumb_url, lyrics, duration_seconds, sort_order, tagged_user:v2_profiles!v2_songs_tagged_user_id_fkey(id, display_name, avatar_url)",
+        "id, title, mp3_url, art_url, art_thumb_url, lyrics, duration_seconds, sort_order, tagged_user:v2_profiles!v2_songs_tagged_user_id_fkey(id, display_name, first_name, last_name, avatar_url)",
       )
       .eq("org_id", orgId)
       .order("sort_order", { ascending: true })

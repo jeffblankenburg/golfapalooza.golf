@@ -75,6 +75,8 @@ export default async function EventHome({
             eventName={event.name}
             storeUrl={org.store_url}
             storeLabel={org.store_label}
+            storeEnabled={org.store_enabled}
+            nameDisplay={org.name_display}
           />
         </>
       ) : (

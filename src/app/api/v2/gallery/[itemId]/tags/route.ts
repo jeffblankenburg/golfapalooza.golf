@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { resolveGalleryItem } from "@/lib/v2/gallery";
 import { sendV2Notifications } from "@/lib/v2/notifications";
+import { orgSlug, orgNameMode } from "@/lib/v2/orgs";
+import { pickName } from "@/lib/v2/profile";
 
 /**
  * Tags on a gallery item.
@@ -42,12 +44,17 @@ export async function POST(
 
   const notify = userIds.filter((uid) => uid !== a.userId && !already.has(uid));
   if (notify.length) {
-    const { data: me } = await a.admin.from("v2_profiles").select("display_name").eq("id", a.userId).maybeSingle();
+    const [{ data: me }, slug, mode] = await Promise.all([
+      a.admin.from("v2_profiles").select("display_name, first_name, last_name").eq("id", a.userId).maybeSingle(),
+      orgSlug(a.admin, a.item.org_id),
+      orgNameMode(a.admin, a.item.org_id),
+    ]);
     await sendV2Notifications(a.admin, notify, {
       orgId: a.item.org_id,
       type: "gallery_tag",
       title: "You were tagged in a photo",
-      body: `${me?.display_name || "Someone"} tagged you`,
+      body: `${pickName(me, mode, "Someone")} tagged you`,
+      data: slug ? { url: `/new/${slug}?open=photos&photo=${itemId}` } : undefined,
     }).catch(() => {});
   }
 

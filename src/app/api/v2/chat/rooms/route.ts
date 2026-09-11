@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
-import { isOrgMember } from "@/lib/v2/orgs";
+import { isOrgMember, orgNameMode } from "@/lib/v2/orgs";
+import { pickName } from "@/lib/v2/profile";
 
 /**
  * POST /api/v2/chat/rooms { orgId, type, name?, memberIds[] } — create a group,
@@ -105,11 +106,11 @@ export async function GET(request: Request) {
 
   const pinnedBy = new Map((mine || []).map((m) => [m.room_id, m.is_pinned]));
 
-  const [roomsRes, membersRes, receiptsRes, recentRes, hiddenRes] = await Promise.all([
+  const [roomsRes, membersRes, receiptsRes, recentRes, hiddenRes, mode] = await Promise.all([
     admin.from("v2_chat_rooms").select("id, type, name, created_at").in("id", roomIds).eq("org_id", orgId),
     admin
       .from("v2_chat_room_members")
-      .select("room_id, user_id, member:v2_profiles(display_name, avatar_url)")
+      .select("room_id, user_id, member:v2_profiles(display_name, first_name, last_name, avatar_url)")
       .in("room_id", roomIds),
     admin.from("v2_chat_read_receipts").select("room_id, last_read_at").eq("user_id", userId).in("room_id", roomIds),
     // Recent-activity window: enough to derive last message + unread per room.
@@ -120,6 +121,7 @@ export async function GET(request: Request) {
       .order("created_at", { ascending: false })
       .limit(600),
     admin.from("v2_chat_hidden_messages").select("message_id").eq("user_id", userId),
+    orgNameMode(admin, orgId),
   ]);
 
   const lastReadBy = new Map((receiptsRes.data || []).map((r) => [r.room_id, r.last_read_at]));
@@ -129,7 +131,7 @@ export async function GET(request: Request) {
   for (const m of membersRes.data || []) {
     const p = Array.isArray(m.member) ? m.member[0] : m.member;
     const list = membersByRoom.get(m.room_id) || [];
-    list.push({ userId: m.user_id, displayName: p?.display_name || "Member", avatarUrl: p?.avatar_url ?? null });
+    list.push({ userId: m.user_id, displayName: pickName(p, mode), avatarUrl: p?.avatar_url ?? null });
     membersByRoom.set(m.room_id, list);
   }
 

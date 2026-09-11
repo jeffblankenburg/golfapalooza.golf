@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
-import { isOrgMember } from "@/lib/v2/orgs";
+import { isOrgMember, orgNameMode } from "@/lib/v2/orgs";
+import { pickName } from "@/lib/v2/profile";
 
 /**
  * GET /api/v2/chat/members?orgId=&includeSelf= — active org members.
@@ -21,11 +22,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Not a member" }, { status: 403 });
   }
 
-  const { data } = await admin
-    .from("v2_memberships")
-    .select("user_id, member:v2_profiles(display_name, avatar_url)")
-    .eq("org_id", orgId)
-    .eq("status", "active");
+  const [{ data }, mode] = await Promise.all([
+    admin
+      .from("v2_memberships")
+      .select("user_id, member:v2_profiles(display_name, first_name, last_name, avatar_url)")
+      .eq("org_id", orgId)
+      .eq("status", "active"),
+    orgNameMode(admin, orgId),
+  ]);
 
   const members = (data || [])
     .filter((m) => includeSelf || m.user_id !== userId)
@@ -33,7 +37,7 @@ export async function GET(request: Request) {
       const p = Array.isArray(m.member) ? m.member[0] : m.member;
       return {
         userId: m.user_id as string,
-        displayName: (p?.display_name as string) || "Member",
+        displayName: pickName(p, mode),
         avatarUrl: (p?.avatar_url as string | null) ?? null,
       };
     })

@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { NameMode } from "@/lib/v2/profile";
 import styles from "@/app/new/new.module.css";
 import DomainsManager from "./DomainsManager";
 
@@ -14,6 +15,8 @@ export default function GroupSettingsForm({
   initialLogo,
   initialStoreUrl,
   initialStoreLabel,
+  initialStoreEnabled,
+  initialNameDisplay,
 }: {
   orgId: string;
   slug: string;
@@ -22,12 +25,16 @@ export default function GroupSettingsForm({
   initialLogo: string | null;
   initialStoreUrl: string | null;
   initialStoreLabel: string | null;
+  initialStoreEnabled: boolean;
+  initialNameDisplay: NameMode;
 }) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
   const [color, setColor] = useState(initialColor);
+  const [nameDisplay, setNameDisplay] = useState<NameMode>(initialNameDisplay);
   const [storeUrl, setStoreUrl] = useState(initialStoreUrl || "");
   const [storeLabel, setStoreLabel] = useState(initialStoreLabel || "");
+  const [storeEnabled, setStoreEnabled] = useState(initialStoreEnabled);
   const [logo, setLogo] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(initialLogo);
   const [saving, setSaving] = useState(false);
@@ -52,8 +59,10 @@ export default function GroupSettingsForm({
         body: JSON.stringify({
           name: name.trim(),
           primary_color: color,
+          name_display: nameDisplay,
           store_url: storeUrl.trim() || null,
           store_label: storeLabel.trim() || null,
+          store_enabled: storeEnabled,
         }),
       });
       if (!res.ok) {
@@ -160,36 +169,84 @@ export default function GroupSettingsForm({
         </div>
 
         <div className={styles.field}>
-          <label className={styles.label} htmlFor="storeUrl">
-            Store link
+          <label className={styles.label} htmlFor="nameDisplay">
+            Member names
           </label>
-          <input
-            id="storeUrl"
+          <select
+            id="nameDisplay"
             className={styles.input}
-            value={storeUrl}
-            onChange={(e) => setStoreUrl(e.target.value)}
-            placeholder="https://your-shop.com"
-            inputMode="url"
-          />
+            value={nameDisplay}
+            onChange={(e) => setNameDisplay(e.target.value as NameMode)}
+          >
+            <option value="nickname">Nicknames</option>
+            <option value="real">Real names (First Last)</option>
+          </select>
           <p className={styles.swatchHint}>
-            External merch shop. Leave blank to hide the Store card.
+            How members are shown across the app. Real names fall back to a member&apos;s nickname if
+            they haven&apos;t set a first/last name.
           </p>
         </div>
 
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="storeLabel">
-            Store label
-          </label>
-          <input
-            id="storeLabel"
-            className={styles.input}
-            value={storeLabel}
-            onChange={(e) => setStoreLabel(e.target.value)}
-            placeholder="Get the gear"
-            maxLength={60}
-          />
-          <p className={styles.swatchHint}>Optional headline for the card.</p>
-        </div>
+        <details className={styles.accordion}>
+          <summary className={styles.accordionSummary}>
+            <span>Store</span>
+            <span className={styles.accordionSummaryRight}>
+              {/* Enable/disable the Store card on the home page. Stop the click
+                  from toggling the accordion open/closed. */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={storeEnabled}
+                aria-label="Show store on home page"
+                className={styles.notifSwitch}
+                data-on={storeEnabled || undefined}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setStoreEnabled((v) => !v);
+                }}
+              >
+                <span className={styles.notifSwitchKnob} />
+              </button>
+              <svg className={styles.chev} width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </span>
+          </summary>
+          <div className={styles.accordionBody}>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="storeUrl">
+                Store link
+              </label>
+              <input
+                id="storeUrl"
+                className={styles.input}
+                value={storeUrl}
+                onChange={(e) => setStoreUrl(e.target.value)}
+                placeholder="https://your-shop.com"
+                inputMode="url"
+              />
+              <p className={styles.swatchHint}>
+                External merch shop. Leave blank to hide the Store card.
+              </p>
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="storeLabel">
+                Store label
+              </label>
+              <input
+                id="storeLabel"
+                className={styles.input}
+                value={storeLabel}
+                onChange={(e) => setStoreLabel(e.target.value)}
+                placeholder="Get the gear"
+                maxLength={60}
+              />
+              <p className={styles.swatchHint}>Optional headline for the card.</p>
+            </div>
+          </div>
+        </details>
 
         <DomainsManager orgId={orgId} />
 

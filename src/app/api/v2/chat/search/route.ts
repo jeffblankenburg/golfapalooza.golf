@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
-import { isOrgMember } from "@/lib/v2/orgs";
+import { isOrgMember, orgNameMode } from "@/lib/v2/orgs";
+import { pickName } from "@/lib/v2/profile";
 
 /**
  * GET /api/v2/chat/search?orgId=&q= — full-text-ish search of message CONTENT
@@ -30,10 +31,10 @@ export async function GET(request: Request) {
   if (roomIds.length === 0) return NextResponse.json({ results: [] });
 
   const pattern = `%${q.replace(/[%_\\]/g, "\\$&")}%`;
-  const [matchRes, hiddenRes, roomsRes, membersRes] = await Promise.all([
+  const [matchRes, hiddenRes, roomsRes, membersRes, mode] = await Promise.all([
     admin
       .from("v2_chat_messages")
-      .select("id, room_id, content, created_at, sender:v2_profiles!v2_chat_messages_sender_id_fkey(display_name)")
+      .select("id, room_id, content, created_at, sender:v2_profiles!v2_chat_messages_sender_id_fkey(display_name, first_name, last_name)")
       .in("room_id", roomIds)
       .not("content", "is", null)
       .ilike("content", pattern)
@@ -43,8 +44,9 @@ export async function GET(request: Request) {
     admin.from("v2_chat_rooms").select("id, type, name").in("id", roomIds),
     admin
       .from("v2_chat_room_members")
-      .select("room_id, user_id, member:v2_profiles(display_name, avatar_url)")
+      .select("room_id, user_id, member:v2_profiles(display_name, first_name, last_name, avatar_url)")
       .in("room_id", roomIds),
+    orgNameMode(admin, orgId),
   ]);
 
   const hidden = new Set((hiddenRes.data || []).map((h) => h.message_id));
@@ -53,7 +55,7 @@ export async function GET(request: Request) {
   for (const m of membersRes.data || []) {
     const p = Array.isArray(m.member) ? m.member[0] : m.member;
     const list = membersByRoom.get(m.room_id) || [];
-    list.push({ userId: m.user_id, name: p?.display_name || "Member", avatar: p?.avatar_url ?? null });
+    list.push({ userId: m.user_id, name: pickName(p, mode), avatar: p?.avatar_url ?? null });
     membersByRoom.set(m.room_id, list);
   }
 
@@ -75,7 +77,7 @@ export async function GET(request: Request) {
         roomId: m.room_id,
         roomName: roomName || "Conversation",
         roomAvatar,
-        senderName: sender?.display_name || "Member",
+        senderName: pickName(sender, mode),
         snippet: (m.content || "").replace(/@\[([^\]]+)\]\([^)]+\)/g, "@$1"),
         createdAt: m.created_at,
       };

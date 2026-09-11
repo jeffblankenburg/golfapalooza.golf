@@ -2,12 +2,16 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { v2BrowserClient } from "@/lib/v2/supabase-browser";
+import { useNameMode } from "./NameMode";
+import { pickName } from "@/lib/v2/profile";
 import ImageLightbox from "./ImageLightbox";
 import styles from "./chat.module.css";
 /* eslint-disable @next/next/no-img-element */
 
 interface Sender {
   display_name: string;
+  first_name?: string | null;
+  last_name?: string | null;
   avatar_url: string | null;
 }
 interface Reaction {
@@ -96,8 +100,20 @@ function renderContent(content: string): React.ReactNode[] {
   return nodes;
 }
 
-export default function ChatDrawer({ orgId, userId }: { orgId: string; userId: string }) {
-  const [openRoom, setOpenRoom] = useState<{ roomId: string; target: string | null } | null>(null);
+export default function ChatDrawer({
+  orgId,
+  userId,
+  initialRoom,
+}: {
+  orgId: string;
+  userId: string;
+  initialRoom?: string;
+}) {
+  // A deep-link (notification tap) can open straight into a room; otherwise the
+  // room list shows first. Seeded once on mount.
+  const [openRoom, setOpenRoom] = useState<{ roomId: string; target: string | null } | null>(
+    initialRoom ? { roomId: initialRoom, target: null } : null,
+  );
   const [rooms, setRooms] = useState<RoomSummary[] | null>(null);
   const [composing, setComposing] = useState(false);
 
@@ -420,6 +436,7 @@ function Room({
   target: string | null;
   onBack: () => void;
 }) {
+  const mode = useNameMode();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -583,7 +600,7 @@ function Room({
           if (!row.sender) {
             const { data } = await supabase
               .from("v2_profiles")
-              .select("display_name, avatar_url")
+              .select("display_name, first_name, last_name, avatar_url")
               .eq("id", row.sender_id)
               .maybeSingle();
             row.sender = data as Sender | null;
@@ -1047,6 +1064,7 @@ function Room({
           const prev = messages[i - 1];
           const mine = m.sender_id === userId;
           const sender = one(m.sender);
+          const senderName = pickName(sender, mode);
           const showDay = !prev || dayOf(prev.created_at) !== dayOf(m.created_at);
           const grouped =
             !!prev &&
@@ -1072,10 +1090,10 @@ function Room({
                         <img src={sender.avatar_url} alt="" className={styles.msgAvatar} />
                       ) : (
                         <span className={styles.msgAvatarFallback}>
-                          {(sender?.display_name || "?").charAt(0).toUpperCase()}
+                          {senderName.charAt(0).toUpperCase()}
                         </span>
                       )}
-                      <span className={styles.msgSender}>{sender?.display_name || "Member"}</span>
+                      <span className={styles.msgSender}>{senderName}</span>
                     </div>
                   )}
                   <div className={styles.bubbleWrap}>
@@ -1141,7 +1159,7 @@ function Room({
                       {m.reply_to && (
                         <span className={styles.replyQuote}>
                           <span className={styles.replyQuoteName}>
-                            {one(m.reply_to.sender)?.display_name || "Reply"}
+                            {m.reply_to.sender ? pickName(one(m.reply_to.sender), mode) : "Reply"}
                           </span>
                           <span className={styles.replyQuoteText}>
                             {m.reply_to.content
@@ -1338,7 +1356,7 @@ function Room({
             </svg>
           </span>
           <span className={styles.replyBarText}>
-            <span className={styles.replyBarName}>Replying to {one(replyTo.sender)?.display_name || "message"}</span>
+            <span className={styles.replyBarName}>Replying to {replyTo.sender ? pickName(one(replyTo.sender), mode) : "message"}</span>
             <span className={styles.replyBarPreview}>
               {replyTo.content
                 ? replyTo.content.replace(/@\[([^\]]+)\]\([^)]+\)/g, "@$1")

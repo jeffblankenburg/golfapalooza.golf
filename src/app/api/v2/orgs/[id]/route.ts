@@ -25,8 +25,10 @@ export async function PATCH(
   let body: {
     name?: string;
     primary_color?: string;
+    name_display?: string;
     store_url?: string | null;
     store_label?: string | null;
+    store_enabled?: boolean;
   };
   try {
     body = await request.json();
@@ -34,7 +36,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
-  const patch: Record<string, string | null> = {};
+  const patch: Record<string, string | null | boolean> = {};
   if (typeof body.name === "string") {
     const name = body.name.trim();
     if (!name) return NextResponse.json({ error: "Name can't be empty" }, { status: 400 });
@@ -47,6 +49,12 @@ export async function PATCH(
     }
     patch.primary_color = body.primary_color;
   }
+  if (body.name_display !== undefined) {
+    if (body.name_display !== "nickname" && body.name_display !== "real") {
+      return NextResponse.json({ error: "Invalid name display" }, { status: 400 });
+    }
+    patch.name_display = body.name_display;
+  }
   if (body.store_url !== undefined) {
     const url = (body.store_url || "").trim();
     if (url && !/^https?:\/\/.+/i.test(url)) {
@@ -57,6 +65,9 @@ export async function PATCH(
   if (body.store_label !== undefined) {
     const label = (body.store_label || "").trim();
     patch.store_label = label ? label.slice(0, 60) : null;
+  }
+  if (typeof body.store_enabled === "boolean") {
+    patch.store_enabled = body.store_enabled;
   }
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });

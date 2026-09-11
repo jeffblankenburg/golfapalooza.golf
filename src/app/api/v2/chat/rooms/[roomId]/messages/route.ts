@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { resolveRoomAccess } from "@/lib/v2/chat";
 import { sendV2Notifications } from "@/lib/v2/notifications";
+import { orgSlug, orgNameMode } from "@/lib/v2/orgs";
+import { pickName } from "@/lib/v2/profile";
 
 /**
  * Messages for a room.
@@ -29,7 +31,7 @@ export async function GET(
   const limit = Math.min(Number(url.searchParams.get("limit")) || PAGE, 100);
 
   const SELECT =
-    "id, room_id, sender_id, content, image_url, reply_to_id, created_at, sender:v2_profiles!v2_chat_messages_sender_id_fkey(display_name, avatar_url), reactions:v2_chat_reactions(emoji, user_id)";
+    "id, room_id, sender_id, content, image_url, reply_to_id, created_at, sender:v2_profiles!v2_chat_messages_sender_id_fkey(display_name, first_name, last_name, avatar_url), reactions:v2_chat_reactions(emoji, user_id)";
 
   const hiddenRes = await a.admin
     .from("v2_chat_hidden_messages")
@@ -94,7 +96,7 @@ export async function GET(
   if (parentIds.length) {
     const { data: parents } = await a.admin
       .from("v2_chat_messages")
-      .select("id, content, image_url, sender:v2_profiles!v2_chat_messages_sender_id_fkey(display_name)")
+      .select("id, content, image_url, sender:v2_profiles!v2_chat_messages_sender_id_fkey(display_name, first_name, last_name)")
       .in("id", parentIds);
     const byId = new Map((parents || []).map((p) => [p.id, p]));
     for (const m of page) if (m.reply_to_id) m.reply_to = byId.get(m.reply_to_id) ?? null;
@@ -133,7 +135,7 @@ export async function POST(
       reply_to_id: body.replyToId || null,
     })
     .select(
-      "id, room_id, sender_id, content, image_url, reply_to_id, created_at, sender:v2_profiles!v2_chat_messages_sender_id_fkey(display_name, avatar_url)",
+      "id, room_id, sender_id, content, image_url, reply_to_id, created_at, sender:v2_profiles!v2_chat_messages_sender_id_fkey(display_name, first_name, last_name, avatar_url)",
     )
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -153,11 +155,17 @@ export async function POST(
 
   if (others.length) {
     const sender = Array.isArray(msg?.sender) ? msg?.sender[0] : msg?.sender;
-    const senderName = sender?.display_name || "Someone";
+    const senderName = pickName(sender, await orgNameMode(a.admin, a.room.org_id), "Someone");
     // Strip mention markup for the preview: "@[Name](id)" → "@Name".
     const clean = content ? content.replace(/@\[([^\]]+)\]\([^)]+\)/g, "@$1") : "";
     const preview = clean ? clean.slice(0, 80) : "📷 Photo";
-    const link = { url: `/new/${a.room.org_id}/chat/${roomId}`, roomId };
+    // Deep-link to the org home with a query param that opens the chat drawer to
+    // this room (chat is a drawer, not a route). Slug-based so the URL resolves.
+    const slug = await orgSlug(a.admin, a.room.org_id);
+    const link = {
+      url: slug ? `/new/${slug}?open=chat&room=${roomId}` : `/new`,
+      roomId,
+    };
 
     // Mentioned users get chat_mention; everyone else chat_message.
     const mentioned = new Set<string>();

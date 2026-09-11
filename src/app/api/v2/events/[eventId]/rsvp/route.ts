@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
-import { isOrgMember } from "@/lib/v2/orgs";
+import { isOrgMember, orgNameMode } from "@/lib/v2/orgs";
+import { pickName } from "@/lib/v2/profile";
 import { logActivity } from "@/lib/v2/activity";
 
 /**
@@ -58,10 +59,13 @@ export async function GET(
   const g = await resolve(request, eventId);
   if ("error" in g) return NextResponse.json({ error: g.error }, { status: g.status });
 
-  const { data } = await g.admin
-    .from("v2_event_participants")
-    .select("user_id, likelihood, likelihood_set_at, on_roster, user:v2_profiles(display_name, avatar_url)")
-    .eq("event_id", eventId);
+  const [{ data }, mode] = await Promise.all([
+    g.admin
+      .from("v2_event_participants")
+      .select("user_id, likelihood, likelihood_set_at, on_roster, user:v2_profiles(display_name, first_name, last_name, avatar_url)")
+      .eq("event_id", eventId),
+    orgNameMode(g.admin, g.orgId),
+  ]);
 
   const rows = (data || []).map((r) => {
     const u = Array.isArray(r.user) ? r.user[0] : r.user;
@@ -69,7 +73,7 @@ export async function GET(
       userId: r.user_id as string,
       likelihood: r.likelihood as number,
       likelihoodSetAt: (r.likelihood_set_at as string | null) ?? null,
-      displayName: (u?.display_name as string) || "Member",
+      displayName: pickName(u, mode),
       avatarUrl: (u?.avatar_url as string | null) ?? null,
     };
   });

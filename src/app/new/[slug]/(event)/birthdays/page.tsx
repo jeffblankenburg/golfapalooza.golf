@@ -7,6 +7,7 @@ import {
   type PersonWithBirthdate,
   type UpcomingBirthday,
 } from "@/lib/v2/birthday";
+import { pickName } from "@/lib/v2/profile";
 import styles from "@/app/new/new.module.css";
 /* eslint-disable @next/next/no-img-element */
 
@@ -14,6 +15,8 @@ interface MemberRow {
   v2_profiles: {
     id: string;
     display_name: string;
+    first_name: string | null;
+    last_name: string | null;
     birthdate: string | null;
     avatar_url: string | null;
   } | null;
@@ -33,7 +36,7 @@ export default async function BirthdaysPage({
   const supabase = await v2ServerClient();
   const { data } = await supabase
     .from("v2_memberships")
-    .select("v2_profiles(id, display_name, birthdate, avatar_url)")
+    .select("v2_profiles(id, display_name, first_name, last_name, birthdate, avatar_url)")
     .eq("org_id", org.id)
     .eq("status", "active");
 
@@ -42,7 +45,7 @@ export default async function BirthdaysPage({
     .filter((p): p is NonNullable<MemberRow["v2_profiles"]> => !!p && !!p.birthdate)
     .map((p) => ({
       id: p.id,
-      name: p.display_name,
+      name: pickName(p, org.name_display),
       avatarUrl: p.avatar_url,
       birthdate: p.birthdate as string,
     }));

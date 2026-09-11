@@ -155,6 +155,24 @@
   font-size: 1.15rem;
   color: var(--ink);
 }
+.drawerHeadActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.drawerAction {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-soft);
+  padding: 4px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+}
+.drawerAction:active {
+  background: rgba(23, 33, 29, 0.06);
+}
 .drawerClose {
   background: none;
   border: none;

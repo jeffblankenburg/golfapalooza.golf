@@ -4,6 +4,8 @@ import { useState, useRef } from "react";
 import { useV2Music } from "./MusicProvider";
 import ReactMarkdown from "react-markdown";
 import { AndroidBackgroundAudioHint } from "./AndroidBackgroundAudioHint";
+import { useNameMode } from "./NameMode";
+import { pickName } from "@/lib/v2/profile";
 /* eslint-disable @next/next/no-img-element */
 
 function formatTime(seconds: number): string {
@@ -38,6 +40,7 @@ export default function MusicPage() {
   const [search, setSearch] = useState("");
   const [showLyrics, setShowLyrics] = useState(false);
   const seekBarRef = useRef<HTMLDivElement>(null);
+  const mode = useNameMode();
 
   const currentSong = songs[currentIndex] || null;
 
@@ -54,7 +57,7 @@ export default function MusicPage() {
     if (favoritesOnly && !s.is_favorite) return false;
     if (search) {
       const q = search.toLowerCase();
-      return s.title.toLowerCase().includes(q) || (s.tagged_user?.display_name || "").toLowerCase().includes(q);
+      return s.title.toLowerCase().includes(q) || (s.tagged_user ? pickName(s.tagged_user, mode) : "").toLowerCase().includes(q);
     }
     return true;
   });
@@ -85,7 +88,7 @@ export default function MusicPage() {
 
           <div className="text-center mb-4">
             <h1 className="text-lg font-bold text-gray-900">{currentSong.title}</h1>
-            {currentSong.tagged_user && <p className="text-sm text-gray-500">{currentSong.tagged_user.display_name}</p>}
+            {currentSong.tagged_user && <p className="text-sm text-gray-500">{pickName(currentSong.tagged_user, mode)}</p>}
           </div>
 
           <div className="mb-2">
@@ -178,7 +181,7 @@ export default function MusicPage() {
 
                 <div className="flex-1 min-w-0">
                   <div className={`text-sm font-medium truncate ${isActive ? "text-green-700" : "text-gray-900"}`}>{song.title}</div>
-                  {song.tagged_user && <div className="text-xs text-gray-500 truncate">{song.tagged_user.display_name}</div>}
+                  {song.tagged_user && <div className="text-xs text-gray-500 truncate">{pickName(song.tagged_user, mode)}</div>}
                 </div>
 
                 {song.duration_seconds && <span className="text-xs text-gray-400 flex-shrink-0">{formatTime(song.duration_seconds)}</span>}

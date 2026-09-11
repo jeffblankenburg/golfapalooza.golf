@@ -59,6 +59,9 @@ export default function EventShell({
   const [open, setOpen] = useState<DrawerKey | null>(null);
   const [unread, setUnread] = useState(initialUnreadCount);
   const [chatUnread, setChatUnread] = useState(initialChatUnread);
+  // A notification/activity deep-link target for a drawer (room or photo id),
+  // consumed by ChatDrawer/PhotosDrawer on open, cleared when the drawer closes.
+  const [deepLink, setDeepLink] = useState<{ room?: string; photo?: string }>({});
   const music = useV2Music();
 
   const refetchChatUnread = useCallback(async () => {
@@ -73,6 +76,9 @@ export default function EventShell({
   const toggle = (k: DrawerKey) => {
     // Opening notifications marks everything read (the drawer does the write).
     if (k === "notifications") setUnread(0);
+    // Manual open is never a deep-link — drop any stale room/photo target so a
+    // reopened drawer doesn't jump back to a previously deep-linked item.
+    setDeepLink((d) => (d.room || d.photo ? {} : d));
     const willOpen = open !== k;
     // Closing chat: read receipts may have changed — refresh the badge.
     if (open === "chat" && k === "chat") refetchChatUnread();
@@ -93,14 +99,41 @@ export default function EventShell({
     return () => window.removeEventListener("ui:drawer-open", handler);
   }, []);
 
-  // Open a drawer on request from elsewhere (e.g. an Activity-feed row linking to
-  // its source: a photo opens Photos, a song opens Music).
+  // Deep-link on arrival: a tapped notification/activity lands on the home route
+  // with ?open=<drawer>&room=/photo=. Open that drawer to the target, then strip
+  // the params so a refresh/back doesn't re-fire. Read from window.location (not
+  // useSearchParams) to avoid a Suspense boundary requirement.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search);
+    const target = p.get("open");
+    if (!target) return;
+    const room = p.get("room") ?? undefined;
+    const photo = p.get("photo") ?? undefined;
+    window.history.replaceState(null, "", window.location.pathname);
+    // Defer state changes out of the effect body (avoids cascading-render lint).
+    const raf = requestAnimationFrame(() => {
+      if (target === "music") {
+        music.expandDrawer();
+      } else if (target in DRAWERS) {
+        setDeepLink({ room, photo });
+        window.dispatchEvent(new CustomEvent("ui:drawer-open", { detail: { name: target } }));
+        setOpen(target as DrawerKey);
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [music]);
+
+  // Open a drawer on request from elsewhere (an Activity-feed row or an in-app
+  // notification tap). detail may carry a deep target (room/photo).
   useEffect(() => {
     const handler = (e: Event) => {
-      const name = (e as CustomEvent<{ name?: string }>).detail?.name;
+      const detail = (e as CustomEvent<{ name?: string; room?: string; photo?: string }>).detail;
+      const name = detail?.name;
       if (name === "music") {
         music.expandDrawer();
       } else if (name && name in DRAWERS) {
+        if (detail?.room || detail?.photo) setDeepLink({ room: detail.room, photo: detail.photo });
         window.dispatchEvent(new CustomEvent("ui:drawer-open", { detail: { name } }));
         setOpen(name as DrawerKey);
       }
@@ -274,11 +307,26 @@ export default function EventShell({
       <section className={styles.drawer} data-open={open !== null} aria-hidden={open === null}>
         <div className={styles.drawerHead}>
           <span className={styles.drawerTitle}>{open ? DRAWERS[open].title : ""}</span>
-          <button type="button" className={styles.drawerClose} onClick={() => setOpen(null)} aria-label="Close">
-            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className={styles.drawerHeadActions}>
+            {open === "notifications" && (
+              <button
+                type="button"
+                className={styles.drawerAction}
+                onClick={() => window.dispatchEvent(new CustomEvent("ui:notif-settings"))}
+                aria-label="Notification settings"
+              >
+                <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                  <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            )}
+            <button type="button" className={styles.drawerClose} onClick={() => setOpen(null)} aria-label="Close">
+              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
         <div className={styles.drawerBody} data-flush={open === "chat" || open === "photos" || undefined}>
           {open === "profile" ? (
@@ -290,9 +338,9 @@ export default function EventShell({
               onClose={() => setOpen(null)}
             />
           ) : open === "chat" ? (
-            <ChatDrawer orgId={orgId} userId={userId} />
+            <ChatDrawer orgId={orgId} userId={userId} initialRoom={deepLink.room} />
           ) : open === "photos" ? (
-            <PhotosDrawer orgId={orgId} userId={userId} isAdmin={isAdmin} />
+            <PhotosDrawer orgId={orgId} userId={userId} isAdmin={isAdmin} initialPhotoId={deepLink.photo} />
           ) : (
             open && <p className={styles.drawerStub}>{DRAWERS[open].body}</p>
           )}

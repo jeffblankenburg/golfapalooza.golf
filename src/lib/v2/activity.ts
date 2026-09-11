@@ -13,7 +13,12 @@ export interface ActivityRow {
   link: string | null;
   created_at: string;
   metadata: Record<string, unknown> | null;
-  actor: { display_name: string; avatar_url: string | null } | null;
+  actor: {
+    display_name: string;
+    first_name?: string | null;
+    last_name?: string | null;
+    avatar_url: string | null;
+  } | null;
 }
 
 export interface LogActivityInput {

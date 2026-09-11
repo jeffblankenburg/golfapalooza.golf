@@ -30,3 +30,24 @@ export function displayNameFrom(f: ProfileFields, fallback = "Member"): string {
   const full = `${(f.first_name || "").trim()} ${(f.last_name || "").trim()}`.trim();
   return full || fallback;
 }
+
+/** Per-org member-name display mode (v2_organizations.name_display). */
+export type NameMode = "nickname" | "real";
+
+/**
+ * Render a member's name per the org's mode. `nickname` mode uses the stored
+ * `display_name` (already nickname-preferred). `real` mode uses "First Last",
+ * falling back to display_name then the fallback. Server- and client-safe (pure).
+ */
+export function pickName(
+  p: { display_name?: string | null; first_name?: string | null; last_name?: string | null } | null | undefined,
+  mode: NameMode,
+  fallback = "Member",
+): string {
+  if (!p) return fallback;
+  if (mode === "real") {
+    const full = `${(p.first_name || "").trim()} ${(p.last_name || "").trim()}`.trim();
+    if (full) return full;
+  }
+  return (p.display_name || "").trim() || fallback;
+}

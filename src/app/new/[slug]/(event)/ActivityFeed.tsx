@@ -5,12 +5,14 @@ import Link from "next/link";
 import { v2BrowserClient, v2RealtimeClient } from "@/lib/v2/supabase-browser";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { timeAgo, type ActivityRow } from "@/lib/v2/activity";
+import { pickName } from "@/lib/v2/profile";
+import { useNameMode } from "./NameMode";
 import styles from "@/app/new/new.module.css";
 /* eslint-disable @next/next/no-img-element */
 
 const FEED_LIMIT = 15;
 const SELECT =
-  "id, kind, title, subtitle, image_url, link, created_at, metadata, actor:v2_profiles(display_name, avatar_url)";
+  "id, kind, title, subtitle, image_url, link, created_at, metadata, actor:v2_profiles(display_name, first_name, last_name, avatar_url)";
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -54,12 +56,16 @@ function KindIcon({ kind }: { kind: string }) {
 }
 
 /** The leading visual: a photo/art thumbnail (square) when the item has an image,
- *  otherwise the actor's circular avatar, otherwise a kind glyph. */
+ *  otherwise the actor's circular avatar, otherwise a kind glyph. If the thumbnail
+ *  fails to load (e.g. the underlying photo was deleted), fall back to the
+ *  avatar/icon rather than showing a broken image. */
 function Leading({ it }: { it: ActivityRow }) {
-  const thumb = it.kind !== "rsvp" ? it.image_url : null;
-  if (thumb) return <img className={styles.feedThumb} src={thumb} alt="" />;
+  const mode = useNameMode();
+  const [thumbBroken, setThumbBroken] = useState(false);
+  const thumb = it.kind !== "rsvp" && !thumbBroken ? it.image_url : null;
+  if (thumb) return <img className={styles.feedThumb} src={thumb} alt="" onError={() => setThumbBroken(true)} />;
   if (it.actor?.avatar_url) return <img className={styles.feedAvatar} src={it.actor.avatar_url} alt="" />;
-  if (it.actor) return <span className={styles.feedAvatarFallback}>{initial(it.actor.display_name)}</span>;
+  if (it.actor) return <span className={styles.feedAvatarFallback}>{initial(pickName(it.actor, mode))}</span>;
   return <KindIcon kind={it.kind} />;
 }
 
@@ -83,27 +89,31 @@ function Accessory({ it }: { it: ActivityRow }) {
   return null;
 }
 
-/** The body: actor name, the kind-specific action/status line, timestamp. */
+/** The body: the kind-specific action/status on top, then name + timestamp
+ *  together on one line at the bottom (name honors the org's name-display mode).
+ *  RSVP reads "Marked their RSVP as {status}" — the name lives on the bottom row
+ *  like every other kind, not in the sentence. */
 function Body({ it }: { it: ActivityRow }) {
+  const mode = useNameMode();
+  const name = it.actor ? pickName(it.actor, mode) : null;
   const likelihood = it.kind === "rsvp" ? num(it.metadata?.likelihood) : null;
+  const action = it.kind === "rsvp" ? `Marked their RSVP as ${it.title}` : it.title;
+
   return (
     <span className={styles.feedMain}>
-      {it.actor?.display_name ? (
-        <>
-          <span className={styles.feedName}>{it.actor.display_name}</span>
-          <span className={styles.feedAction}>
-            {likelihood !== null && (
-              <span className={styles.feedActionDot} data-likelihood={likelihood} aria-hidden />
-            )}
-            {it.title}
-          </span>
-        </>
-      ) : (
-        // No actor (system event): title becomes the primary line.
-        <span className={styles.feedName}>{it.title}</span>
-      )}
+      <span className={styles.feedAction}>
+        {likelihood !== null && <span className={styles.feedActionDot} data-likelihood={likelihood} aria-hidden />}
+        {action}
+      </span>
       {it.subtitle && <span className={styles.feedActionSub}>{it.subtitle}</span>}
-      <span className={styles.feedTime}>{timeAgo(it.created_at)}</span>
+      <span className={styles.feedMeta}>
+        {name && (
+          <>
+            <span className={styles.feedMetaName}>{name}</span>,{" "}
+          </>
+        )}
+        {timeAgo(it.created_at)}
+      </span>
     </span>
   );
 }
@@ -148,12 +158,24 @@ export default function ActivityFeed({
       if (cancelled) return;
       channel = sb
         .channel(`v2-activity-${orgId}`)
+        // INSERT (new event), UPDATE (e.g. a bulk photo count/image changed), and
+        // DELETE (a photo whose activity row was removed) all refetch the slice so
+        // the feed stays consistent live. DELETE filtering needs REPLICA IDENTITY
+        // FULL on v2_activity (migration 00204) so org_id is present in the old row.
         .on(
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "v2_activity", filter: `org_id=eq.${orgId}` },
-          () => {
-            refresh();
-          },
+          () => refresh(),
+        )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "v2_activity", filter: `org_id=eq.${orgId}` },
+          () => refresh(),
+        )
+        .on(
+          "postgres_changes",
+          { event: "DELETE", schema: "public", table: "v2_activity", filter: `org_id=eq.${orgId}` },
+          () => refresh(),
         )
         .subscribe();
     })();

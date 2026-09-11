@@ -10,7 +10,14 @@ export const GALLERY_BUCKET = "v2-gallery-media";
 export interface GalleryItemAccess {
   admin: SupabaseClient;
   userId: string;
-  item: { id: string; org_id: string; uploader_id: string; media_url: string; thumbnail_url: string | null };
+  item: {
+    id: string;
+    org_id: string;
+    uploader_id: string;
+    media_url: string;
+    thumbnail_url: string | null;
+    bulk_id: string | null;
+  };
 }
 
 export async function resolveGalleryItem(
@@ -23,7 +30,7 @@ export async function resolveGalleryItem(
   const admin = v2AdminClient();
   const { data: item } = await admin
     .from("v2_gallery_items")
-    .select("id, org_id, uploader_id, media_url, thumbnail_url")
+    .select("id, org_id, uploader_id, media_url, thumbnail_url, bulk_id")
     .eq("id", itemId)
     .maybeSingle();
   if (!item) return { error: "Item not found", status: 404 };

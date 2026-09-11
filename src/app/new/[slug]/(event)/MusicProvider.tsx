@@ -11,6 +11,8 @@ import {
 } from "react";
 import { WakeLockKeeper } from "./WakeLockKeeper";
 import MusicDrawer from "./MusicDrawer";
+import { useNameMode } from "./NameMode";
+import { pickName } from "@/lib/v2/profile";
 
 export interface Song {
   id: string;
@@ -21,7 +23,13 @@ export interface Song {
   lyrics: string | null;
   duration_seconds: number | null;
   sort_order: number;
-  tagged_user: { id: string; display_name: string; avatar_url?: string | null } | null;
+  tagged_user: {
+    id: string;
+    display_name: string;
+    first_name?: string | null;
+    last_name?: string | null;
+    avatar_url?: string | null;
+  } | null;
   is_favorite: boolean;
 }
 
@@ -106,6 +114,7 @@ export default function MusicProvider({
   const K_PLAYING = `v2_music_playing_${orgId}`;
   const K_TIME = `v2_music_time_${orgId}`;
 
+  const mode = useNameMode();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const orgIdRef = useRef(orgId);
   useEffect(() => {
@@ -549,7 +558,7 @@ export default function MusicProvider({
 
     navigator.mediaSession.metadata = new MediaMetadata({
       title: currentSong.title,
-      artist: currentSong.tagged_user?.display_name || "Golfapalooza",
+      artist: currentSong.tagged_user ? pickName(currentSong.tagged_user, mode) : "Golfapalooza",
       album: "Golfapalooza",
       artwork: currentSong.art_url
         ? [{ src: currentSong.art_url, sizes: "512x512", type: "image/jpeg" }, ...FALLBACK_ARTWORK]
@@ -563,7 +572,7 @@ export default function MusicProvider({
     navigator.mediaSession.setActionHandler("seekto", (details) => {
       if (details.seekTime !== undefined) seek(details.seekTime);
     });
-  }, [songs, currentIndex, isPlaying, pause, resume, previous, next, seek]);
+  }, [songs, currentIndex, isPlaying, pause, resume, previous, next, seek, mode]);
 
   return (
     <MusicContext.Provider

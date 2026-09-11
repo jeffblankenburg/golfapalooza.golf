@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { resolveNotificationRecipients } from "./notification-prefs";
 
 /**
  * v2 notification dispatch. Reuses the shared web-push machinery (same VAPID keys
@@ -77,23 +78,31 @@ export async function sendV2Notifications(
   const ids = [...new Set(userIds)].filter(Boolean);
   if (ids.length === 0) return;
 
-  await admin.from("v2_notifications").insert(
-    ids.map((user_id) => ({
-      org_id: input.orgId,
-      user_id,
-      type: input.type,
-      title: input.title,
-      body: input.body ?? null,
-      data: input.data ?? {},
-    })),
-  );
+  // Honor per-user prefs (opt-out): a disabled type suppresses the in-app row AND
+  // the push; master-push-off suppresses only the device push (in-app still logs).
+  const { inApp, push } = await resolveNotificationRecipients(admin, ids, input.type, input.orgId);
 
-  const payload = {
-    title: input.title,
-    body: input.body ?? "",
-    data: input.data ?? {},
-  };
-  await Promise.allSettled(ids.map((id) => pushToUser(admin, id, payload)));
+  if (inApp.length > 0) {
+    await admin.from("v2_notifications").insert(
+      inApp.map((user_id) => ({
+        org_id: input.orgId,
+        user_id,
+        type: input.type,
+        title: input.title,
+        body: input.body ?? null,
+        data: input.data ?? {},
+      })),
+    );
+  }
+
+  if (push.length > 0) {
+    const payload = {
+      title: input.title,
+      body: input.body ?? "",
+      data: input.data ?? {},
+    };
+    await Promise.allSettled(push.map((id) => pushToUser(admin, id, payload)));
+  }
 }
 
 /** Notify a single user. */

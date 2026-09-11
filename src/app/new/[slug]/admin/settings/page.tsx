@@ -25,6 +25,8 @@ export default async function GroupSettingsPage({
       initialLogo={org.logo_url}
       initialStoreUrl={org.store_url}
       initialStoreLabel={org.store_label}
+      initialStoreEnabled={org.store_enabled}
+      initialNameDisplay={org.name_display}
     />
   );
 }

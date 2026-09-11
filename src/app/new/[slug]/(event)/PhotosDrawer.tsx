@@ -6,8 +6,17 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { compressImage, compressVideo, extractVideoFrame } from "@/lib/v2/gallery-compress";
 import { extractExifDate, extractVideoDate } from "@/lib/v2/gallery-exif";
 import MediaViewer, { type ViewerItem, type ViewerUser } from "./MediaViewer";
+import { useNameMode } from "./NameMode";
+import { pickName, type NameMode } from "@/lib/v2/profile";
 import styles from "./photos.module.css";
 /* eslint-disable @next/next/no-img-element */
+
+interface UploaderRef {
+  display_name: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  avatar_url: string | null;
+}
 
 interface Item {
   id: string;
@@ -20,7 +29,7 @@ interface Item {
   height: number | null;
   taken_at: string | null;
   created_at: string;
-  uploader: { display_name: string; avatar_url: string | null } | { display_name: string; avatar_url: string | null }[] | null;
+  uploader: UploaderRef | UploaderRef[] | null;
   reactions: { emoji: string; user_id: string }[] | null;
   tags: { tagged_user_id: string }[] | null;
   comments: { count: number }[] | null;
@@ -30,7 +39,7 @@ type Sort = "taken" | "uploaded";
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
 
 /** Transform a raw gallery row into the shape MediaViewer consumes. */
-function toViewerItem(it: Item, userId: string): ViewerItem {
+function toViewerItem(it: Item, userId: string, mode: NameMode): ViewerItem {
   const reactions: Record<string, { count: number; hasReacted: boolean }> = {};
   for (const r of it.reactions || []) {
     const e = reactions[r.emoji] || { count: 0, hasReacted: false };
@@ -50,7 +59,7 @@ function toViewerItem(it: Item, userId: string): ViewerItem {
     created_at: it.created_at,
     taken_at: it.taken_at,
     uploader_id: it.uploader_id,
-    uploader: { display_name: up?.display_name || "Member", avatar_url: up?.avatar_url ?? null },
+    uploader: { display_name: pickName(up, mode), avatar_url: up?.avatar_url ?? null },
     reactions,
     reactionCount: Object.values(reactions).reduce((s, r) => s + r.count, 0),
     tags: (it.tags || []).map((t) => t.tagged_user_id),
@@ -67,10 +76,12 @@ export default function PhotosDrawer({
   orgId,
   userId,
   isAdmin,
+  initialPhotoId,
 }: {
   orgId: string;
   userId: string;
   isAdmin: boolean;
+  initialPhotoId?: string;
 }) {
   const [items, setItems] = useState<Item[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -78,6 +89,10 @@ export default function PhotosDrawer({
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
   const [viewIndex, setViewIndex] = useState<number | null>(null);
+  // A deep-linked photo (notification tap) opens straight in the viewer, even if
+  // it isn't on the first grid page — fetched on mount into a single-item viewer.
+  const [deepPhoto, setDeepPhoto] = useState<ViewerItem | null>(null);
+  const mode = useNameMode();
   const [allUsers, setAllUsers] = useState<ViewerUser[]>([]);
 
   // Filters (mirror the original).
@@ -145,7 +160,23 @@ export default function PhotosDrawer({
     };
   }, [orgId]);
 
-  const viewerItems = useMemo(() => items.map((it) => toViewerItem(it, userId)), [items, userId]);
+  const viewerItems = useMemo(() => items.map((it) => toViewerItem(it, userId, mode)), [items, userId, mode]);
+
+  // Deep-link: open the specific photo from a notification tap.
+  useEffect(() => {
+    if (!initialPhotoId) return;
+    let cancelled = false;
+    (async () => {
+      const res = await fetch(`/api/v2/gallery/${initialPhotoId}`);
+      if (!res.ok) return;
+      const d = await res.json();
+      if (cancelled || !d.item) return;
+      setDeepPhoto(toViewerItem(d.item as Item, userId, mode));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialPhotoId, userId, mode]);
 
   // Load / reload on filter change.
   useEffect(() => {
@@ -313,7 +344,7 @@ export default function PhotosDrawer({
     await fetch("/api/v2/gallery/log-upload", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orgId, count: files.length, imageUrl: firstThumb }),
+      body: JSON.stringify({ orgId, count: files.length, imageUrl: firstThumb, bulkId }),
     }).catch(() => {});
     setUpload(null);
     setReloadKey((k) => k + 1);
@@ -465,6 +496,22 @@ export default function PhotosDrawer({
           allUsers={allUsers}
           onClose={() => setViewIndex(null)}
           onDelete={(id) => setItems((cur) => cur.filter((it) => it.id !== id))}
+        />
+      )}
+
+      {deepPhoto && (
+        <MediaViewer
+          items={[deepPhoto]}
+          initialIndex={0}
+          orgId={orgId}
+          userId={userId}
+          isAdmin={isAdmin}
+          allUsers={allUsers}
+          onClose={() => setDeepPhoto(null)}
+          onDelete={(id) => {
+            setDeepPhoto(null);
+            setItems((cur) => cur.filter((it) => it.id !== id));
+          }}
         />
       )}
     </div>

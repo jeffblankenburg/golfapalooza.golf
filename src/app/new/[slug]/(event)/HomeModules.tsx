@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { stripMarkdown } from "@/lib/v2/text";
+import { pickName, type NameMode } from "@/lib/v2/profile";
 import { todayInTimezone, ageTurningToday } from "@/lib/v2/birthday";
 import BirthdayBanner, { type BirthdayPerson } from "./BirthdayBanner";
 import RsvpModule, { type Likelihood } from "./RsvpModule";
@@ -26,12 +28,15 @@ const PREVIEW = true; // while stubbing: show empty modules as labeled previews.
 interface MemberProfile {
   id: string;
   display_name: string;
+  first_name: string | null;
+  last_name: string | null;
   birthdate: string | null;
   avatar_url: string | null;
 }
 
 function birthdaysToday(
   rows: { v2_profiles: MemberProfile | null }[],
+  mode: NameMode,
 ): BirthdayPerson[] {
   const today = todayInTimezone();
   const mmdd = `${String(today.month).padStart(2, "0")}-${String(today.day).padStart(2, "0")}`;
@@ -41,7 +46,7 @@ function birthdaysToday(
     .filter((p) => (p.birthdate as string).slice(5) === mmdd) // YYYY-MM-DD → MM-DD
     .map((p) => ({
       id: p.id,
-      name: p.display_name,
+      name: pickName(p, mode),
       avatarUrl: p.avatar_url,
       age: ageTurningToday(p.birthdate as string, today.year),
     }));
@@ -55,6 +60,8 @@ export default async function HomeModules({
   eventName,
   storeUrl,
   storeLabel,
+  storeEnabled,
+  nameDisplay,
 }: {
   orgId: string;
   eventId: string;
@@ -63,24 +70,26 @@ export default async function HomeModules({
   eventName: string;
   storeUrl: string | null;
   storeLabel: string | null;
+  storeEnabled: boolean;
+  nameDisplay: NameMode;
 }) {
   const supabase = await v2ServerClient();
 
   const nowIso = new Date().toISOString();
 
   // Birthdays + article + RSVP + attending count + ads + activity, in parallel.
-  const [membersRes, articleRes, myRsvpRes, goingRes, adsRes, activityRes] =
+  const [membersRes, articleRes, myRsvpRes, goingRes, attendingRes, adsRes, activityRes] =
     await Promise.all([
     supabase
       .from("v2_memberships")
-      .select("user_id, v2_profiles(id, display_name, birthdate, avatar_url)")
+      .select("user_id, v2_profiles(id, display_name, first_name, last_name, birthdate, avatar_url)")
       .eq("org_id", orgId)
       .eq("status", "active"),
     // Latest published article for the org (event-specific scoping comes later).
     supabase
       .from("v2_articles")
       .select(
-        "id, title, publish_at, image_url, content, image_focal_x, image_focal_y, author:v2_profiles(display_name, avatar_url)",
+        "id, title, publish_at, image_url, content, image_focal_x, image_focal_y, author:v2_profiles(display_name, first_name, last_name, avatar_url)",
       )
       .eq("org_id", orgId)
       .not("publish_at", "is", null)
@@ -99,13 +108,18 @@ export default async function HomeModules({
       .select("id", { count: "exact", head: true })
       .eq("event_id", eventId),
     supabase
+      .from("v2_event_participants")
+      .select("id", { count: "exact", head: true })
+      .eq("event_id", eventId)
+      .eq("on_roster", true),
+    supabase
       .from("v2_ads")
       .select("id, image_url, alt_text")
       .eq("org_id", orgId)
       .eq("active", true),
     supabase
       .from("v2_activity")
-      .select("id, kind, title, subtitle, image_url, link, created_at, metadata, actor:v2_profiles(display_name, avatar_url)")
+      .select("id, kind, title, subtitle, image_url, link, created_at, metadata, actor:v2_profiles(display_name, first_name, last_name, avatar_url)")
       .eq("org_id", orgId)
       .order("created_at", { ascending: false })
       .limit(15),
@@ -113,6 +127,7 @@ export default async function HomeModules({
 
   const myLikelihood = (myRsvpRes.data?.likelihood as Likelihood | undefined) ?? null;
   const responseCount = goingRes.count ?? 0;
+  const attendingCount = attendingRes.count ?? 0;
   const ads = (adsRes.data as Ad[] | null) ?? [];
   const activity = ((activityRes.data as unknown as (Omit<ActivityRow, "actor"> & {
     actor: ActivityRow["actor"] | ActivityRow["actor"][];
@@ -123,6 +138,7 @@ export default async function HomeModules({
 
   const birthdays = birthdaysToday(
     (membersRes.data as unknown as { v2_profiles: MemberProfile | null }[]) || [],
+    nameDisplay,
   );
 
   // Featured article (null until 00185 is applied / an article is published).
@@ -137,7 +153,7 @@ export default async function HomeModules({
         preview: stripMarkdown(row.content || "") || null,
         focalX: row.image_focal_x ?? 50,
         focalY: row.image_focal_y ?? 50,
-        authorName: rowAuthor?.display_name ?? null,
+        authorName: rowAuthor ? pickName(rowAuthor, nameDisplay) : null,
         authorAvatar: rowAuthor?.avatar_url ?? null,
       }
     : null;
@@ -145,14 +161,15 @@ export default async function HomeModules({
   return (
     <>
       <BirthdayBanner birthdays={birthdays} slug={slug} />
-      <ArticleModule article={article} />
+      <ArticleModule article={article} slug={slug} />
       <RsvpModule
         eventId={eventId}
         eventName={eventName}
         initialLikelihood={myLikelihood}
         initialResponseCount={responseCount}
+        initialAttendingCount={attendingCount}
       />
-      <StoreModule storeUrl={storeUrl} storeLabel={storeLabel} />
+      <StoreModule storeUrl={storeEnabled ? storeUrl : null} storeLabel={storeLabel} />
       <ActivityFeed initialItems={activity} orgId={orgId} />
       <AdCarousel ads={ads} />
     </>
@@ -164,6 +181,8 @@ export default async function HomeModules({
 /* ── 2 · Current Article ─────────────────────────────────────────────────── */
 interface ArticleAuthor {
   display_name: string;
+  first_name: string | null;
+  last_name: string | null;
   avatar_url: string | null;
 }
 interface ArticleRow {
@@ -201,7 +220,7 @@ const STUB_ARTICLE: FeaturedArticle = {
   authorAvatar: null,
 };
 
-function ArticleModule({ article }: { article: FeaturedArticle | null }) {
+function ArticleModule({ article, slug }: { article: FeaturedArticle | null; slug: string }) {
   if (!article && !PREVIEW) return null;
   const a = article ?? STUB_ARTICLE;
 
@@ -211,10 +230,11 @@ function ArticleModule({ article }: { article: FeaturedArticle | null }) {
     year: "numeric",
   });
 
-  return (
-    <section className={styles.module}>
-      <div className={styles.articleCard}>
-        <div className={styles.articleImage}>
+  // Real articles link to their reading page; the stub preview isn't clickable.
+  const href = a.id ? `/new/${slug}/articles/${a.id}` : null;
+  const inner = (
+    <>
+      <div className={styles.articleImage}>
           {a.imageUrl && (
             <img
               src={a.imageUrl}
@@ -247,7 +267,18 @@ function ArticleModule({ article }: { article: FeaturedArticle | null }) {
             <p className={styles.articleExcerpt}>{a.preview}</p>
           </div>
         )}
-      </div>
+    </>
+  );
+
+  return (
+    <section className={styles.module}>
+      {href ? (
+        <Link href={href} className={styles.articleCard}>
+          {inner}
+        </Link>
+      ) : (
+        <div className={styles.articleCard}>{inner}</div>
+      )}
     </section>
   );
 }

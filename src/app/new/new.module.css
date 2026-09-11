@@ -749,6 +749,11 @@
 .accordionSummary::-webkit-details-marker {
   display: none;
 }
+.accordionSummaryRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 .chev {
   color: var(--ink-soft);
   transition: transform 0.18s ease;
@@ -1127,10 +1132,16 @@ details[open] .chev {
    on a bottom scrim, then the opening sentences below (mirrors the legacy home
    article card). */
 .articleCard {
+  display: block;
   border-radius: 14px;
   border: 1px solid var(--line);
   background: var(--card);
   overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+}
+a.articleCard:active {
+  border-color: color-mix(in srgb, var(--brand) 40%, var(--line));
 }
 .articleImage {
   position: relative;
@@ -1228,6 +1239,77 @@ details[open] .chev {
   margin-left: auto; /* date stays left; author cluster pushes to the right edge */
 }
 
+/* Article reading page (full content, reached from the featured-article card). */
+.articleDetail {
+  margin-top: 4px;
+}
+.articleDetailImage {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  background: color-mix(in srgb, var(--ink) 6%, var(--paper));
+}
+.articleDetailImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.articleDetailTitle {
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  color: var(--ink);
+  margin: 0 0 10px;
+}
+.articleBody {
+  margin-top: 18px;
+  color: var(--ink);
+  font-size: 0.98rem;
+  line-height: 1.65;
+}
+.articleBody p {
+  margin: 0 0 1em;
+}
+.articleBody h1,
+.articleBody h2,
+.articleBody h3 {
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 1.4em 0 0.4em;
+}
+.articleBody h1 { font-size: 1.3rem; }
+.articleBody h2 { font-size: 1.15rem; }
+.articleBody h3 { font-size: 1.02rem; }
+.articleBody a {
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.articleBody ul,
+.articleBody ol {
+  padding-left: 1.25em;
+  margin: 0 0 1em;
+}
+.articleBody li {
+  margin: 0.2em 0;
+}
+.articleBody img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+  margin: 0.5em 0;
+}
+.articleBody blockquote {
+  margin: 0 0 1em;
+  padding-left: 12px;
+  border-left: 3px solid color-mix(in srgb, var(--brand) 40%, var(--line));
+  color: var(--ink-soft);
+}
+
 /* 3 · Registration — bold brand CTA shown until the user RSVPs. Whole box is the
    brand color with white type + a gentle attention pulse (mirrors legacy home). */
 .rsvpPrompt {
@@ -1301,6 +1383,9 @@ details[open] .chev {
 .rsvpCount {
   color: var(--ink-soft);
   font-weight: 500;
+}
+.rsvpAttending {
+  margin-left: 14px;
 }
 .rsvpChevron {
   color: var(--ink-soft);
@@ -1529,7 +1614,11 @@ details[open] .chev {
   border-radius: 14px;
   border: 1px solid var(--line);
   background: var(--card);
-  overflow: hidden;
+  /* Show ~5 rows, then scroll within the card for the rest. */
+  max-height: 20rem;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .feedRow {
   display: flex;
@@ -1600,6 +1689,13 @@ button.feedRow:active {
   font-size: 0.72rem;
   color: var(--ink-soft);
   margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.feedMetaName {
+  font-weight: 700;
+  color: var(--ink);
 }
 .feedEmpty {
   display: flex;
@@ -1665,8 +1761,9 @@ button.feedRow:active {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.78rem;
-  color: var(--ink-soft);
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2034,4 +2131,131 @@ button.feedRow:active {
 }
 .notifDelete:hover {
   color: var(--ink);
+}
+
+/* Notification settings modal (launched from the drawer-header gear). Sits above
+   the drawer (z 55) but below the fixed bars (z 60), so the bars stay visible. */
+.notifSettingsBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 58;
+  background: rgba(23, 33, 29, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.notifSettingsCard {
+  width: 100%;
+  max-width: 400px;
+  max-height: 80dvh;
+  overflow-y: auto;
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.55);
+  padding: 18px 18px 20px;
+}
+.notifSettingsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.notifSettingsTitle {
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 1.15rem;
+  color: var(--ink);
+}
+.notifSettingsClose {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--ink-soft);
+  padding: 2px;
+}
+.notifSettingsClose:hover {
+  color: var(--ink);
+}
+.notifSettingsIntro {
+  margin: 6px 0 14px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+.notifSettingsLoading {
+  padding: 16px 0;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+.notifSettingsList {
+  display: flex;
+  flex-direction: column;
+}
+.notifSettingsSection {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+}
+.notifSettingsSectionLabel {
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+}
+.notifSettingRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+.notifSettingRow + .notifSettingRow {
+  border-top: 1px solid var(--line);
+}
+.notifSettingText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.notifSettingLabel {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.notifSettingDesc {
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: var(--ink-soft);
+  margin-top: 1px;
+}
+.notifSwitch {
+  flex: none;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--ink) 20%, var(--paper));
+  position: relative;
+  transition: background 0.18s ease;
+}
+.notifSwitch[data-on] {
+  background: var(--brand);
+}
+.notifSwitchKnob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.18s ease;
+}
+.notifSwitch[data-on] .notifSwitchKnob {
+  transform: translateX(18px);
 }

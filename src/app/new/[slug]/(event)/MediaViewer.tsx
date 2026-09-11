@@ -3,6 +3,8 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { v2RealtimeClient } from "@/lib/v2/supabase-browser";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import { useNameMode } from "./NameMode";
+import { pickName } from "@/lib/v2/profile";
 /* eslint-disable @next/next/no-img-element */
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -303,15 +305,22 @@ function ReactionsSheet({
 
 // ─── Comments drawer ─────────────────────────────────────────────────────────
 
+interface CommentSender {
+  display_name: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  avatar_url: string | null;
+}
 interface CommentRow {
   id: string;
   content: string;
   created_at: string;
   sender_id: string;
-  sender: { display_name: string; avatar_url: string | null } | { display_name: string; avatar_url: string | null }[] | null;
+  sender: CommentSender | CommentSender[] | null;
 }
 
 function CommentsSheet({ itemId, onClose, onCountChange }: { itemId: string; onClose: () => void; onCountChange: (n: number) => void }) {
+  const mode = useNameMode();
   const [comments, setComments] = useState<CommentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
@@ -410,18 +419,19 @@ function CommentsSheet({ itemId, onClose, onCountChange }: { itemId: string; onC
           {!loading && comments.length === 0 && <p className="text-center text-gray-400 text-sm py-8">No comments yet</p>}
           {comments.map((c) => {
             const s = one(c.sender);
+            const senderName = pickName(s, mode);
             return (
               <div key={c.id} className="flex gap-2.5">
                 <div className="w-7 h-7 rounded-full bg-green-700 text-white flex items-center justify-center flex-shrink-0 overflow-hidden">
                   {s?.avatar_url ? (
                     <img src={s.avatar_url} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-[0.625rem] font-semibold">{getInitials(s?.display_name || "?")}</span>
+                    <span className="text-[0.625rem] font-semibold">{getInitials(senderName)}</span>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-sm font-semibold text-gray-900">{s?.display_name}</span>
+                    <span className="text-sm font-semibold text-gray-900">{senderName}</span>
                     <span className="text-[0.6875rem] text-gray-400">{commentStamp(c.created_at)}</span>
                   </div>
                   <p className="text-sm text-gray-700 break-words">{c.content}</p>

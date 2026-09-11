@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
-import { isOrgMember } from "@/lib/v2/orgs";
+import { isOrgMember, orgNameMode } from "@/lib/v2/orgs";
+import { pickName } from "@/lib/v2/profile";
 
 /**
  * GET /api/v2/gallery/facets?orgId= — filter options for the gallery: available
@@ -32,14 +33,17 @@ export async function GET(request: Request) {
   const itemIds = rows.map((r) => r.id);
   let taggedUsers: { userId: string; displayName: string }[] = [];
   if (itemIds.length) {
-    const { data: tags } = await admin
-      .from("v2_gallery_tags")
-      .select("tagged_user_id, tagged:v2_profiles!v2_gallery_tags_tagged_user_id_fkey(display_name)")
-      .in("item_id", itemIds);
+    const [{ data: tags }, mode] = await Promise.all([
+      admin
+        .from("v2_gallery_tags")
+        .select("tagged_user_id, tagged:v2_profiles!v2_gallery_tags_tagged_user_id_fkey(display_name, first_name, last_name)")
+        .in("item_id", itemIds),
+      orgNameMode(admin, orgId),
+    ]);
     const seen = new Map<string, string>();
     for (const t of tags || []) {
       const p = Array.isArray(t.tagged) ? t.tagged[0] : t.tagged;
-      if (!seen.has(t.tagged_user_id)) seen.set(t.tagged_user_id, p?.display_name || "Member");
+      if (!seen.has(t.tagged_user_id)) seen.set(t.tagged_user_id, pickName(p, mode));
     }
     taggedUsers = [...seen.entries()]
       .map(([userId, displayName]) => ({ userId, displayName }))

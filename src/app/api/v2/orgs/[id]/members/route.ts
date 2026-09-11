@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
-import { isOrgAdmin } from "@/lib/v2/orgs";
+import { isOrgAdmin, orgNameMode } from "@/lib/v2/orgs";
+import { pickName } from "@/lib/v2/profile";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 async function guard(request: Request, orgId: string) {
@@ -41,18 +42,21 @@ export async function GET(
   const g = await guard(request, id);
   if ("error" in g) return NextResponse.json({ error: g.error }, { status: g.status });
 
-  const { data } = await g.admin
-    .from("v2_memberships")
-    .select("user_id, role, status, profile:v2_profiles(display_name, avatar_url)")
-    .eq("org_id", id)
-    .order("role");
+  const [{ data }, mode] = await Promise.all([
+    g.admin
+      .from("v2_memberships")
+      .select("user_id, role, status, profile:v2_profiles(display_name, first_name, last_name, avatar_url)")
+      .eq("org_id", id)
+      .order("role"),
+    orgNameMode(g.admin, id),
+  ]);
   const members = (data || []).map((m) => {
     const p = Array.isArray(m.profile) ? m.profile[0] : m.profile;
     return {
       user_id: m.user_id,
       role: m.role,
       status: m.status,
-      display_name: (p as { display_name?: string })?.display_name || "Member",
+      display_name: pickName(p as { display_name?: string | null; first_name?: string | null; last_name?: string | null }, mode),
       avatar_url: (p as { avatar_url?: string | null })?.avatar_url || null,
     };
   });

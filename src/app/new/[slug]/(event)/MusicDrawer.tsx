@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useV2Music } from "./MusicProvider";
 import MusicPage from "./MusicPage";
+import { useNameMode } from "./NameMode";
+import { pickName } from "@/lib/v2/profile";
 /* eslint-disable @next/next/no-img-element */
 
 /**
@@ -32,6 +34,7 @@ export default function MusicDrawer() {
     collapseDrawer,
     dismiss,
   } = useV2Music();
+  const mode = useNameMode();
 
   const dragStartYRef = useRef<number | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
@@ -147,7 +150,7 @@ export default function MusicDrawer() {
             )}
             <div className="min-w-0">
               <div className="text-sm font-medium text-gray-900 truncate">{currentSong.title}</div>
-              {currentSong.tagged_user && <div className="text-xs text-gray-500 truncate">{currentSong.tagged_user.display_name}</div>}
+              {currentSong.tagged_user && <div className="text-xs text-gray-500 truncate">{pickName(currentSong.tagged_user, mode)}</div>}
             </div>
           </button>
 

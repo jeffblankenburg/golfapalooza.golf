@@ -1,4 +1,5 @@
 import { v2ServerClient } from "@/lib/v2/supabase";
+import type { NameMode } from "@/lib/v2/profile";
 
 /**
  * Platform context for the /new web app (server components). Native clients read
@@ -16,6 +17,8 @@ export interface PlatformOrg {
   secondary_color: string | null;
   store_url: string | null;
   store_label: string | null;
+  store_enabled: boolean;
+  name_display: NameMode;
   role: OrgRole;
 }
 
@@ -39,7 +42,7 @@ export async function getPlatformContext(): Promise<PlatformContext | null> {
   const { data: memberships } = await supabase
     .from("v2_memberships")
     .select(
-      "role, org:v2_organizations(id, name, slug, logo_url, primary_color, secondary_color, store_url, store_label)"
+      "role, org:v2_organizations(id, name, slug, logo_url, primary_color, secondary_color, store_url, store_label, store_enabled, name_display)"
     )
     .eq("user_id", user.id)
     .eq("status", "active");

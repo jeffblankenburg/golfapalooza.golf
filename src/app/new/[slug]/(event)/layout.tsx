@@ -3,6 +3,7 @@ import { getPlatformContext } from "@/lib/v2/context";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import EventShell from "./EventShell";
 import MusicProvider from "./MusicProvider";
+import { NameModeProvider } from "./NameMode";
 
 /**
  * Wraps the member-facing event experience in the fixed top-bar/bottom-nav shell.
@@ -59,6 +60,7 @@ export default async function EventLayout({
   }
 
   return (
+    <NameModeProvider mode={org.name_display}>
     <MusicProvider orgId={org.id}>
       <EventShell
         slug={slug}
@@ -74,5 +76,6 @@ export default async function EventLayout({
         {children}
       </EventShell>
     </MusicProvider>
+    </NameModeProvider>
   );
 }

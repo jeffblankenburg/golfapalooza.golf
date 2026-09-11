@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { NameMode } from "./profile";
 
 /** Unguessable, URL-safe, single-use invite code. */
 export function genInviteCode(): string {
@@ -36,6 +37,26 @@ export async function isOrgMember(
     .eq("status", "active")
     .maybeSingle();
   return !!data;
+}
+
+/** The org's URL slug (for building in-app deep-links). Use the service-role client. */
+export async function orgSlug(admin: SupabaseClient, orgId: string): Promise<string | null> {
+  const { data } = await admin
+    .from("v2_organizations")
+    .select("slug")
+    .eq("id", orgId)
+    .maybeSingle();
+  return (data?.slug as string | undefined) ?? null;
+}
+
+/** The org's member-name display mode (defaults to 'nickname'). Service-role client. */
+export async function orgNameMode(admin: SupabaseClient, orgId: string): Promise<NameMode> {
+  const { data } = await admin
+    .from("v2_organizations")
+    .select("name_display")
+    .eq("id", orgId)
+    .maybeSingle();
+  return data?.name_display === "real" ? "real" : "nickname";
 }
 
 /**

@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { v2BrowserClient } from "@/lib/v2/supabase-browser";
 import { formatPhone } from "@/lib/v2/phone";
+import { pickName } from "@/lib/v2/profile";
+import { useNameMode } from "./NameMode";
 import styles from "@/app/new/new.module.css";
 /* eslint-disable @next/next/no-img-element */
 
@@ -37,6 +39,7 @@ const SHIRTS = ["S", "M", "L", "XL", "2XL", "3XL", "4XL"];
  *  it's opened; edits save to /api/v2/profile. */
 export default function ProfileDrawer({ active }: { active: boolean }) {
   const router = useRouter();
+  const mode = useNameMode();
   const [p, setP] = useState<Profile | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -140,11 +143,11 @@ export default function ProfileDrawer({ active }: { active: boolean }) {
           <img src={p.avatar_url} alt="" className={styles.profileAvatar} />
         ) : (
           <div className={styles.profileAvatarFallback}>
-            {(p.display_name || "?").charAt(0).toUpperCase()}
+            {(pickName(p, mode)[0] || "?").toUpperCase()}
           </div>
         )}
         <div>
-          <p className={styles.profileName}>{p.display_name}</p>
+          <p className={styles.profileName}>{pickName(p, mode)}</p>
           <button type="button" className={styles.fileBtn} onClick={() => fileRef.current?.click()}>
             Change photo
           </button>

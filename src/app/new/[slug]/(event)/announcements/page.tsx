@@ -2,9 +2,18 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getPlatformContext } from "@/lib/v2/context";
 import { v2AdminClient } from "@/lib/v2/supabase";
+import { getSystemProfile } from "@/lib/v2/system-user";
+import { pickName } from "@/lib/v2/profile";
 import styles from "@/app/new/new.module.css";
 import AnnouncementsList, { type MemberAnnouncement } from "./AnnouncementsList";
 
+interface SenderRef {
+  display_name: string;
+  first_name: string | null;
+  last_name: string | null;
+  nickname: string | null;
+  avatar_url: string | null;
+}
 interface Row {
   id: string;
   title: string;
@@ -13,6 +22,8 @@ interface Row {
   audience_user_ids: string[] | null;
   event_id: string | null;
   sent_at: string | null;
+  send_as_system: boolean;
+  sender: SenderRef | SenderRef[] | null;
 }
 
 /**
@@ -37,10 +48,12 @@ export default async function AnnouncementsPage({
   if (!org) redirect("/new");
 
   const admin = v2AdminClient();
-  const [annRes, partRes] = await Promise.all([
+  const [annRes, partRes, systemProfile] = await Promise.all([
     admin
       .from("v2_announcements")
-      .select("id, title, body, audience_type, audience_user_ids, event_id, sent_at")
+      .select(
+        "id, title, body, audience_type, audience_user_ids, event_id, sent_at, send_as_system, sender:v2_profiles!v2_announcements_created_by_fkey(display_name, first_name, last_name, nickname, avatar_url)",
+      )
       .eq("org_id", org.id)
       .eq("status", "sent")
       .order("sent_at", { ascending: false }),
@@ -49,7 +62,11 @@ export default async function AnnouncementsPage({
       .select("event_id")
       .eq("user_id", ctx.userId)
       .neq("status", "not_going"),
+    getSystemProfile(admin),
   ]);
+
+  const alName = systemProfile?.display_name || "Al Pine";
+  const alAvatar = systemProfile?.avatar_url || "/alpine.png";
 
   const myEvents = new Set((partRes.data || []).map((p) => p.event_id));
   const visible: MemberAnnouncement[] = ((annRes.data as Row[] | null) || [])
@@ -59,20 +76,29 @@ export default async function AnnouncementsPage({
         (r.audience_type === "custom" && (r.audience_user_ids || []).includes(ctx.userId)) ||
         (r.audience_type === "event" && !!r.event_id && myEvents.has(r.event_id)),
     )
-    .map((r) => ({
-      id: r.id,
-      title: r.title,
-      body: r.body,
-      dateText: r.sent_at
-        ? new Date(r.sent_at).toLocaleString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
-          })
-        : "",
-    }));
+    .map((r) => {
+      const sender = Array.isArray(r.sender) ? r.sender[0] ?? null : r.sender;
+      // Members see the presented author: Al Pine when chosen, otherwise the
+      // real sender. (The admin page always shows the real sender.)
+      const authorName = r.send_as_system ? alName : sender ? pickName(sender, org.name_display) : null;
+      const authorAvatar = r.send_as_system ? alAvatar : sender?.avatar_url ?? null;
+      return {
+        id: r.id,
+        title: r.title,
+        body: r.body,
+        authorName,
+        authorAvatar,
+        dateText: r.sent_at
+          ? new Date(r.sent_at).toLocaleString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+            })
+          : "",
+      };
+    });
 
   return (
     <div className={`${styles.page} ${styles.orgPage}`}>

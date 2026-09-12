@@ -7,6 +7,8 @@ export interface MemberAnnouncement {
   title: string;
   body: string | null;
   dateText: string;
+  authorName: string | null;
+  authorAvatar: string | null;
 }
 
 /**
@@ -58,7 +60,32 @@ export default function AnnouncementsList({
           <h2 style={{ margin: 0, fontSize: "0.9rem", fontWeight: 700, color: "var(--ink)", lineHeight: 1.3 }}>
             {a.title}
           </h2>
-          <p style={{ margin: "2px 0 0", fontSize: "0.66rem", color: "var(--ink-soft)" }}>{a.dateText}</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "3px 0 0" }}>
+            {a.authorName &&
+              (a.authorAvatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={a.authorAvatar} alt="" style={{ width: 16, height: 16, borderRadius: "50%", objectFit: "cover" }} />
+              ) : (
+                <span
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: "50%",
+                    background: "var(--brand)",
+                    color: "#fff",
+                    fontSize: "0.55rem",
+                    fontWeight: 700,
+                    display: "grid",
+                    placeItems: "center",
+                  }}
+                >
+                  {a.authorName.charAt(0).toUpperCase()}
+                </span>
+              ))}
+            <span style={{ fontSize: "0.66rem", color: "var(--ink-soft)" }}>
+              {a.authorName ? `${a.authorName}, ${a.dateText}` : a.dateText}
+            </span>
+          </div>
           {a.body && (
             <p style={{ margin: "8px 0 0", fontSize: "0.82rem", whiteSpace: "pre-wrap", lineHeight: 1.5, color: "var(--ink)" }}>
               {a.body}

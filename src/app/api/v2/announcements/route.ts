@@ -43,7 +43,9 @@ export async function GET(request: Request) {
   const [annRes, memRes, evtRes, systemRes] = await Promise.all([
     g.admin
       .from("v2_announcements")
-      .select("id, title, body, audience_type, audience_user_ids, event_id, scheduled_for, status, recipient_count, created_at, sent_at")
+      .select(
+        "id, title, body, audience_type, audience_user_ids, event_id, scheduled_for, status, recipient_count, created_at, sent_at, created_by, send_as_system, sender:v2_profiles!v2_announcements_created_by_fkey(display_name, first_name, last_name, nickname)",
+      )
       .eq("org_id", orgId)
       .order("created_at", { ascending: false }),
     g.admin
@@ -76,11 +78,18 @@ export async function GET(request: Request) {
     // Al Pine (system) is never a selectable audience member.
     .filter((m) => !m.is_system);
 
+  // Normalize the embedded sender (created_by) to a single object so the client
+  // can show who actually sent it — even when it was authored as Al Pine.
+  const announcements = (annRes.data || []).map((a) => {
+    const { sender, ...rest } = a as typeof a & { sender: unknown };
+    return { ...rest, sender: Array.isArray(sender) ? sender[0] ?? null : sender ?? null };
+  });
+
   return NextResponse.json({
-    announcements: annRes.data || [],
+    announcements,
     members,
     events: evtRes.data || [],
-    systemSender: systemRes ? { name: systemRes.display_name, avatar: systemRes.avatar_url } : null,
+    systemSender: systemRes ? { name: systemRes.display_name, avatar: systemRes.avatar_url || "/alpine.png" } : null,
   });
 }
 

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
-import type { NameMode } from "@/lib/v2/profile";
+import { pickName, type NameMode } from "@/lib/v2/profile";
 import styles from "@/app/new/new.module.css";
 
 type Audience = "everyone" | "event" | "custom";
@@ -21,6 +21,7 @@ interface Announcement {
   created_at: string;
   sent_at: string | null;
   send_as_system: boolean;
+  sender: { display_name: string; first_name: string | null; last_name: string | null; nickname: string | null } | null;
 }
 interface MemberLite {
   user_id: string;
@@ -242,6 +243,15 @@ export default function AnnouncementManager({
     }
     const data = await fetchAll();
     setAnnouncements(data.announcements || []);
+  }
+
+  // Who actually sent it — always the real admin, noting when it went out as the
+  // system personality ("… (as Al Pine)").
+  function senderLabel(a: Announcement): string | null {
+    const name = a.sender ? pickName(a.sender, nameMode) : null;
+    const alias = systemSender?.name || "Al Pine";
+    if (!name) return a.send_as_system ? `Sent as ${alias}` : null;
+    return a.send_as_system ? `${name} (as ${alias})` : name;
   }
 
   function audienceLabel(a: Announcement): string {
@@ -491,6 +501,11 @@ export default function AnnouncementManager({
                     <span className={styles.memberSub}>
                       {audienceLabel(a)} — {whenLabel(a)}
                     </span>
+                    {senderLabel(a) && (
+                      <span className={styles.memberSub} style={{ opacity: 0.75 }}>
+                        Sent by {senderLabel(a)}
+                      </span>
+                    )}
                     {a.body && (
                       <span className={styles.memberSub} style={{ opacity: 0.75 }}>
                         {a.body.length > 100 ? `${a.body.slice(0, 100)}…` : a.body}

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import Modal from "@/app/new/_components/Modal";
+import { BottomDrawer } from "@/components/v2/BottomDrawer";
 import { formatPhone } from "@/lib/v2/phone";
 import type { NameMode } from "@/lib/v2/profile";
 import { PERMISSION_GROUPS, type PermissionMap } from "@/lib/v2/permissions";
@@ -362,7 +363,8 @@ export default function MembersManager({
       </div>
 
       {/* ── Edit member ─────────────────────────────────────────────────── */}
-      <Modal open={!!editing} title="Edit member" onClose={() => setEditing(null)}>
+      <BottomDrawer open={!!editing} title="Edit member" onClose={() => setEditing(null)}>
+        <div style={{ padding: "8px 18px 4px" }}>
         <form className={styles.form} onSubmit={saveEdit}>
           <div className={styles.field}>
             <label className={styles.label}>First name</label>
@@ -458,7 +460,8 @@ export default function MembersManager({
             )}
           </div>
         </form>
-      </Modal>
+        </div>
+      </BottomDrawer>
 
       <Modal open={inviteOpen} title="Invite someone" onClose={() => setInviteOpen(false)}>
         <p className={styles.dnsHint} style={{ marginTop: 0 }}>

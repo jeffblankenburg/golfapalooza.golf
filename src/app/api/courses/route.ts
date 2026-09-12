@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { geocodeAddress } from "@/lib/geocode";
+import { sanitizeSearchTerm } from "@/lib/search";
 
 // Great-circle distance in miles. We do this in JS rather than PostGIS
 // because the courses table is small (<2k rows) and likely to stay that
@@ -26,7 +27,8 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const query = searchParams.get("q");
+  // Sanitized: this term is interpolated into a PostgREST .or() filter string.
+  const query = sanitizeSearchTerm(searchParams.get("q"));
   const latParam = searchParams.get("lat");
   const lngParam = searchParams.get("lng");
   const radiusParam = searchParams.get("radius");

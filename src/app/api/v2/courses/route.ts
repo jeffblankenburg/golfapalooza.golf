@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { geocodeAddress } from "@/lib/v2/geocode";
+import { sanitizeSearchTerm } from "@/lib/v2/search";
 
 /** Great-circle distance in miles (small library, app-side is fine). */
 function haversineMi(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -20,7 +21,8 @@ export async function GET(request: Request) {
   if (!userId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
-  const query = searchParams.get("q");
+  // Sanitized: this term is interpolated into a PostgREST .or() filter string.
+  const query = sanitizeSearchTerm(searchParams.get("q"));
   const latParam = searchParams.get("lat");
   const lngParam = searchParams.get("lng");
   const radiusParam = searchParams.get("radius");

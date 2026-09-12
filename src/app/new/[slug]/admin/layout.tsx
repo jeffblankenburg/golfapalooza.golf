@@ -32,11 +32,17 @@ export default async function AdminLayout({
           )}
         </Link>
 
-        <Link href={`/new/${slug}/admin`} className={shell.iconBtn} aria-label="Admin home">
+        <Link
+          href={`/new/${slug}/admin`}
+          className={shell.iconBtn}
+          aria-label="Admin home"
+          style={{ height: "auto", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1, padding: "2px 6px" }}
+        >
           <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden>
             <path d="M3 11l9-8 9 8" />
             <path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10" />
           </svg>
+          <span style={{ fontSize: "0.6rem", fontWeight: 600, lineHeight: 1 }}>Admin</span>
         </Link>
       </header>
 

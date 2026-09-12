@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendV2Notifications } from "./notifications";
 import { logActivity } from "./activity";
+import { getSystemProfileId } from "./system-user";
 
 /**
  * Announcement audience + delivery helpers, shared by the /api/v2/announcements
@@ -19,6 +20,7 @@ export interface AnnouncementRow {
   audience_user_ids: string[] | null;
   event_id: string | null;
   created_by?: string | null;
+  send_as_system?: boolean;
 }
 
 /**
@@ -83,12 +85,15 @@ export async function deliverAnnouncement(
   // (event/custom) are deliberately NOT logged — the feed is org-wide, so posting
   // a subset-audience announcement there would leak it to non-recipients.
   if (a.audience_type === "everyone") {
+    // When sent "as Al Pine", the feed attributes it to the system personality
+    // (falls back to the real sender if the system profile isn't provisioned).
+    const systemId = a.send_as_system ? await getSystemProfileId(admin) : null;
     await logActivity(admin, {
       orgId: a.org_id,
       kind: "announcement",
-      actorId: a.created_by ?? null,
-      title: "posted an announcement",
-      subtitle: a.title,
+      actorId: systemId ?? a.created_by ?? null,
+      // Just show the announcement itself — no "posted an announcement" label.
+      title: a.title,
       link,
       refId: a.id,
     });

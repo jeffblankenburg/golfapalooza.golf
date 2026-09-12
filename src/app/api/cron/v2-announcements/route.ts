@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const admin = v2AdminClient();
   const { data: due, error } = await admin
     .from("v2_announcements")
-    .select("id, org_id, title, body, audience_type, audience_user_ids, event_id, created_by")
+    .select("id, org_id, title, body, audience_type, audience_user_ids, event_id, created_by, send_as_system")
     .eq("status", "pending")
     .not("scheduled_for", "is", null)
     .lte("scheduled_for", new Date().toISOString())

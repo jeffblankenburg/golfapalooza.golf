@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import styles from "@/app/new/new.module.css";
 
 export interface MemberAnnouncement {
   id: string;
@@ -44,22 +43,26 @@ export default function AnnouncementsList({
   }, [highlightId]);
 
   return (
-    <div ref={containerRef} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {items.map((a) => (
+    <div ref={containerRef} style={{ display: "flex", flexDirection: "column" }}>
+      {items.map((a, i) => (
         <article
           key={a.id}
           data-aid={a.id}
-          className={styles.card}
-          style={
-            flash === a.id
-              ? { borderColor: "var(--brand)", boxShadow: "0 0 0 2px var(--brand)", transition: "box-shadow 0.3s ease, border-color 0.3s ease" }
-              : undefined
-          }
+          style={{
+            padding: "16px 0",
+            borderTop: i === 0 ? "none" : "1px solid var(--line)",
+            transition: "background-color 0.3s ease",
+            ...(flash === a.id ? { backgroundColor: "rgba(10, 92, 54, 0.08)" } : {}),
+          }}
         >
-          <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "var(--ink)" }}>{a.title}</h2>
-          <p style={{ margin: "4px 0 0", fontSize: "0.72rem", color: "var(--ink-soft)" }}>{a.dateText}</p>
+          <h2 style={{ margin: 0, fontSize: "0.9rem", fontWeight: 700, color: "var(--ink)", lineHeight: 1.3 }}>
+            {a.title}
+          </h2>
+          <p style={{ margin: "2px 0 0", fontSize: "0.66rem", color: "var(--ink-soft)" }}>{a.dateText}</p>
           {a.body && (
-            <p style={{ margin: "12px 0 0", whiteSpace: "pre-wrap", lineHeight: 1.5, color: "var(--ink)" }}>{a.body}</p>
+            <p style={{ margin: "8px 0 0", fontSize: "0.82rem", whiteSpace: "pre-wrap", lineHeight: 1.5, color: "var(--ink)" }}>
+              {a.body}
+            </p>
           )}
         </article>
       ))}

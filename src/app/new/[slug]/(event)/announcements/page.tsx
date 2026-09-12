@@ -64,7 +64,13 @@ export default async function AnnouncementsPage({
       title: r.title,
       body: r.body,
       dateText: r.sent_at
-        ? new Date(r.sent_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+        ? new Date(r.sent_at).toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          })
         : "",
     }));
 
@@ -78,7 +84,7 @@ export default async function AnnouncementsPage({
       </Link>
 
       <p className={styles.eyebrow}>{org.name}</p>
-      <h1 className={styles.title}>Announcements</h1>
+      <h1 className={styles.title} style={{ marginBottom: 24 }}>Announcements</h1>
 
       {visible.length === 0 ? (
         <p className={styles.lede}>No announcements yet. Check back soon.</p>

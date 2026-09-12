@@ -20,6 +20,7 @@ interface Announcement {
   recipient_count: number | null;
   created_at: string;
   sent_at: string | null;
+  send_as_system: boolean;
 }
 interface MemberLite {
   user_id: string;
@@ -60,6 +61,7 @@ export default function AnnouncementManager({
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [members, setMembers] = useState<MemberLite[]>([]);
   const [events, setEvents] = useState<EventLite[]>([]);
+  const [systemSender, setSystemSender] = useState<{ name: string; avatar: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(0);
   const [composing, setComposing] = useState(false);
@@ -74,6 +76,7 @@ export default function AnnouncementManager({
   const [memberQuery, setMemberQuery] = useState("");
   const [timing, setTiming] = useState<"now" | "schedule">("now");
   const [scheduleAt, setScheduleAt] = useState("");
+  const [asSystem, setAsSystem] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<{ id: string; title: string } | null>(null);
@@ -93,6 +96,7 @@ export default function AnnouncementManager({
       setAnnouncements(data.announcements || []);
       setMembers(data.members || []);
       setEvents(data.events || []);
+      setSystemSender(data.systemSender || null);
       setLoading(false);
     })();
     return () => {
@@ -130,6 +134,7 @@ export default function AnnouncementManager({
     setMemberQuery("");
     setTiming("now");
     setScheduleAt(toLocalInput(null));
+    setAsSystem(false);
     setError(null);
     setEditingId(null);
   }
@@ -148,6 +153,7 @@ export default function AnnouncementManager({
     setMemberQuery("");
     setTiming(a.scheduled_for ? "schedule" : "now");
     setScheduleAt(toLocalInput(a.scheduled_for));
+    setAsSystem(a.send_as_system);
     setError(null);
     setEditingId(a.id);
     setComposing(true);
@@ -191,6 +197,7 @@ export default function AnnouncementManager({
       event_id: audience === "event" ? eventId : null,
       scheduled_for: timing === "schedule" ? new Date(scheduleAt).toISOString() : null,
       send_now: timing === "now",
+      send_as_system: asSystem,
     };
     const res = editingId
       ? await fetch(`/api/v2/announcements/${editingId}`, {
@@ -405,6 +412,31 @@ export default function AnnouncementManager({
                 : "Held until the scheduled time, then delivered automatically."}
             </p>
           </div>
+
+          {systemSender && (
+            <div className={styles.field}>
+              <label className={styles.permRow} style={{ alignItems: "center" }}>
+                <input type="checkbox" checked={asSystem} onChange={(e) => setAsSystem(e.target.checked)} />
+                <span className={styles.permText}>
+                  <span className={styles.permLabel} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    {systemSender.avatar && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={systemSender.avatar}
+                        alt=""
+                        style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover" }}
+                      />
+                    )}
+                    Send as {systemSender.name}
+                  </span>
+                  <span className={styles.permDesc}>
+                    Posts from the {systemSender.name} system personality instead of you — for generic or
+                    automated-feeling announcements.
+                  </span>
+                </span>
+              </label>
+            </div>
+          )}
 
           {error && <p className={styles.formError}>{error}</p>}
 

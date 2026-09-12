@@ -28,7 +28,7 @@ async function guard(
   const admin = v2AdminClient();
   const { data: row } = await admin
     .from("v2_announcements")
-    .select("id, org_id, title, body, audience_type, audience_user_ids, event_id, status, created_by")
+    .select("id, org_id, title, body, audience_type, audience_user_ids, event_id, status, created_by, send_as_system")
     .eq("id", id)
     .maybeSingle();
   if (!row) return { error: "Not found", status: 404 };
@@ -48,6 +48,7 @@ interface AnnRow {
   event_id: string | null;
   status: "pending" | "sent" | "cancelled";
   created_by: string | null;
+  send_as_system: boolean;
 }
 
 async function slugForOrg(admin: SupabaseClient, orgId: string): Promise<string | null> {
@@ -71,6 +72,7 @@ export async function PUT(
     audience_user_ids?: string[];
     event_id?: string | null;
     scheduled_for?: string | null;
+    send_as_system?: boolean;
   };
   try {
     body = await request.json();
@@ -119,6 +121,7 @@ export async function PUT(
     }
     patch.scheduled_for = body.scheduled_for;
   }
+  if (body.send_as_system !== undefined) patch.send_as_system = body.send_as_system === true;
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }

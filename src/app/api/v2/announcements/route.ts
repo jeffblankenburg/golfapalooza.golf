@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { hasPermission } from "@/lib/v2/permissions-server";
 import { deliverAnnouncement, type AnnouncementAudience } from "@/lib/v2/announcements";
+import { getSystemProfile } from "@/lib/v2/system-user";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
 
   // One round-trip each: announcement history, the roster (custom audience), the
   // event list (event audience). Parallelized.
-  const [annRes, memRes, evtRes] = await Promise.all([
+  const [annRes, memRes, evtRes, systemRes] = await Promise.all([
     g.admin
       .from("v2_announcements")
       .select("id, title, body, audience_type, audience_user_ids, event_id, scheduled_for, status, recipient_count, created_at, sent_at")
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
       .order("created_at", { ascending: false }),
     g.admin
       .from("v2_memberships")
-      .select("user_id, profile:v2_profiles(display_name, first_name, last_name, nickname)")
+      .select("user_id, profile:v2_profiles(display_name, first_name, last_name, nickname, is_system)")
       .eq("org_id", orgId)
       .eq("status", "active"),
     g.admin
@@ -55,25 +56,31 @@ export async function GET(request: Request) {
       .select("id, name, year, status")
       .eq("org_id", orgId)
       .order("year", { ascending: false }),
+    getSystemProfile(g.admin),
   ]);
 
-  const members = (memRes.data || []).map((m) => {
-    const p = (Array.isArray(m.profile) ? m.profile[0] : m.profile) as
-      | { display_name?: string; first_name?: string | null; last_name?: string | null; nickname?: string | null }
-      | null;
-    return {
-      user_id: m.user_id,
-      display_name: p?.display_name || "Member",
-      first_name: p?.first_name ?? null,
-      last_name: p?.last_name ?? null,
-      nickname: p?.nickname ?? null,
-    };
-  });
+  const members = (memRes.data || [])
+    .map((m) => {
+      const p = (Array.isArray(m.profile) ? m.profile[0] : m.profile) as
+        | { display_name?: string; first_name?: string | null; last_name?: string | null; nickname?: string | null; is_system?: boolean }
+        | null;
+      return {
+        user_id: m.user_id,
+        display_name: p?.display_name || "Member",
+        first_name: p?.first_name ?? null,
+        last_name: p?.last_name ?? null,
+        nickname: p?.nickname ?? null,
+        is_system: !!p?.is_system,
+      };
+    })
+    // Al Pine (system) is never a selectable audience member.
+    .filter((m) => !m.is_system);
 
   return NextResponse.json({
     announcements: annRes.data || [],
     members,
     events: evtRes.data || [],
+    systemSender: systemRes ? { name: systemRes.display_name, avatar: systemRes.avatar_url } : null,
   });
 }
 
@@ -87,6 +94,7 @@ export async function POST(request: Request) {
     event_id?: string | null;
     scheduled_for?: string | null;
     send_now?: boolean;
+    send_as_system?: boolean;
   };
   try {
     body = await request.json();
@@ -128,12 +136,13 @@ export async function POST(request: Request) {
     scheduled_for: sendNow ? null : body.scheduled_for ?? null,
     status: "pending" as const,
     created_by: g.userId,
+    send_as_system: body.send_as_system === true,
   };
 
   const { data: created, error } = await g.admin
     .from("v2_announcements")
     .insert(insertRow)
-    .select("id, org_id, title, body, audience_type, audience_user_ids, event_id, created_by")
+    .select("id, org_id, title, body, audience_type, audience_user_ids, event_id, created_by, send_as_system")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

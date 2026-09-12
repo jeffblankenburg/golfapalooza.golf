@@ -46,7 +46,7 @@ export async function GET(
   const { data } = await g.admin
     .from("v2_memberships")
     .select(
-      "user_id, role, status, profile:v2_profiles(display_name, first_name, last_name, nickname, birthdate, avatar_url)",
+      "user_id, role, status, profile:v2_profiles(display_name, first_name, last_name, nickname, birthdate, avatar_url, is_system)",
     )
     .eq("org_id", id)
     .order("role");
@@ -60,28 +60,33 @@ export async function GET(
   }
   // Return the raw name parts so the client can sort/display per the org's
   // name-display mode (last-name vs nickname) and edit them in the modal.
-  const members = (data || []).map((m) => {
-    const p = (Array.isArray(m.profile) ? m.profile[0] : m.profile) as {
-      display_name?: string | null;
-      first_name?: string | null;
-      last_name?: string | null;
-      nickname?: string | null;
-      birthdate?: string | null;
-      avatar_url?: string | null;
-    } | null;
-    return {
-      user_id: m.user_id,
-      role: m.role,
-      status: m.status,
-      display_name: p?.display_name || "Member",
-      first_name: p?.first_name ?? null,
-      last_name: p?.last_name ?? null,
-      nickname: p?.nickname ?? null,
-      birthdate: p?.birthdate ?? null,
-      avatar_url: p?.avatar_url || null,
-      permissions: permsByUser.get(m.user_id) ?? {},
-    };
-  });
+  const members = (data || [])
+    .map((m) => {
+      const p = (Array.isArray(m.profile) ? m.profile[0] : m.profile) as {
+        display_name?: string | null;
+        first_name?: string | null;
+        last_name?: string | null;
+        nickname?: string | null;
+        birthdate?: string | null;
+        avatar_url?: string | null;
+        is_system?: boolean | null;
+      } | null;
+      return {
+        user_id: m.user_id,
+        role: m.role,
+        status: m.status,
+        display_name: p?.display_name || "Member",
+        first_name: p?.first_name ?? null,
+        last_name: p?.last_name ?? null,
+        nickname: p?.nickname ?? null,
+        birthdate: p?.birthdate ?? null,
+        avatar_url: p?.avatar_url || null,
+        is_system: !!p?.is_system,
+        permissions: permsByUser.get(m.user_id) ?? {},
+      };
+    })
+    // Al Pine (system personality) is never shown as a member.
+    .filter((m) => !m.is_system);
   return NextResponse.json({ members });
 }
 

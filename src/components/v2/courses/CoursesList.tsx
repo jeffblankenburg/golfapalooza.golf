@@ -12,6 +12,7 @@ interface CourseRow {
   club_name: string | null;
   city: string | null;
   state: string | null;
+  website?: string | null;
   updated_at?: string | null;
   mapped?: { set_points: number; total_points: number; fully_mapped_holes: number; total_holes: number };
   distance_mi?: number;
@@ -19,35 +20,51 @@ interface CourseRow {
 
 const RADIUS_MI = 50;
 
+/** Ensure a stored website opens as an absolute URL in a new tab. */
+function externalUrl(raw: string): string {
+  return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+}
+
 function CourseCard({ course, slug }: { course: CourseRow; slug: string }) {
   const subtitle = [course.city, course.state].filter(Boolean).join(", ");
+  const website = course.website?.trim();
   return (
-    <Link
-      href={`/new/${slug}/courses/${course.id}`}
-      className="block rounded-xl border border-gray-200 bg-white p-3 active:bg-gray-50"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium text-gray-900">{course.name}</div>
-          {(subtitle || course.club_name) && (
-            <div className="text-xs text-gray-500 mt-0.5 truncate">
-              {course.club_name && course.club_name !== course.name ? `${course.club_name} — ` : ""}{subtitle}
-            </div>
-          )}
-        </div>
-        <div className="shrink-0 flex flex-col items-end gap-1">
-          {typeof course.distance_mi === "number" && (
-            <span className="text-xs font-semibold text-green-700 whitespace-nowrap">{Math.round(course.distance_mi)} mi</span>
-          )}
-          {course.mapped && (
-            <MappedStatusBadge
-              fullyMappedHoles={course.mapped.fully_mapped_holes}
-              totalHoles={course.mapped.total_holes}
-            />
-          )}
-        </div>
+    // Card is a div (not a Link) so the website link isn't a nested anchor.
+    <div className="flex items-stretch justify-between gap-3 rounded-xl border border-gray-200 bg-white p-3">
+      <Link href={`/new/${slug}/courses/${course.id}`} className="min-w-0 flex-1 active:opacity-70">
+        <div className="text-sm font-medium text-gray-900">{course.name}</div>
+        {course.club_name && course.club_name !== course.name && (
+          <div className="text-xs text-gray-500 mt-0.5 truncate">{course.club_name}</div>
+        )}
+        {subtitle && <div className="text-xs text-gray-500 mt-0.5 truncate">{subtitle}</div>}
+      </Link>
+      <div className="shrink-0 flex flex-col items-end gap-1">
+        {typeof course.distance_mi === "number" && (
+          <span className="text-xs font-semibold text-green-700 whitespace-nowrap">{Math.round(course.distance_mi)} mi</span>
+        )}
+        {course.mapped && (
+          <MappedStatusBadge
+            fullyMappedHoles={course.mapped.fully_mapped_holes}
+            totalHoles={course.mapped.total_holes}
+          />
+        )}
+        {website && (
+          <a
+            href={externalUrl(website)}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Course website (opens in a new tab)"
+            className="mt-auto text-gray-500 active:opacity-70"
+          >
+            <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden>
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+              <path d="M15 3h6v6" />
+              <path d="M10 14L21 3" />
+            </svg>
+          </a>
+        )}
       </div>
-    </Link>
+    </div>
   );
 }
 

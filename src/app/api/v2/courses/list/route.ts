@@ -35,7 +35,7 @@ export async function GET(request: Request) {
   const [coursesRes, holesRes] = await Promise.all([
     admin
       .from("v2_courses")
-      .select("id, name, club_name, city, state, updated_at")
+      .select("id, name, club_name, city, state, website, updated_at")
       .order("name", { ascending: true }),
     fetchAll<HoleCoordRow & { course_id: string }>(async (f, t) => {
       const r = await admin
@@ -65,6 +65,7 @@ export async function GET(request: Request) {
       club_name: c.club_name,
       city: c.city,
       state: c.state,
+      website: c.website,
       locked: false, // v2 has no per-course locking; kept for UI shape parity
       updated_at: c.updated_at,
       last_played_at: null,

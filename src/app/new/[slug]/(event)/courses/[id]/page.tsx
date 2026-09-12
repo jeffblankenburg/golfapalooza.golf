@@ -27,7 +27,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ s
         </svg>
         Courses
       </Link>
-      <CourseManager courseId={id} />
+      <CourseManager courseId={id} slug={slug} viewerIsAdmin={isAdmin} />
     </div>
   );
 }

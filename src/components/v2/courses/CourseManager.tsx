@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import { TEE_COLOR_OPTIONS, getTeeColorClasses } from "@/lib/v2/tee-colors";
@@ -46,7 +47,10 @@ function mappedCount(h: Hole): number {
 
 interface CompMap { hole_number: number; source_tee_id: string }
 
-export default function CourseManager({ courseId, onCourseChanged }: { courseId: string; onCourseChanged?: () => void }) {
+export default function CourseManager({ courseId, slug, viewerIsAdmin = false, onCourseChanged }: {
+  courseId: string; slug?: string; viewerIsAdmin?: boolean; onCourseChanged?: () => void;
+}) {
+  const router = useRouter();
   const [course, setCourse] = useState<Course | null>(null);
   const [tees, setTees] = useState<Tee[]>([]);
   const [holesByTee, setHolesByTee] = useState<Record<string, Hole[]>>({});
@@ -57,6 +61,7 @@ export default function CourseManager({ courseId, onCourseChanged }: { courseId:
   const [status, setStatus] = useState<string | null>(null);
   const [mapHole, setMapHole] = useState<Hole | null>(null);
   const [confirmDelTee, setConfirmDelTee] = useState<Tee | null>(null);
+  const [confirmDelCourse, setConfirmDelCourse] = useState(false);
 
   interface Detail {
     course: Course; tees: Tee[];
@@ -127,7 +132,12 @@ export default function CourseManager({ courseId, onCourseChanged }: { courseId:
       {status && <div className="mb-3 text-xs font-medium text-green-700">{status}</div>}
 
       {tab === "info" && (
-        <InfoTab course={course} onSaved={(c) => { setCourse(c); flash("Saved"); onCourseChanged?.(); }} />
+        <InfoTab
+          course={course}
+          canDelete={viewerIsAdmin}
+          onDeleteCourse={() => setConfirmDelCourse(true)}
+          onSaved={(c) => { setCourse(c); flash("Saved"); onCourseChanged?.(); }}
+        />
       )}
       {tab === "tees" && (
         <TeesTab
@@ -237,12 +247,29 @@ export default function CourseManager({ courseId, onCourseChanged }: { courseId:
         }}
         onCancel={() => setConfirmDelTee(null)}
       />
+
+      <ConfirmModal
+        open={confirmDelCourse}
+        title="Delete this course?"
+        message="This permanently removes the course and all its tees, holes, and hybrid tees. Courses are shared by every group. This can't be undone."
+        confirmLabel="Delete course"
+        destructive
+        onConfirm={async () => {
+          setConfirmDelCourse(false);
+          const res = await fetch(`/api/v2/courses/${courseId}`, { method: "DELETE" });
+          if (res.ok) { if (slug) router.push(`/new/${slug}/courses`); else onCourseChanged?.(); }
+          else { flash((await res.json().catch(() => ({}))).error || "Could not delete"); }
+        }}
+        onCancel={() => setConfirmDelCourse(false)}
+      />
     </div>
   );
 }
 
 /* ── Info ─────────────────────────────────────────────────────────────────── */
-function InfoTab({ course, onSaved }: { course: Course; onSaved: (c: Course) => void }) {
+function InfoTab({ course, canDelete, onDeleteCourse, onSaved }: {
+  course: Course; canDelete: boolean; onDeleteCourse: () => void; onSaved: (c: Course) => void;
+}) {
   const [f, setF] = useState(course);
   const [saving, setSaving] = useState(false);
   const set = (k: keyof Course, v: unknown) => setF((p) => ({ ...p, [k]: v }));
@@ -278,6 +305,15 @@ function InfoTab({ course, onSaved }: { course: Course; onSaved: (c: Course) => 
       <button type="button" onClick={save} disabled={saving} className="w-full py-3 bg-green-600 text-white font-semibold rounded-lg disabled:opacity-50">
         {saving ? "Saving…" : "Save course info"}
       </button>
+
+      {canDelete && (
+        <div className="mt-4 pt-3 border-t border-gray-100">
+          <button type="button" onClick={onDeleteCourse} className="text-sm font-medium text-red-600 active:opacity-70">
+            Delete this course
+          </button>
+          <p className="mt-1 text-xs text-gray-400">Admins only. Removes the course for every group (e.g. a duplicate).</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -314,7 +350,8 @@ function TeesTab({ tees, compIds, compMappings, onReload, onDelete, courseId, fl
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tee_id: t.id, tee_name: t.tee_name, tee_color: t.tee_color, course_rating: t.course_rating, slope_rating: t.slope_rating, par: t.par }),
     });
-    if (res.ok) flash("Tee saved");
+    // Reload so the accordion summary (which reads saved props) reflects the edit.
+    if (res.ok) { flash("Tee saved"); onReload(); } else { flash((await res.json().catch(() => ({}))).error || "Could not save tee"); }
   }
 
   return (
@@ -530,10 +567,10 @@ function HolesTab({ tees, holes, selectedTeeId, onSelectTee, onReload, readOnly,
             className={`inline-block w-3 h-3 rounded-full align-middle ${readOnly ? (cls?.bg ?? "bg-gray-200") : "bg-transparent"}`}
             style={readOnly && cls?.isGradient ? { background: cls.gradientHex! } : readOnly && cls?.hex ? { background: cls.hex } : undefined} />
         </td>
-        <td className="py-1 px-0.5 w-14"><input type="number" disabled={readOnly} className={cell} value={h.par} onChange={(e) => setRow(h.id, "par", parseInt(e.target.value) || 0)} /></td>
-        <td className="py-1 px-0.5 w-14"><input type="number" disabled={readOnly} className={cell} value={h.handicap_index} onChange={(e) => setRow(h.id, "handicap_index", parseInt(e.target.value) || 0)} /></td>
-        <td className="py-1 px-0.5 w-16"><input type="number" disabled={readOnly} className={cell} value={h.yards ?? ""} onChange={(e) => setRow(h.id, "yards", e.target.value ? parseInt(e.target.value) : null)} /></td>
-        <td className="py-1 pl-2"><input disabled={readOnly} className={nameCell} value={h.hole_name ?? ""} onChange={(e) => setRow(h.id, "hole_name", e.target.value)} placeholder="—" /></td>
+        <td className="py-1 px-0.5 w-14"><input type="number" tabIndex={100 + h.hole_number} disabled={readOnly} className={cell} value={h.par} onChange={(e) => setRow(h.id, "par", parseInt(e.target.value) || 0)} /></td>
+        <td className="py-1 px-0.5 w-14"><input type="number" tabIndex={200 + h.hole_number} disabled={readOnly} className={cell} value={h.handicap_index} onChange={(e) => setRow(h.id, "handicap_index", parseInt(e.target.value) || 0)} /></td>
+        <td className="py-1 px-0.5 w-16"><input type="number" tabIndex={300 + h.hole_number} disabled={readOnly} className={cell} value={h.yards ?? ""} onChange={(e) => setRow(h.id, "yards", e.target.value ? parseInt(e.target.value) : null)} /></td>
+        <td className="py-1 pl-2"><input tabIndex={400 + h.hole_number} disabled={readOnly} className={nameCell} value={h.hole_name ?? ""} onChange={(e) => setRow(h.id, "hole_name", e.target.value)} placeholder="—" /></td>
       </tr>
     );
   };

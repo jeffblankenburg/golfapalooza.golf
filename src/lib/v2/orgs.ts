@@ -23,6 +23,23 @@ export async function isOrgAdmin(
   return !!data && (data.role === "owner" || data.role === "admin");
 }
 
+/**
+ * True if the user is an owner/admin of ANY active org. Used to gate actions on
+ * universal (non-org-scoped) resources like the shared course library, where
+ * "admin" means "a group admin somewhere," not tied to one org.
+ */
+export async function isAnyOrgAdmin(admin: SupabaseClient, userId: string): Promise<boolean> {
+  const { data } = await admin
+    .from("v2_memberships")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .in("role", ["owner", "admin"])
+    .limit(1)
+    .maybeSingle();
+  return !!data;
+}
+
 /** True when the user is an active member (any role) of the org. */
 export async function isOrgMember(
   admin: SupabaseClient,

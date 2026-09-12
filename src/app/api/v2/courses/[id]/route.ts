@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
+import { isAnyOrgAdmin } from "@/lib/v2/orgs";
 import { geocodeAddress } from "@/lib/v2/geocode";
 
 const HOLE_SELECT =
@@ -147,4 +148,24 @@ export async function PUT(
   } catch {
     return NextResponse.json({ error: "Failed to update course" }, { status: 500 });
   }
+}
+
+/** DELETE — remove a course entirely (admins only). Cascades tees / holes /
+ *  composition mappings via FK ON DELETE CASCADE. */
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const { userId } = await v2GetUser(request);
+  if (!userId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  const admin = v2AdminClient();
+  if (!(await isAnyOrgAdmin(admin, userId))) {
+    return NextResponse.json({ error: "Only group admins can delete courses" }, { status: 403 });
+  }
+
+  const { error } = await admin.from("v2_courses").delete().eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
 }

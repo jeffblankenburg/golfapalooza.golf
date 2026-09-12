@@ -290,7 +290,7 @@
   letter-spacing: 0.12em;
   color: var(--ink-soft);
   text-decoration: none;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 .back:hover {
   color: var(--ink);

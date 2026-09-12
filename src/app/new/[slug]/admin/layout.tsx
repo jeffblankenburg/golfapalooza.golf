@@ -46,9 +46,10 @@ export default async function AdminLayout({
         </Link>
       </header>
 
-      {/* Nav is fixed (56px, out of flow); .page adds 40px of its own top
-          padding, so this pad lands the back link a comfortable gap below it. */}
-      <main style={{ paddingTop: 40 }}>{children}</main>
+      {/* Nav is fixed (56px, out of flow) and .page adds 40px top padding, so
+          32px here yields a 16px gap above the back link — matching .back's
+          16px margin-bottom for equal spacing around it. */}
+      <main style={{ paddingTop: 32 }}>{children}</main>
     </>
   );
 }

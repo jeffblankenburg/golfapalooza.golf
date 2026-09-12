@@ -64,4 +64,10 @@ for (const t of tees) {
 console.log(`tees read: ${tees.length} (renamed ${renamed}), inserted: ${await insertAll("v2_course_tees", tees)}`);
 const holes = await readAll("course_holes", HOLE_COLS);
 console.log(`holes read: ${holes.length}, inserted: ${await insertAll("v2_course_holes", holes)}`);
+
+// Hybrid ("composition") tee mappings — the per-hole source-tee pointers. Tee ids
+// were preserved above, so these FKs resolve. Without these, hybrid tees look
+// like plain tees with their own (placeholder) hole data.
+const comp = await readAll("composition_tee_mappings", "id, tee_id, hole_number, source_tee_id, created_at");
+console.log(`composition mappings read: ${comp.length}, inserted: ${await insertAll("v2_composition_tee_mappings", comp)}`);
 console.log("done");

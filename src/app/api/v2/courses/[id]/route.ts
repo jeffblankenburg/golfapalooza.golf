@@ -2,7 +2,20 @@ import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { geocodeAddress } from "@/lib/v2/geocode";
 
-/** GET — course + tees + holes for the selected tee (image-backfill from siblings). */
+const HOLE_SELECT =
+  "id, tee_id, hole_number, par, handicap_index, yards, meters, hole_name, tee_latitude, tee_longitude, green_latitude, green_longitude, green_front_latitude, green_front_longitude, green_back_latitude, green_back_longitude, drive_latitude, drive_longitude, center_line";
+
+interface HoleRow {
+  id: string; tee_id: string; hole_number: number; par: number; handicap_index: number;
+  yards: number | null; hole_name: string | null; [k: string]: unknown;
+}
+interface MapRow { tee_id: string; hole_number: number; source_tee_id: string }
+
+/**
+ * GET — the whole course in one shot: course + tees + **every tee's holes**
+ * (hybrid tees resolved from their source tees) + composition state. Returning
+ * all tees' holes up front lets the client switch tees instantly (no refetch).
+ */
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -11,68 +24,66 @@ export async function GET(
   if (!userId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   const { id } = await params;
-  const { searchParams } = new URL(request.url);
-  const teeId = searchParams.get("tee_id");
-
   const admin = v2AdminClient();
   const { data: course, error } = await admin.from("v2_courses").select("*").eq("id", id).maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!course) return NextResponse.json({ error: "Course not found" }, { status: 404 });
 
-  const { data: tees } = await admin
-    .from("v2_course_tees")
-    .select("*")
-    .eq("course_id", id)
+  const { data: teeData } = await admin
+    .from("v2_course_tees").select("*").eq("course_id", id)
     .order("course_rating", { ascending: false });
+  const tees = teeData || [];
+  const teeIds = tees.map((t) => t.id);
 
-  const selectedTeeId = teeId || tees?.[0]?.id;
+  let allHoles: HoleRow[] = [];
+  let maps: MapRow[] = [];
+  if (teeIds.length) {
+    const [hRes, mRes] = await Promise.all([
+      admin.from("v2_course_holes").select(HOLE_SELECT).in("tee_id", teeIds).order("hole_number"),
+      admin.from("v2_composition_tee_mappings").select("tee_id, hole_number, source_tee_id").in("tee_id", teeIds).order("hole_number"),
+    ]);
+    allHoles = (hRes.data as HoleRow[] | null) || [];
+    maps = (mRes.data as MapRow[] | null) || [];
+  }
 
-  let holes: Array<{ id: string; hole_number: number; overhead_image_url: string | null; green_image_url: string | null }> = [];
-  if (selectedTeeId) {
-    const { data } = await admin
-      .from("v2_course_holes")
-      .select("*")
-      .eq("tee_id", selectedTeeId)
-      .order("hole_number");
-    holes = data || [];
+  // Index own holes + the composition mappings.
+  const ownByTee: Record<string, HoleRow[]> = {};
+  const holeByKey = new Map<string, HoleRow>();
+  for (const h of allHoles) {
+    (ownByTee[h.tee_id] ||= []).push(h);
+    holeByKey.set(`${h.tee_id}|${h.hole_number}`, h);
+  }
+  const mapByTee: Record<string, MapRow[]> = {};
+  for (const m of maps) (mapByTee[m.tee_id] ||= []).push(m);
+  const compositionTeeIds = Object.keys(mapByTee);
 
-    // Backfill missing hole photos from sibling tees so the editor isn't blank.
-    if (holes.length > 0) {
-      const missingNumbers = holes
-        .filter((h) => !h.overhead_image_url || !h.green_image_url)
-        .map((h) => h.hole_number);
-      if (missingNumbers.length > 0) {
-        const { data: siblings } = await admin
-          .from("v2_course_holes")
-          .select("hole_number, overhead_image_url, green_image_url")
-          .eq("course_id", id)
-          .neq("tee_id", selectedTeeId)
-          .in("hole_number", missingNumbers);
-        const imageMap: Record<number, { overhead?: string; green?: string }> = {};
-        for (const sh of siblings || []) {
-          if (!imageMap[sh.hole_number]) imageMap[sh.hole_number] = {};
-          if (sh.overhead_image_url && !imageMap[sh.hole_number].overhead) imageMap[sh.hole_number].overhead = sh.overhead_image_url;
-          if (sh.green_image_url && !imageMap[sh.hole_number].green) imageMap[sh.hole_number].green = sh.green_image_url;
-        }
-        for (const hole of holes) {
-          const imgs = imageMap[hole.hole_number];
-          if (!imgs) continue;
-          const patch: Record<string, string> = {};
-          if (!hole.overhead_image_url && imgs.overhead) { patch.overhead_image_url = imgs.overhead; hole.overhead_image_url = imgs.overhead; }
-          if (!hole.green_image_url && imgs.green) { patch.green_image_url = imgs.green; hole.green_image_url = imgs.green; }
-          if (Object.keys(patch).length > 0) await admin.from("v2_course_holes").update(patch).eq("id", hole.id);
-        }
-      }
+  // Resolve every tee's holes (hybrids pull each hole from its source tee).
+  const holesByTee: Record<string, HoleRow[]> = {};
+  for (const tee of tees) {
+    const m = mapByTee[tee.id];
+    if (m && m.length) {
+      holesByTee[tee.id] = m
+        .slice()
+        .sort((a, b) => a.hole_number - b.hole_number)
+        .map((mm) =>
+          holeByKey.get(`${mm.source_tee_id}|${mm.hole_number}`) ?? {
+            id: `${tee.id}-${mm.hole_number}`, tee_id: mm.source_tee_id, hole_number: mm.hole_number,
+            par: 4, handicap_index: mm.hole_number, yards: null, hole_name: null,
+          } as HoleRow,
+        );
+    } else {
+      holesByTee[tee.id] = (ownByTee[tee.id] || []).slice().sort((a, b) => a.hole_number - b.hole_number);
     }
   }
 
   return NextResponse.json({
     course,
-    tees: tees || [],
-    holes,
-    selected_tee_id: selectedTeeId,
-    trip_id: null,
-    is_admin: true, // universal edit — everyone can edit any course
+    tees,
+    holes_by_tee: holesByTee,
+    composition_tee_ids: compositionTeeIds,
+    composition_mappings: mapByTee,
+    selected_tee_id: tees[0]?.id ?? null,
+    is_admin: true, // universal edit
   });
 }
 

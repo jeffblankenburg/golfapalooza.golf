@@ -12,9 +12,12 @@ interface CourseRow {
   club_name: string | null;
   city: string | null;
   state: string | null;
-  updated_at: string | null;
-  mapped: { set_points: number; total_points: number; fully_mapped_holes: number; total_holes: number };
+  updated_at?: string | null;
+  mapped?: { set_points: number; total_points: number; fully_mapped_holes: number; total_holes: number };
+  distance_mi?: number;
 }
+
+const RADIUS_MI = 50;
 
 function CourseCard({ course, slug }: { course: CourseRow; slug: string }) {
   const subtitle = [course.city, course.state].filter(Boolean).join(", ");
@@ -32,11 +35,16 @@ function CourseCard({ course, slug }: { course: CourseRow; slug: string }) {
             </div>
           )}
         </div>
-        <div className="shrink-0">
-          <MappedStatusBadge
-            fullyMappedHoles={course.mapped.fully_mapped_holes}
-            totalHoles={course.mapped.total_holes}
-          />
+        <div className="shrink-0 flex flex-col items-end gap-1">
+          {typeof course.distance_mi === "number" && (
+            <span className="text-xs font-semibold text-green-700 whitespace-nowrap">{Math.round(course.distance_mi)} mi</span>
+          )}
+          {course.mapped && (
+            <MappedStatusBadge
+              fullyMappedHoles={course.mapped.fully_mapped_holes}
+              totalHoles={course.mapped.total_holes}
+            />
+          )}
         </div>
       </div>
     </Link>
@@ -48,12 +56,15 @@ export default function CoursesList({ slug }: { slug: string }) {
   const [courses, setCourses] = useState<CourseRow[] | null>(null);
   const [query, setQuery] = useState("");
   const [showLookup, setShowLookup] = useState(false);
+  const [mode, setMode] = useState<"all" | "near">("all");
+  const [nearResults, setNearResults] = useState<CourseRow[] | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
 
   const fetchCourses = useCallback(async (): Promise<CourseRow[]> => {
     const res = await fetch("/api/v2/courses/list");
     return res.ok ? ((await res.json()).courses || []) : [];
   }, []);
-  // For the focus listeners (event callbacks — setState there is fine).
   const load = useCallback(async () => { setCourses(await fetchCourses()); }, [fetchCourses]);
 
   useEffect(() => {
@@ -73,16 +84,73 @@ export default function CoursesList({ slug }: { slug: string }) {
     };
   }, [load]);
 
+  const coursesById = useMemo(() => {
+    const m = new Map<string, CourseRow>();
+    for (const c of courses || []) m.set(c.id, c);
+    return m;
+  }, [courses]);
+
+  function findNearby() {
+    setGeoError(null);
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGeoError("Location isn't available on this device.");
+      return;
+    }
+    setMode("near");
+    setNearResults(null);
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const res = await fetch(`/api/v2/courses?lat=${latitude}&lng=${longitude}&radius=${RADIUS_MI}`);
+          const data = res.ok ? await res.json() : { courses: [] };
+          // Merge in mapped-status from the full list (the nearby endpoint omits it).
+          const enriched: CourseRow[] = (data.courses || []).map((c: CourseRow) => ({
+            ...coursesById.get(c.id),
+            ...c,
+          }));
+          setNearResults(enriched);
+        } catch {
+          setNearResults([]);
+          setGeoError("Couldn't load nearby courses.");
+        } finally {
+          setLocating(false);
+        }
+      },
+      (err) => {
+        setLocating(false);
+        setMode("all");
+        setNearResults(null);
+        setGeoError(
+          err.code === err.PERMISSION_DENIED
+            ? "Location permission denied — allow it to find courses near you."
+            : "Couldn't get your location.",
+        );
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
+    );
+  }
+
+  function showAll() {
+    setMode("all");
+    setNearResults(null);
+    setGeoError(null);
+  }
+
+  const activeList = mode === "near" ? nearResults : courses;
+  const loadingList = mode === "near" ? locating || nearResults === null : courses === null;
+
   const filtered = useMemo(() => {
-    if (!courses) return [];
+    const list = activeList || [];
     const q = query.trim().toLowerCase();
-    if (!q) return courses;
-    return courses.filter((c) =>
+    if (!q) return list;
+    return list.filter((c) =>
       c.name.toLowerCase().includes(q) ||
       (c.club_name || "").toLowerCase().includes(q) ||
       (c.city || "").toLowerCase().includes(q) ||
       (c.state || "").toLowerCase().includes(q));
-  }, [courses, query]);
+  }, [activeList, query]);
 
   return (
     <div className="px-4 py-4 max-w-2xl mx-auto">
@@ -97,19 +165,46 @@ export default function CoursesList({ slug }: { slug: string }) {
         </button>
       </div>
 
-      <input
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search courses..."
-        className="w-full px-3 py-2.5 mb-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40"
-      />
+      <div className="flex gap-2 mb-2">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search courses..."
+          className="flex-1 min-w-0 px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40"
+        />
+        <button
+          type="button"
+          onClick={mode === "near" ? showAll : findNearby}
+          className={`shrink-0 inline-flex items-center gap-1 px-3 rounded-lg text-sm font-semibold border ${
+            mode === "near" ? "bg-green-600 text-white border-green-600" : "border-gray-200 text-green-700"
+          }`}
+        >
+          <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden>
+            <path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" />
+          </svg>
+          {mode === "near" ? "Show all" : "Near me"}
+        </button>
+      </div>
 
-      {courses === null ? (
-        <div className="py-12 text-center text-sm text-gray-500">Loading courses…</div>
+      {geoError && <p className="mb-3 text-xs text-red-600">{geoError}</p>}
+      {mode === "near" && !geoError && !loadingList && (
+        <p className="mb-3 text-xs text-gray-500">
+          {filtered.length} course{filtered.length === 1 ? "" : "s"} within {RADIUS_MI} miles
+        </p>
+      )}
+
+      {loadingList ? (
+        <div className="py-12 text-center text-sm text-gray-500">
+          {mode === "near" ? "Finding courses near you…" : "Loading courses…"}
+        </div>
       ) : filtered.length === 0 ? (
         <div className="py-12 text-center text-sm text-gray-500">
-          {query ? "No matching courses" : "No courses yet — add one above."}
+          {mode === "near"
+            ? `No courses within ${RADIUS_MI} miles.`
+            : query
+              ? "No matching courses"
+              : "No courses yet — add one above."}
         </div>
       ) : (
         <div className="space-y-2">

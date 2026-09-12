@@ -133,7 +133,7 @@ export async function POST(request: Request) {
   const { data: created, error } = await g.admin
     .from("v2_announcements")
     .insert(insertRow)
-    .select("id, org_id, title, body, audience_type, audience_user_ids, event_id")
+    .select("id, org_id, title, body, audience_type, audience_user_ids, event_id, created_by")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

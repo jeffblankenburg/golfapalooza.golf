@@ -153,8 +153,8 @@ export async function POST(
     .eq("room_id", roomId)
     .not("hidden_at", "is", null);
 
-  if (others.length) {
-    const sender = Array.isArray(msg?.sender) ? msg?.sender[0] : msg?.sender;
+  if (others.length && msg) {
+    const sender = Array.isArray(msg.sender) ? msg.sender[0] : msg.sender;
     const senderName = pickName(sender, await orgNameMode(a.admin, a.room.org_id), "Someone");
     // Strip mention markup for the preview: "@[Name](id)" → "@Name".
     const clean = content ? content.replace(/@\[([^\]]+)\]\([^)]+\)/g, "@$1") : "";
@@ -162,9 +162,11 @@ export async function POST(
     // Deep-link to the org home with a query param that opens the chat drawer to
     // this room (chat is a drawer, not a route). Slug-based so the URL resolves.
     const slug = await orgSlug(a.admin, a.room.org_id);
+    // Deep-link to this specific message so a tap scrolls straight to it.
     const link = {
-      url: slug ? `/new/${slug}?open=chat&room=${roomId}` : `/new`,
+      url: slug ? `/new/${slug}?open=chat&room=${roomId}&msg=${msg.id}` : `/new`,
       roomId,
+      messageId: msg.id,
     };
 
     // Mentioned users get chat_mention; everyone else chat_message.

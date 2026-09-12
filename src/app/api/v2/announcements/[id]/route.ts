@@ -28,7 +28,7 @@ async function guard(
   const admin = v2AdminClient();
   const { data: row } = await admin
     .from("v2_announcements")
-    .select("id, org_id, title, body, audience_type, audience_user_ids, event_id, status")
+    .select("id, org_id, title, body, audience_type, audience_user_ids, event_id, status, created_by")
     .eq("id", id)
     .maybeSingle();
   if (!row) return { error: "Not found", status: 404 };
@@ -47,6 +47,7 @@ interface AnnRow {
   audience_user_ids: string[] | null;
   event_id: string | null;
   status: "pending" | "sent" | "cancelled";
+  created_by: string | null;
 }
 
 async function slugForOrg(admin: SupabaseClient, orgId: string): Promise<string | null> {

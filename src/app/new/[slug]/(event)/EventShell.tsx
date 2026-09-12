@@ -74,7 +74,7 @@ export default function EventShell({
   const [chatUnread, setChatUnread] = useState(initialChatUnread);
   // A notification/activity deep-link target for a drawer (room or photo id),
   // consumed by ChatDrawer/PhotosDrawer on open, cleared when the drawer closes.
-  const [deepLink, setDeepLink] = useState<{ room?: string; photo?: string }>({});
+  const [deepLink, setDeepLink] = useState<{ room?: string; photo?: string; msg?: string }>({});
   const music = useV2Music();
 
   const refetchChatUnread = useCallback(async () => {
@@ -91,7 +91,7 @@ export default function EventShell({
     if (k === "notifications") setUnread(0);
     // Manual open is never a deep-link — drop any stale room/photo target so a
     // reopened drawer doesn't jump back to a previously deep-linked item.
-    setDeepLink((d) => (d.room || d.photo ? {} : d));
+    setDeepLink((d) => (d.room || d.photo || d.msg ? {} : d));
     setEverythingOpen(false);
     const willOpen = open !== k;
     // Closing chat: read receipts may have changed — refresh the badge.
@@ -106,7 +106,7 @@ export default function EventShell({
   // Open/close the "Everything" launcher (bottom sheet), coordinating with the
   // drawers and the music overlay so only one full-screen surface shows at once.
   const openEverything = () => {
-    setDeepLink((d) => (d.room || d.photo ? {} : d));
+    setDeepLink((d) => (d.room || d.photo || d.msg ? {} : d));
     const willOpen = !everythingOpen;
     if (willOpen && typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("ui:drawer-open", { detail: { name: "everything" } }));
@@ -142,6 +142,7 @@ export default function EventShell({
     if (!target) return;
     const room = p.get("room") ?? undefined;
     const photo = p.get("photo") ?? undefined;
+    const msg = p.get("msg") ?? undefined;
     window.history.replaceState(null, "", window.location.pathname);
     // Defer state changes out of the effect body (avoids cascading-render lint).
     const raf = requestAnimationFrame(() => {
@@ -152,7 +153,7 @@ export default function EventShell({
       } else if (target === "photos" && !photosEnabled) {
         /* photos is off for this viewer */
       } else if (target in DRAWERS) {
-        setDeepLink({ room, photo });
+        setDeepLink({ room, photo, msg });
         window.dispatchEvent(new CustomEvent("ui:drawer-open", { detail: { name: target } }));
         setOpen(target as DrawerKey);
       }
@@ -164,7 +165,7 @@ export default function EventShell({
   // notification tap). detail may carry a deep target (room/photo).
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ name?: string; room?: string; photo?: string }>).detail;
+      const detail = (e as CustomEvent<{ name?: string; room?: string; photo?: string; msg?: string }>).detail;
       const name = detail?.name;
       if (name === "music") {
         if (musicEnabled) music.expandDrawer();
@@ -173,7 +174,8 @@ export default function EventShell({
       } else if (name === "photos" && !photosEnabled) {
         /* off */
       } else if (name && name in DRAWERS) {
-        if (detail?.room || detail?.photo) setDeepLink({ room: detail.room, photo: detail.photo });
+        if (detail?.room || detail?.photo || detail?.msg)
+          setDeepLink({ room: detail.room, photo: detail.photo, msg: detail.msg });
         window.dispatchEvent(new CustomEvent("ui:drawer-open", { detail: { name } }));
         setOpen(name as DrawerKey);
       }
@@ -384,7 +386,7 @@ export default function EventShell({
               onClose={() => setOpen(null)}
             />
           ) : open === "chat" ? (
-            <ChatDrawer orgId={orgId} userId={userId} initialRoom={deepLink.room} />
+            <ChatDrawer orgId={orgId} userId={userId} initialRoom={deepLink.room} initialMessageId={deepLink.msg} />
           ) : open === "photos" ? (
             <PhotosDrawer orgId={orgId} userId={userId} isAdmin={isAdmin} initialPhotoId={deepLink.photo} />
           ) : (

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendV2Notifications } from "./notifications";
+import { logActivity } from "./activity";
 
 /**
  * Announcement audience + delivery helpers, shared by the /api/v2/announcements
@@ -17,6 +18,7 @@ export interface AnnouncementRow {
   audience_type: AnnouncementAudience;
   audience_user_ids: string[] | null;
   event_id: string | null;
+  created_by?: string | null;
 }
 
 /**
@@ -63,6 +65,7 @@ export async function deliverAnnouncement(
   slug: string | null,
 ): Promise<number> {
   const userIds = await resolveAnnouncementAudience(admin, a);
+  const link = slug ? `/new/${slug}/announcements?a=${a.id}` : null;
   if (userIds.length) {
     await sendV2Notifications(admin, userIds, {
       orgId: a.org_id,
@@ -71,9 +74,25 @@ export async function deliverAnnouncement(
       body: a.body || undefined,
       data: {
         announcementId: a.id,
-        ...(slug ? { url: `/new/${slug}` } : {}),
+        ...(link ? { url: link } : {}),
       },
     });
   }
+
+  // Surface org-wide announcements in the home activity feed. Targeted ones
+  // (event/custom) are deliberately NOT logged — the feed is org-wide, so posting
+  // a subset-audience announcement there would leak it to non-recipients.
+  if (a.audience_type === "everyone") {
+    await logActivity(admin, {
+      orgId: a.org_id,
+      kind: "announcement",
+      actorId: a.created_by ?? null,
+      title: "posted an announcement",
+      subtitle: a.title,
+      link,
+      refId: a.id,
+    });
+  }
+
   return userIds.length;
 }

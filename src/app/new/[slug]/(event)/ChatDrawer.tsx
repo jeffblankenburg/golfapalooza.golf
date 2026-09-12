@@ -104,15 +104,17 @@ export default function ChatDrawer({
   orgId,
   userId,
   initialRoom,
+  initialMessageId,
 }: {
   orgId: string;
   userId: string;
   initialRoom?: string;
+  initialMessageId?: string;
 }) {
-  // A deep-link (notification tap) can open straight into a room; otherwise the
-  // room list shows first. Seeded once on mount.
+  // A deep-link (notification tap) can open straight into a room — and, when the
+  // notification is for a specific message, scroll to it. Seeded once on mount.
   const [openRoom, setOpenRoom] = useState<{ roomId: string; target: string | null } | null>(
-    initialRoom ? { roomId: initialRoom, target: null } : null,
+    initialRoom ? { roomId: initialRoom, target: initialMessageId ?? null } : null,
   );
   const [rooms, setRooms] = useState<RoomSummary[] | null>(null);
   const [composing, setComposing] = useState(false);

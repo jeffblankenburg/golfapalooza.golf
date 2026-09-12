@@ -119,6 +119,7 @@ export default function NotificationDrawer({
             name: target,
             room: u.searchParams.get("room") ?? undefined,
             photo: u.searchParams.get("photo") ?? undefined,
+            msg: u.searchParams.get("msg") ?? undefined,
           },
         }),
       );

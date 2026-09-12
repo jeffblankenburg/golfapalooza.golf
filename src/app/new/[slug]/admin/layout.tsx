@@ -47,8 +47,8 @@ export default async function AdminLayout({
       </header>
 
       {/* Nav is fixed (56px, out of flow); .page adds 40px of its own top
-          padding, so a small pad here lands the content just below the nav. */}
-      <main style={{ paddingTop: 20 }}>{children}</main>
+          padding, so this pad lands the back link a comfortable gap below it. */}
+      <main style={{ paddingTop: 40 }}>{children}</main>
     </>
   );
 }

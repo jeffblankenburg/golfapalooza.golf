@@ -293,7 +293,7 @@ export default function EventShell({
           {chatEnabled && (
             <span className={styles.bellWrap}>
               <TopIcon label="Chat" active={open === "chat"} onClick={() => toggle("chat")}>
-                <path d="M8 10h8M8 14h5M21 12a8 8 0 01-11.5 7.2L3 21l1.8-6.5A8 8 0 1121 12z" />
+                <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </TopIcon>
               {chatUnread > 0 && (
                 <span className={styles.bellBadge}>{chatUnread > 99 ? "99+" : chatUnread}</span>
@@ -302,16 +302,12 @@ export default function EventShell({
           )}
           {photosEnabled && (
             <TopIcon label="Photos" active={open === "photos"} onClick={() => toggle("photos")}>
-              <rect x="3" y="5" width="18" height="14" rx="2" />
-              <circle cx="8.5" cy="10" r="1.5" />
-              <path d="M21 16l-5-5-9 8" />
+              <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </TopIcon>
           )}
           {musicEnabled && (
             <TopIcon label="Music" active={music.isDrawerExpanded} onClick={() => music.toggleDrawer()}>
-              <path d="M9 18V6l10-2v12" />
-              <circle cx="6" cy="18" r="3" />
-              <circle cx="16" cy="16" r="3" />
+              <path d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
             </TopIcon>
           )}
           <TopIcon label="Rounds" active={open === "rounds"} onClick={() => toggle("rounds")}>
@@ -321,7 +317,7 @@ export default function EventShell({
           </TopIcon>
           <span className={styles.bellWrap}>
             <TopIcon label="Notifications" active={open === "notifications"} onClick={() => toggle("notifications")}>
-              <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0" />
+              <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </TopIcon>
             {unread > 0 && (
               <span className={styles.bellBadge}>{unread > 99 ? "99+" : unread}</span>
@@ -507,7 +503,7 @@ function TopIcon({
       aria-label={label}
       aria-pressed={active}
     >
-      <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden>
+      <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden>
         {children}
       </svg>
     </button>

@@ -166,8 +166,8 @@ export default function CourseManager({ courseId, onCourseChanged }: { courseId:
       )}
 
       {mapHole && course && (
-        <div className="fixed inset-0 z-[70] bg-black">
-          <HoleMapEditor
+        <HoleMapEditor
+            key={mapHole.id}
             holeNumber={mapHole.hole_number}
             courseId={courseId}
             courseLatitude={course.latitude}
@@ -176,6 +176,8 @@ export default function CourseManager({ courseId, onCourseChanged }: { courseId:
             courseName={course.name}
             courseCity={course.city}
             courseState={course.state}
+            teeName={tees.find((t) => t.id === selectedTeeId)?.tee_name}
+            teeColor={tees.find((t) => t.id === selectedTeeId)?.tee_color}
             previousHoleGreen={(() => {
               const prev = holes.find((h) => h.hole_number === mapHole.hole_number - 1);
               return prev && prev.green_latitude != null && prev.green_longitude != null
@@ -198,9 +200,26 @@ export default function CourseManager({ courseId, onCourseChanged }: { courseId:
               });
               if (res.ok) { setMapHole(null); await reload(selectedTeeId); flash("Map saved"); onCourseChanged?.(); }
             }}
+            onSaveNext={
+              holes.some((h) => h.hole_number === mapHole.hole_number + 1)
+                ? async (coords) => {
+                    const res = await fetch(`/api/v2/courses/holes/coordinates`, {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ hole_id: mapHole.id, ...coords }),
+                    });
+                    if (res.ok) {
+                      const next = holes.find((h) => h.hole_number === mapHole.hole_number + 1) || null;
+                      setMapHole(next);
+                      await reload(selectedTeeId);
+                      flash("Saved");
+                      onCourseChanged?.();
+                    }
+                  }
+                : undefined
+            }
             onClose={() => setMapHole(null)}
           />
-        </div>
       )}
 
       <ConfirmModal
@@ -336,29 +355,53 @@ function TeeRow({ tee, isComp, eligible, mappingArr, onSave, onDelete, onChanged
   // Reset local edits when the tee prop identity changes (after a reload).
   const [seen, setSeen] = useState(tee);
   if (seen !== tee) { setSeen(tee); setT(tee); }
-  const cls = getTeeColorClasses(t.tee_color);
   const input = "w-full px-2 py-1.5 border border-gray-300 rounded text-sm";
+  // Summary reflects saved values (props); the body edits local state.
+  const sumCls = getTeeColorClasses(tee.tee_color);
+  const dotStyle = (c: ReturnType<typeof getTeeColorClasses>) =>
+    c.isGradient ? { background: c.gradientHex! } : c.hex ? { background: c.hex } : undefined;
+
   return (
-    <div className="border border-gray-200 rounded-xl p-3 bg-white">
-      <div className="flex items-center gap-2 mb-2">
-        <span className={`w-5 h-5 rounded-full ${cls.bg}`} style={cls.isGradient ? { background: cls.gradientHex! } : cls.hex ? { background: cls.hex } : undefined} />
-        <input value={t.tee_name} onChange={(e) => setT({ ...t, tee_name: e.target.value })} className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm font-medium" />
-        {canDelete && <button type="button" onClick={() => onDelete(tee)} className="text-xs text-red-600 font-medium">Delete</button>}
+    <details className="group border border-gray-200 rounded-xl bg-white">
+      <summary className="flex items-center gap-2 p-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+        <span className={`w-4 h-4 shrink-0 rounded-full ${sumCls.bg}`} style={dotStyle(sumCls)} />
+        <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
+          {tee.tee_name}
+          {isComp && <span className="ml-1.5 text-[0.6rem] uppercase tracking-wide text-gray-400">Hybrid</span>}
+        </span>
+        <span className="text-xs text-gray-500 whitespace-nowrap">Par {tee.par}</span>
+        <span className="text-xs text-gray-400 whitespace-nowrap">{tee.course_rating ?? "—"} / {tee.slope_rating ?? "—"}</span>
+        <svg className="w-4 h-4 shrink-0 text-gray-400 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </summary>
+
+      <div className="border-t border-gray-100 px-3 pb-3 pt-3">
+        <div className="mb-2">
+          <label className="block text-[0.65rem] text-gray-500">Tee name</label>
+          <input value={t.tee_name} onChange={(e) => setT({ ...t, tee_name: e.target.value })} className={input} />
+        </div>
+        <div className="mb-2">
+          <label className="block text-[0.65rem] text-gray-500 mb-1">Color</label>
+          <div className="flex flex-wrap gap-1.5">
+            {TEE_COLOR_OPTIONS.map((c) => (
+              <button key={c.value} type="button" title={c.label} onClick={() => setT({ ...t, tee_color: c.value })}
+                className={`w-6 h-6 rounded-full ${c.bg} ${t.tee_color === c.value ? "ring-2 ring-green-500 ring-offset-1" : ""}`} />
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <div><label className="block text-[0.65rem] text-gray-500">Par</label><input type="number" className={input} value={t.par} onChange={(e) => setT({ ...t, par: parseInt(e.target.value) || 0 })} /></div>
+          <div><label className="block text-[0.65rem] text-gray-500">Rating</label><input type="number" step="0.1" className={input} value={t.course_rating ?? ""} onChange={(e) => setT({ ...t, course_rating: e.target.value ? parseFloat(e.target.value) : null })} /></div>
+          <div><label className="block text-[0.65rem] text-gray-500">Slope</label><input type="number" className={input} value={t.slope_rating ?? ""} onChange={(e) => setT({ ...t, slope_rating: e.target.value ? parseInt(e.target.value) : null })} /></div>
+        </div>
+        <div className="mt-3 flex items-center gap-4">
+          <button type="button" onClick={() => onSave(t)} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold">Save tee</button>
+          {canDelete && <button type="button" onClick={() => onDelete(tee)} className="text-sm font-medium text-red-600">Delete</button>}
+        </div>
+        <CompositionEditor tee={tee} isComp={isComp} eligible={eligible} mappingArr={mappingArr} onChanged={onChanged} />
       </div>
-      <div className="flex flex-wrap gap-1.5 mb-2">
-        {TEE_COLOR_OPTIONS.map((c) => (
-          <button key={c.value} type="button" title={c.label} onClick={() => setT({ ...t, tee_color: c.value })}
-            className={`w-6 h-6 rounded-full ${c.bg} ${t.tee_color === c.value ? "ring-2 ring-green-500 ring-offset-1" : ""}`} />
-        ))}
-      </div>
-      <div className="grid grid-cols-3 gap-2">
-        <div><label className="block text-[0.65rem] text-gray-500">Par</label><input type="number" className={input} value={t.par} onChange={(e) => setT({ ...t, par: parseInt(e.target.value) || 0 })} /></div>
-        <div><label className="block text-[0.65rem] text-gray-500">Rating</label><input type="number" step="0.1" className={input} value={t.course_rating ?? ""} onChange={(e) => setT({ ...t, course_rating: e.target.value ? parseFloat(e.target.value) : null })} /></div>
-        <div><label className="block text-[0.65rem] text-gray-500">Slope</label><input type="number" className={input} value={t.slope_rating ?? ""} onChange={(e) => setT({ ...t, slope_rating: e.target.value ? parseInt(e.target.value) : null })} /></div>
-      </div>
-      <button type="button" onClick={() => onSave(t)} className="mt-2 text-sm font-semibold text-green-700">Save tee</button>
-      <CompositionEditor tee={tee} isComp={isComp} eligible={eligible} mappingArr={mappingArr} onChanged={onChanged} />
-    </div>
+    </details>
   );
 }
 

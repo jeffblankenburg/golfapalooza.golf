@@ -7,7 +7,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatCourseName } from "@/lib/v2/course-display";
-import { DragHandle } from "@/components/v2/DragHandle";
 
 // Loading-state phrases. Cycled through randomly while the cascade runs.
 // Mostly golf, with a generous helping of Caddyshack / Happy Gilmore /
@@ -270,12 +269,18 @@ export default function CourseLookupModal({ initialName = "", onClose, onCourseR
     <div className="fixed top-14 bottom-16 left-0 right-0 z-35 flex items-end justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up max-h-full flex flex-col">
-        <div className="px-6 pt-3 pb-3 border-b border-gray-100">
-          <DragHandle onClose={onClose} className="mb-3" />
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-gray-900">Add a New Course</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
-          </div>
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-900 truncate">Add a New Course</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-gray-500 active:bg-gray-100"
+          >
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         {phase === "input" && (

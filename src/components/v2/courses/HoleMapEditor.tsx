@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { DragHandle } from "@/components/v2/DragHandle";
+import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import { CourseHelpDrawer } from "@/components/v2/courses/CourseHelpDrawer";
 import { computeIdealDriveDefault } from "@/lib/v2/courses/mapped-status";
+import { getTeeColorClasses } from "@/lib/v2/tee-colors";
 
 interface Coordinates {
   tee_latitude: number | null;
@@ -43,11 +44,17 @@ interface HoleMapEditorProps {
   courseName: string | null;
   courseCity: string | null;
   courseState: string | null;
+  /** The tee being edited — shown in the header so it's clear which set of tees
+   *  this hole's markers belong to (the tee picker is hidden behind the drawer). */
+  teeName?: string;
+  teeColor?: string | null;
   /** Previous hole's green coordinates, used as a smarter starting center
    *  when the current hole has no markers placed yet. */
   previousHoleGreen?: [number, number] | null;
   coordinates: Coordinates;
   onSave: (coords: Coordinates) => void;
+  /** Present only when there's a next hole — save these markers, then advance. */
+  onSaveNext?: (coords: Coordinates) => void;
   onClose: () => void;
 }
 
@@ -72,6 +79,13 @@ function calcYards(a: [number, number], b: [number, number]): number {
   return Math.round(meters * 1.09361);
 }
 
+type PlaceKind = "tee" | "green" | "drive" | "green_front" | "green_back";
+const PLACE_TONES = {
+  tee: { active: "bg-blue-600 text-white", ring: "ring-blue-300", set: "bg-blue-50 text-blue-700 border border-blue-200" },
+  drive: { active: "bg-amber-500 text-white", ring: "ring-amber-300", set: "bg-amber-50 text-amber-700 border border-amber-200" },
+  green: { active: "bg-green-600 text-white", ring: "ring-green-300", set: "bg-green-50 text-green-700 border border-green-200" },
+};
+
 export default function HoleMapEditor({
   holeNumber,
   courseId,
@@ -81,9 +95,12 @@ export default function HoleMapEditor({
   courseName,
   courseCity,
   courseState,
+  teeName,
+  teeColor,
   previousHoleGreen,
   coordinates,
   onSave,
+  onSaveNext,
   onClose,
 }: HoleMapEditorProps) {
   const [placing, setPlacing] = useState<"tee" | "green" | "drive" | "green_front" | "green_back" | "center_line" | null>(null);
@@ -131,6 +148,7 @@ export default function HoleMapEditor({
   placingRef.current = placing;
 
   const [helpOpen, setHelpOpen] = useState(false);
+  const [showDiscard, setShowDiscard] = useState(false);
 
   // Issue #133. When no ideal-drive point has been saved yet but we know
   // the tee and green positions, render a "ghost" hint at the 250-yd
@@ -369,8 +387,8 @@ export default function HoleMapEditor({
     };
   }, [ghostDrive, drive]);
 
-  function handleSave() {
-    onSave({
+  function collectCoords(): Coordinates {
+    return {
       tee_latitude: tee ? tee[0] : null,
       tee_longitude: tee ? tee[1] : null,
       green_latitude: green ? green[0] : null,
@@ -382,8 +400,47 @@ export default function HoleMapEditor({
       green_back_latitude: greenBack ? greenBack[0] : null,
       green_back_longitude: greenBack ? greenBack[1] : null,
       center_line: centerLine.length > 0 ? centerLine : null,
-    });
+    };
   }
+  function handleSave() { onSave(collectCoords()); }
+  function handleSaveNext() { onSaveNext?.(collectCoords()); }
+
+  // Which markers differ from what we opened with (for the discard warning).
+  function changedPoints(): string[] {
+    const c = coordinates;
+    const rows: [string, [number | null, number | null], [number | null, number | null]][] = [
+      ["Tee", [tee?.[0] ?? null, tee?.[1] ?? null], [c.tee_latitude, c.tee_longitude]],
+      ["Green Center", [green?.[0] ?? null, green?.[1] ?? null], [c.green_latitude, c.green_longitude]],
+      ["Green Front", [greenFront?.[0] ?? null, greenFront?.[1] ?? null], [c.green_front_latitude, c.green_front_longitude]],
+      ["Green Back", [greenBack?.[0] ?? null, greenBack?.[1] ?? null], [c.green_back_latitude, c.green_back_longitude]],
+      ["Drive", [drive?.[0] ?? null, drive?.[1] ?? null], [c.drive_latitude, c.drive_longitude]],
+    ];
+    const out: string[] = [];
+    for (const [label, cur, init] of rows) {
+      const hasCur = cur[0] != null && cur[1] != null;
+      const hadInit = init[0] != null && init[1] != null;
+      if (hasCur && !hadInit) out.push(`${label} added`);
+      else if (!hasCur && hadInit) out.push(`${label} removed`);
+      else if (hasCur && hadInit && (cur[0] !== init[0] || cur[1] !== init[1])) out.push(`${label} moved`);
+    }
+    return out;
+  }
+  function attemptClose() {
+    if (changedPoints().length > 0) setShowDiscard(true);
+    else onClose();
+  }
+
+  const placeBtn = (kind: PlaceKind, label: string, isSet: boolean, tone: typeof PLACE_TONES.tee, small = false) => (
+    <button
+      type="button"
+      onClick={() => setPlacing(placing === kind ? null : kind)}
+      className={`flex-1 rounded-xl font-semibold transition-colors ${small ? "py-1.5 text-xs" : "py-2 text-sm"} ${
+        placing === kind ? `${tone.active} ring-2 ${tone.ring}` : isSet ? tone.set : "bg-gray-100 text-gray-600"
+      }`}
+    >
+      {placing === kind ? "Tap map…" : label}
+    </button>
+  );
 
   function handleClear() {
     setTee(null);
@@ -412,93 +469,54 @@ export default function HoleMapEditor({
 
   return (
     <div className="fixed top-14 left-0 right-0 z-50 flex items-end justify-center bottom-[calc(4rem+env(safe-area-inset-bottom))]">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50" onClick={attemptClose} />
       <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up flex flex-col" style={{ maxHeight: "90vh" }}>
-        <div className="px-6 pt-5 pb-3 border-b border-gray-100 shrink-0">
-          <DragHandle onClose={onClose} className="mb-4" />
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h2 className="text-xl font-bold text-gray-900">Hole {holeNumber} Map</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                Tap a button, then tap the map to place the marker.
-              </p>
-            </div>
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <h2 className="text-lg font-semibold text-gray-900 whitespace-nowrap shrink-0">Hole {holeNumber} Map</h2>
+            {teeName && (() => {
+              const tc = getTeeColorClasses(teeColor ?? null);
+              return (
+                <span className="flex items-center gap-1.5 min-w-0 text-xs text-gray-500">
+                  <span className={`inline-block w-2.5 h-2.5 shrink-0 rounded-full ${tc.bg}`}
+                    style={tc.isGradient ? { background: tc.gradientHex! } : tc.hex ? { background: tc.hex } : undefined} />
+                  <span className="truncate">{teeName} tees</span>
+                </span>
+              );
+            })()}
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
             <button
               type="button"
               onClick={() => setHelpOpen(true)}
               aria-label="How to map this hole"
-              className="shrink-0 w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 active:bg-gray-100"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 active:bg-gray-100"
             >
               <span className="text-base font-semibold">?</span>
+            </button>
+            <button
+              type="button"
+              onClick={attemptClose}
+              aria-label="Close"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 active:bg-gray-100"
+            >
+              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
         </div>
 
         <div className="px-6 py-3 border-b border-gray-100 shrink-0">
+          {/* Top row: Tee + Drive. Bottom row: the three green points. */}
           <div className="flex gap-2">
-            <button
-              onClick={() => setPlacing(placing === "tee" ? null : "tee")}
-              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-colors ${
-                placing === "tee"
-                  ? "bg-blue-600 text-white ring-2 ring-blue-300"
-                  : tee
-                    ? "bg-blue-50 text-blue-700 border border-blue-200"
-                    : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              {placing === "tee" ? "Tap map..." : tee ? "Move Tee" : "Place Tee"}
-            </button>
-            <button
-              onClick={() => setPlacing(placing === "green" ? null : "green")}
-              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-colors ${
-                placing === "green"
-                  ? "bg-green-600 text-white ring-2 ring-green-300"
-                  : green
-                    ? "bg-green-50 text-green-700 border border-green-200"
-                    : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              {placing === "green" ? "Tap map..." : green ? "Move Green" : "Place Green"}
-            </button>
-            <button
-              onClick={() => setPlacing(placing === "drive" ? null : "drive")}
-              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-colors ${
-                placing === "drive"
-                  ? "bg-amber-500 text-white ring-2 ring-amber-300"
-                  : drive
-                    ? "bg-amber-50 text-amber-700 border border-amber-200"
-                    : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              {placing === "drive" ? "Tap map..." : drive ? "Move Drive" : "Place Drive"}
-            </button>
+            {placeBtn("tee", "Tee", !!tee, PLACE_TONES.tee)}
+            {placeBtn("drive", "Drive", !!drive, PLACE_TONES.drive)}
           </div>
-          {/* Green front/back buttons */}
           <div className="flex gap-2 mt-2">
-            <button
-              onClick={() => setPlacing(placing === "green_front" ? null : "green_front")}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                placing === "green_front"
-                  ? "bg-green-600 text-white ring-2 ring-green-300"
-                  : greenFront
-                    ? "bg-green-50 text-green-700 border border-green-200"
-                    : "bg-gray-100 text-gray-500"
-              }`}
-            >
-              {placing === "green_front" ? "Tap map..." : greenFront ? "Move Front" : "Green Front"}
-            </button>
-            <button
-              onClick={() => setPlacing(placing === "green_back" ? null : "green_back")}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                placing === "green_back"
-                  ? "bg-green-600 text-white ring-2 ring-green-300"
-                  : greenBack
-                    ? "bg-green-50 text-green-700 border border-green-200"
-                    : "bg-gray-100 text-gray-500"
-              }`}
-            >
-              {placing === "green_back" ? "Tap map..." : greenBack ? "Move Back" : "Green Back"}
-            </button>
+            {placeBtn("green_front", "Green Front", !!greenFront, PLACE_TONES.green, true)}
+            {placeBtn("green", "Green Center", !!green, PLACE_TONES.green, true)}
+            {placeBtn("green_back", "Green Back", !!greenBack, PLACE_TONES.green, true)}
           </div>
           {/* Center-line UI intentionally hidden — issue #133 follow-up.
               Existing center_line data still round-trips through save and
@@ -522,24 +540,53 @@ export default function HoleMapEditor({
           />
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 flex gap-2 shrink-0">
-          <button
-            onClick={handleSave}
-            className="flex-1 py-3 bg-green-600 text-white rounded-xl font-semibold active:opacity-80"
-          >
-            Save Markers
-          </button>
-          {(tee || green || drive) && (
+        <div className="px-6 py-4 border-t border-gray-100 flex flex-col gap-2 shrink-0">
+          {onSaveNext && (
             <button
-              onClick={handleClear}
-              className="px-4 py-3 border border-gray-300 rounded-xl font-semibold text-gray-600 active:bg-gray-50"
+              onClick={handleSaveNext}
+              className="w-full py-3 bg-green-600 text-white rounded-xl font-semibold active:opacity-80"
             >
-              Clear
+              Save &amp; Next Hole
             </button>
           )}
+          <div className="flex gap-2">
+            <button
+              onClick={handleSave}
+              className={`flex-1 py-3 rounded-xl font-semibold active:opacity-80 ${
+                onSaveNext ? "bg-green-50 text-green-700 border border-green-200" : "bg-green-600 text-white"
+              }`}
+            >
+              Save &amp; Close
+            </button>
+            {(tee || green || drive) && (
+              <button
+                onClick={handleClear}
+                className="px-4 py-3 border border-gray-300 rounded-xl font-semibold text-gray-600 active:bg-gray-50"
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
       </div>
       <CourseHelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <ConfirmModal
+        open={showDiscard}
+        title="Discard map changes?"
+        message={
+          <>
+            These won&apos;t be saved:
+            <ul className="mt-1.5 list-disc pl-5 space-y-0.5">
+              {changedPoints().map((c) => <li key={c}>{c}</li>)}
+            </ul>
+          </>
+        }
+        confirmLabel="Discard"
+        cancelLabel="Keep editing"
+        destructive
+        onConfirm={() => { setShowDiscard(false); onClose(); }}
+        onCancel={() => setShowDiscard(false)}
+      />
     </div>
   );
 }

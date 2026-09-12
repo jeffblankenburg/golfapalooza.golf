@@ -63,15 +63,6 @@ function mediaStamp(s: string, now = new Date()): string {
 }
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
 
-// Inline close handle for the bottom sheets (avoids importing legacy DragHandle).
-function SheetHandle({ onClose }: { onClose: () => void }) {
-  return (
-    <button type="button" onClick={onClose} aria-label="Close" className="block w-full py-2">
-      <span className="block w-10 h-1 bg-gray-300 rounded-full mx-auto" />
-    </button>
-  );
-}
-
 // ─── MediaPanel: a single photo (pinch-zoom) or video ────────────────────────
 
 function MediaPanel({
@@ -401,13 +392,12 @@ function CommentsSheet({ itemId, onClose, onCountChange }: { itemId: string; onC
   return (
     <div className="absolute inset-0 z-20 flex flex-col justify-end" onClick={onClose}>
       <div className="bg-white rounded-t-2xl max-h-[60vh] flex flex-col animate-slide-up" onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-center pt-1">
-          <SheetHandle onClose={onClose} />
-        </div>
-        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
-          <h3 className="text-base font-bold text-gray-900">Comments</h3>
-          <button onClick={onClose} className="text-sm font-semibold text-gray-500 px-2 py-1">
-            Close
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-900 truncate">Comments</h3>
+          <button onClick={onClose} aria-label="Close" className="w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-gray-500 active:bg-gray-100">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
@@ -530,13 +520,12 @@ function TagSheet({
         className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl animate-slide-up max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-center pt-1">
-          <SheetHandle onClose={onClose} />
-        </div>
-        <div className="flex items-center justify-between px-4 pb-3">
-          <h2 className="text-lg font-bold text-gray-900">Tag Loozers</h2>
-          <button onClick={onClose} className="text-gray-500 text-sm font-medium">
-            Skip
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-900 truncate">Tag Loozers</h2>
+          <button onClick={onClose} aria-label="Close" className="w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-gray-500 active:bg-gray-100">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
         <div className="px-4 pb-3">

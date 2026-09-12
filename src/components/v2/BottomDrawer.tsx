@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { DragHandle } from "@/components/v2/DragHandle";
 
 interface BottomDrawerProps {
   open: boolean;
@@ -35,25 +34,25 @@ export function BottomDrawer({ open, onClose, title, subtitle, children }: Botto
 
       {/* Drawer panel */}
       <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up max-h-[calc(100%-12px)] flex flex-col">
-        {/* Handle bar */}
-        <div className="px-6 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
-          <DragHandle onClose={onClose} className="mb-4" />
-          <div className="flex items-start justify-between">
-            {title ? (
-              <div className="min-w-0 flex-1">
-                <h2 className="text-xl font-bold text-gray-900 truncate">{title}</h2>
-                {subtitle && <p className="text-xs text-gray-500 truncate">{subtitle}</p>}
-              </div>
-            ) : (
-              <div className="flex-1" />
-            )}
-            <button
-              onClick={onClose}
-              className="ml-3 px-4 py-1.5 bg-green-600 text-white text-sm font-semibold rounded-lg active:bg-green-700 flex-shrink-0"
-            >
-              Done
-            </button>
-          </div>
+        {/* Compact header — matches the top-bar drawers (small title + X close). */}
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100 flex-shrink-0">
+          {title ? (
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg font-semibold text-gray-900 truncate">{title}</h2>
+              {subtitle && <p className="text-xs text-gray-500 truncate">{subtitle}</p>}
+            </div>
+          ) : (
+            <div className="flex-1" />
+          )}
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-gray-500 active:bg-gray-100"
+          >
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         {/* Scrollable content — pb-20 keeps content above the bottom nav */}

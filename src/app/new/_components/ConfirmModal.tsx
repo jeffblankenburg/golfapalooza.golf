@@ -20,7 +20,7 @@ export default function ConfirmModal({
 }: {
   open: boolean;
   title: string;
-  message?: string;
+  message?: React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   destructive?: boolean;
@@ -47,7 +47,7 @@ export default function ConfirmModal({
     <div className={styles.overlay} onClick={onCancel} role="dialog" aria-modal="true">
       <div className={styles.card} onClick={(e) => e.stopPropagation()}>
         <h2 className={styles.title}>{title}</h2>
-        {message && <p className={styles.message}>{message}</p>}
+        {message && <div className={styles.message}>{message}</div>}
         <div className={styles.actions}>
           <button type="button" className={styles.cancel} onClick={onCancel}>
             {cancelLabel}

@@ -40,7 +40,7 @@ export default async function AdminHub({
             { label: "Courses", desc: "Course library" },
             { label: "People", desc: "Bios & profiles" },
             { label: "Music", desc: "Jukebox library" },
-            { label: "Articles", desc: "News & posts" },
+            { label: "Articles", href: `/new/${slug}/admin/articles`, desc: "News & posts" },
             { label: "Announcements", desc: "Notify members" },
             { label: "Gallery", desc: "Photos & videos" },
             { label: "Chat", desc: "Rooms" },

@@ -13,6 +13,7 @@ interface CourseRow {
   city: string | null;
   state: string | null;
   website?: string | null;
+  phone?: string | null;
   updated_at?: string | null;
   mapped?: { set_points: number; total_points: number; fully_mapped_holes: number; total_holes: number };
   distance_mi?: number;
@@ -28,6 +29,8 @@ function externalUrl(raw: string): string {
 function CourseCard({ course, slug }: { course: CourseRow; slug: string }) {
   const subtitle = [course.city, course.state].filter(Boolean).join(", ");
   const website = course.website?.trim();
+  const phone = course.phone?.trim();
+  const phoneHref = phone ? `tel:${phone.replace(/[^0-9+]/g, "")}` : null;
   return (
     // Card is a div (not a Link) so the website link isn't a nested anchor.
     <div className="flex items-stretch justify-between gap-3 rounded-xl border border-gray-200 bg-white p-3">
@@ -48,20 +51,31 @@ function CourseCard({ course, slug }: { course: CourseRow; slug: string }) {
             totalHoles={course.mapped.total_holes}
           />
         )}
-        {website && (
-          <a
-            href={externalUrl(website)}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Course website (opens in a new tab)"
-            className="mt-auto text-gray-500 active:opacity-70"
-          >
-            <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden>
-              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-              <path d="M15 3h6v6" />
-              <path d="M10 14L21 3" />
-            </svg>
-          </a>
+        {(phoneHref || website) && (
+          <div className="mt-auto flex items-center gap-3 text-gray-500">
+            {phoneHref && (
+              <a href={phoneHref} aria-label="Call the course" className="active:opacity-70">
+                <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden>
+                  <path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6 19.8 19.8 0 01-3.1-8.7A2 2 0 014.1 2h3a2 2 0 012 1.7c.1.9.4 1.8.7 2.7a2 2 0 01-.5 2.1L8.1 9.9a16 16 0 006 6l1.4-1.2a2 2 0 012.1-.5c.9.3 1.8.6 2.7.7a2 2 0 011.7 2z" />
+                </svg>
+              </a>
+            )}
+            {website && (
+              <a
+                href={externalUrl(website)}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Course website (opens in a new tab)"
+                className="active:opacity-70"
+              >
+                <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden>
+                  <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                  <path d="M15 3h6v6" />
+                  <path d="M10 14L21 3" />
+                </svg>
+              </a>
+            )}
+          </div>
         )}
       </div>
     </div>

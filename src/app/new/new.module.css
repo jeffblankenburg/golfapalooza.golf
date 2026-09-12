@@ -2540,3 +2540,40 @@ button.feedRow:active {
   gap: 8px;
   margin-left: auto;
 }
+
+/* Member permissions editor (Members admin edit modal). */
+.permGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.permRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  cursor: pointer;
+}
+.permRow input {
+  margin-top: 2px;
+  flex: none;
+}
+.permText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.permLabel {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.permDesc {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  line-height: 1.3;
+}

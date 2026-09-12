@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
 import { cleanProfileFields, displayNameFrom } from "@/lib/v2/profile";
+import { cleanPermissions, type PermissionMap } from "@/lib/v2/permissions";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 async function guard(request: Request, orgId: string) {
@@ -49,6 +50,14 @@ export async function GET(
     )
     .eq("org_id", id)
     .order("role");
+
+  // Permissions read separately + best-effort so the roster still loads if the
+  // 00213 column isn't applied yet.
+  const permsByUser = new Map<string, Record<string, boolean>>();
+  const permsRes = await g.admin.from("v2_memberships").select("user_id, permissions").eq("org_id", id);
+  if (!permsRes.error) {
+    for (const r of permsRes.data || []) permsByUser.set(r.user_id, (r.permissions as Record<string, boolean>) || {});
+  }
   // Return the raw name parts so the client can sort/display per the org's
   // name-display mode (last-name vs nickname) and edit them in the modal.
   const members = (data || []).map((m) => {
@@ -70,6 +79,7 @@ export async function GET(
       nickname: p?.nickname ?? null,
       birthdate: p?.birthdate ?? null,
       avatar_url: p?.avatar_url || null,
+      permissions: permsByUser.get(m.user_id) ?? {},
     };
   });
   return NextResponse.json({ members });
@@ -92,15 +102,16 @@ export async function PATCH(
       nickname?: string | null;
       birthdate?: string | null;
     };
+    permissions?: PermissionMap;
   };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
-  const { user_id, role, profile } = body;
+  const { user_id, role, profile, permissions } = body;
   if (!user_id) return NextResponse.json({ error: "user_id is required" }, { status: 400 });
-  if (!role && !profile) {
+  if (!role && !profile && !permissions) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
 
@@ -149,6 +160,16 @@ export async function PATCH(
         updated_at: new Date().toISOString(),
       })
       .eq("id", user_id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Granular permission grants (caller is already guaranteed an org admin).
+  if (permissions) {
+    const { error } = await g.admin
+      .from("v2_memberships")
+      .update({ permissions: cleanPermissions(permissions) })
+      .eq("org_id", id)
+      .eq("user_id", user_id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

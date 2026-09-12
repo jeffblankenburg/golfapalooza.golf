@@ -5,6 +5,7 @@ import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import Modal from "@/app/new/_components/Modal";
 import { formatPhone } from "@/lib/v2/phone";
 import type { NameMode } from "@/lib/v2/profile";
+import { PERMISSION_GROUPS, type PermissionMap } from "@/lib/v2/permissions";
 import styles from "@/app/new/new.module.css";
 
 interface Member {
@@ -17,6 +18,7 @@ interface Member {
   nickname: string | null;
   birthdate: string | null;
   avatar_url: string | null;
+  permissions: PermissionMap;
 }
 interface Invite {
   id: string;
@@ -90,6 +92,7 @@ export default function MembersManager({
   const [eNick, setENick] = useState("");
   const [eBday, setEBday] = useState("");
   const [eRole, setERole] = useState<"owner" | "admin" | "member">("member");
+  const [ePerms, setEPerms] = useState<PermissionMap>({});
   const [eBusy, setEBusy] = useState(false);
   const [eError, setEError] = useState<string | null>(null);
 
@@ -142,6 +145,7 @@ export default function MembersManager({
     setENick(m.nickname || "");
     setEBday(m.birthdate || "");
     setERole(m.role);
+    setEPerms(m.permissions || {});
     setEError(null);
   }
 
@@ -156,6 +160,7 @@ export default function MembersManager({
       user_id: string;
       role?: string;
       profile: { first_name: string; last_name: string; nickname: string; birthdate: string | null };
+      permissions?: PermissionMap;
     } = {
       user_id: editing.user_id,
       profile: {
@@ -166,6 +171,8 @@ export default function MembersManager({
       },
     };
     if (canManage && eRole !== editing.role) body.role = eRole;
+    // Only a plain member carries explicit grants; owners/admins have all.
+    if (canManage && eRole === "member") body.permissions = ePerms;
     const res = await fetch(`/api/v2/orgs/${orgId}/members`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -391,6 +398,42 @@ export default function MembersManager({
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {editingCanManage && (
+            <div className={styles.field}>
+              <label className={styles.label}>Permissions</label>
+              {eRole !== "member" ? (
+                <p className={styles.swatchHint}>
+                  {eRole === "owner" ? "Owners" : "Admins"} have full access to everything in this group.
+                </p>
+              ) : (
+                <>
+                  <p className={styles.swatchHint}>
+                    Give this member access to specific tools without making them an admin.
+                  </p>
+                  {PERMISSION_GROUPS.map((grp) => (
+                    <div key={grp.key} className={styles.permGroup}>
+                      {grp.items.map((perm) => (
+                        <label key={perm.key} className={styles.permRow}>
+                          <input
+                            type="checkbox"
+                            checked={!!ePerms[perm.key]}
+                            onChange={(ev) =>
+                              setEPerms((p) => ({ ...p, [perm.key]: ev.target.checked }))
+                            }
+                          />
+                          <span className={styles.permText}>
+                            <span className={styles.permLabel}>{perm.label}</span>
+                            <span className={styles.permDesc}>{perm.description}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           )}
           {eError && <p className={styles.formError}>{eError}</p>}

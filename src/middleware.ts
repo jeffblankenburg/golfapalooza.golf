@@ -14,6 +14,9 @@ export const config = {
      * - favicon.ico (favicon file)
      * - public folder
      */
-    "/((?!_next/static|_next/image|favicon.ico|sw\\.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|json)$).*)",
+    // Also skip the public per-org PWA manifest + icon routes so browsers can
+    // fetch them uncredentialed without hitting the auth redirect. (New /new
+    // sub-paths only — original routes are unaffected.)
+    "/((?!_next/static|_next/image|favicon.ico|sw\\.js|new/[^/]+/icon$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|json|webmanifest)$).*)",
   ],
 };

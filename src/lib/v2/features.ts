@@ -97,7 +97,7 @@ export const FEATURE_CATALOG: FeatureDef[] = [
 
   // ── Schedule & Logistics (mostly per event) ──────────────────────────────
   { key: "schedule", label: "Schedule", bucket: "schedule", scope: "event", icon: "calendar", status: "planned", surface: "route", blurb: "The event itinerary." },
-  { key: "courses", label: "Courses", bucket: "schedule", scope: "group", icon: "map", status: "planned", surface: "route", blurb: "Course library & scorecards." },
+  { key: "courses", label: "Courses", bucket: "schedule", scope: "group", icon: "map", status: "available", surface: "route", blurb: "Course library & scorecards." },
   { key: "rooms", label: "Rooms", bucket: "schedule", scope: "event", icon: "bed", status: "planned", surface: "route", blurb: "Lodging & room assignments." },
   { key: "trip_info", label: "Trip Info", bucket: "schedule", scope: "event", icon: "info", status: "planned", surface: "route", blurb: "Logistics, links & the essentials." },
   { key: "shirt_guide", label: "Shirt Guide", bucket: "schedule", scope: "event", icon: "shirt", status: "planned", surface: "route", blurb: "What to wear each day." },
@@ -290,6 +290,7 @@ export const MAX_PINNED = 3;
  */
 const FEATURE_ROUTES: Record<string, (slug: string) => string> = {
   articles: (slug) => `/new/${slug}/articles`,
+  courses: (slug) => `/new/${slug}/courses`,
 };
 
 export function featureHref(slug: string, def: FeatureDef): string | null {

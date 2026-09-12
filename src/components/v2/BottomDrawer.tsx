@@ -30,7 +30,7 @@ export function BottomDrawer({ open, onClose, title, subtitle, children }: Botto
       className="fixed top-14 bottom-0 left-0 right-0 z-35 flex items-end justify-center"
     >
       {/* Overlay — fills the constrained area */}
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-[#17211d]/20 backdrop-blur-[6px]" onClick={onClose} />
 
       {/* Drawer panel */}
       <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up max-h-[calc(100%-12px)] flex flex-col">

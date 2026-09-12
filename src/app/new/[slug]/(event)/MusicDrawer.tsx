@@ -76,7 +76,7 @@ export default function MusicDrawer() {
       <div
         onClick={collapseDrawer}
         aria-hidden="true"
-        className={`fixed left-0 right-0 top-[56px] bottom-[calc(60px+env(safe-area-inset-bottom,0px))] z-[50] bg-black/35 transition-opacity duration-200 ${
+        className={`fixed left-0 right-0 top-[56px] bottom-[calc(60px+env(safe-area-inset-bottom,0px))] z-[50] bg-[#17211d]/20 backdrop-blur-[6px] transition-opacity duration-200 ${
           isDrawerExpanded ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       />

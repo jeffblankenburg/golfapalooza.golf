@@ -469,7 +469,7 @@ export default function HoleMapEditor({
 
   return (
     <div className="fixed top-14 left-0 right-0 z-50 flex items-end justify-center bottom-[calc(4rem+env(safe-area-inset-bottom))]">
-      <div className="absolute inset-0 bg-black/50" onClick={attemptClose} />
+      <div className="absolute inset-0 bg-[#17211d]/20 backdrop-blur-[6px]" onClick={attemptClose} />
       <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up flex flex-col" style={{ maxHeight: "90vh" }}>
         <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-2 min-w-0">

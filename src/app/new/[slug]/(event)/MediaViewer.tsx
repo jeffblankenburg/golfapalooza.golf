@@ -862,6 +862,12 @@ export default function MediaViewer({
           80% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
           100% { transform: translate(-50%, -60%) scale(1); opacity: 0; }
         }
+        /* Prev/next pads: only on devices with a real pointer (desktop/trackpad);
+           touch devices navigate by swiping. */
+        .mv-navpad { display: none; }
+        @media (hover: hover) and (pointer: fine) {
+          .mv-navpad { display: flex; }
+        }
       `}</style>
 
       <div
@@ -894,6 +900,32 @@ export default function MediaViewer({
           ))}
         </div>
       </div>
+
+      {/* Desktop prev/next pads (swipe is touch-only). Hidden at the ends. */}
+      {!isZoomed && currentIndex > 0 && (
+        <button
+          type="button"
+          className="mv-navpad absolute left-3 top-1/2 -translate-y-1/2 z-20 w-11 h-11 items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
+          onClick={() => goTo(currentIndex - 1)}
+          aria-label="Previous photo"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+      )}
+      {!isZoomed && currentIndex < list.length - 1 && (
+        <button
+          type="button"
+          className="mv-navpad absolute right-3 top-1/2 -translate-y-1/2 z-20 w-11 h-11 items-center justify-center rounded-full bg-black/40 text-white hover:bg-black/60 transition-colors"
+          onClick={() => goTo(currentIndex + 1)}
+          aria-label="Next photo"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      )}
 
       {heartAnimations.map((h) => (
         <div

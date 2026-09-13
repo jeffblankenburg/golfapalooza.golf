@@ -12,7 +12,7 @@ import { isOrgMember } from "@/lib/v2/orgs";
  */
 const PAGE = 24;
 const ITEM_SELECT =
-  "id, uploader_id, media_url, thumbnail_url, media_type, caption, width, height, taken_at, created_at, sort_date, uploader:v2_profiles!v2_gallery_items_uploader_id_fkey(display_name, first_name, last_name, avatar_url), reactions:v2_gallery_reactions(emoji, user_id), tags:v2_gallery_tags(tagged_user_id), comments:v2_gallery_comments(count)";
+  "id, uploader_id, media_url, thumbnail_url, media_type, caption, width, height, taken_at, created_at, sort_date, bulk_id, uploader:v2_profiles!v2_gallery_items_uploader_id_fkey(display_name, first_name, last_name, avatar_url), reactions:v2_gallery_reactions(emoji, user_id), tags:v2_gallery_tags(tagged_user_id), comments:v2_gallery_comments(count)";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);

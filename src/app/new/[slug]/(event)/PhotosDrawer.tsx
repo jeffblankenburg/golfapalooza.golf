@@ -29,6 +29,7 @@ interface Item {
   height: number | null;
   taken_at: string | null;
   created_at: string;
+  bulk_id: string | null;
   uploader: UploaderRef | UploaderRef[] | null;
   reactions: { emoji: string; user_id: string }[] | null;
   tags: { tagged_user_id: string }[] | null;
@@ -77,11 +78,13 @@ export default function PhotosDrawer({
   userId,
   isAdmin,
   initialPhotoId,
+  initialBulkId,
 }: {
   orgId: string;
   userId: string;
   isAdmin: boolean;
   initialPhotoId?: string;
+  initialBulkId?: string;
 }) {
   const [items, setItems] = useState<Item[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -95,8 +98,10 @@ export default function PhotosDrawer({
   const mode = useNameMode();
   const [allUsers, setAllUsers] = useState<ViewerUser[]>([]);
 
-  // Filters (mirror the original).
-  const [sort, setSort] = useState<Sort>("taken");
+  // Filters (mirror the original). Arriving from a photo-upload activity item
+  // (initialBulkId) defaults the sort to most-recently-uploaded so the batch is
+  // right at the top.
+  const [sort, setSort] = useState<Sort>(initialBulkId ? "uploaded" : "taken");
   const [year, setYear] = useState<string>("all");
   const [taggedIds, setTaggedIds] = useState<Set<string>>(new Set());
   const [showFilterUsers, setShowFilterUsers] = useState(false);
@@ -439,8 +444,16 @@ export default function PhotosDrawer({
       ) : (
         <div className={styles.scrollArea} onScroll={onScroll}>
           <div className={styles.grid}>
-            {items.map((it, i) => (
-              <button key={it.id} type="button" className={styles.cell} onClick={() => setViewIndex(i)}>
+            {items.map((it, i) => {
+              const highlighted = !!initialBulkId && it.bulk_id === initialBulkId;
+              return (
+              <button
+                key={it.id}
+                type="button"
+                className={styles.cell}
+                onClick={() => setViewIndex(i)}
+                style={highlighted ? { boxShadow: "inset 0 0 0 3px var(--brand)", borderRadius: 8 } : undefined}
+              >
                 <img src={it.thumbnail_url || it.media_url} alt="" loading="lazy" />
                 {it.media_type === "video" && (
                   <span className={styles.playBadge} aria-hidden>
@@ -450,7 +463,8 @@ export default function PhotosDrawer({
                   </span>
                 )}
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

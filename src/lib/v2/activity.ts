@@ -12,6 +12,7 @@ export interface ActivityRow {
   image_url: string | null;
   link: string | null;
   created_at: string;
+  ref_id: string | null;
   metadata: Record<string, unknown> | null;
   actor: {
     display_name: string;

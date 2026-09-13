@@ -12,7 +12,7 @@ import styles from "@/app/new/new.module.css";
 
 const FEED_LIMIT = 15;
 const SELECT =
-  "id, kind, title, subtitle, image_url, link, created_at, metadata, actor:v2_profiles(display_name, first_name, last_name, avatar_url)";
+  "id, kind, title, subtitle, image_url, link, created_at, ref_id, metadata, actor:v2_profiles(display_name, first_name, last_name, avatar_url)";
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -227,12 +227,16 @@ export default function ActivityFeed({
             );
           }
           if (drawer) {
+            // Photo rows carry the upload batch (ref_id) so the gallery opens
+            // sorted by most-recently-uploaded with that batch highlighted.
+            const detail =
+              drawer === "photos" && it.ref_id ? { name: drawer, bulk: it.ref_id } : { name: drawer };
             return (
               <button
                 key={it.id}
                 type="button"
                 className={styles.feedRow}
-                onClick={() => window.dispatchEvent(new CustomEvent("ui:open-drawer", { detail: { name: drawer } }))}
+                onClick={() => window.dispatchEvent(new CustomEvent("ui:open-drawer", { detail }))}
               >
                 {inner}
               </button>

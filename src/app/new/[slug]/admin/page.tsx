@@ -39,7 +39,7 @@ export default async function AdminHub({
             { label: "Settings", href: `/new/${slug}/admin/settings`, desc: "Name, logo, colors, domains" },
             { label: "Courses", desc: "Course library" },
             { label: "People", desc: "Bios & profiles" },
-            { label: "Music", desc: "Jukebox library" },
+            { label: "Music", href: `/new/${slug}/admin/music`, desc: "Jukebox library" },
             { label: "Articles", href: `/new/${slug}/admin/articles`, desc: "News & posts" },
             { label: "Announcements", href: `/new/${slug}/admin/announcements`, desc: "Notify members" },
             { label: "Gallery", desc: "Photos & videos" },

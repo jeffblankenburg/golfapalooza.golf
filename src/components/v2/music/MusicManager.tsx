@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import { pickName, type NameMode } from "@/lib/v2/profile";
 import styles from "@/app/new/new.module.css";
@@ -57,7 +56,7 @@ function readDuration(file: File): Promise<number | null> {
   });
 }
 
-export default function MusicManager({ orgId, nameMode, slug }: { orgId: string; nameMode: NameMode; slug: string }) {
+export default function MusicManager({ orgId, nameMode }: { orgId: string; nameMode: NameMode }) {
   const [songs, setSongs] = useState<Song[]>([]);
   const [members, setMembers] = useState<MemberLite[]>([]);
   const [loading, setLoading] = useState(true);
@@ -378,16 +377,11 @@ export default function MusicManager({ orgId, nameMode, slug }: { orgId: string;
     <>
       <div className={styles.titleRow}>
         <h1 className={styles.title}>Music</h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Link href={`/new/${slug}/admin/music/walkups`} className={styles.createBtnGhost} style={{ padding: "7px 13px" }}>
-            Walk-ups
-          </Link>
-          <button type="button" className={styles.circleAdd} aria-label="Add song" onClick={openNew}>
-            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14" />
-            </svg>
-          </button>
-        </div>
+        <button type="button" className={styles.circleAdd} aria-label="Add song" onClick={openNew}>
+          <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
       </div>
 
       <div className={styles.section}>

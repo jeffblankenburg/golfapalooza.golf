@@ -38,7 +38,7 @@ export default async function AdminMusicPage({
         </svg>
         Administration
       </Link>
-      <MusicManager orgId={org.id} nameMode={org.name_display} slug={slug} />
+      <MusicManager orgId={org.id} nameMode={org.name_display} />
     </div>
   );
 }

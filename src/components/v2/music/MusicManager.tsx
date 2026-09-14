@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import ReactMarkdown from "react-markdown";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
+import { BottomDrawer } from "@/components/v2/BottomDrawer";
+import { compressImage, generateThumbnail } from "@/lib/v2/gallery-compress";
 import { pickName, type NameMode } from "@/lib/v2/profile";
-import styles from "@/app/new/new.module.css";
 /* eslint-disable @next/next/no-img-element */
 
 interface TaggedUser {
@@ -33,53 +35,75 @@ interface MemberLite {
   last_name: string | null;
   nickname: string | null;
 }
-
-function fmtDuration(s: number | null): string {
-  if (!s || s <= 0) return "";
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
-  return `${m}:${sec.toString().padStart(2, "0")}`;
+interface PlayListener {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  count: number;
+  last_played_at: string;
 }
-
-/** Read an audio file's duration (seconds) client-side. */
-function readDuration(file: File): Promise<number | null> {
-  return new Promise((resolve) => {
-    const el = document.createElement("audio");
-    el.preload = "metadata";
-    el.onloadedmetadata = () => {
-      const d = el.duration;
-      URL.revokeObjectURL(el.src);
-      resolve(Number.isFinite(d) ? Math.round(d) : null);
-    };
-    el.onerror = () => resolve(null);
-    el.src = URL.createObjectURL(file);
-  });
+interface LikeListener {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  created_at: string;
 }
+interface Listeners {
+  plays: PlayListener[];
+  likes: LikeListener[];
+}
+type SortKey = "sort_order" | "title" | "plays" | "likes";
+type SortDir = "asc" | "desc";
 
 export default function MusicManager({ orgId, nameMode }: { orgId: string; nameMode: NameMode }) {
   const [songs, setSongs] = useState<Song[]>([]);
   const [members, setMembers] = useState<MemberLite[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<Song | "new" | null>(null);
-
-  // Editor fields.
-  const [title, setTitle] = useState("");
-  const [lyrics, setLyrics] = useState("");
-  const [taggedId, setTaggedId] = useState("");
-  const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [artFile, setArtFile] = useState<File | null>(null);
-  const [artPreview, setArtPreview] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const audioRef = useRef<HTMLInputElement>(null);
-  const artRef = useRef<HTMLInputElement>(null);
+
+  const [sortBy, setSortBy] = useState<SortKey>("sort_order");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+  const [touchPreview, setTouchPreview] = useState<{ name: string; y: number } | null>(null);
+  const touchCurrentIndex = useRef<number | null>(null);
+  const songListRef = useRef<HTMLDivElement>(null);
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editingSong, setEditingSong] = useState<Song | null>(null);
+  const [listenersBySong, setListenersBySong] = useState<Record<string, Listeners>>({});
+  const [listenersLoading, setListenersLoading] = useState<Record<string, boolean>>({});
+  const [confirmSong, setConfirmSong] = useState<Song | null>(null);
+
+  // Add form.
+  const [title, setTitle] = useState("");
+  const [taggedUserId, setTaggedUserId] = useState("");
+  const [lyrics, setLyrics] = useState("");
+  const [showLyricsPreview, setShowLyricsPreview] = useState(false);
+  const [durationSeconds, setDurationSeconds] = useState<number | null>(null);
+  const mp3InputRef = useRef<HTMLInputElement>(null);
+  const artInputRef = useRef<HTMLInputElement>(null);
+
+  // Edit form.
+  const [editTitle, setEditTitle] = useState("");
+  const [editLyrics, setEditLyrics] = useState("");
+  const [editTaggedUserId, setEditTaggedUserId] = useState("");
+  const [editShowPreview, setEditShowPreview] = useState(false);
+  const editArtInputRef = useRef<HTMLInputElement>(null);
 
   const fetchAll = useCallback(async () => {
-    const r = await fetch(`/api/v2/music?orgId=${orgId}&admin=1`);
-    return r.ok ? r.json() : { songs: [], members: [] };
+    const res = await fetch(`/api/v2/music?orgId=${orgId}&admin=1`);
+    if (!res.ok) return { songs: [] as Song[], members: [] as MemberLite[] };
+    return res.json();
   }, [orgId]);
+
+  const refreshSongs = useCallback(async () => {
+    const data = await fetchAll();
+    setSongs(data.songs || []);
+  }, [fetchAll]);
 
   useEffect(() => {
     let active = true;
@@ -95,348 +119,530 @@ export default function MusicManager({ orgId, nameMode }: { orgId: string; nameM
     };
   }, [fetchAll]);
 
-  const sortedMembers = useMemo(() => {
-    const key = (m: MemberLite) =>
-      (nameMode === "real"
-        ? (m.last_name || "").trim() || (m.first_name || "").trim() || m.display_name
-        : (m.nickname || "").trim() || m.display_name
-      ).toLowerCase();
-    return [...members].sort((a, b) => key(a).localeCompare(key(b)));
-  }, [members, nameMode]);
+  const memberName = useCallback((m: MemberLite) => pickName(m, nameMode), [nameMode]);
+  const sortedMembers = useMemo(
+    () => [...members].sort((a, b) => memberName(a).localeCompare(memberName(b))),
+    [members, memberName],
+  );
 
-  function resetEditor() {
-    setTitle("");
-    setLyrics("");
-    setTaggedId("");
-    setAudioFile(null);
-    setArtFile(null);
-    setArtPreview(null);
-    setError(null);
-    setProgress(null);
-  }
+  const isDraggable = sortBy === "sort_order";
 
-  function openNew() {
-    resetEditor();
-    setEditing("new");
-  }
-  function openEdit(s: Song) {
-    resetEditor();
-    setTitle(s.title);
-    setLyrics(s.lyrics || "");
-    setTaggedId(s.tagged_user?.id || "");
-    setArtPreview(s.art_url || s.art_thumb_url || null);
-    setEditing(s);
-  }
+  const sortedSongs = useMemo(() => {
+    const arr = [...songs];
+    arr.sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === "sort_order") cmp = a.sort_order - b.sort_order;
+      else if (sortBy === "title") cmp = a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+      else if (sortBy === "plays") cmp = a.play_count - b.play_count;
+      else if (sortBy === "likes") cmp = a.like_count - b.like_count;
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return arr;
+  }, [songs, sortBy, sortDir]);
 
-  async function refresh() {
-    const data = await fetchAll();
-    setSongs(data.songs || []);
-  }
+  const toggleSort = (key: SortKey) => {
+    if (key === "sort_order") {
+      setSortBy("sort_order");
+      setSortDir("asc");
+    } else if (sortBy === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(key);
+      setSortDir(key === "title" ? "asc" : "desc");
+    }
+  };
 
-  /** Upload a file to a signed URL. */
-  async function putSigned(signedUrl: string, file: File, contentType: string) {
-    const res = await fetch(signedUrl, { method: "PUT", body: file, headers: { "content-type": contentType } });
-    if (!res.ok) throw new Error("Upload failed");
-  }
-
-  async function save() {
-    if (busy) return;
-    if (!title.trim()) {
-      setError("A title is required.");
+  const handleMp3Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setDurationSeconds(null);
       return;
     }
-    const isNew = editing === "new";
-    if (isNew && !audioFile) {
-      setError("Choose an audio file.");
-      return;
-    }
-    setBusy(true);
-    setError(null);
+    const audio = new Audio();
+    audio.addEventListener("loadedmetadata", () => {
+      setDurationSeconds(Math.round(audio.duration));
+      URL.revokeObjectURL(audio.src);
+    });
+    audio.src = URL.createObjectURL(file);
+  };
 
+  async function putSigned(signedUrl: string, body: Blob, contentType: string) {
+    const res = await fetch(signedUrl, {
+      method: "PUT",
+      headers: { "Content-Type": contentType, "Cache-Control": "max-age=31536000" },
+      body,
+    });
+    if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+  }
+
+  const handleAdd = async () => {
+    const mp3File = mp3InputRef.current?.files?.[0];
+    if (!title.trim() || !mp3File) return;
+    setSaving(true);
+    setError(null);
     try {
-      if (isNew) {
-        setProgress("Uploading…");
-        const duration = audioFile ? await readDuration(audioFile) : null;
+      const artFile = artInputRef.current?.files?.[0];
+      let artBlob: Blob | null = null;
+      let thumbBlob: Blob | null = null;
+      if (artFile) {
+        const [full, thumb] = await Promise.all([compressImage(artFile, 512, 0.85), generateThumbnail(artFile, 80)]);
+        artBlob = full.blob;
+        thumbBlob = thumb;
+      }
+      const urlRes = await fetch("/api/v2/music/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId, hasArt: !!artBlob, hasThumb: !!thumbBlob }),
+      });
+      if (!urlRes.ok) throw new Error((await urlRes.json().catch(() => ({}))).error || "Could not start upload");
+      const urls = await urlRes.json();
+
+      await putSigned(urls.mp3.signedUrl, mp3File, "audio/mpeg");
+      let artUrl: string | null = null;
+      let artThumbUrl: string | null = null;
+      if (artBlob && urls.art) {
+        await putSigned(urls.art.signedUrl, artBlob, "image/jpeg");
+        artUrl = urls.art.publicUrl;
+      }
+      if (thumbBlob && urls.thumb) {
+        await putSigned(urls.thumb.signedUrl, thumbBlob, "image/jpeg");
+        artThumbUrl = urls.thumb.publicUrl;
+      }
+
+      const res = await fetch("/api/v2/music", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orgId,
+          title: title.trim(),
+          mp3_url: urls.mp3.publicUrl,
+          art_url: artUrl,
+          art_thumb_url: artThumbUrl,
+          lyrics: lyrics.trim() || null,
+          tagged_user_id: taggedUserId || null,
+          duration_seconds: durationSeconds || null,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Could not save");
+
+      await refreshSongs();
+      setTitle("");
+      setTaggedUserId("");
+      setLyrics("");
+      setDurationSeconds(null);
+      setShowLyricsPreview(false);
+      if (mp3InputRef.current) mp3InputRef.current.value = "";
+      if (artInputRef.current) artInputRef.current.value = "";
+      setShowAdd(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add song");
+    }
+    setSaving(false);
+  };
+
+  const fetchListeners = useCallback(async (songId: string) => {
+    setListenersLoading((prev) => ({ ...prev, [songId]: true }));
+    try {
+      const res = await fetch(`/api/v2/music/${songId}/listeners`);
+      if (res.ok) {
+        const data = (await res.json()) as Listeners;
+        setListenersBySong((prev) => ({ ...prev, [songId]: data }));
+      }
+    } finally {
+      setListenersLoading((prev) => ({ ...prev, [songId]: false }));
+    }
+  }, []);
+
+  const toggleExpand = (song: Song) => {
+    if (expandedId === song.id) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(song.id);
+    if (!listenersBySong[song.id]) void fetchListeners(song.id);
+  };
+
+  const openEdit = (song: Song) => {
+    setEditingSong(song);
+    setEditTitle(song.title);
+    setEditLyrics(song.lyrics || "");
+    setEditTaggedUserId(song.tagged_user?.id || "");
+    setEditShowPreview(false);
+    setError(null);
+    if (editArtInputRef.current) editArtInputRef.current.value = "";
+  };
+
+  const saveEdit = async () => {
+    if (!editingSong) return;
+    const songId = editingSong.id;
+    setSaving(true);
+    setError(null);
+    try {
+      let artUrl: string | undefined;
+      let artThumbUrl: string | undefined;
+      const newArtFile = editArtInputRef.current?.files?.[0];
+      if (newArtFile) {
+        const [full, thumb] = await Promise.all([compressImage(newArtFile, 512, 0.85), generateThumbnail(newArtFile, 80)]);
         const urlRes = await fetch("/api/v2/music/upload-url", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orgId, hasArt: !!artFile }),
+          body: JSON.stringify({ orgId, hasArt: true, hasThumb: true }),
         });
-        if (!urlRes.ok) throw new Error((await urlRes.json().catch(() => ({}))).error || "Could not start upload");
-        const u = await urlRes.json();
-        await putSigned(u.mp3.signedUrl, audioFile!, audioFile!.type || "audio/mpeg");
-        let artUrl: string | null = null;
-        if (artFile && u.art) {
-          await putSigned(u.art.signedUrl, artFile, artFile.type || "image/jpeg");
-          artUrl = u.art.publicUrl;
-        }
-        setProgress("Saving…");
-        const res = await fetch("/api/v2/music", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            orgId,
-            title: title.trim(),
-            mp3_url: u.mp3.publicUrl,
-            art_url: artUrl,
-            art_thumb_url: artUrl,
-            lyrics,
-            tagged_user_id: taggedId || null,
-            duration_seconds: duration,
-          }),
-        });
-        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Could not save");
-      } else {
-        // Edit: metadata, plus optional art replacement.
-        let artUrl: string | undefined;
-        if (artFile) {
-          setProgress("Uploading art…");
-          const urlRes = await fetch("/api/v2/music/upload-url", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ orgId, hasArt: true }),
-          });
-          if (!urlRes.ok) throw new Error("Could not upload art");
-          const u = await urlRes.json();
-          await putSigned(u.art.signedUrl, artFile, artFile.type || "image/jpeg");
-          artUrl = u.art.publicUrl;
-        }
-        setProgress("Saving…");
-        const res = await fetch(`/api/v2/music/${(editing as Song).id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: title.trim(),
-            lyrics,
-            tagged_user_id: taggedId || null,
-            ...(artUrl ? { art_url: artUrl, art_thumb_url: artUrl } : {}),
-          }),
-        });
-        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Could not save");
+        if (!urlRes.ok) throw new Error("Could not upload art");
+        const urls = await urlRes.json();
+        await putSigned(urls.art.signedUrl, full.blob, "image/jpeg");
+        await putSigned(urls.thumb.signedUrl, thumb, "image/jpeg");
+        artUrl = urls.art.publicUrl;
+        artThumbUrl = urls.thumb.publicUrl;
       }
-      setEditing(null);
-      await refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
-    } finally {
-      setBusy(false);
-      setProgress(null);
+      const res = await fetch(`/api/v2/music/${songId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          lyrics: editLyrics.trim() || null,
+          tagged_user_id: editTaggedUserId || null,
+          ...(artUrl ? { art_url: artUrl, art_thumb_url: artThumbUrl } : {}),
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Could not save");
+      await refreshSongs();
+      setEditingSong(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
     }
-  }
+    setSaving(false);
+  };
 
-  async function del() {
-    if (editing === "new" || !editing) return;
-    const res = await fetch(`/api/v2/music/${editing.id}`, { method: "DELETE" });
-    if (!res.ok) {
-      setError((await res.json().catch(() => ({}))).error || "Could not delete");
-      return;
-    }
-    setEditing(null);
-    await refresh();
-  }
+  const doDelete = async (song: Song) => {
+    await fetch(`/api/v2/music/${song.id}`, { method: "DELETE" });
+    if (expandedId === song.id) setExpandedId(null);
+    if (editingSong?.id === song.id) setEditingSong(null);
+    await refreshSongs();
+  };
 
-  // Move a song up/down and persist the new order (optimistic).
-  async function move(index: number, dir: -1 | 1) {
-    const j = index + dir;
-    if (j < 0 || j >= songs.length) return;
-    const next = [...songs];
-    [next[index], next[j]] = [next[j], next[index]];
-    const reindexed = next.map((s, i) => ({ ...s, sort_order: i }));
-    setSongs(reindexed);
-    const res = await fetch("/api/v2/music", {
+  const handleDragEnd = async (fromIdx: number, toIdx: number) => {
+    if (!isDraggable || fromIdx === toIdx) return;
+    const newList = [...sortedSongs];
+    const [moved] = newList.splice(fromIdx, 1);
+    newList.splice(toIdx, 0, moved);
+    const reordered = newList.map((s, i) => ({ ...s, sort_order: i }));
+    setSongs(reordered);
+    await fetch("/api/v2/music", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orgId, order: reindexed.map((s) => ({ id: s.id, sort_order: s.sort_order })) }),
+      body: JSON.stringify({ orgId, order: reordered.map((s) => ({ id: s.id, sort_order: s.sort_order })) }),
     });
-    if (!res.ok) refresh(); // revert to server truth on failure
-  }
+  };
 
-  // ── Editor ──────────────────────────────────────────────────────────────
-  if (editing) {
-    const isNew = editing === "new";
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds) return "";
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  if (loading) {
     return (
-      <>
-        <button type="button" className={styles.back} onClick={() => setEditing(null)}>
-          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 19l-7-7 7-7" />
-          </svg>
-          All songs
-        </button>
-        <h1 className={styles.title}>{isNew ? "Add song" : "Edit song"}</h1>
-
-        <form
-          className={styles.form}
-          onSubmit={(e) => {
-            e.preventDefault();
-            save();
-          }}
-        >
-          <div className={styles.field}>
-            <label className={styles.label}>Title</label>
-            <input className={styles.input} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} autoFocus />
-          </div>
-
-          {isNew && (
-            <div className={styles.field}>
-              <label className={styles.label}>Audio file</label>
-              <button type="button" className={styles.createBtnGhost} onClick={() => audioRef.current?.click()}>
-                {audioFile ? `♪ ${audioFile.name}` : "Choose MP3"}
-              </button>
-              <input
-                ref={audioRef}
-                type="file"
-                accept="audio/*"
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  setAudioFile(e.target.files?.[0] ?? null);
-                  e.target.value = "";
-                }}
-              />
-            </div>
-          )}
-
-          <div className={styles.field}>
-            <label className={styles.label}>
-              Album art <span className={styles.optional}>(optional)</span>
-            </label>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              {artPreview && (
-                <img src={artPreview} alt="" style={{ width: 56, height: 56, borderRadius: 10, objectFit: "cover", border: "1px solid var(--line)" }} />
-              )}
-              <button type="button" className={styles.createBtnGhost} onClick={() => artRef.current?.click()}>
-                {artFile ? "Change art" : artPreview ? "Replace art" : "Choose image"}
-              </button>
-            </div>
-            <input
-              ref={artRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              style={{ display: "none" }}
-              onChange={(e) => {
-                const f = e.target.files?.[0] ?? null;
-                setArtFile(f);
-                if (f) setArtPreview(URL.createObjectURL(f));
-                e.target.value = "";
-              }}
-            />
-          </div>
-
-          <div className={styles.field}>
-            <label className={styles.label}>
-              Tagged Loozer <span className={styles.optional}>(the artist / whose song)</span>
-            </label>
-            <select className={styles.roleSelect} value={taggedId} onChange={(e) => setTaggedId(e.target.value)}>
-              <option value="">Nobody</option>
-              {sortedMembers.map((m) => (
-                <option key={m.user_id} value={m.user_id}>
-                  {pickName(m, nameMode)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className={styles.field}>
-            <label className={styles.label}>
-              Lyrics <span className={styles.optional}>(optional, Markdown)</span>
-            </label>
-            <textarea className={styles.textarea} value={lyrics} onChange={(e) => setLyrics(e.target.value)} rows={8} />
-          </div>
-
-          {error && <p className={styles.formError}>{error}</p>}
-
-          <div className={styles.memberEditActions}>
-            <button type="submit" className={styles.createBtn} disabled={busy}>
-              {busy ? progress || "Working…" : isNew ? "Add song" : "Save changes"}
-            </button>
-            {!isNew && (
-              <button type="button" className={styles.removeBtn} onClick={() => setConfirmDelete(true)}>
-                Delete
-              </button>
-            )}
-          </div>
-        </form>
-
-        <ConfirmModal
-          open={confirmDelete}
-          title="Delete song?"
-          message={`Delete “${title || "this song"}”? This removes it from the jukebox for everyone.`}
-          confirmLabel="Delete"
-          destructive
-          onConfirm={() => {
-            setConfirmDelete(false);
-            del();
-          }}
-          onCancel={() => setConfirmDelete(false)}
-        />
-      </>
+      <div className="flex justify-center py-10">
+        <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "var(--brand)", borderTopColor: "transparent" }} />
+      </div>
     );
   }
 
-  // ── List ──────────────────────────────────────────────────────────────────
   return (
-    <>
-      <div className={styles.titleRow}>
-        <h1 className={styles.title}>Music</h1>
-        <button type="button" className={styles.circleAdd} aria-label="Add song" onClick={openNew}>
-          <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14" />
-          </svg>
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs text-gray-400">{songs.length} {songs.length === 1 ? "song" : "songs"}</p>
+        <button
+          type="button"
+          onClick={() => { setShowAdd((v) => !v); setError(null); }}
+          className="inline-flex items-center gap-1 text-sm font-semibold rounded-lg px-3 py-1.5 text-white"
+          style={{ backgroundColor: "var(--brand)" }}
+        >
+          <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" /></svg>
+          Add song
         </button>
       </div>
 
-      <div className={styles.section}>
-        <p className={styles.sectionLabel}>Jukebox ({songs.length})</p>
-        {loading ? (
-          <p className={styles.dnsHint} style={{ marginTop: 0 }}>Loading…</p>
-        ) : songs.length === 0 ? (
-          <p className={styles.dnsHint} style={{ marginTop: 0 }}>No songs yet. Tap + above to add one.</p>
-        ) : (
-          <ul className={styles.memberList}>
-            {songs.map((s, i) => (
-              <li key={s.id} className={styles.memberRow} style={{ padding: 0, border: "none", gap: 4 }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingRight: 2 }}>
-                  <button
-                    type="button"
-                    aria-label="Move up"
-                    disabled={i === 0}
-                    onClick={() => move(i, -1)}
-                    style={{ opacity: i === 0 ? 0.25 : 0.7, background: "none", border: "none", cursor: i === 0 ? "default" : "pointer", padding: 2 }}
-                  >
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+      {error && !editingSong && <p className="text-sm text-red-600 mb-2">{error}</p>}
+
+      {showAdd && (
+        <div className="px-4 py-3 mb-4 rounded-xl bg-gray-50 border border-gray-200 space-y-2">
+          <input type="text" placeholder="Song title" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base" />
+          <select value={taggedUserId} onChange={(e) => setTaggedUserId(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base" style={{ backgroundColor: "transparent" }}>
+            <option value="">No tagged Loozer</option>
+            {sortedMembers.map((u) => (<option key={u.user_id} value={u.user_id}>{memberName(u)}</option>))}
+          </select>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">MP3 File *</label>
+            <input ref={mp3InputRef} type="file" accept="audio/mpeg,audio/mp3" onChange={handleMp3Change} className="w-full text-sm" />
+            {durationSeconds ? <p className="text-xs text-gray-500 mt-1">Duration: {formatDuration(durationSeconds)}</p> : null}
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Album Art (optional)</label>
+            <input ref={artInputRef} type="file" accept="image/*" className="w-full text-sm" />
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-gray-500">Lyrics (optional, markdown)</label>
+              {lyrics.trim() && (
+                <button type="button" onClick={() => setShowLyricsPreview(!showLyricsPreview)} className="text-xs font-medium" style={{ color: "var(--brand)" }}>
+                  {showLyricsPreview ? "Edit" : "Preview"}
+                </button>
+              )}
+            </div>
+            {showLyricsPreview ? (
+              <div className="p-3 bg-white border border-gray-300 rounded-lg prose prose-sm max-w-none text-gray-700 min-h-[80px]"><ReactMarkdown>{lyrics}</ReactMarkdown></div>
+            ) : (
+              <textarea value={lyrics} onChange={(e) => setLyrics(e.target.value)} placeholder="Song lyrics..." rows={4} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base" />
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={handleAdd} disabled={!title.trim() || !mp3InputRef.current?.files?.length || saving} className="flex-1 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-50" style={{ backgroundColor: "var(--brand)" }}>
+              {saving ? "Uploading..." : "Add Song"}
+            </button>
+            <button onClick={() => setShowAdd(false)} className="px-4 text-sm text-gray-500">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Sortable column header */}
+      <div className="flex items-center gap-2 px-4 py-1.5 -mx-4 border-y border-gray-100 bg-gray-50/50 text-[0.625rem] uppercase tracking-wider text-gray-500 font-semibold">
+        <SortHeader label="#" active={sortBy === "sort_order"} dir={sortDir} onClick={() => toggleSort("sort_order")} className="w-4 flex-shrink-0" ariaLabel="Sort by play order" />
+        <span className="w-8 flex-shrink-0" aria-hidden />
+        <SortHeader label="Title" active={sortBy === "title"} dir={sortDir} onClick={() => toggleSort("title")} className="flex-1 min-w-0" />
+        <SortHeader label="Plays" active={sortBy === "plays"} dir={sortDir} onClick={() => toggleSort("plays")} className="w-12 flex-shrink-0 justify-end" />
+        <SortHeader label="Likes" active={sortBy === "likes"} dir={sortDir} onClick={() => toggleSort("likes")} className="w-12 flex-shrink-0 justify-end" />
+        <span className="w-6 flex-shrink-0" aria-hidden />
+      </div>
+
+      {/* Song list */}
+      <div className="divide-y divide-gray-100 -mx-4" ref={songListRef}>
+        {touchPreview && (
+          <div className="fixed left-4 right-4 z-50 pointer-events-none" style={{ top: touchPreview.y - 20 }}>
+            <div className="text-white rounded-xl px-4 py-2 shadow-lg text-sm font-medium text-center opacity-90" style={{ backgroundColor: "var(--brand)" }}>{touchPreview.name}</div>
+          </div>
+        )}
+        {sortedSongs.map((song, index) => {
+          const expanded = expandedId === song.id;
+          const dropHere = isDraggable && dropTargetIndex === index && dragIndex !== null && dragIndex !== index;
+          return (
+            <div key={song.id}>
+              {dropHere && <div className="h-1 rounded-full mx-4" style={{ backgroundColor: "var(--brand)" }} />}
+              <div
+                data-drag-item
+                draggable={isDraggable && !expanded}
+                onDragStart={() => { if (isDraggable) setDragIndex(index); }}
+                onDragOver={(e) => { if (!isDraggable) return; e.preventDefault(); setDropTargetIndex(index); }}
+                onDragLeave={() => setDropTargetIndex((prev) => (prev === index ? null : prev))}
+                onDrop={() => { if (isDraggable && dragIndex !== null) { handleDragEnd(dragIndex, index); setDragIndex(null); setDropTargetIndex(null); } }}
+                onDragEnd={() => { setDragIndex(null); setDropTargetIndex(null); }}
+                onTouchStart={(e) => {
+                  if (!isDraggable) return;
+                  const touch = e.touches[0];
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  if (touch.clientX - rect.left > 40) return;
+                  touchCurrentIndex.current = index;
+                  setDragIndex(index);
+                  setDropTargetIndex(index);
+                  setTouchPreview({ name: song.title, y: touch.clientY });
+                }}
+                onTouchMove={(e) => {
+                  if (!isDraggable || dragIndex === null || !songListRef.current) return;
+                  e.preventDefault();
+                  const touch = e.touches[0];
+                  setTouchPreview((prev) => (prev ? { ...prev, y: touch.clientY } : null));
+                  const items = songListRef.current.querySelectorAll("[data-drag-item]");
+                  for (let i = 0; i < items.length; i++) {
+                    const rect = items[i].getBoundingClientRect();
+                    if (touch.clientY < rect.top + rect.height / 2) { touchCurrentIndex.current = i; setDropTargetIndex(i); return; }
+                  }
+                  touchCurrentIndex.current = items.length - 1;
+                  setDropTargetIndex(items.length - 1);
+                }}
+                onTouchEnd={() => {
+                  if (isDraggable && dragIndex !== null && touchCurrentIndex.current !== null) handleDragEnd(dragIndex, touchCurrentIndex.current);
+                  setDragIndex(null);
+                  setDropTargetIndex(null);
+                  setTouchPreview(null);
+                  touchCurrentIndex.current = null;
+                }}
+                className={`transition-colors ${dragIndex === index ? "opacity-40 bg-gray-100" : ""} ${dropHere ? "bg-gray-50" : ""}`}
+              >
+                <div className="px-4 py-1.5 flex items-center gap-2">
+                  {isDraggable ? (
+                    <div className="text-gray-300 cursor-grab active:cursor-grabbing flex-shrink-0 touch-none w-4">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 6a2 2 0 112 0 2 2 0 01-2 0zm8 0a2 2 0 112 0 2 2 0 01-2 0zm-8 6a2 2 0 112 0 2 2 0 01-2 0zm8 0a2 2 0 112 0 2 2 0 01-2 0zm-8 6a2 2 0 112 0 2 2 0 01-2 0zm8 0a2 2 0 112 0 2 2 0 01-2 0z" /></svg>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-400 tabular-nums w-4 text-right flex-shrink-0">{song.sort_order + 1}</div>
+                  )}
+
+                  {song.art_thumb_url || song.art_url ? (
+                    <img src={song.art_thumb_url || song.art_url!} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" /></svg>
+                    </div>
+                  )}
+
+                  <button type="button" onClick={() => openEdit(song)} className="flex-1 min-w-0 text-left -my-1 py-1 rounded hover:bg-gray-50">
+                    <div className="text-sm font-medium text-gray-900 truncate leading-tight">{song.title}</div>
+                    {(song.duration_seconds || song.tagged_user) && (
+                      <div className="text-xs text-gray-400 truncate">
+                        {song.duration_seconds ? formatDuration(song.duration_seconds) : ""}
+                        {song.duration_seconds && song.tagged_user ? " — " : ""}
+                        {song.tagged_user ? pickName(song.tagged_user, nameMode) : ""}
+                      </div>
+                    )}
                   </button>
-                  <button
-                    type="button"
-                    aria-label="Move down"
-                    disabled={i === songs.length - 1}
-                    onClick={() => move(i, 1)}
-                    style={{ opacity: i === songs.length - 1 ? 0.25 : 0.7, background: "none", border: "none", cursor: i === songs.length - 1 ? "default" : "pointer", padding: 2 }}
-                  >
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+
+                  <div className="text-xs text-gray-500 tabular-nums flex items-center gap-0.5 w-12 justify-end flex-shrink-0">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <span>{song.play_count}</span>
+                  </div>
+                  <div className="text-xs text-gray-500 tabular-nums flex items-center gap-0.5 w-12 justify-end flex-shrink-0">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+                    <span>{song.like_count}</span>
+                  </div>
+
+                  <button onClick={() => toggleExpand(song)} className="text-gray-400 hover:text-gray-600 p-1 -mr-1 flex-shrink-0" aria-label={expanded ? "Collapse" : "Expand"}>
+                    <svg className={`w-4 h-4 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                   </button>
                 </div>
-                <button type="button" className={styles.memberRowBtn} onClick={() => openEdit(s)}>
-                  {s.art_thumb_url || s.art_url ? (
-                    <img src={s.art_thumb_url || s.art_url || ""} alt="" className={styles.memberAvatar} />
-                  ) : (
-                    <span className={styles.memberAvatar}>♪</span>
-                  )}
-                  <div className={styles.memberMeta}>
-                    <span className={styles.memberName}>{s.title}</span>
-                    <span className={styles.memberSub}>
-                      {s.tagged_user ? pickName(s.tagged_user, nameMode) : "No Loozer"}
-                      {fmtDuration(s.duration_seconds) ? `, ${fmtDuration(s.duration_seconds)}` : ""}
-                      {` — ${s.play_count} play${s.play_count === 1 ? "" : "s"}, ${s.like_count} ♥`}
-                    </span>
-                  </div>
-                  <svg className={styles.arrow} width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+
+                {expanded && <ListenersPanel listeners={listenersBySong[song.id]} loading={!!listenersLoading[song.id]} />}
+              </div>
+            </div>
+          );
+        })}
+        {songs.length === 0 && <div className="px-4 py-6 text-center text-sm text-gray-400">No songs yet. Add one to get started.</div>}
       </div>
-    </>
+
+      {/* Edit drawer */}
+      <BottomDrawer open={!!editingSong} onClose={() => setEditingSong(null)} title={editingSong?.title || "Edit song"}>
+        {editingSong && (
+          <div className="px-6 py-4 space-y-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Title</label>
+              <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Tagged Loozer</label>
+              <select value={editTaggedUserId} onChange={(e) => setEditTaggedUserId(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base" style={{ backgroundColor: "transparent" }}>
+                <option value="">No tagged Loozer</option>
+                {sortedMembers.map((u) => (<option key={u.user_id} value={u.user_id}>{memberName(u)}</option>))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">{editingSong.art_url ? "Replace Album Art" : "Album Art"}</label>
+              <input ref={editArtInputRef} type="file" accept="image/*" className="w-full text-sm" />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs text-gray-500">Lyrics (markdown)</label>
+                {editLyrics.trim() && (
+                  <button type="button" onClick={() => setEditShowPreview(!editShowPreview)} className="text-xs font-medium" style={{ color: "var(--brand)" }}>
+                    {editShowPreview ? "Edit" : "Preview"}
+                  </button>
+                )}
+              </div>
+              {editShowPreview ? (
+                <div className="p-3 bg-white border border-gray-300 rounded-lg prose prose-sm max-w-none text-gray-700 min-h-[120px]"><ReactMarkdown>{editLyrics}</ReactMarkdown></div>
+              ) : (
+                <textarea value={editLyrics} onChange={(e) => setEditLyrics(e.target.value)} placeholder="Song lyrics..." rows={6} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base" />
+              )}
+            </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <div className="flex gap-2 items-center pt-2">
+              <button onClick={saveEdit} disabled={!editTitle.trim() || saving} className="flex-1 text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ backgroundColor: "var(--brand)" }}>
+                {saving ? "Saving..." : "Save"}
+              </button>
+              <button onClick={() => setConfirmSong(editingSong)} className="px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-1.5" aria-label="Delete song">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                Delete
+              </button>
+            </div>
+          </div>
+        )}
+      </BottomDrawer>
+
+      <ConfirmModal
+        open={!!confirmSong}
+        title="Delete song?"
+        message={`Delete “${confirmSong?.title ?? "this song"}”? This removes it from the jukebox for everyone.`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => {
+          const s = confirmSong;
+          setConfirmSong(null);
+          if (s) doDelete(s);
+        }}
+        onCancel={() => setConfirmSong(null)}
+      />
+    </div>
+  );
+}
+
+function ListenersPanel({ listeners, loading }: { listeners: Listeners | undefined; loading: boolean }) {
+  if (loading && !listeners) {
+    return (
+      <div className="px-4 pb-3 pt-1 flex justify-center">
+        <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "var(--brand)", borderTopColor: "transparent" }} />
+      </div>
+    );
+  }
+  const plays = listeners?.plays ?? [];
+  const likes = listeners?.likes ?? [];
+  return (
+    <div className="px-4 pb-3 pt-2 grid grid-cols-2 gap-3 bg-gray-50/50">
+      <ListenerColumn title="Plays" emptyText="No plays yet" items={plays.map((p) => ({ id: p.user_id, name: p.display_name, avatar: p.avatar_url, meta: p.count > 1 ? `×${p.count}` : null }))} />
+      <ListenerColumn title="Likes" emptyText="No likes yet" items={likes.map((l) => ({ id: l.user_id, name: l.display_name, avatar: l.avatar_url, meta: null }))} />
+    </div>
+  );
+}
+
+function ListenerColumn({ title, emptyText, items }: { title: string; emptyText: string; items: { id: string; name: string; avatar: string | null; meta: string | null }[] }) {
+  return (
+    <div>
+      <div className="text-[0.625rem] uppercase tracking-wider text-gray-500 font-semibold mb-1">
+        {title} <span className="text-gray-400 normal-case font-normal">({items.length})</span>
+      </div>
+      {items.length === 0 ? (
+        <div className="text-xs text-gray-400 italic">{emptyText}</div>
+      ) : (
+        <ul className="space-y-1">
+          {items.map((it) => (
+            <li key={it.id} className="flex items-center gap-1.5 text-xs text-gray-700">
+              {it.avatar ? (
+                <img src={it.avatar} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
+              ) : (
+                <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[0.5625rem] font-semibold text-gray-500 flex-shrink-0">{it.name.charAt(0).toUpperCase()}</div>
+              )}
+              <span className="truncate flex-1">{it.name}</span>
+              {it.meta && <span className="text-gray-400 tabular-nums flex-shrink-0">{it.meta}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function SortHeader({ label, active, dir, onClick, className = "", ariaLabel }: { label: string; active: boolean; dir: SortDir; onClick: () => void; className?: string; ariaLabel?: string }) {
+  return (
+    <button type="button" onClick={onClick} aria-label={ariaLabel || `Sort by ${label}`} className={`flex items-center gap-0.5 hover:text-gray-700 transition-colors ${className}`} style={active ? { color: "var(--brand)" } : undefined}>
+      <span className="truncate">{label}</span>
+      {active && (
+        <svg className="w-2.5 h-2.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+          {dir === "asc" ? (
+            <path d="M5.293 12.95a1 1 0 011.414 0L10 9.657l3.293 3.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414z" />
+          ) : (
+            <path d="M14.707 7.05a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L10 10.343l3.293-3.293a1 1 0 011.414 0z" />
+          )}
+        </svg>
+      )}
+    </button>
   );
 }

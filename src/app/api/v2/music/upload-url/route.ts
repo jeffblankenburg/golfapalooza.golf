@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   const { userId } = await v2GetUser(request);
   if (!userId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  let body: { orgId?: string; hasArt?: boolean };
+  let body: { orgId?: string; hasArt?: boolean; hasThumb?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -40,18 +40,26 @@ export async function POST(request: Request) {
     publicUrl: admin.storage.from(BUCKET).getPublicUrl(audioPath).data.publicUrl,
   };
 
-  let art: { signedUrl: string; token: string; path: string; publicUrl: string } | null = null;
-  if (body.hasArt) {
-    const artPath = `${orgId}/art/${ts}-${userId}.jpg`;
-    const { data: artData, error: artErr } = await admin.storage.from(BUCKET).createSignedUploadUrl(artPath);
-    if (artErr) return NextResponse.json({ error: artErr.message }, { status: 500 });
-    art = {
-      signedUrl: artData.signedUrl,
-      token: artData.token,
-      path: artPath,
-      publicUrl: admin.storage.from(BUCKET).getPublicUrl(artPath).data.publicUrl,
-    };
+  type Signed = { signedUrl: string; token: string; path: string; publicUrl: string };
+  async function signImage(kind: "art" | "thumb"): Promise<Signed | { error: string } | null> {
+    const path = `${orgId}/${kind}/${ts}-${userId}.jpg`;
+    const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(path);
+    if (error) return { error: error.message };
+    return { signedUrl: data.signedUrl, token: data.token, path, publicUrl: admin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl };
   }
 
-  return NextResponse.json({ mp3, art });
+  let art: Signed | null = null;
+  if (body.hasArt) {
+    const r = await signImage("art");
+    if (r && "error" in r) return NextResponse.json({ error: r.error }, { status: 500 });
+    art = r as Signed | null;
+  }
+  let thumb: Signed | null = null;
+  if (body.hasThumb) {
+    const r = await signImage("thumb");
+    if (r && "error" in r) return NextResponse.json({ error: r.error }, { status: 500 });
+    thumb = r as Signed | null;
+  }
+
+  return NextResponse.json({ mp3, art, thumb });
 }

@@ -38,6 +38,7 @@ export default async function AdminMusicPage({
         </svg>
         Administration
       </Link>
+      <h1 className={styles.title} style={{ marginBottom: 16 }}>Music</h1>
       <MusicManager orgId={org.id} nameMode={org.name_display} />
     </div>
   );

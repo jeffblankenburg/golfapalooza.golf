@@ -65,7 +65,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         last_played_at: agg.last,
       };
     })
-    .sort((a, b) => (a.last_played_at < b.last_played_at ? 1 : -1));
+    // Most plays first; break ties by most-recently played.
+    .sort((a, b) => b.count - a.count || (a.last_played_at < b.last_played_at ? 1 : -1));
 
   const likes = (likesRes.data || []).map((l) => {
     const p = (Array.isArray(l.profile) ? l.profile[0] : l.profile) as ProfileRef | null;

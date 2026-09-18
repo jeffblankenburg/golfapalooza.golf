@@ -12,7 +12,7 @@ import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
  * satisfy the membership RLS policy until it exists (chicken-and-egg).
  */
 export async function POST(request: Request) {
-  const { userId, supabase } = await v2GetUser(request);
+  const { userId } = await v2GetUser(request);
   if (!userId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
@@ -38,21 +38,18 @@ export async function POST(request: Request) {
 
   const admin = v2AdminClient();
 
-  // Ensure the caller has a v2_profiles row (self-provision until the dedicated
-  // signup flow collects a name). Uses the auth user's own metadata/phone.
-  const { data: authData } = await supabase.auth.getUser();
-  const authUser = authData.user;
-  const displayName =
-    (authUser?.user_metadata?.display_name as string | undefined) ||
-    (authUser?.user_metadata?.name as string | undefined) ||
-    authUser?.phone ||
-    "Member";
-  const { error: profileErr } = await admin.from("v2_profiles").upsert(
-    { id: userId, display_name: displayName, phone: authUser?.phone ?? null },
-    { onConflict: "id", ignoreDuplicates: true }
-  );
-  if (profileErr) {
-    return NextResponse.json({ error: profileErr.message }, { status: 500 });
+  // The creator becomes a member, so they must already have a completed profile
+  // with a real name (collected at signup). Never mint a nameless member here.
+  const { data: profile } = await admin
+    .from("v2_profiles")
+    .select("first_name, last_name")
+    .eq("id", userId)
+    .maybeSingle();
+  if (!profile || !(profile.first_name || "").trim() || !(profile.last_name || "").trim()) {
+    return NextResponse.json(
+      { error: "Add your name before creating a group." },
+      { status: 400 }
+    );
   }
 
   // Unique slug from the name.

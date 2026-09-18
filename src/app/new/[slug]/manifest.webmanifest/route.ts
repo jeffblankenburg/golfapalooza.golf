@@ -24,16 +24,19 @@ export async function GET(
   const name = org?.name || "Golfapalooza";
   const theme = org?.primary_color || "#0a5c36";
   const base = `/new/${slug}`;
+  // Version the icon URLs by the logo's unique filename so a new logo re-installs
+  // the app icon instead of serving the cached one.
+  const ver = org?.logo_url ? encodeURIComponent(org.logo_url.split("/").pop() || "1") : "1";
 
   // Per-tenant icons: when the org has a logo, generate square app icons from it
   // (dynamic icon route). Otherwise fall back to the default app icons. Each org
   // therefore installs with its OWN icon.
   const icons = org?.logo_url
     ? [
-        { src: `${base}/icon?size=192`, sizes: "192x192", type: "image/png", purpose: "any" },
-        { src: `${base}/icon?size=192&maskable=1`, sizes: "192x192", type: "image/png", purpose: "maskable" },
-        { src: `${base}/icon?size=512`, sizes: "512x512", type: "image/png", purpose: "any" },
-        { src: `${base}/icon?size=512&maskable=1`, sizes: "512x512", type: "image/png", purpose: "maskable" },
+        { src: `${base}/icon?size=192&v=${ver}`, sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: `${base}/icon?size=192&maskable=1&v=${ver}`, sizes: "192x192", type: "image/png", purpose: "maskable" },
+        { src: `${base}/icon?size=512&v=${ver}`, sizes: "512x512", type: "image/png", purpose: "any" },
+        { src: `${base}/icon?size=512&maskable=1&v=${ver}`, sizes: "512x512", type: "image/png", purpose: "maskable" },
       ]
     : [
         { src: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png", purpose: "any" },

@@ -27,6 +27,8 @@ export default async function GroupSettingsPage({
       initialStoreLabel={org.store_label}
       initialStoreEnabled={org.store_enabled}
       initialNameDisplay={org.name_display}
+      initialSystemName={org.system_name || "System"}
+      initialSystemAvatar={org.system_avatar_url}
     />
   );
 }

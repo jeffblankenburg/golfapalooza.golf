@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   const { userId } = await v2GetUser(request);
   if (!userId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  let body: { orgId?: string; count?: number; imageUrl?: string | null; bulkId?: string | null };
+  let body: { orgId?: string; count?: number; imageUrl?: string | null; thumbs?: unknown; bulkId?: string | null };
   try {
     body = await request.json();
   } catch {
@@ -20,6 +20,11 @@ export async function POST(request: Request) {
   }
   const count = Math.max(1, Math.floor(body.count || 1));
   if (!body.orgId) return NextResponse.json({ error: "orgId required" }, { status: 400 });
+
+  // A few preview thumbnails for the feed row (leading image + a small strip).
+  const thumbs = Array.isArray(body.thumbs)
+    ? body.thumbs.filter((t): t is string => typeof t === "string" && t.length > 0).slice(0, 4)
+    : [];
 
   const admin = v2AdminClient();
   if (!(await isOrgMember(admin, userId, body.orgId))) {
@@ -37,7 +42,7 @@ export async function POST(request: Request) {
     imageUrl: body.imageUrl ?? null,
     // ref_id = the upload batch, so deleting photos can update/remove this row.
     refId: body.bulkId ?? null,
-    metadata: { count },
+    metadata: { count, thumbs },
   }).catch(() => {});
 
   return NextResponse.json({ ok: true });

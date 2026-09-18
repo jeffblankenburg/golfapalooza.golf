@@ -15,6 +15,7 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
 
   const [step, setStep] = useState<Step>("loading");
   const [orgName, setOrgName] = useState("");
+  const [orgLogo, setOrgLogo] = useState<string | null>(null);
   const [invalidReason, setInvalidReason] = useState<string | null>(null);
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
@@ -88,6 +89,7 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
         return;
       }
       setOrgName(data.orgName || "this group");
+      setOrgLogo(data.orgLogo || null);
       const pf = data.prefill || {};
       if (pf.first_name) setFirstName(pf.first_name);
       if (pf.last_name) setLastName(pf.last_name);
@@ -158,6 +160,10 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
 
   return (
     <div className={styles.page}>
+      {orgLogo && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={orgLogo} alt={orgName} className={styles.signupBrandLogo} />
+      )}
       {step === "loading" && <p className={styles.lede}>Checking your invite…</p>}
 
       {step === "invalid" && (

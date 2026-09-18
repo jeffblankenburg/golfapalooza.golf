@@ -21,6 +21,7 @@ export async function GET(request: Request) {
   const sort = url.searchParams.get("sort") === "uploaded" ? "uploaded" : "taken";
   const year = url.searchParams.get("year"); // "all" or a 4-digit year
   const taggedParam = url.searchParams.get("taggedUserIds"); // comma-separated
+  const bulkId = url.searchParams.get("bulkId"); // one upload batch
   const limit = Math.min(Number(url.searchParams.get("limit")) || PAGE, 60);
 
   const { userId } = await v2GetUser(request);
@@ -55,6 +56,7 @@ export async function GET(request: Request) {
     q = q.gte(col, `${year}-01-01`).lt(col, `${Number(year) + 1}-01-01`);
   }
   if (taggedItemIds) q = q.in("id", taggedItemIds);
+  if (bulkId) q = q.eq("bulk_id", bulkId);
 
   const { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

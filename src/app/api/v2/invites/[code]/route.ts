@@ -15,7 +15,7 @@ export async function GET(
   const { data: invite } = await admin
     .from("v2_invites")
     .select(
-      "id, org_id, role, max_uses, uses, expires_at, redeemed_at, first_name, last_name, nickname, birthdate, zip, org:v2_organizations(name, slug)"
+      "id, org_id, role, max_uses, uses, expires_at, redeemed_at, first_name, last_name, nickname, birthdate, zip, org:v2_organizations(name, slug, logo_url)"
     )
     .eq("code", code)
     .maybeSingle();
@@ -31,6 +31,7 @@ export async function GET(
     reason: expired ? "expired" : used ? "used" : undefined,
     orgName: (org as { name?: string })?.name || "a golf group",
     orgSlug: (org as { slug?: string })?.slug || null,
+    orgLogo: (org as { logo_url?: string | null })?.logo_url || null,
     prefill: {
       first_name: invite.first_name,
       last_name: invite.last_name,

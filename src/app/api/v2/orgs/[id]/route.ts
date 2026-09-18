@@ -29,6 +29,7 @@ export async function PATCH(
     store_url?: string | null;
     store_label?: string | null;
     store_enabled?: boolean;
+    system_name?: string;
   };
   try {
     body = await request.json();
@@ -68,6 +69,12 @@ export async function PATCH(
   }
   if (typeof body.store_enabled === "boolean") {
     patch.store_enabled = body.store_enabled;
+  }
+  if (typeof body.system_name === "string") {
+    const sys = body.system_name.trim();
+    if (!sys) return NextResponse.json({ error: "System name can't be empty" }, { status: 400 });
+    if (sys.length > 40) return NextResponse.json({ error: "System name is too long" }, { status: 400 });
+    patch.system_name = sys;
   }
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });

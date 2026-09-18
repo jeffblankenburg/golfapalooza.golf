@@ -50,6 +50,11 @@ export async function PATCH(request: Request) {
   if ("first_name" in body) patch.first_name = str(body.first_name);
   if ("last_name" in body) patch.last_name = str(body.last_name);
   if ("nickname" in body) patch.nickname = str(body.nickname);
+  // Real name is required — a member may edit it but never clear it (it's the
+  // fallback when a nickname is absent).
+  if (("first_name" in patch && !patch.first_name) || ("last_name" in patch && !patch.last_name)) {
+    return NextResponse.json({ error: "First and last name are required" }, { status: 400 });
+  }
   if ("birthdate" in body) {
     const b = str(body.birthdate);
     if (b && !/^\d{4}-\d{2}-\d{2}$/.test(b)) {

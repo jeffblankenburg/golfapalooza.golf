@@ -80,7 +80,7 @@ export default async function HomeModules({
   const nowIso = new Date().toISOString();
 
   // Birthdays + article + RSVP + attending count + ads + activity, in parallel.
-  const [membersRes, articleRes, myRsvpRes, goingRes, attendingRes, adsRes, activityRes] =
+  const [membersRes, articleRes, myRsvpRes, goingRes, attendingRes, adsRes, activityRes, orgSysRes] =
     await Promise.all([
     supabase
       .from("v2_memberships")
@@ -121,10 +121,15 @@ export default async function HomeModules({
       .eq("active", true),
     supabase
       .from("v2_activity")
-      .select("id, kind, title, subtitle, image_url, link, created_at, metadata, actor:v2_profiles(display_name, first_name, last_name, avatar_url)")
+      .select("id, kind, title, subtitle, image_url, link, created_at, ref_id, metadata, actor:v2_profiles(display_name, first_name, last_name, avatar_url)")
       .eq("org_id", orgId)
       .order("created_at", { ascending: false })
       .limit(15),
+    supabase
+      .from("v2_organizations")
+      .select("system_name, system_avatar_url")
+      .eq("id", orgId)
+      .maybeSingle(),
   ]);
 
   const myLikelihood = (myRsvpRes.data?.likelihood as Likelihood | undefined) ?? null;
@@ -137,6 +142,10 @@ export default async function HomeModules({
     ...a,
     actor: Array.isArray(a.actor) ? a.actor[0] ?? null : a.actor,
   })) as ActivityRow[];
+
+  const orgSys = (orgSysRes.data as { system_name: string | null; system_avatar_url: string | null } | null) ?? null;
+  const systemName = orgSys?.system_name?.trim() || "System";
+  const systemAvatar = orgSys?.system_avatar_url ?? null;
 
   const birthdays = birthdaysToday(
     (membersRes.data as unknown as { v2_profiles: MemberProfile | null }[]) || [],
@@ -172,7 +181,7 @@ export default async function HomeModules({
         initialAttendingCount={attendingCount}
       />
       <StoreModule storeUrl={storeEnabled ? storeUrl : null} storeLabel={storeLabel} />
-      <ActivityFeed initialItems={activity} orgId={orgId} />
+      <ActivityFeed initialItems={activity} orgId={orgId} systemName={systemName} systemAvatar={systemAvatar} />
       <AdCarousel ads={ads} />
     </>
   );

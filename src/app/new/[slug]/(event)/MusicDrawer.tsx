@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import { useV2Music } from "./MusicProvider";
 import MusicPage from "./MusicPage";
 import { useNameMode } from "./NameMode";
 import { pickName } from "@/lib/v2/profile";
+import styles from "./event-shell.module.css";
 /* eslint-disable @next/next/no-img-element */
 
 /**
@@ -36,9 +37,6 @@ export default function MusicDrawer() {
   } = useV2Music();
   const mode = useNameMode();
 
-  const dragStartYRef = useRef<number | null>(null);
-  const [dragOffset, setDragOffset] = useState(0);
-
   useEffect(() => {
     if (!isDrawerExpanded) return;
     const prev = document.body.style.overflow;
@@ -54,22 +52,6 @@ export default function MusicDrawer() {
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  function onHandleTouchStart(e: React.TouchEvent) {
-    dragStartYRef.current = e.touches[0].clientY;
-  }
-  function onHandleTouchMove(e: React.TouchEvent) {
-    if (dragStartYRef.current == null) return;
-    const dy = e.touches[0].clientY - dragStartYRef.current;
-    if (dy > 0) setDragOffset(dy);
-  }
-  function onHandleTouchEnd() {
-    const start = dragStartYRef.current;
-    dragStartYRef.current = null;
-    const offset = dragOffset;
-    setDragOffset(0);
-    if (start != null && offset > 80) collapseDrawer();
-  }
-
   return (
     <>
       {/* Backdrop between the fixed bars while expanded. */}
@@ -84,29 +66,16 @@ export default function MusicDrawer() {
       {/* Expanded overlay — clips below the top bar (56px + 50px gap) and above
           the bottom nav, mirroring the shell's shared drawer. */}
       <div
-        className={`fixed left-0 right-0 top-[106px] bottom-[calc(60px+env(safe-area-inset-bottom,0px))] z-[55] bg-white rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out flex flex-col ${
+        className={`fixed left-0 right-0 top-[106px] bottom-[calc(60px+env(safe-area-inset-bottom,0px))] z-[55] bg-[var(--paper)] rounded-t-2xl shadow-[0_-12px_30px_-18px_rgba(0,0,0,0.5)] transition-transform duration-300 ease-out flex flex-col ${
           isDrawerExpanded ? "translate-y-0" : "translate-y-full pointer-events-none"
         }`}
-        style={{
-          transform: isDrawerExpanded ? `translateY(${dragOffset}px)` : undefined,
-          transition: dragOffset > 0 ? "none" : undefined,
-        }}
         aria-hidden={!isDrawerExpanded}
       >
-        <div
-          className="shrink-0 relative pt-3 pb-2 flex justify-center items-center bg-white"
-          onTouchStart={onHandleTouchStart}
-          onTouchMove={onHandleTouchMove}
-          onTouchEnd={onHandleTouchEnd}
-        >
-          <button type="button" onClick={collapseDrawer} aria-label="Collapse music" className="w-12 h-1.5 rounded-full bg-gray-300 active:bg-gray-400" />
-          <button
-            type="button"
-            onClick={collapseDrawer}
-            aria-label="Close music"
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full text-gray-500 active:bg-gray-100"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {/* Standard shared-drawer header (matches Chat/Photos/Rounds/etc.). */}
+        <div className={styles.drawerHead}>
+          <span className={styles.drawerTitle}>Music</span>
+          <button type="button" className={styles.drawerClose} onClick={collapseDrawer} aria-label="Close">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -116,20 +85,20 @@ export default function MusicDrawer() {
 
       {/* Collapsed mini-player — above the bottom nav, hidden while expanded. */}
       <div
-        className={`fixed left-0 right-0 bottom-[calc(60px+env(safe-area-inset-bottom,0px))] z-[40] bg-white border-t border-gray-200 shadow-lg transition-opacity duration-200 ${
+        className={`fixed left-0 right-0 bottom-[calc(60px+env(safe-area-inset-bottom,0px))] z-[40] bg-[var(--card)] border-t border-[var(--line)] shadow-lg transition-opacity duration-200 ${
           isDrawerExpanded ? "opacity-0 pointer-events-none" : "opacity-100"
         }`}
         aria-hidden={isDrawerExpanded}
       >
-        <div className="h-0.5 bg-gray-100">
-          <div className="h-full bg-green-600 transition-[width] duration-200" style={{ width: `${progress}%` }} />
+        <div className="h-0.5 bg-[var(--line)]">
+          <div className="h-full bg-[var(--brand)] transition-[width] duration-200" style={{ width: `${progress}%` }} />
         </div>
 
         <div className="flex items-center h-14 px-2 gap-2">
           <button
             type="button"
             onClick={dismiss}
-            className="flex items-center justify-center w-9 h-9 flex-shrink-0 text-gray-400 active:text-gray-600"
+            className="flex items-center justify-center w-9 h-9 flex-shrink-0 text-[var(--ink-soft)]"
             aria-label="Close music player"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -141,32 +110,32 @@ export default function MusicDrawer() {
             {currentSong.art_thumb_url || currentSong.art_url ? (
               <img key={currentSong.id} src={currentSong.art_thumb_url || currentSong.art_url!} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
             ) : (
-              <div className="w-8 h-8 rounded bg-green-100 flex items-center justify-center flex-shrink-0">
-                <svg className="w-4 h-4 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-8 h-8 rounded bg-[var(--brand)]/10 flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-[var(--brand)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                 </svg>
               </div>
             )}
             <div className="min-w-0">
-              <div className="text-sm font-medium text-gray-900 truncate">{currentSong.title}</div>
-              {currentSong.tagged_user && <div className="text-xs text-gray-500 truncate">{pickName(currentSong.tagged_user, mode)}</div>}
+              <div className="text-sm font-medium text-[var(--ink)] truncate">{currentSong.title}</div>
+              {currentSong.tagged_user && <div className="text-xs text-[var(--ink-soft)] truncate">{pickName(currentSong.tagged_user, mode)}</div>}
             </div>
           </button>
 
           <div className="flex items-center gap-1 flex-shrink-0">
             <button type="button" onClick={previous} className="flex items-center justify-center w-9 h-9" aria-label="Previous">
-              <svg className="w-5 h-5 text-gray-700" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
+              <svg className="w-5 h-5 text-[var(--ink-soft)]" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
             </button>
             <button type="button" onClick={togglePlayPause} className="flex items-center justify-center w-10 h-10" aria-label={isPlaying ? "Pause" : "Play"}>
               {isPlaying ? (
-                <svg className="w-7 h-7 text-gray-900" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z" /></svg>
+                <svg className="w-7 h-7 text-[var(--ink)]" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z" /></svg>
               ) : (
-                <svg className="w-7 h-7 text-gray-900" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                <svg className="w-7 h-7 text-[var(--ink)]" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
               )}
             </button>
             <button type="button" onClick={next} className="flex items-center justify-center w-9 h-9" aria-label="Next">
-              <svg className="w-5 h-5 text-gray-700" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
+              <svg className="w-5 h-5 text-[var(--ink-soft)]" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
             </button>
           </div>
         </div>

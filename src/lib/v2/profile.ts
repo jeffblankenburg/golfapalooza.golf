@@ -35,9 +35,11 @@ export function displayNameFrom(f: ProfileFields, fallback = "Member"): string {
 export type NameMode = "nickname" | "real";
 
 /**
- * Render a member's name per the org's mode. `nickname` mode uses the stored
- * `display_name` (already nickname-preferred). `real` mode uses "First Last",
- * falling back to display_name then the fallback. Server- and client-safe (pure).
+ * Render a member's name per the org's mode, with a BIDIRECTIONAL fallback: each
+ * mode falls back to the other when its preferred value is absent (nicknames are
+ * often empty, so `nickname` mode falls back to the real name). `display_name` is
+ * the stored nickname-preferred value; `real` mode prefers "First Last".
+ * Server- and client-safe (pure).
  */
 export function pickName(
   p: { display_name?: string | null; first_name?: string | null; last_name?: string | null } | null | undefined,
@@ -45,9 +47,8 @@ export function pickName(
   fallback = "Member",
 ): string {
   if (!p) return fallback;
-  if (mode === "real") {
-    const full = `${(p.first_name || "").trim()} ${(p.last_name || "").trim()}`.trim();
-    if (full) return full;
-  }
-  return (p.display_name || "").trim() || fallback;
+  const full = `${(p.first_name || "").trim()} ${(p.last_name || "").trim()}`.trim();
+  const display = (p.display_name || "").trim(); // nickname-preferred
+  if (mode === "real") return full || display || fallback;
+  return display || full || fallback;
 }

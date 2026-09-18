@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { hasPermission } from "@/lib/v2/permissions-server";
 import { deliverAnnouncement, type AnnouncementAudience } from "@/lib/v2/announcements";
-import { getSystemProfile } from "@/lib/v2/system-user";
+import { getOrgSystemIdentity } from "@/lib/v2/system-user";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
 
   // One round-trip each: announcement history, the roster (custom audience), the
   // event list (event audience). Parallelized.
-  const [annRes, memRes, evtRes, systemRes] = await Promise.all([
+  const [annRes, memRes, evtRes, systemIdentity] = await Promise.all([
     g.admin
       .from("v2_announcements")
       .select(
@@ -58,7 +58,7 @@ export async function GET(request: Request) {
       .select("id, name, year, status")
       .eq("org_id", orgId)
       .order("year", { ascending: false }),
-    getSystemProfile(g.admin),
+    getOrgSystemIdentity(g.admin, orgId),
   ]);
 
   const members = (memRes.data || [])
@@ -75,11 +75,11 @@ export async function GET(request: Request) {
         is_system: !!p?.is_system,
       };
     })
-    // Al Pine (system) is never a selectable audience member.
+    // The system entity is never a selectable audience member.
     .filter((m) => !m.is_system);
 
   // Normalize the embedded sender (created_by) to a single object so the client
-  // can show who actually sent it — even when it was authored as Al Pine.
+  // can show who actually sent it — even when it was authored as the system.
   const announcements = (annRes.data || []).map((a) => {
     const { sender, ...rest } = a as typeof a & { sender: unknown };
     return { ...rest, sender: Array.isArray(sender) ? sender[0] ?? null : sender ?? null };
@@ -89,7 +89,7 @@ export async function GET(request: Request) {
     announcements,
     members,
     events: evtRes.data || [],
-    systemSender: systemRes ? { name: systemRes.display_name, avatar: systemRes.avatar_url || "/alpine.png" } : null,
+    systemSender: { name: systemIdentity.name, avatar: systemIdentity.avatar_url },
   });
 }
 

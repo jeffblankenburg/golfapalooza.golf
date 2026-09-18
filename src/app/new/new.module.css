@@ -114,6 +114,17 @@
   color: var(--brand);
   margin-bottom: 16px;
 }
+/* Group logo atop the login screen, so members land on their group's brand. */
+.signupBrandLogo {
+  display: block;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  object-fit: contain;
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--line);
+  margin-bottom: 20px;
+}
 
 .title {
   font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
@@ -696,6 +707,19 @@
   border-radius: 11px;
   background: none;
   cursor: pointer;
+  overflow: hidden; /* clip the filled color to the rounded corners */
+}
+/* Fill the whole squircle with the chosen color (no inner square + padding). */
+.swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 10px;
+}
+.swatch::-moz-color-swatch {
+  border: none;
+  border-radius: 10px;
 }
 .swatchHint {
   font-size: 0.84rem;
@@ -763,6 +787,77 @@ details[open] .chev {
 }
 .accordionBody {
   padding: 0 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+/* Closed-state preview shown on the right of an accordion summary (a live value:
+   logo + group name, system avatar + name, current member-name mode, …). Resets
+   the summary's uppercase/tracking so real values read naturally. */
+.summaryPreview {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+.summaryPreview span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.summaryPreviewMuted {
+  color: var(--ink-soft);
+}
+.summaryThumb {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background-size: cover;
+  background-position: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+}
+.summaryThumbRound {
+  border-radius: 50%;
+}
+/* Segmented control for two equal choices (neither is "on/off") — e.g. member
+   name display. Lives on an accordion summary; selected option is brand-filled. */
+.segToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+}
+.segOption {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+  color: var(--ink-soft);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.segOption[data-on] {
+  background: var(--brand);
+  color: #fff;
 }
 
 /* ── Custom domains ─────────────────────────────────────────────────────── */
@@ -1654,6 +1749,39 @@ button.feedRow:active {
   height: 40px;
   border-radius: 8px;
   object-fit: cover;
+}
+/* A few extra thumbnails on the right of a multi-photo upload row. */
+.feedThumbs {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 8px;
+}
+.feedThumbsItem {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.feedThumbsItem img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.feedThumbsMore {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(23, 33, 29, 0.6);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
 }
 .feedIcon {
   flex: none;
@@ -2576,4 +2704,264 @@ button.feedRow:active {
   font-size: 0.75rem;
   color: var(--ink-soft);
   line-height: 1.3;
+}
+
+/* ── Music (jukebox drawer body: now-playing + transport + playlist) ─────── */
+.musicPage {
+  padding: 20px 20px 32px;
+}
+
+.musicNow {
+  margin-bottom: 22px;
+}
+.musicArtWrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+.musicArt,
+.musicArtFallback {
+  width: 208px;
+  height: 208px;
+  border-radius: 18px;
+  box-shadow: 0 14px 34px -16px rgba(23, 33, 29, 0.5);
+}
+.musicArt {
+  object-fit: cover;
+}
+.musicArtFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--brand) 9%, var(--card));
+  color: color-mix(in srgb, var(--brand) 42%, var(--paper));
+}
+.musicArtNote {
+  width: 76px;
+  height: 76px;
+}
+.musicThumbNote {
+  width: 22px;
+  height: 22px;
+}
+.musicNowTitle {
+  font-family: var(--font-libre), sans-serif;
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: var(--ink);
+  text-align: center;
+  line-height: 1.25;
+}
+.musicNowArtist {
+  margin-top: 3px;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.musicSeek {
+  margin-top: 16px;
+}
+.musicSeekTrack {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--line);
+  cursor: pointer;
+}
+.musicSeekFill {
+  position: relative;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--brand);
+}
+.musicSeekThumb {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translate(50%, -50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--brand);
+  box-shadow: 0 1px 4px rgba(23, 33, 29, 0.35);
+}
+.musicTimes {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.musicTransport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 18px;
+}
+.musicSecondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--ink-soft);
+  border-radius: 50%;
+  transition: color 0.15s ease;
+}
+.musicSecondary[data-on="true"] {
+  color: var(--brand);
+}
+.musicSecondary[data-fav="true"] {
+  color: #dc2626;
+}
+.musicSkip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--ink);
+}
+.musicPlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px;
+  height: 62px;
+  border: none;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--brand) 70%, transparent);
+  transition: transform 0.12s ease;
+}
+.musicPlay:active {
+  transform: scale(0.94);
+}
+
+.musicLyricsToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 18px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--brand);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.musicLyricsChevron {
+  transition: transform 0.15s ease;
+}
+.musicLyricsChevron[data-open="true"] {
+  transform: rotate(90deg);
+}
+.musicLyrics {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.musicSearch {
+  margin-bottom: 12px;
+}
+.musicList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.musicRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.musicRow:active {
+  background: rgba(23, 33, 29, 0.04);
+}
+.musicRow[data-active="true"] {
+  background: color-mix(in srgb, var(--brand) 7%, var(--card));
+}
+.musicThumb,
+.musicThumbFallback {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  flex: none;
+}
+.musicThumb {
+  object-fit: cover;
+}
+.musicThumbFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--brand) 8%, var(--card));
+  color: color-mix(in srgb, var(--brand) 42%, var(--paper));
+}
+.musicRowText {
+  flex: 1;
+  min-width: 0;
+}
+.musicRowTitle {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 0.92rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.musicRow[data-active="true"] .musicRowTitle {
+  color: var(--brand);
+}
+.musicRowArtist {
+  margin-top: 1px;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.musicRowTime {
+  flex: none;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.musicFav {
+  flex: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  color: var(--line-strong);
+}
+.musicFav[data-on="true"] {
+  color: #dc2626;
+}
+.musicEmpty {
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  padding: 32px 0;
 }

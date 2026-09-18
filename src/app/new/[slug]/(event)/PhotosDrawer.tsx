@@ -99,11 +99,12 @@ export default function PhotosDrawer({
   const [allUsers, setAllUsers] = useState<ViewerUser[]>([]);
 
   // Filters (mirror the original). Arriving from a photo-upload activity item
-  // (initialBulkId) defaults the sort to most-recently-uploaded so the batch is
-  // right at the top.
+  // (initialBulkId) narrows the gallery to just that upload batch, with a
+  // clearable "From this upload" chip to return to the full collection.
   const [sort, setSort] = useState<Sort>(initialBulkId ? "uploaded" : "taken");
   const [year, setYear] = useState<string>("all");
   const [taggedIds, setTaggedIds] = useState<Set<string>>(new Set());
+  const [bulk, setBulk] = useState<string | null>(initialBulkId ?? null);
   const [showFilterUsers, setShowFilterUsers] = useState(false);
   const [years, setYears] = useState<number[]>([]);
   const [taggedUsers, setTaggedUsers] = useState<{ userId: string; displayName: string }[]>([]);
@@ -112,7 +113,7 @@ export default function PhotosDrawer({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const taggedKey = [...taggedIds].sort().join(",");
-  const filtersActive = year !== "all" || taggedIds.size > 0;
+  const filtersActive = year !== "all" || taggedIds.size > 0 || !!bulk;
 
   const params = useCallback(
     (cur?: string) => {
@@ -120,10 +121,11 @@ export default function PhotosDrawer({
       if (sort === "uploaded") p.set("sort", "uploaded");
       if (year !== "all") p.set("year", year);
       if (taggedIds.size) p.set("taggedUserIds", [...taggedIds].join(","));
+      if (bulk) p.set("bulkId", bulk);
       if (cur) p.set("cursor", cur);
       return p.toString();
     },
-    [orgId, sort, year, taggedIds],
+    [orgId, sort, year, taggedIds, bulk],
   );
 
   // Filter options.
@@ -203,7 +205,7 @@ export default function PhotosDrawer({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orgId, sort, year, taggedKey, reloadKey]);
+  }, [orgId, sort, year, taggedKey, bulk, reloadKey]);
 
   const loadMore = useCallback(async () => {
     if (loading || !hasMore || !cursor) return;
@@ -333,14 +335,16 @@ export default function PhotosDrawer({
     if (files.length === 0) return;
     const bulkId = crypto.randomUUID();
     setUpload({ done: 0, total: files.length });
-    let firstThumb: string | null = null;
+    // A few thumbnails to preview the batch in the activity feed (leading image +
+    // a small strip). Parallel workers finish out of order — any few will do.
+    const thumbs: string[] = [];
     let done = 0;
     const queue = [...files];
     const worker = async () => {
       while (queue.length) {
         const f = queue.shift()!;
         const r = await uploadOne(f, bulkId);
-        if (r && !firstThumb) firstThumb = r.thumb;
+        if (r?.thumb && thumbs.length < 4) thumbs.push(r.thumb);
         done += 1;
         setUpload({ done, total: files.length });
       }
@@ -349,7 +353,7 @@ export default function PhotosDrawer({
     await fetch("/api/v2/gallery/log-upload", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orgId, count: files.length, imageUrl: firstThumb, bulkId }),
+      body: JSON.stringify({ orgId, count: files.length, imageUrl: thumbs[0] ?? null, thumbs, bulkId }),
     }).catch(() => {});
     setUpload(null);
     setReloadKey((k) => k + 1);
@@ -367,6 +371,14 @@ export default function PhotosDrawer({
   return (
     <div className={styles.wrap}>
       <div className={styles.filters}>
+        {bulk && (
+          <button type="button" className={styles.bulkChip} onClick={() => setBulk(null)}>
+            From this upload
+            <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+              <path d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
         <button
           type="button"
           className={styles.sortBtn}
@@ -444,15 +456,12 @@ export default function PhotosDrawer({
       ) : (
         <div className={styles.scrollArea} onScroll={onScroll}>
           <div className={styles.grid}>
-            {items.map((it, i) => {
-              const highlighted = !!initialBulkId && it.bulk_id === initialBulkId;
-              return (
+            {items.map((it, i) => (
               <button
                 key={it.id}
                 type="button"
                 className={styles.cell}
                 onClick={() => setViewIndex(i)}
-                style={highlighted ? { boxShadow: "inset 0 0 0 3px var(--brand)", borderRadius: 8 } : undefined}
               >
                 <img src={it.thumbnail_url || it.media_url} alt="" loading="lazy" />
                 {it.media_type === "video" && (
@@ -463,8 +472,7 @@ export default function PhotosDrawer({
                   </span>
                 )}
               </button>
-              );
-            })}
+            ))}
           </div>
         </div>
       )}

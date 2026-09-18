@@ -17,16 +17,31 @@ export async function generateMetadata({
   const admin = v2AdminClient();
   const { data: org } = await admin
     .from("v2_organizations")
-    .select("name")
+    .select("name, logo_url")
     .eq("slug", slug)
     .maybeSingle();
   const name = org?.name || "Golfapalooza";
-  return {
+  const base = `/new/${slug}`;
+  // Cache-bust the favicon/app icon by the logo's unique filename, so changing
+  // the logo swaps the browser tab + home-screen icon immediately (browsers cache
+  // favicons hard; a stable URL would stay stale).
+  const ver = org?.logo_url ? encodeURIComponent(org.logo_url.split("/").pop() || "1") : null;
+  const meta: Metadata = {
     title: name,
     applicationName: name,
-    manifest: `/new/${slug}/manifest.webmanifest`,
+    manifest: `${base}/manifest.webmanifest`,
     appleWebApp: { capable: true, statusBarStyle: "default", title: name },
   };
+  // Point the favicon + Apple touch icon at the org's logo (composited by the
+  // icon route). Falls back to the app default when the org has no logo.
+  if (ver) {
+    meta.icons = {
+      icon: [{ url: `${base}/icon?size=192&v=${ver}`, sizes: "192x192", type: "image/png" }],
+      shortcut: [{ url: `${base}/icon?size=192&v=${ver}` }],
+      apple: [{ url: `${base}/icon?size=512&v=${ver}`, sizes: "512x512", type: "image/png" }],
+    };
+  }
+  return meta;
 }
 
 export default function OrgLayout({ children }: { children: React.ReactNode }) {

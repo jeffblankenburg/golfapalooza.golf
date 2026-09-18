@@ -19,7 +19,8 @@ export default async function EventLayout({
 }) {
   const { slug } = await params;
   const ctx = await getPlatformContext();
-  if (!ctx) redirect("/new/signup");
+  // Carry the group so the login screen brands to the group they were headed to.
+  if (!ctx) redirect(`/new/signup?org=${encodeURIComponent(slug)}`);
   const org = ctx.orgs.find((o) => o.slug === slug);
   if (!org) redirect("/new");
   const isAdmin = org.role === "owner" || org.role === "admin";

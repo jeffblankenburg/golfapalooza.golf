@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getPlatformContext } from "@/lib/v2/context";
 import { v2AdminClient } from "@/lib/v2/supabase";
-import { getSystemProfile } from "@/lib/v2/system-user";
+import { getOrgSystemIdentity } from "@/lib/v2/system-user";
 import { pickName } from "@/lib/v2/profile";
 import styles from "@/app/new/new.module.css";
 import AnnouncementsList, { type MemberAnnouncement } from "./AnnouncementsList";
@@ -48,7 +48,7 @@ export default async function AnnouncementsPage({
   if (!org) redirect("/new");
 
   const admin = v2AdminClient();
-  const [annRes, partRes, systemProfile] = await Promise.all([
+  const [annRes, partRes, systemIdentity] = await Promise.all([
     admin
       .from("v2_announcements")
       .select(
@@ -62,11 +62,11 @@ export default async function AnnouncementsPage({
       .select("event_id")
       .eq("user_id", ctx.userId)
       .neq("status", "not_going"),
-    getSystemProfile(admin),
+    getOrgSystemIdentity(admin, org.id),
   ]);
 
-  const alName = systemProfile?.display_name || "Al Pine";
-  const alAvatar = systemProfile?.avatar_url || "/alpine.png";
+  const sysName = systemIdentity.name;
+  const sysAvatar = systemIdentity.avatar_url;
 
   const myEvents = new Set((partRes.data || []).map((p) => p.event_id));
   const visible: MemberAnnouncement[] = ((annRes.data as Row[] | null) || [])
@@ -78,10 +78,10 @@ export default async function AnnouncementsPage({
     )
     .map((r) => {
       const sender = Array.isArray(r.sender) ? r.sender[0] ?? null : r.sender;
-      // Members see the presented author: Al Pine when chosen, otherwise the
-      // real sender. (The admin page always shows the real sender.)
-      const authorName = r.send_as_system ? alName : sender ? pickName(sender, org.name_display) : null;
-      const authorAvatar = r.send_as_system ? alAvatar : sender?.avatar_url ?? null;
+      // Members see the presented author: the org's system entity when chosen,
+      // otherwise the real sender. (The admin page always shows the real sender.)
+      const authorName = r.send_as_system ? sysName : sender ? pickName(sender, org.name_display) : null;
+      const authorAvatar = r.send_as_system ? sysAvatar : sender?.avatar_url ?? null;
       return {
         id: r.id,
         title: r.title,

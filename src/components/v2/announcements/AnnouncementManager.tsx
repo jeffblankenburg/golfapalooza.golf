@@ -246,10 +246,10 @@ export default function AnnouncementManager({
   }
 
   // Who actually sent it — always the real admin, noting when it went out as the
-  // system personality ("… (as Al Pine)").
+  // system entity ("… (as {system name})").
   function senderLabel(a: Announcement): string | null {
     const name = a.sender ? pickName(a.sender, nameMode) : null;
-    const alias = systemSender?.name || "Al Pine";
+    const alias = systemSender?.name || "System";
     if (!name) return a.send_as_system ? `Sent as ${alias}` : null;
     return a.send_as_system ? `${name} (as ${alias})` : name;
   }
@@ -429,18 +429,36 @@ export default function AnnouncementManager({
                 <input type="checkbox" checked={asSystem} onChange={(e) => setAsSystem(e.target.checked)} />
                 <span className={styles.permText}>
                   <span className={styles.permLabel} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                    {systemSender.avatar && (
+                    {systemSender.avatar ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={systemSender.avatar}
                         alt=""
                         style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover" }}
                       />
+                    ) : (
+                      <span
+                        aria-hidden
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: "50%",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: "var(--brand)",
+                          color: "#fff",
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {systemSender.name.charAt(0).toUpperCase()}
+                      </span>
                     )}
                     Send as {systemSender.name}
                   </span>
                   <span className={styles.permDesc}>
-                    Posts from the {systemSender.name} system personality instead of you — for generic or
+                    Posts from the {systemSender.name} system entity instead of you — for generic or
                     automated-feeling announcements.
                   </span>
                 </span>

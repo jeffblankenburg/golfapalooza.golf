@@ -1,31 +1,34 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * "Al Pine" — the platform's system personality. A single global v2_profile
- * (is_system = true) reused as the author of automated/generic content:
- * announcements sent "as Al Pine", birthday wishes, etc. Mirrors the legacy
- * is_system user (scripts/create-al-pine.mjs); the v2 profile reuses the same
- * auth identity (provisioned in migration 00216).
+ * Per-org "system identity" — the presented author of automated/generic content
+ * (announcements sent "as the system", future bot posts). Each org names its own
+ * entity; the default is the generic "System". Golfapalooza uses "Al Pine".
+ *
+ * Stored on v2_organizations (system_name / system_avatar_url) rather than a
+ * v2_profile, because v2_profiles.id FKs auth.users — there's no clean way to
+ * mint one system profile per tenant. See migration 00223.
  */
 
-export interface SystemProfile {
-  id: string;
-  display_name: string;
+export interface SystemIdentity {
+  name: string;
   avatar_url: string | null;
 }
 
-/** The system profile, or null if it hasn't been provisioned. */
-export async function getSystemProfile(admin: SupabaseClient): Promise<SystemProfile | null> {
-  const { data } = await admin
-    .from("v2_profiles")
-    .select("id, display_name, avatar_url")
-    .eq("is_system", true)
-    .limit(1)
-    .maybeSingle();
-  return data ?? null;
-}
+const DEFAULT_SYSTEM_NAME = "System";
 
-/** Just the system profile's id (for FK/actor fields), or null. */
-export async function getSystemProfileId(admin: SupabaseClient): Promise<string | null> {
-  return (await getSystemProfile(admin))?.id ?? null;
+/** The org's system identity (name + avatar), with a safe generic default. */
+export async function getOrgSystemIdentity(
+  admin: SupabaseClient,
+  orgId: string,
+): Promise<SystemIdentity> {
+  const { data } = await admin
+    .from("v2_organizations")
+    .select("system_name, system_avatar_url")
+    .eq("id", orgId)
+    .maybeSingle();
+  return {
+    name: data?.system_name?.trim() || DEFAULT_SYSTEM_NAME,
+    avatar_url: data?.system_avatar_url ?? null,
+  };
 }

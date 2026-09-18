@@ -108,6 +108,24 @@
   font-weight: 600;
   padding: 0 4px;
 }
+/* Active "showing one upload" chip — tap the ✕ to clear back to the full grid. */
+.bulkChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px 0 12px;
+  border-radius: 999px;
+  border: none;
+  background: var(--brand);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bulkChip svg {
+  opacity: 0.85;
+}
 .loozerPanel {
   flex: none;
   border-bottom: 1px solid var(--line);

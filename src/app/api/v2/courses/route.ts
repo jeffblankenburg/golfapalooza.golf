@@ -66,8 +66,9 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { name, city, state, address, phone, website, hole_count, tee_name, tee_color, course_rating, slope_rating, par } = body;
+    const { name, city, state, address, phone, website, hole_count, tee_name, tee_color, gender, course_rating, slope_rating, par } = body;
     if (!name) return NextResponse.json({ error: "Course name is required" }, { status: 400 });
+    const teeGender = ["men", "women", "all"].includes(gender ?? "") ? gender : "all";
 
     const holes = hole_count === 9 ? 9 : 18;
     const coords = await geocodeAddress({ address, city, state, name });
@@ -100,6 +101,7 @@ export async function POST(request: Request) {
         course_id: course.id,
         tee_name: tee_name || "White",
         tee_color: tee_color || null,
+        gender: teeGender,
         course_rating: course_rating || null,
         slope_rating: slope_rating || null,
         par: par || (holes === 9 ? 36 : 72),

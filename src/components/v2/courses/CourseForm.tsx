@@ -45,6 +45,7 @@ export default function CourseForm({ slug, course }: CourseFormProps) {
   // Initial tee fields (only for new courses)
   const [teeName, setTeeName] = useState("White");
   const [teeColor, setTeeColor] = useState("White");
+  const [teeGender, setTeeGender] = useState<"all" | "men" | "women">("all");
   const [courseRating, setCourseRating] = useState("");
   const [slopeRating, setSlopeRating] = useState("");
   const [par, setPar] = useState("72");
@@ -86,6 +87,7 @@ export default function CourseForm({ slug, course }: CourseFormProps) {
             hole_count: holeCount,
             tee_name: teeName,
             tee_color: teeColor,
+            gender: teeGender,
             course_rating: courseRating ? parseFloat(courseRating) : null,
             slope_rating: slopeRating ? parseInt(slopeRating) : null,
             par: parseInt(par),
@@ -226,6 +228,21 @@ export default function CourseForm({ slug, course }: CourseFormProps) {
                       teeColor === name ? "ring-2 ring-green-500 ring-offset-2" : ""
                     }`}
                   />
+                ))}
+              </div>
+            </div>
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tees for</label>
+              <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden">
+                {([["all", "Everyone"], ["men", "Men's"], ["women", "Women's"]] as const).map(([val, label]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setTeeGender(val)}
+                    className={`px-3 py-1.5 text-xs font-medium ${teeGender === val ? "bg-green-600 text-white" : "bg-white text-gray-600"}`}
+                  >
+                    {label}
+                  </button>
                 ))}
               </div>
             </div>

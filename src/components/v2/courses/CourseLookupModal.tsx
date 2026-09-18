@@ -266,9 +266,9 @@ export default function CourseLookupModal({ initialName = "", onClose, onCourseR
   }
 
   return (
-    <div className="fixed top-14 bottom-16 left-0 right-0 z-35 flex items-end justify-center">
+    <div className="fixed inset-0 z-[58] flex items-center justify-center p-5">
       <div className="absolute inset-0 bg-[#17211d]/20 backdrop-blur-[6px]" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-white rounded-t-3xl animate-slide-up max-h-full flex flex-col">
+      <div className="relative w-full max-w-lg max-h-[85dvh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
         <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100">
           <h2 className="text-lg font-semibold text-gray-900 truncate">Add a New Course</h2>
           <button

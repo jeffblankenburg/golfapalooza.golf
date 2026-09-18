@@ -175,6 +175,36 @@
 .drawerAction:active {
   background: rgba(23, 33, 29, 0.06);
 }
+/* Title + primary "+" action, grouped on the left of a drawer header. */
+.drawerHeadLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+/* Primary "+" action in a drawer header — a filled brand circle. When it opens a
+   toggleable surface (My Rounds form) it rotates the + into an × and turns a
+   subtle red, so it reads as "close" without a second × next to the drawer close. */
+.drawerAddBtn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+.drawerAddBtn:active {
+  filter: brightness(0.92);
+}
+.drawerAddBtn[data-open] {
+  transform: rotate(45deg);
+  background: #c9524c;
+}
 .drawerClose {
   background: none;
   border: none;

@@ -6,29 +6,6 @@
   flex-direction: column;
   position: relative;
 }
-.addFab {
-  position: absolute;
-  right: 16px;
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  z-index: 5;
-  width: 52px;
-  height: 52px;
-  display: grid;
-  place-items: center;
-  border: none;
-  border-radius: 50%;
-  background: var(--brand);
-  color: #fff;
-  cursor: pointer;
-  box-shadow: 0 8px 22px -8px color-mix(in srgb, var(--brand) 70%, transparent);
-}
-.addFab:active {
-  transform: scale(0.96);
-}
-.addFab:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
 .uploadToast {
   position: absolute;
   left: 50%;

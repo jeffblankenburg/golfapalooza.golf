@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isAnyOrgAdmin } from "@/lib/v2/orgs";
 import { geocodeAddress } from "@/lib/v2/geocode";
+import { compareTees } from "@/lib/v2/golf/tees";
 
 const HOLE_SELECT =
   "id, tee_id, hole_number, par, handicap_index, yards, meters, hole_name, tee_latitude, tee_longitude, green_latitude, green_longitude, green_front_latitude, green_front_longitude, green_back_latitude, green_back_longitude, drive_latitude, drive_longitude, center_line";
@@ -31,9 +32,9 @@ export async function GET(
   if (!course) return NextResponse.json({ error: "Course not found" }, { status: 404 });
 
   const { data: teeData } = await admin
-    .from("v2_course_tees").select("*").eq("course_id", id)
-    .order("course_rating", { ascending: false });
-  const tees = teeData || [];
+    .from("v2_course_tees").select("*").eq("course_id", id);
+  // Canonical order: men's/unisex (longest first), then women's (longest first).
+  const tees = (teeData || []).slice().sort(compareTees);
   const teeIds = tees.map((t) => t.id);
 
   let allHoles: HoleRow[] = [];
@@ -107,7 +108,7 @@ export async function PUT(
     const {
       name, club_name, city, state, address, phone, website,
       hole_count, latitude, longitude,
-      tee_id, tee_name, tee_color, course_rating, slope_rating, par,
+      tee_id, tee_name, tee_color, gender, course_rating, slope_rating, par,
     } = body;
 
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString(), updated_by: userId };
@@ -135,6 +136,7 @@ export async function PUT(
       const teeUpdates: Record<string, unknown> = {};
       if (tee_name !== undefined) teeUpdates.tee_name = tee_name || "White";
       if (tee_color !== undefined) teeUpdates.tee_color = tee_color || null;
+      if (gender !== undefined) teeUpdates.gender = ["men", "women", "all"].includes(gender) ? gender : "all";
       if (course_rating !== undefined) teeUpdates.course_rating = course_rating || null;
       if (slope_rating !== undefined) teeUpdates.slope_rating = slope_rating || null;
       if (par !== undefined) teeUpdates.par = par || 72;

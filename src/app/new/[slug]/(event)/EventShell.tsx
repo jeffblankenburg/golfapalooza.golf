@@ -10,6 +10,7 @@ import ProfileDrawer from "./ProfileDrawer";
 import NotificationDrawer from "./NotificationDrawer";
 import ChatDrawer from "./ChatDrawer";
 import PhotosDrawer from "./PhotosDrawer";
+import RoundsDrawer from "./RoundsDrawer";
 import { useV2Music } from "./MusicProvider";
 import FeatureIcon from "@/app/new/_components/FeatureIcon";
 import type { NavFeature, LauncherGroup } from "@/lib/v2/features";
@@ -70,6 +71,9 @@ export default function EventShell({
 }) {
   const [open, setOpen] = useState<DrawerKey | null>(null);
   const [everythingOpen, setEverythingOpen] = useState(false);
+  // The My Rounds "log a round" form: header +/× toggles it. Reset in `toggle`
+  // (any drawer switch) so reopening My Rounds always lands on the list.
+  const [roundsFormOpen, setRoundsFormOpen] = useState(false);
   const [unread, setUnread] = useState(initialUnreadCount);
   const [chatUnread, setChatUnread] = useState(initialChatUnread);
   // A notification/activity deep-link target for a drawer (room or photo id),
@@ -93,6 +97,7 @@ export default function EventShell({
     // reopened drawer doesn't jump back to a previously deep-linked item.
     setDeepLink((d) => (d.room || d.photo || d.msg || d.bulk ? {} : d));
     setEverythingOpen(false);
+    setRoundsFormOpen(false);
     const willOpen = open !== k;
     // Closing chat: read receipts may have changed — refresh the badge.
     if (open === "chat" && k === "chat") refetchChatUnread();
@@ -350,7 +355,34 @@ export default function EventShell({
       <div className={styles.backdrop} data-open={open !== null} onClick={() => setOpen(null)} aria-hidden />
       <section className={styles.drawer} data-open={open !== null} aria-hidden={open === null}>
         <div className={styles.drawerHead}>
-          <span className={styles.drawerTitle}>{open ? DRAWERS[open].title : ""}</span>
+          <div className={styles.drawerHeadLeft}>
+            <span className={styles.drawerTitle}>{open ? DRAWERS[open].title : ""}</span>
+            {open === "rounds" && (
+              <button
+                type="button"
+                className={styles.drawerAddBtn}
+                data-open={roundsFormOpen || undefined}
+                onClick={() => setRoundsFormOpen((v) => !v)}
+                aria-label={roundsFormOpen ? "Close" : "Log a round"}
+              >
+                <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </button>
+            )}
+            {open === "photos" && (
+              <button
+                type="button"
+                className={styles.drawerAddBtn}
+                onClick={() => window.dispatchEvent(new CustomEvent("ui:photos-add"))}
+                aria-label="Add photos"
+              >
+                <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </button>
+            )}
+          </div>
           <div className={styles.drawerHeadActions}>
             {open === "notifications" && (
               <button
@@ -385,9 +417,15 @@ export default function EventShell({
             <ChatDrawer orgId={orgId} userId={userId} initialRoom={deepLink.room} initialMessageId={deepLink.msg} />
           ) : open === "photos" ? (
             <PhotosDrawer orgId={orgId} userId={userId} isAdmin={isAdmin} initialPhotoId={deepLink.photo} initialBulkId={deepLink.bulk} />
-          ) : (
-            open && <p className={styles.drawerStub}>{DRAWERS[open].body}</p>
-          )}
+          ) : open === "rounds" ? (
+            <RoundsDrawer
+              active={open === "rounds"}
+              orgId={orgId}
+              formOpen={roundsFormOpen}
+              onExitForm={() => setRoundsFormOpen(false)}
+              onCloseDrawer={() => setOpen(null)}
+            />
+          ) : null}
         </div>
       </section>
 

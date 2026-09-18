@@ -1,0 +1,128 @@
+import { NextResponse } from "next/server";
+import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
+import { formatCourseName } from "@/lib/v2/course-display";
+import { expectedHoleCount, isRoundIncomplete } from "@/lib/rounds/incomplete";
+
+/**
+ * GET /api/v2/rounds/[id] — one round's detail for the in-drawer scorecard: a
+ * shared par row + EVERY player's hole-by-hole scores (the viewer's is flagged
+ * so the UI can highlight it), plus the viewer's gross/adjusted/differential.
+ * Personal & global — any authed user can read a round.
+ */
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { userId } = await v2GetUser(request);
+  if (!userId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  const admin = v2AdminClient();
+  const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
+
+  const { data: round } = await admin
+    .from("v2_rounds")
+    .select(
+      `id, round_date, round_type, format, status,
+       course:v2_courses(name, club_name),
+       tee:v2_course_tees(tee_name, tee_color, gender, course_rating, slope_rating, par),
+       players:v2_round_players(
+         id, user_id, guest_name, tee_id, player_position,
+         final_gross_score, final_adjusted_score, score_differential,
+         profile:v2_profiles(display_name, first_name, last_name, nickname, avatar_url)
+       )`,
+    )
+    .eq("id", id)
+    .order("player_position", { referencedTable: "players", ascending: true })
+    .maybeSingle();
+
+  if (!round) return NextResponse.json({ error: "Round not found" }, { status: 404 });
+
+  const playerRows = round.players || [];
+  const viewer = playerRows.find((p) => p.user_id === userId) || playerRows[0] || null;
+  const course = one(round.course);
+  const roundTee = one(round.tee);
+
+  // The holes that belong to this round's nine (front 1–9, back 10–18, all 18).
+  const inNine = (h: number) =>
+    round.round_type === "9-front" ? h <= 9 : round.round_type === "9-back" ? h >= 10 : true;
+
+  // Shared par row from the viewer's tee (composition-tee resolution is a TODO).
+  const gridTeeId = viewer?.tee_id ?? null;
+  const { data: holeRows } = gridTeeId
+    ? await admin
+        .from("v2_course_holes")
+        .select("hole_number, par, handicap_index")
+        .eq("tee_id", gridTeeId)
+        .order("hole_number", { ascending: true })
+    : { data: [] };
+  const holes = (holeRows || [])
+    .filter((h) => inNine(h.hole_number))
+    .map((h) => ({ hole_number: h.hole_number, par: h.par, handicap_index: h.handicap_index }));
+
+  // Every player's hole scores for this round, grouped by player.
+  const { data: scoreRows } = await admin
+    .from("v2_round_scores")
+    .select("round_player_id, hole_number, strokes")
+    .eq("round_id", id);
+  const scoresByPlayer = new Map<string, Record<number, number>>();
+  for (const s of scoreRows || []) {
+    if (!inNine(s.hole_number)) continue;
+    const m = scoresByPlayer.get(s.round_player_id) || {};
+    if (s.strokes != null) m[s.hole_number] = s.strokes;
+    scoresByPlayer.set(s.round_player_id, m);
+  }
+
+  const teePar = roundTee?.par ?? 72;
+  const parFromHoles = holes.reduce((sum, h) => sum + h.par, 0);
+  const par = parFromHoles || (round.round_type === "18" ? teePar : Math.round(teePar / 2));
+
+  const viewerGross = viewer?.final_gross_score ?? null;
+  const viewerHolesPlayed = Object.keys(scoresByPlayer.get(viewer?.id ?? "") || {}).length;
+  const isIncomplete = isRoundIncomplete(round.round_type, viewerHolesPlayed, viewerGross != null);
+  const viewerToPar = isIncomplete || viewerGross == null ? null : viewerGross - par;
+
+  const players = playerRows.map((p) => {
+    const scores = scoresByPlayer.get(p.id) || {};
+    const gross = p.final_gross_score ?? null;
+    const prof = one(p.profile);
+    return {
+      is_viewer: p.id === viewer?.id,
+      is_guest: !p.user_id,
+      guest_name: p.guest_name ?? null,
+      profile: prof
+        ? {
+            display_name: prof.display_name,
+            first_name: prof.first_name,
+            last_name: prof.last_name,
+            nickname: prof.nickname,
+            avatar_url: prof.avatar_url,
+          }
+        : null,
+      gross,
+      to_par: gross != null ? gross - par : null,
+      scores,
+    };
+  });
+
+  return NextResponse.json({
+    id: round.id,
+    round_date: round.round_date,
+    round_type: round.round_type,
+    format: round.format,
+    status: round.status,
+    course_name: course ? formatCourseName(course) : "Unknown",
+    tee_name: roundTee?.tee_name || "",
+    tee_color: roundTee?.tee_color ?? null,
+    tee_gender: roundTee?.gender ?? null,
+    course_rating: roundTee?.course_rating ?? null,
+    slope_rating: roundTee?.slope_rating ?? null,
+    par,
+    gross: viewerGross,
+    adjusted: viewer?.final_adjusted_score ?? null,
+    differential: viewer?.score_differential ?? null,
+    to_par: viewerToPar,
+    is_incomplete: isIncomplete,
+    holes_played: viewerHolesPlayed,
+    expected_holes: expectedHoleCount(round.round_type),
+    holes,
+    players,
+  });
+}

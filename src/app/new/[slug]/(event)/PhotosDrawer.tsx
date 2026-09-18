@@ -167,6 +167,15 @@ export default function PhotosDrawer({
     };
   }, [orgId]);
 
+  // The "add photos" + lives in the shared drawer header now (EventShell).
+  useEffect(() => {
+    const handler = () => {
+      if (!upload) fileRef.current?.click();
+    };
+    window.addEventListener("ui:photos-add", handler);
+    return () => window.removeEventListener("ui:photos-add", handler);
+  }, [upload]);
+
   const viewerItems = useMemo(() => items.map((it) => toViewerItem(it, userId, mode)), [items, userId, mode]);
 
   // Deep-link: open the specific photo from a notification tap.
@@ -477,7 +486,7 @@ export default function PhotosDrawer({
         </div>
       )}
 
-      {/* Add photos (single or bulk). */}
+      {/* Add photos (single or bulk) — triggered by the header + (ui:photos-add). */}
       <input
         ref={fileRef}
         type="file"
@@ -489,17 +498,6 @@ export default function PhotosDrawer({
           e.target.value = "";
         }}
       />
-      <button
-        type="button"
-        className={styles.addFab}
-        onClick={() => fileRef.current?.click()}
-        disabled={!!upload}
-        aria-label="Add photos"
-      >
-        <svg width="26" height="26" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-      </button>
 
       {upload && (
         <div className={styles.uploadToast}>

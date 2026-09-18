@@ -43,5 +43,5 @@ export async function GET(request: Request) {
     })
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
 
-  return NextResponse.json({ members });
+  return NextResponse.json({ members, viewerId: userId });
 }

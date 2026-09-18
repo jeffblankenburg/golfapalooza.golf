@@ -14,12 +14,13 @@ export async function POST(request: Request) {
   if (!userId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   let body: {
-    course_id?: string; tee_name?: string; tee_color?: string | null;
+    course_id?: string; tee_name?: string; tee_color?: string | null; gender?: string;
     course_rating?: number; slope_rating?: number; par?: number; duplicate_from?: string;
   };
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
-  const { course_id, tee_name, tee_color, course_rating, slope_rating, par, duplicate_from } = body;
+  const { course_id, tee_name, tee_color, gender, course_rating, slope_rating, par, duplicate_from } = body;
   if (!course_id || !tee_name) return NextResponse.json({ error: "course_id and tee_name are required" }, { status: 400 });
+  const teeGender = ["men", "women", "all"].includes(gender ?? "") ? gender : "all";
 
   const admin = v2AdminClient();
 
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
 
   const { data: tee, error: teeError } = await admin
     .from("v2_course_tees")
-    .insert({ course_id, tee_name, tee_color: sourceColor, course_rating: sourceRating, slope_rating: sourceSlope, par: sourcePar })
+    .insert({ course_id, tee_name, tee_color: sourceColor, gender: teeGender, course_rating: sourceRating, slope_rating: sourceSlope, par: sourcePar })
     .select()
     .single();
   if (teeError) return NextResponse.json({ error: teeError.message }, { status: 500 });
@@ -92,9 +93,9 @@ export async function PUT(request: Request) {
   const { userId } = await v2GetUser(request);
   if (!userId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  let body: { tee_id?: string; tee_name?: string; tee_color?: string | null; course_rating?: number; slope_rating?: number; par?: number };
+  let body: { tee_id?: string; tee_name?: string; tee_color?: string | null; gender?: string; course_rating?: number; slope_rating?: number; par?: number };
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
-  const { tee_id, tee_name, tee_color, course_rating, slope_rating, par } = body;
+  const { tee_id, tee_name, tee_color, gender, course_rating, slope_rating, par } = body;
   if (!tee_id) return NextResponse.json({ error: "tee_id is required" }, { status: 400 });
 
   const admin = v2AdminClient();
@@ -104,6 +105,7 @@ export async function PUT(request: Request) {
   const updates: Record<string, unknown> = {};
   if (tee_name !== undefined) updates.tee_name = tee_name || "White";
   if (tee_color !== undefined) updates.tee_color = tee_color || null;
+  if (gender !== undefined) updates.gender = ["men", "women", "all"].includes(gender) ? gender : "all";
   if (course_rating !== undefined) updates.course_rating = course_rating || null;
   if (slope_rating !== undefined) updates.slope_rating = slope_rating || null;
   if (par !== undefined) updates.par = par || 72;

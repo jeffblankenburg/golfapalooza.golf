@@ -2965,3 +2965,1001 @@ button.feedRow:active {
   font-size: 0.9rem;
   padding: 32px 0;
 }
+
+/* ── My Rounds drawer ──────────────────────────────────────────────────────── */
+.roundsWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.roundsStats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.roundStat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+}
+.roundStat[data-accent="hcp"] {
+  border-color: color-mix(in srgb, var(--brand) 35%, transparent);
+  background: color-mix(in srgb, var(--brand) 6%, var(--card));
+}
+.roundStatLabel {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+.roundStatValue {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.roundStat[data-accent="hcp"] .roundStatValue {
+  color: var(--brand);
+}
+.roundStat[data-accent="best"] .roundStatValue {
+  color: #16a34a;
+}
+
+.roundList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.roundItem {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  overflow: hidden;
+}
+.roundRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 13px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.roundRow:active {
+  background: rgba(23, 33, 29, 0.04);
+}
+.roundChev {
+  flex: none;
+  color: var(--ink-soft);
+  transition: transform 0.18s ease;
+}
+.roundItem[data-open] .roundChev {
+  transform: rotate(180deg);
+}
+.roundBody {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px 13px 14px;
+  border-top: 1px solid var(--line);
+}
+.roundBodyMeta {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+.roundDate {
+  flex: none;
+  width: 38px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+.roundDateMon {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+.roundDateDay {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.roundInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.roundCourse {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.roundBadges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.roundBadge {
+  font-size: 0.63rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--ink) 6%, var(--paper));
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.roundBadge[data-live] {
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, var(--card));
+}
+.roundBadge[data-warn] {
+  color: #b45309;
+  background: color-mix(in srgb, #b45309 12%, var(--card));
+}
+.roundTee {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+}
+.roundScore {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.05;
+}
+.roundScoreNum {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.roundToPar {
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.roundToPar[data-sign="under"] {
+  color: #16a34a;
+}
+.roundToPar[data-sign="over"] {
+  color: #b91c1c;
+}
+.roundToPar[data-sign="even"] {
+  color: var(--ink-soft);
+}
+.roundScoreDash {
+  font-size: 1.1rem;
+  color: var(--ink-soft);
+}
+
+.roundsEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 44px 20px;
+}
+.roundsEmptyIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 10%, var(--card));
+  margin-bottom: 2px;
+}
+.roundsEmptyTitle {
+  font-weight: 600;
+  color: var(--ink);
+}
+.roundsEmptySub {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  max-width: 34ch;
+}
+
+/* ── Round scorecard (inline in the accordion body) ───────────────────────── */
+.scCard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  overflow-x: auto;
+}
+.scNine {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 300px; /* keep columns legible; .scCard scrolls-x if narrower */
+}
+.scRow {
+  display: flex;
+  align-items: center;
+}
+.scRowLabel {
+  flex: none;
+  width: 46px;
+  padding-right: 4px;
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+.scHead,
+.scPar,
+.scHcp {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+.scHead {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.scHead[data-total] {
+  color: var(--ink);
+}
+.scPar {
+  font-size: 0.66rem;
+  color: var(--ink-soft);
+}
+.scPar[data-total] {
+  font-weight: 700;
+  color: var(--ink);
+}
+.scHcp {
+  font-size: 0.58rem;
+  color: var(--line-strong);
+}
+.scCell {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+}
+/* Fixed-width total column so every row's total lines up. */
+.scNine [data-total] {
+  flex: none;
+  width: 30px;
+}
+/* One row per player; the viewer's row is subtly highlighted. */
+.scScoreRow {
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+}
+.scScoreRow[data-viewer] {
+  background: color-mix(in srgb, var(--brand) 8%, var(--card));
+}
+.scNameLabel {
+  flex: none;
+  width: 46px;
+  padding-right: 4px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scScoreRow[data-viewer] .scNameLabel {
+  color: var(--brand);
+}
+.scMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+/* Two-digit hole scores (10+) grow the shape into an oval/rounded-rect but stay centered. */
+.scMark[data-two] {
+  width: auto;
+  min-width: 20px;
+  padding: 0 3px;
+}
+/* Optical vertical centering: digits sit ~1px high within their line box
+   (ascender bias), so nudge the glyph — not the shape — down to sit dead-center. */
+.scNum {
+  display: block;
+  line-height: 1;
+  transform: translateY(0.75px);
+}
+.scMark[data-mark="birdie"] {
+  border: 1.5px solid #16a34a;
+  border-radius: 50%;
+  color: #15803d;
+}
+.scMark[data-mark="eagle"] {
+  border: 1.5px solid #16a34a;
+  border-radius: 50%;
+  color: #15803d;
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 3.5px #16a34a;
+}
+.scMark[data-mark="bogey"] {
+  border: 1.5px solid var(--ink);
+  border-radius: 4px;
+}
+.scMark[data-mark="double"] {
+  border: 1.5px solid #b91c1c;
+  border-radius: 4px;
+  color: #b91c1c;
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 3.5px #b91c1c;
+}
+.scMark[data-mark="none"] {
+  color: var(--line-strong);
+  font-weight: 400;
+}
+.scTotalNum {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.scQuickNote {
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--ink-soft);
+}
+.scTotals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+  gap: 8px;
+}
+.scTotal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+}
+.scTotalLabel {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.scTotalValue {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.scTotalValue[data-sign="under"] {
+  color: #16a34a;
+}
+.scTotalValue[data-sign="over"] {
+  color: #b91c1c;
+}
+.scIncomplete {
+  font-size: 0.8rem;
+  color: #b45309;
+  background: color-mix(in srgb, #b45309 8%, var(--card));
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.scPlayers {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.scPlayersLabel {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+.scPlayerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--card);
+}
+.scPlayerRow[data-viewer] {
+  border-color: color-mix(in srgb, var(--brand) 35%, transparent);
+  background: color-mix(in srgb, var(--brand) 8%, var(--card));
+}
+.scPlayerName {
+  font-size: 0.9rem;
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.scGuestTag {
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--ink) 6%, var(--paper));
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.scPlayerTotals {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.scPlayerGross {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.scPlayerPar {
+  min-width: 34px;
+  text-align: right;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.scPlayerPar[data-sign="under"] {
+  color: #16a34a;
+}
+.scPlayerPar[data-sign="over"] {
+  color: #b91c1c;
+}
+.scPlayerPar[data-sign="even"] {
+  color: var(--ink-soft);
+}
+.scTeamNames {
+  padding: 2px 2px 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+
+/* ── Log a round (RoundForm) ──────────────────────────────────────────────── */
+.courseListHead {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.courseLocBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--brand);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.courseLocBtn:disabled {
+  opacity: 0.6;
+}
+.roundFormHint {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+.coursePicked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 11px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+}
+.coursePickedName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.coursePickedChange {
+  flex: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--brand);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+.courseResults {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  /* Cap at ~5.5 rows so a longer list peeks + scrolls (the .5 signals "more").
+     5 rows @ 50px + inter-row borders + half of row 6. */
+  max-height: 280px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.courseHit {
+  flex: none;
+  min-height: 50px; /* grows for a wrapped name instead of overlapping the next row */
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border: none;
+  background: var(--card);
+  cursor: pointer;
+  text-align: left;
+}
+.courseHit + .courseHit {
+  border-top: 1px solid var(--line);
+}
+.courseHit:active {
+  background: rgba(23, 33, 29, 0.04);
+}
+/* Course name → club (if different) → city, mirroring the Courses page. */
+.courseHitMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.courseHitName {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  /* Long names wrap to at most 2 lines, then ellipsize (no runaway rows). */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.courseHitClub,
+.courseHitLoc {
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.courseHitDist {
+  flex: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--brand);
+  white-space: nowrap;
+}
+.courseAddBtn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--brand);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+/* ── Log-a-round wizard (steps + progress bar) ────────────────────────────── */
+/* Running summary of what's been built, shown from step 2 on — small + compact. */
+.wizSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 11px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--ink) 3%, var(--card));
+}
+.wizSummaryCourse {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wizSummaryLoc {
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+}
+.wizSummaryMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+}
+.wizSummaryBadge {
+  font-size: 0.58rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, var(--card));
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.wizSummaryChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.wizChip {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 10%, var(--card));
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.wizSteps {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.wizStep {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.wizStep:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.wizSeg {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line);
+}
+.wizStep[data-state="current"] .wizSeg,
+.wizStep[data-state="done"] .wizSeg {
+  background: var(--brand);
+}
+.wizStepLabel {
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--ink-soft);
+}
+.wizStep[data-state="current"] .wizStepLabel,
+.wizStep[data-state="done"] .wizStepLabel {
+  color: var(--ink);
+}
+.wizNav {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.wizNav .createBtn {
+  flex: 1;
+}
+.wizBackBtn {
+  flex: none;
+  padding: 12px 16px;
+  border-radius: 11px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.wizPlayerList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.wizPlayerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--card);
+}
+.wizPlayerName {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.wizPlayerYou {
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, var(--card));
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.wizPlayerRemove {
+  flex: none;
+  display: flex;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--ink-soft);
+  padding: 2px;
+}
+.wizGuestRow {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.wizGuestRow .input {
+  flex: 1;
+}
+.wizGuestAdd {
+  flex: none;
+  padding: 0 16px;
+  border-radius: 11px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.wizGuestAdd:disabled {
+  opacity: 0.5;
+}
+.teeQuick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.teeQuickLabel {
+  margin-right: 2px;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+}
+.teeQuickBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+/* Per-player tee choice — name on the left, custom dropdown on the right. */
+.wizTeePlayer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+}
+.wizTeePlayerName {
+  flex: none;
+  width: 84px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Custom (CSS-styled) tee dropdown — replaces the native <select>. */
+.teeSelect {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.teeSelectControl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 11px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--font-libre), sans-serif;
+  font-size: 0.95rem;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease;
+}
+.teeSelectControl[data-open] {
+  border-color: var(--brand);
+}
+.teeSelectValue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.teeSelectName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.teeSelectMeta {
+  margin-left: auto;
+  padding-left: 8px;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.teeSelectPlaceholder {
+  flex: 1;
+  color: rgba(89, 99, 91, 0.7);
+}
+.teeSelectChev {
+  flex: none;
+  color: var(--ink-soft);
+  transition: transform 0.15s ease;
+}
+.teeSelectControl[data-open] .teeSelectChev {
+  transform: rotate(180deg);
+}
+.teeSelectMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 244px;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: 11px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  box-shadow: 0 12px 28px rgba(23, 33, 29, 0.16);
+}
+.teeSelectOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-libre), sans-serif;
+  font-size: 0.95rem;
+  cursor: pointer;
+  text-align: left;
+}
+.teeSelectOption:hover {
+  background: var(--paper);
+}
+.teeSelectOption[data-on] {
+  background: color-mix(in srgb, var(--brand) 12%, var(--card));
+  color: var(--brand);
+}
+.wizScoreRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.wizScoreName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.wizScoreInput {
+  flex: none;
+  width: 100px;
+  padding: 11px 12px;
+  border-radius: 11px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--font-libre), sans-serif;
+  font-size: 1rem;
+  text-align: center;
+}
+
+/* Full-width segmented control (Holes / Format) — sized to match .input boxes
+   so the Details step reads as a stack of equally weighted fields. */
+.wizSegToggle {
+  display: flex;
+  width: 100%;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 11px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+}
+.wizSegOption {
+  flex: 1;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 11px 8px;
+  border-radius: 8px;
+  font-family: var(--font-libre), sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-align: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.wizSegOption[data-on] {
+  background: var(--brand);
+  color: #fff;
+}
+
+/* A small color chip for a tee, plus a concise women's marker. */
+.teeDot {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  flex: none;
+  vertical-align: middle;
+}
+.teeWMark {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--brand);
+}
+.wizPlayerCap {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}

@@ -327,6 +327,30 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+const GENDER_OPTIONS: { value: "all" | "men" | "women"; label: string }[] = [
+  { value: "all", label: "Everyone" },
+  { value: "men", label: "Men's" },
+  { value: "women", label: "Women's" },
+];
+
+/** Segmented control for a tee's gender (men's / women's / unisex). */
+function GenderPicker({ value, onChange }: { value: "all" | "men" | "women"; onChange: (g: "all" | "men" | "women") => void }) {
+  return (
+    <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden">
+      {GENDER_OPTIONS.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          className={`px-3 py-1.5 text-xs font-medium ${value === o.value ? "bg-green-600 text-white" : "bg-white text-gray-600"}`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /* ── Tees ─────────────────────────────────────────────────────────────────── */
 function TeesTab({ tees, compIds, compMappings, onReload, onDelete, courseId, flash }: {
   tees: Tee[]; compIds: string[]; compMappings: Record<string, CompMap[]>;
@@ -334,21 +358,22 @@ function TeesTab({ tees, compIds, compMappings, onReload, onDelete, courseId, fl
 }) {
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newGender, setNewGender] = useState<"all" | "men" | "women">("all");
 
   async function addTee() {
     if (!newName.trim()) return;
     const res = await fetch(`/api/v2/courses/tees`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ course_id: courseId, tee_name: newName.trim() }),
+      body: JSON.stringify({ course_id: courseId, tee_name: newName.trim(), gender: newGender }),
     });
-    if (res.ok) { setNewName(""); setAdding(false); onReload(); flash("Tee added"); }
+    if (res.ok) { setNewName(""); setNewGender("all"); setAdding(false); onReload(); flash("Tee added"); }
   }
   async function saveTee(t: Tee) {
     const res = await fetch(`/api/v2/courses/tees`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tee_id: t.id, tee_name: t.tee_name, tee_color: t.tee_color, course_rating: t.course_rating, slope_rating: t.slope_rating, par: t.par }),
+      body: JSON.stringify({ tee_id: t.id, tee_name: t.tee_name, tee_color: t.tee_color, gender: t.gender, course_rating: t.course_rating, slope_rating: t.slope_rating, par: t.par }),
     });
     // Reload so the accordion summary (which reads saved props) reflects the edit.
     if (res.ok) { flash("Tee saved"); onReload(); } else { flash((await res.json().catch(() => ({}))).error || "Could not save tee"); }
@@ -371,11 +396,14 @@ function TeesTab({ tees, compIds, compMappings, onReload, onDelete, courseId, fl
       ))}
 
       {adding ? (
-        <div className="flex gap-2">
-          <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Tee name (e.g. Blue)"
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg" />
-          <button type="button" onClick={addTee} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium">Add</button>
-          <button type="button" onClick={() => setAdding(false)} className="px-3 py-2 text-gray-500 text-sm">Cancel</button>
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Tee name (e.g. Blue)"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg" />
+            <button type="button" onClick={addTee} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium">Add</button>
+            <button type="button" onClick={() => setAdding(false)} className="px-3 py-2 text-gray-500 text-sm">Cancel</button>
+          </div>
+          <GenderPicker value={newGender} onChange={setNewGender} />
         </div>
       ) : (
         <button type="button" onClick={() => setAdding(true)} className="text-sm font-semibold text-green-700">+ Add tee box</button>
@@ -404,6 +432,8 @@ function TeeRow({ tee, isComp, eligible, mappingArr, onSave, onDelete, onChanged
         <span className={`w-4 h-4 shrink-0 rounded-full ${sumCls.bg}`} style={dotStyle(sumCls)} />
         <span className="flex-1 min-w-0 truncate text-sm font-medium text-gray-900">
           {tee.tee_name}
+          {tee.gender === "women" && <span className="ml-1.5 text-[0.6rem] uppercase tracking-wide text-pink-600">Women&apos;s</span>}
+          {tee.gender === "men" && <span className="ml-1.5 text-[0.6rem] uppercase tracking-wide text-gray-400">Men&apos;s</span>}
           {isComp && <span className="ml-1.5 text-[0.6rem] uppercase tracking-wide text-gray-400">Hybrid</span>}
         </span>
         <span className="text-xs text-gray-500 whitespace-nowrap">Par {tee.par}</span>
@@ -426,6 +456,10 @@ function TeeRow({ tee, isComp, eligible, mappingArr, onSave, onDelete, onChanged
                 className={`w-6 h-6 rounded-full ${c.bg} ${t.tee_color === c.value ? "ring-2 ring-green-500 ring-offset-1" : ""}`} />
             ))}
           </div>
+        </div>
+        <div className="mb-2">
+          <label className="block text-[0.65rem] text-gray-500 mb-1">Tees for</label>
+          <GenderPicker value={(t.gender as "all" | "men" | "women") ?? "all"} onChange={(g) => setT({ ...t, gender: g })} />
         </div>
         <div className="grid grid-cols-3 gap-2">
           <div><label className="block text-[0.65rem] text-gray-500">Par</label><input type="number" className={input} value={t.par} onChange={(e) => setT({ ...t, par: parseInt(e.target.value) || 0 })} /></div>
@@ -707,7 +741,7 @@ function ScorecardTab({ tees, holes, selectedTeeId, onSelectTee }: {
       {tee && (
         // Fixed 5-column grid so stats stay put when switching tees.
         <div className="grid grid-cols-5 gap-2 mb-4 px-1 py-2 border-y border-gray-200">
-          <ScoreStat label="Tee" value={tee.tee_name} />
+          <ScoreStat label="Tee" value={`${tee.tee_name}${tee.gender === "women" ? " (W)" : ""}`} />
           <ScoreStat label="Rating" value={tee.course_rating ?? "—"} />
           <ScoreStat label="Slope" value={tee.slope_rating ?? "—"} />
           <ScoreStat label="Par" value={tee.par} />
@@ -732,7 +766,7 @@ function TeePicker({ tees, selectedTeeId, onSelect }: { tees: Tee[]; selectedTee
           <button key={t.id} type="button" onClick={() => onSelect(t.id)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium border ${active ? "border-green-600 text-green-700 bg-green-50" : "border-gray-200 text-gray-600"}`}>
             <span className={`inline-block w-2.5 h-2.5 rounded-full mr-1.5 align-middle ${cls.bg}`} style={cls.isGradient ? { background: cls.gradientHex! } : cls.hex ? { background: cls.hex } : undefined} />
-            {t.tee_name}
+            {t.tee_name}{t.gender === "women" ? " (W)" : ""}
           </button>
         );
       })}

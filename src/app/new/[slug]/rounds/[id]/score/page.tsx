@@ -98,6 +98,8 @@ export default async function ScorePage({ params }: { params: Promise<{ slug: st
         initialScores={initialScores}
         trackedStats={trackedStats}
         initialStatus={round.status}
+        viewerId={ctx.userId}
+        orgId={org.id}
       />
     </div>
   );

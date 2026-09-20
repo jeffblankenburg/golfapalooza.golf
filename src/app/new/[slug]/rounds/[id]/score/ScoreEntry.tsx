@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useRouter } from "next/navigation";
 import styles from "./score.module.css";
 import { subscribeToV2Round } from "@/lib/v2/realtime/round-channel";
+import RoundComments from "./RoundComments";
 
 export interface ScoreHole {
   hole_number: number;
@@ -82,6 +83,8 @@ export default function ScoreEntry({
   initialScores,
   trackedStats: initialTracked,
   initialStatus,
+  viewerId,
+  orgId,
 }: {
   slug: string;
   roundId: string;
@@ -91,6 +94,8 @@ export default function ScoreEntry({
   initialScores: Scores;
   trackedStats: StatKey[];
   initialStatus: string;
+  viewerId: string;
+  orgId: string;
 }) {
   const router = useRouter();
   const [scores, setScores] = useState<Scores>(initialScores);
@@ -238,7 +243,8 @@ export default function ScoreEntry({
   const bumpStrokes = (rpId: string, delta: number) => {
     const cur = scores[rpId]?.[hole.hole_number]?.strokes;
     if (cur == null) {
-      if (delta > 0) writeCell(rpId, hole.hole_number, { strokes: hole.par });
+      // First tap seeds the score: + starts at par, − starts one under par.
+      writeCell(rpId, hole.hole_number, { strokes: Math.max(1, delta > 0 ? hole.par : hole.par - 1) });
       return;
     }
     const nextVal = Math.min(20, Math.max(1, cur + delta));
@@ -391,7 +397,7 @@ export default function ScoreEntry({
                       <Fragment key={h.hole_number}>
                         {h.hole_number === 10 && hasBothNines && <td className={styles.cardTotVal}>{anyF ? f9 : "·"}</td>}
                         <td>
-                          {st != null ? <span className={styles.mark} data-mark={markOf(st, h.par)}>{st}</span> : <span className={styles.mark}>·</span>}
+                          {st != null ? <span className={styles.mark} data-mark={markOf(st, h.par)}><span className={styles.markNum}>{st}</span></span> : <span className={styles.mark}>·</span>}
                         </td>
                       </Fragment>
                     );
@@ -445,42 +451,50 @@ export default function ScoreEntry({
                 </div>
                 <div className={styles.runningTotal}>
                   {played.length > 0 && (
-                    <>
-                      <span className={styles.runningNum}>{roundTotal}</span>
-                      <span className={styles.runningToPar}>{toParLabel}</span>
-                    </>
+                    <span className={styles.runningNum}>
+                      {roundTotal}
+                      <sup className={styles.runningSup}>{toParLabel}</sup>
+                    </span>
                   )}
                 </div>
                 <div className={styles.spacer} />
 
-                {/* Strokes (always) */}
+                {/* Strokes (always) — slides right on its own when putts is off. */}
                 <div className={styles.stat}>
-                  <button type="button" className={styles.stepBtn} data-kind="strokes" onClick={() => bumpStrokes(p.id, -1)} disabled={strokes != null && strokes <= 1}>−</button>
+                  <button type="button" className={styles.stepBtn} data-kind="strokes" onClick={() => bumpStrokes(p.id, -1)} disabled={strokes != null && strokes <= 1}><span className={styles.glyph}>−</span></button>
                   <div className={`${styles.statVal} ${styles.statValStrokes}`}>
                     <span className={styles.statNum} data-mark={markOf(strokes, hole.par)}>{strokes ?? "·"}</span>
                     <span className={styles.statLabel}>Strokes</span>
                   </div>
-                  <button type="button" className={styles.stepBtn} data-kind="strokes" onClick={() => bumpStrokes(p.id, 1)}>+</button>
+                  <button type="button" className={styles.stepBtn} data-kind="strokes" onClick={() => bumpStrokes(p.id, 1)}><span className={styles.glyph}>+</span></button>
                 </div>
+
+                {/* Putts inline (v1), when tracked. */}
+                {tracked.includes("putts") && (
+                  <>
+                    <div className={styles.statDivider} />
+                    <div className={styles.stat}>
+                      <button type="button" className={styles.stepBtn} data-kind="minor" onClick={() => bumpPutts(p.id, -1)} disabled={cell.putts != null && cell.putts <= 0}><span className={styles.glyph}>−</span></button>
+                      <div className={`${styles.statVal} ${styles.statValMinor}`}>
+                        <span className={styles.statNumMinor}>{cell.putts ?? "·"}</span>
+                        <span className={styles.statLabel}>Putts</span>
+                      </div>
+                      <button type="button" className={styles.stepBtn} data-kind="minor" onClick={() => bumpPutts(p.id, 1)}><span className={styles.glyph}>+</span></button>
+                    </div>
+                  </>
+                )}
               </div>
 
-              {/* Optional stats wrap onto their own line(s) so nothing scrolls at 400px. */}
-              {tracked.length > 0 && (
+              {/* Fairways / GIR / penalties wrap onto their own line so nothing
+                  scrolls at 400px (putts stays inline above, like v1). */}
+              {(tracked.includes("penalties") || tracked.includes("fairways") || tracked.includes("gir")) && (
                 <div className={styles.playerExtras}>
-                  {tracked.includes("putts") && (
-                    <div className={styles.extraStat}>
-                      <span className={styles.extraLabel}>Putts</span>
-                      <button type="button" className={styles.stepBtn} data-kind="minor" onClick={() => bumpPutts(p.id, -1)} disabled={cell.putts != null && cell.putts <= 0}>−</button>
-                      <span className={styles.extraVal}>{cell.putts ?? "·"}</span>
-                      <button type="button" className={styles.stepBtn} data-kind="minor" onClick={() => bumpPutts(p.id, 1)}>+</button>
-                    </div>
-                  )}
                   {tracked.includes("penalties") && (
                     <div className={styles.extraStat}>
                       <span className={styles.extraLabel}>Pen</span>
-                      <button type="button" className={styles.stepBtn} data-kind="minor" onClick={() => bumpPenalties(p.id, -1)} disabled={cell.penalty_strokes != null && cell.penalty_strokes <= 0}>−</button>
+                      <button type="button" className={styles.stepBtn} data-kind="minor" onClick={() => bumpPenalties(p.id, -1)} disabled={cell.penalty_strokes != null && cell.penalty_strokes <= 0}><span className={styles.glyph}>−</span></button>
                       <span className={styles.extraVal}>{cell.penalty_strokes ?? "·"}</span>
-                      <button type="button" className={styles.stepBtn} data-kind="minor" onClick={() => bumpPenalties(p.id, 1)}>+</button>
+                      <button type="button" className={styles.stepBtn} data-kind="minor" onClick={() => bumpPenalties(p.id, 1)}><span className={styles.glyph}>+</span></button>
                     </div>
                   )}
                   {tracked.includes("fairways") && (
@@ -521,6 +535,9 @@ export default function ScoreEntry({
             </button>
           ))}
         </div>
+
+        {/* Live comments — the group chatters while scoring. */}
+        <RoundComments roundId={roundId} viewerId={viewerId} orgId={orgId} />
       </div>
 
       {confirmOpen && (

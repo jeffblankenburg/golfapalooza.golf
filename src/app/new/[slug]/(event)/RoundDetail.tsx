@@ -211,6 +211,11 @@ export default function RoundDetail({
 
   return (
     <div className={styles.roundBody}>
+      {d.status === "in_progress" && (
+        <button type="button" className={styles.roundResumeBtn} onClick={onResume} style={{ marginBottom: 12 }}>
+          Resume scoring
+        </button>
+      )}
       {(d.tee_name || ratingLine) && (
         <p className={styles.roundBodyMeta}>
           {d.tee_name ? `${d.tee_name}${d.tee_gender === "women" ? " (Women's)" : ""} tees` : ""}
@@ -275,11 +280,6 @@ export default function RoundDetail({
       )}
 
       <div className={styles.roundActions}>
-        {d.status === "in_progress" && (
-          <button type="button" className={styles.roundResumeBtn} onClick={onResume}>
-            Resume scoring
-          </button>
-        )}
         <button type="button" className={styles.roundDeleteBtn} onClick={() => setConfirmOpen(true)}>
           Delete round
         </button>

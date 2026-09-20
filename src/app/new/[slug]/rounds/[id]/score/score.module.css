@@ -167,37 +167,49 @@
   font-weight: 700;
   color: var(--ink);
 }
+/* Flexbox centers the line box, not the glyph — nudge the digit down so it sits
+   optically centered inside the birdie/bogey shapes. */
+.markNum {
+  display: block;
+  transform: translateY(0.5px);
+}
+/* Scorecard stays monochrome — shape conveys birdie/bogey, not color. */
 .mark[data-mark="eagle"],
 .mark[data-mark="birdie"] {
   border-radius: 999px;
-  border: 1.3px solid #c026a0;
-  color: #c026a0;
+  border: 1.3px solid var(--ink);
+  color: var(--ink);
 }
 .mark[data-mark="eagle"] {
-  box-shadow: 0 0 0 2px var(--card), 0 0 0 3.2px #c026a0;
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 3.2px var(--ink);
 }
 .mark[data-mark="bogey"],
 .mark[data-mark="double"] {
   border-radius: 3px;
-  border: 1.3px solid #2563eb;
-  color: #2563eb;
+  border: 1.3px solid var(--ink);
+  color: var(--ink);
 }
 .mark[data-mark="double"] {
-  box-shadow: 0 0 0 2px var(--card), 0 0 0 3.2px #2563eb;
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 3.2px var(--ink);
 }
 
 /* Course strip + save banner. */
 .courseStrip {
   position: relative;
   flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
   background: var(--ink);
   padding: 6px 14px;
-  text-align: center;
 }
 .courseName {
   font-size: 0.72rem;
   font-weight: 600;
+  line-height: 1.2;
   color: #fff;
+  text-align: center;
 }
 .saveBanner {
   position: absolute;
@@ -264,7 +276,7 @@
 .playerMain {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 .playerExtras {
   display: flex;
@@ -298,7 +310,7 @@
   font-variant-numeric: tabular-nums;
 }
 .playerId {
-  width: 74px;
+  width: 60px;
   min-width: 0;
   flex: none;
 }
@@ -317,21 +329,26 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Fixed slot so a big total (e.g. 108⁺³⁶) never shifts the steppers — the number
+   just spills into the (empty) spacer to its right. */
 .runningTotal {
-  min-width: 40px;
+  width: 46px;
   flex: none;
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  align-items: baseline;
+  justify-content: flex-start;
   line-height: 1;
 }
 .runningNum {
-  font-size: 1.5rem;
+  font-size: 1.3rem;
   font-weight: 800;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
-.runningToPar {
+/* Par differential as a superscript on the running total (v1 style). */
+.runningSup {
+  margin-left: 1px;
   font-size: 0.7rem;
   font-weight: 600;
   color: var(--ink-soft);
@@ -343,18 +360,18 @@
 .stat {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   flex: none;
 }
 .stepBtn {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
   border: none;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -363,13 +380,27 @@
   color: #fff;
 }
 .stepBtn[data-kind="minor"] {
-  width: 27px;
-  height: 27px;
+  width: 26px;
+  height: 26px;
   font-size: 0.85rem;
   background: var(--paper);
   color: var(--ink-soft);
 }
 .stepBtn:disabled { opacity: 0.3; }
+/* Optically center the +/− operators (they render high on the math axis; flex
+   centers the line box, not the glyph). */
+.glyph {
+  display: block;
+  line-height: 1;
+  transform: translateY(1px);
+}
+.statDivider {
+  width: 1px;
+  height: 28px;
+  background: var(--line);
+  margin: 0 3px;
+  flex: none;
+}
 .statVal {
   display: flex;
   flex-direction: column;
@@ -377,12 +408,21 @@
   line-height: 1;
 }
 .statValStrokes {
-  width: 34px;
+  width: 30px;
+}
+.statValMinor {
+  width: 18px;
 }
 .statNum {
   font-size: 1.45rem;
   font-weight: 800;
   color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.statNumMinor {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
 .statLabel {
@@ -392,8 +432,6 @@
   color: var(--ink-soft);
   margin-top: 1px;
 }
-.statNum[data-mark="eagle"], .statNum[data-mark="birdie"] { color: #c026a0; }
-.statNum[data-mark="bogey"], .statNum[data-mark="double"] { color: #2563eb; }
 
 /* Boolean stat toggle (fairway / GIR). */
 .toggleBtn {
@@ -529,4 +567,112 @@
   background: var(--paper);
   color: var(--ink-soft);
   font-size: 0.9rem;
+}
+
+/* Live comments card. */
+.comments {
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+}
+.commentsTitle {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.commentList {
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.commentEmpty {
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  padding: 18px 0;
+}
+.commentRow {
+  display: flex;
+  gap: 9px;
+}
+.commentAvatar {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+.commentAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.commentBody {
+  flex: 1;
+  min-width: 0;
+}
+.commentHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.commentName {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.commentTime {
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+}
+.commentDelete {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+.commentDelete:active {
+  color: #a3341f;
+}
+.commentText {
+  margin: 1px 0 0;
+  font-size: 0.85rem;
+  color: var(--ink);
+  word-break: break-word;
+}
+.mention {
+  color: var(--brand);
+  font-weight: 600;
+}
+.commentLink {
+  color: var(--brand);
+  text-decoration: underline;
+  word-break: break-all;
+}
+.commentImage {
+  display: block;
+  margin-top: 4px;
+  max-width: 180px;
+  max-height: 180px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}
+.commentForm {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
 }

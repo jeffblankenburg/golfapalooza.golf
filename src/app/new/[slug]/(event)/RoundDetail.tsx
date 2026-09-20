@@ -39,6 +39,7 @@ interface Detail {
   holes_played: number;
   expected_holes: number;
   comment_count: number;
+  can_manage: boolean;
   holes: Hole[];
   players: PlayerRow[];
 }
@@ -229,7 +230,7 @@ export default function RoundDetail({
 
   return (
     <div className={styles.roundBody}>
-      {d.status === "in_progress" && (
+      {d.status === "in_progress" && d.can_manage && (
         <button type="button" className={styles.roundResumeBtn} onClick={onResume} style={{ marginBottom: 12 }}>
           Resume scoring
         </button>
@@ -310,11 +311,13 @@ export default function RoundDetail({
         )}
       </div>
 
-      <div className={styles.roundActions}>
-        <button type="button" className={styles.roundDeleteBtn} onClick={() => setConfirmOpen(true)}>
-          Delete round
-        </button>
-      </div>
+      {d.can_manage && (
+        <div className={styles.roundActions}>
+          <button type="button" className={styles.roundDeleteBtn} onClick={() => setConfirmOpen(true)}>
+            Delete round
+          </button>
+        </div>
+      )}
 
       <ConfirmModal
         open={confirmOpen}

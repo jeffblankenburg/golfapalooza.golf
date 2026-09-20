@@ -22,7 +22,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { data: round } = await admin
     .from("v2_rounds")
     .select(
-      `id, round_date, round_type, format, status,
+      `id, round_date, round_type, format, status, created_by,
        course:v2_courses(name, club_name),
        tee:v2_course_tees(tee_name, tee_color, gender, course_rating, slope_rating, par),
        players:v2_round_players(
@@ -38,7 +38,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!round) return NextResponse.json({ error: "Round not found" }, { status: 404 });
 
   const playerRows = round.players || [];
-  const viewer = playerRows.find((p) => p.user_id === userId) || playerRows[0] || null;
+  // The viewer's OWN player row — null for a non-player (spectator). No fallback:
+  // a spectator must not be treated as a player (no "You" row, no manage actions).
+  const viewer = playerRows.find((p) => p.user_id === userId) || null;
+  // Whoever's tee drives the shared par grid (any player's tee works for par).
+  const gridTee = viewer ?? playerRows[0] ?? null;
+  // Can this viewer manage the round (resume / complete / delete)?
+  const canManage = !!viewer || round.created_by === userId;
   const course = one(round.course);
   const roundTee = one(round.tee);
 
@@ -52,8 +58,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const inNine = (h: number) =>
     round.round_type === "9-front" ? h <= 9 : round.round_type === "9-back" ? h >= 10 : true;
 
-  // Shared par row from the viewer's tee (composition-tee resolution is a TODO).
-  const gridTeeId = viewer?.tee_id ?? null;
+  // Shared par row from the grid tee (composition-tee resolution is a TODO).
+  const gridTeeId = gridTee?.tee_id ?? null;
   const { data: holeRows } = gridTeeId
     ? await admin
         .from("v2_course_holes")
@@ -92,7 +98,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const gross = p.final_gross_score ?? null;
     const prof = one(p.profile);
     return {
-      is_viewer: p.id === viewer?.id,
+      is_viewer: viewer ? p.id === viewer.id : false,
       is_guest: !p.user_id,
       guest_name: p.guest_name ?? null,
       profile: prof
@@ -131,6 +137,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     holes_played: viewerHolesPlayed,
     expected_holes: expectedHoleCount(round.round_type),
     comment_count: commentCount ?? 0,
+    can_manage: canManage,
     holes,
     players,
   });

@@ -429,6 +429,15 @@
   border-top: 1px solid var(--line);
   background: var(--card);
 }
+/* Wraps the shared MessageComposer at the bottom of the chat room: restores the
+   old inputBar framing + breathing room from the drawer's bottom edge (which
+   sits just above the mini-player / bottom nav). */
+.composerFooter {
+  flex: none;
+  padding: 10px 12px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--card);
+}
 .input {
   flex: 1;
   min-width: 0;

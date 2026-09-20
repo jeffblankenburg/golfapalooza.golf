@@ -18,17 +18,24 @@ export async function GET(
   const [{ data }, mode] = await Promise.all([
     a.admin
       .from("v2_chat_room_members")
-      .select("user_id, member:v2_profiles(display_name, first_name, last_name, avatar_url)")
+      .select("user_id, member:v2_profiles(display_name, first_name, last_name, nickname, avatar_url)")
       .eq("room_id", roomId),
     orgNameMode(a.admin, a.room.org_id),
   ]);
 
   const members = (data || []).map((m) => {
     const p = Array.isArray(m.member) ? m.member[0] : m.member;
+    // Searchable across every name part (real + nickname) even though the UI
+    // shows only pickName(p, mode) — the org's default naming.
+    const search = [p?.display_name, p?.first_name, p?.last_name, p?.nickname]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
     return {
       userId: m.user_id as string,
       displayName: pickName(p, mode),
       avatarUrl: (p?.avatar_url as string | null) ?? null,
+      search,
     };
   });
 

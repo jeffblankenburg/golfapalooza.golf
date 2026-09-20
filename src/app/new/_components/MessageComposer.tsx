@@ -7,6 +7,9 @@ export interface ComposerMember {
   userId: string;
   displayName: string;
   avatarUrl?: string | null;
+  // Lowercased haystack of every name part (real + nickname). Mentions search
+  // this but the list only ever shows `displayName` (the org's default naming).
+  search?: string;
 }
 
 export interface ComposerPayload {
@@ -28,11 +31,17 @@ export default function MessageComposer({
   onSend,
   placeholder = "Add a comment…",
   menuPlacement = "above",
+  onTyping,
+  topSlot,
+  clearBeforeSend = false,
 }: {
   members: ComposerMember[];
   onSend: (payload: ComposerPayload) => Promise<boolean>;
   placeholder?: string;
   menuPlacement?: "above" | "below";
+  onTyping?: () => void;
+  topSlot?: React.ReactNode;
+  clearBeforeSend?: boolean;
 }) {
   const [text, setText] = useState("");
   const [staged, setStaged] = useState<{ file: File; preview: string } | null>(null);
@@ -57,6 +66,7 @@ export default function MessageComposer({
     const v = e.target.value;
     setText(v);
     autoGrow();
+    onTyping?.();
     const caret = e.target.selectionStart ?? v.length;
     const before = v.slice(0, caret);
     const m = before.match(/@([\p{L}\p{N}'.\- ]{0,30})$/u);
@@ -113,7 +123,7 @@ export default function MessageComposer({
   }
 
   const mentionMatches = mention
-    ? members.filter((m) => m.displayName.toLowerCase().includes(mention.query)).slice(0, 6)
+    ? members.filter((m) => (m.search ?? m.displayName.toLowerCase()).includes(mention.query)).slice(0, 6)
     : [];
 
   // Giphy search.
@@ -142,6 +152,16 @@ export default function MessageComposer({
     };
   }, [panel, gifQuery]);
 
+  function clearInput() {
+    setText("");
+    setMention(null);
+    mentionMap.current.clear();
+    clearStaged();
+    requestAnimationFrame(() => {
+      if (taRef.current) taRef.current.style.height = "auto";
+    });
+  }
+
   async function submit(payload: ComposerPayload): Promise<boolean> {
     if (sending) return false;
     setSending(true);
@@ -155,19 +175,19 @@ export default function MessageComposer({
   async function send() {
     const raw = text.trim();
     if (!raw && !staged) return;
-    const ok = await submit({
+    const payload: ComposerPayload = {
       content: raw ? buildContent(raw) : null,
       imageFile: staged?.file ?? null,
       gifUrl: null,
-    });
-    if (ok) {
-      setText("");
-      setMention(null);
-      mentionMap.current.clear();
-      clearStaged();
-      requestAnimationFrame(() => {
-        if (taRef.current) taRef.current.style.height = "auto";
-      });
+    };
+    // Chat wants an instant, optimistic clear (it renders an optimistic message +
+    // marks it failed on error). Comments clear only after a confirmed save.
+    if (clearBeforeSend) {
+      clearInput();
+      await submit(payload);
+    } else {
+      const ok = await submit(payload);
+      if (ok) clearInput();
     }
   }
 
@@ -265,6 +285,9 @@ export default function MessageComposer({
 
       {menuPlacement === "above" && panels}
 
+      {/* Caller-supplied slot above the input (e.g. chat's reply bar). */}
+      {topSlot}
+
       {staged && (
         <div className={styles.staged}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -300,6 +323,14 @@ export default function MessageComposer({
           value={text}
           rows={1}
           onChange={onTextChange}
+          onFocus={() => setPanel(null)}
+          onPaste={(e) => {
+            const img = Array.from(e.clipboardData.files).find((f) => f.type.startsWith("image/"));
+            if (img) {
+              e.preventDefault();
+              stageImage(img);
+            }
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();

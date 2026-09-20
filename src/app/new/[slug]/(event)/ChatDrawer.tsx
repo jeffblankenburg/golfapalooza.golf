@@ -5,6 +5,7 @@ import { v2BrowserClient } from "@/lib/v2/supabase-browser";
 import { useNameMode } from "./NameMode";
 import { pickName } from "@/lib/v2/profile";
 import ImageLightbox from "./ImageLightbox";
+import MessageComposer, { type ComposerPayload } from "@/app/new/_components/MessageComposer";
 import styles from "./chat.module.css";
 /* eslint-disable @next/next/no-img-element */
 
@@ -39,6 +40,7 @@ interface Member {
   userId: string;
   displayName: string;
   avatarUrl: string | null;
+  search?: string;
 }
 interface RoomSummary {
   id: string;
@@ -52,12 +54,6 @@ interface RoomSummary {
 }
 
 const TAPBACKS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
-const EMOJIS = [
-  "😀", "😂", "🤣", "😊", "😍", "😘", "😎", "🤔", "😴", "😭",
-  "😅", "😉", "🙃", "😳", "🥳", "😤", "😩", "🤯", "🤠", "🥴",
-  "👍", "👎", "👏", "🙌", "🙏", "💪", "🤙", "🤝", "✌️", "🤞",
-  "❤️", "🔥", "💯", "🎉", "⛳", "🏌️", "🍺", "🥃", "🌭", "💰",
-];
 const one = (s: Msg["sender"]): Sender | null => (Array.isArray(s) ? s[0] ?? null : s ?? null);
 const timeOf = (iso: string) =>
   new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
@@ -369,7 +365,11 @@ function RoomList({
         <div className={styles.roomList}>
           {rooms.map((r) => {
             const preview = r.lastMessage
-              ? r.lastMessage.content || (r.lastMessage.imageUrl ? "📷 Photo" : "")
+              ? (r.lastMessage.content
+                  ? r.lastMessage.content.replace(/@\[([^\]]+)\]\([^)]+\)/g, "@$1")
+                  : r.lastMessage.imageUrl
+                    ? "📷 Photo"
+                    : "")
               : "";
             return (
               <button key={r.id} className={styles.roomRow} onClick={() => onOpen(r.id)}>
@@ -449,19 +449,12 @@ function Room({
   const [farBack, setFarBack] = useState(false);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
   const [pinned, setPinned] = useState(!!room?.isPinned);
-  const [panel, setPanel] = useState<"menu" | "emoji" | "gif" | null>(null);
-  const [gifQuery, setGifQuery] = useState("");
-  const [gifs, setGifs] = useState<{ id: string; url: string }[]>([]);
   const [members, setMembers] = useState<Member[]>(room?.members || []);
   const [tapbackFor, setTapbackFor] = useState<string | null>(null);
   const [reactionDetail, setReactionDetail] = useState<{ messageId: string; emoji: string } | null>(null);
   const [replyTo, setReplyTo] = useState<Msg | null>(null);
-  const [staged, setStaged] = useState<{ file: File; preview: string } | null>(null);
   const [lightbox, setLightbox] = useState<{ id: string; src: string } | null>(null);
-  const [mention, setMention] = useState<{ query: string; start: number } | null>(null);
   const [typing, setTyping] = useState<string[]>([]);
   const longPress = useRef<{ timer: ReturnType<typeof setTimeout> | null; fired: boolean }>({
     timer: null,
@@ -472,9 +465,6 @@ function Room({
   const restore = useRef<number | null>(null);
   const hasNewerRef = useRef(false);
   const scrolledToTarget = useRef(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const taRef = useRef<HTMLTextAreaElement>(null);
-  const mentionMap = useRef<Map<string, string>>(new Map()); // "@Name" -> userId
   const supabaseRef = useRef(v2BrowserClient());
   const typingChan = useRef<ReturnType<ReturnType<typeof v2BrowserClient>["channel"]> | null>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -759,60 +749,33 @@ function Room({
   }
 
   // Convert tracked "@Name" tokens to wire markup on send.
-  function buildContent(raw: string): string {
-    let out = raw;
-    for (const [token, id] of mentionMap.current) {
-      const name = token.slice(1);
-      out = out.split(token).join(`@[${name}](${id})`);
+  // MessageComposer emits {content (wire), imageFile, gifUrl}; this fulfills it
+  // with chat's optimistic send. A GIF sends immediately as an image message.
+  async function chatSend({ content, imageFile, gifUrl }: ComposerPayload): Promise<boolean> {
+    if (gifUrl) {
+      const res = await fetch(`/api/v2/chat/rooms/${roomId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: gifUrl }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        mergeIncoming(d.message);
+        requestAnimationFrame(() => scrollToBottom("smooth"));
+      }
+      return res.ok;
     }
-    return out;
-  }
 
-  function resetComposerHeight() {
-    const ta = taRef.current;
-    if (ta) ta.style.height = "auto";
-  }
-  function autoGrow() {
-    const ta = taRef.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
-  }
-
-  // Stage an image in the composer (iMessage-style) rather than sending at once.
-  function stageImage(file: File) {
-    setStaged((cur) => {
-      if (cur) URL.revokeObjectURL(cur.preview);
-      return { file, preview: URL.createObjectURL(file) };
-    });
-    setPanel(null);
-    requestAnimationFrame(() => taRef.current?.focus());
-  }
-  function clearStaged() {
-    setStaged((cur) => {
-      if (cur) URL.revokeObjectURL(cur.preview);
-      return null;
-    });
-  }
-
-  async function send() {
-    const raw = text.trim();
-    if ((!raw && !staged) || sending) return;
-    const wire = raw ? buildContent(raw) : null;
     const replySnap = replyTo;
-    const stagedSnap = staged;
-    setText("");
-    setMention(null);
     setReplyTo(null);
-    setStaged(null);
-    resetComposerHeight();
+    const preview = imageFile ? URL.createObjectURL(imageFile) : null;
 
     const temp: Msg = {
       id: `temp-${Date.now()}`,
       room_id: roomId,
       sender_id: userId,
-      content: wire,
-      image_url: stagedSnap?.preview ?? null,
+      content,
+      image_url: preview,
       reply_to_id: replySnap?.id ?? null,
       reply_to: replySnap
         ? { content: replySnap.content, image_url: replySnap.image_url, sender: one(replySnap.sender) }
@@ -822,12 +785,11 @@ function Room({
     };
     setMessages((cur) => [...cur, temp]);
     requestAnimationFrame(() => scrollToBottom("smooth"));
-    setSending(true);
     try {
       let imageUrl: string | null = null;
-      if (stagedSnap) {
+      if (imageFile) {
         const fd = new FormData();
-        fd.append("file", stagedSnap.file);
+        fd.append("file", imageFile);
         const up = await fetch(`/api/v2/chat/rooms/${roomId}/upload`, { method: "POST", body: fd });
         if (!up.ok) throw new Error();
         imageUrl = (await up.json()).url;
@@ -835,33 +797,20 @@ function Room({
       const res = await fetch(`/api/v2/chat/rooms/${roomId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: wire, imageUrl, replyToId: replySnap?.id || null }),
+        body: JSON.stringify({ content, imageUrl, replyToId: replySnap?.id || null }),
       });
       if (!res.ok) throw new Error();
       const d = await res.json();
       // The POST response lacks the reply_to preview — carry the snapshot for display.
       const final: Msg = { ...d.message, reply_to: temp.reply_to };
       setMessages((cur) => [...cur.filter((m) => m.id !== temp.id && m.id !== final.id), final]);
-      if (stagedSnap) URL.revokeObjectURL(stagedSnap.preview);
+      if (preview) URL.revokeObjectURL(preview);
+      return true;
     } catch {
       setMessages((cur) =>
         cur.map((m) => (m.id === temp.id ? { ...m, pending: false, content: `${m.content || ""} (failed)` } : m)),
       );
-    } finally {
-      setSending(false);
-    }
-  }
-
-  async function sendImageUrl(url: string) {
-    const res = await fetch(`/api/v2/chat/rooms/${roomId}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageUrl: url }),
-    });
-    if (res.ok) {
-      const d = await res.json();
-      mergeIncoming(d.message);
-      requestAnimationFrame(() => scrollToBottom("smooth"));
+      return false;
     }
   }
 
@@ -879,83 +828,6 @@ function Room({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pinned: next }),
     }).catch(() => {});
-  }
-
-  // Giphy search (debounced-ish via the panel).
-  useEffect(() => {
-    if (panel !== "gif") return;
-    const key = process.env.NEXT_PUBLIC_GIPHY_API_KEY;
-    if (!key) return;
-    let cancelled = false;
-    const q = gifQuery.trim();
-    const endpoint = q
-      ? `https://api.giphy.com/v1/gifs/search?api_key=${key}&q=${encodeURIComponent(q)}&limit=24&rating=pg-13`
-      : `https://api.giphy.com/v1/gifs/trending?api_key=${key}&limit=24&rating=pg-13`;
-    const t = setTimeout(() => {
-      fetch(endpoint)
-        .then((r) => r.json())
-        .then((d) => {
-          if (cancelled) return;
-          type GiphyItem = { id: string; images: { fixed_width: { url: string } } };
-          setGifs((d.data || []).map((g: GiphyItem) => ({ id: g.id, url: g.images.fixed_width.url })));
-        })
-        .catch(() => {});
-    }, 300);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [panel, gifQuery]);
-
-  function openFilePicker(camera: boolean) {
-    const input = fileRef.current;
-    if (!input) return;
-    if (camera) input.setAttribute("capture", "environment");
-    else input.removeAttribute("capture");
-    input.click();
-    setPanel(null);
-  }
-
-  function insertEmoji(emoji: string) {
-    const ta = taRef.current;
-    if (!ta) {
-      setText((t) => t + emoji);
-      return;
-    }
-    const start = ta.selectionStart ?? text.length;
-    const end = ta.selectionEnd ?? text.length;
-    setText(text.slice(0, start) + emoji + text.slice(end));
-    requestAnimationFrame(() => {
-      ta.focus();
-      ta.selectionStart = ta.selectionEnd = start + emoji.length;
-    });
-  }
-
-  function onTextChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    const v = e.target.value;
-    setText(v);
-    autoGrow();
-    signalTyping();
-    // Detect an @mention token ending at the caret.
-    const caret = e.target.selectionStart ?? v.length;
-    const before = v.slice(0, caret);
-    const m = before.match(/@([\p{L}\p{N}'.\- ]{0,30})$/u);
-    if (m && !before.slice(0, m.index).endsWith("]")) {
-      setMention({ query: m[1].toLowerCase(), start: m.index ?? 0 });
-    } else {
-      setMention(null);
-    }
-  }
-
-  function pickMention(member: Member) {
-    if (!mention) return;
-    const token = `@${member.displayName}`;
-    const v = text;
-    const next = v.slice(0, mention.start) + token + " " + v.slice((taRef.current?.selectionStart ?? v.length));
-    mentionMap.current.set(token, member.userId);
-    setText(next);
-    setMention(null);
-    taRef.current?.focus();
   }
 
   async function toggleReaction(messageId: string, emoji: string) {
@@ -1018,11 +890,6 @@ function Room({
     }
     toggleReaction(messageId, emoji);
   }
-
-  const mentionMatches =
-    mention === null
-      ? []
-      : members.filter((m) => m.userId !== userId && m.displayName.toLowerCase().includes(mention.query)).slice(0, 6);
 
   const title = room?.name || "Conversation";
 
@@ -1122,7 +989,6 @@ function Room({
                             ev.stopPropagation();
                             setTapbackFor(null);
                             setReplyTo(m);
-                            requestAnimationFrame(() => taRef.current?.focus());
                           }}
                           aria-label="Reply"
                           title="Reply"
@@ -1249,184 +1115,40 @@ function Room({
         </div>
       )}
 
-      {mentionMatches.length > 0 && (
-        <div className={styles.mentionMenu}>
-          {mentionMatches.map((mem) => (
-            <button key={mem.userId} type="button" className={styles.mentionOption} onClick={() => pickMention(mem)}>
-              {mem.avatarUrl ? (
-                <img src={mem.avatarUrl} alt="" className={styles.mentionAvatar} />
-              ) : (
-                <span className={styles.mentionAvatarFallback}>{mem.displayName.charAt(0).toUpperCase()}</span>
-              )}
-              {mem.displayName}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Attachment menu (from the "+"): Camera · Photos · GIFs · Emoji. */}
-      {panel === "menu" && (
-        <div className={styles.attachMenu}>
-          <button type="button" className={styles.attachItem} onClick={() => openFilePicker(true)}>
-            <span className={styles.attachIcon}>
-              <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
-                <circle cx="12" cy="13" r="4" />
-              </svg>
-            </span>
-            Camera
-          </button>
-          <button type="button" className={styles.attachItem} onClick={() => openFilePicker(false)}>
-            <span className={styles.attachIcon}>
-              <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                <rect x="3" y="5" width="18" height="14" rx="2" />
-                <circle cx="8.5" cy="10" r="1.5" />
-                <path d="M21 16l-5-5-9 8" />
-              </svg>
-            </span>
-            Photos
-          </button>
-          <button type="button" className={styles.attachItem} onClick={() => setPanel("gif")}>
-            <span className={styles.attachIcon}>
-              <strong className={styles.attachGif}>GIF</strong>
-            </span>
-            GIFs
-          </button>
-          <button type="button" className={styles.attachItem} onClick={() => setPanel("emoji")}>
-            <span className={styles.attachIcon} aria-hidden>😊</span>
-            Emoji
-          </button>
-        </div>
-      )}
-
-      {panel === "emoji" && (
-        <div className={styles.emojiPanel}>
-          {EMOJIS.map((e) => (
-            <button key={e} type="button" className={styles.emojiCell} onClick={() => insertEmoji(e)}>
-              {e}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {panel === "gif" && (
-        <div className={styles.gifPanel}>
-          <input
-            className={styles.gifSearch}
-            value={gifQuery}
-            onChange={(e) => setGifQuery(e.target.value)}
-            placeholder="Search GIFs"
-            autoFocus
-          />
-          <div className={styles.gifGrid}>
-            {gifs.map((g) => (
-              <button
-                key={g.id}
-                type="button"
-                className={styles.gifCell}
-                onClick={() => {
-                  sendImageUrl(g.url);
-                  setPanel(null);
-                  setGifQuery("");
-                }}
-              >
-                <img src={g.url} alt="" />
+      {/* Shared composer — mentions, photo, GIF, emoji. The reply chip rides in
+          its topSlot (iMessage-style, above the input). */}
+      <div className={styles.composerFooter}>
+      <MessageComposer
+        members={members.filter((m) => m.userId !== userId)}
+        onSend={chatSend}
+        onTyping={signalTyping}
+        clearBeforeSend
+        placeholder="Message"
+        topSlot={
+          replyTo ? (
+            <div className={styles.replyBar}>
+              <span className={styles.replyBarBadge} aria-hidden>
+                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                  <path d="M9 17l-5-5 5-5M4 12h11a4 4 0 014 4v2" />
+                </svg>
+              </span>
+              <span className={styles.replyBarText}>
+                <span className={styles.replyBarName}>Replying to {replyTo.sender ? pickName(one(replyTo.sender), mode) : "message"}</span>
+                <span className={styles.replyBarPreview}>
+                  {replyTo.content
+                    ? replyTo.content.replace(/@\[([^\]]+)\]\([^)]+\)/g, "@$1")
+                    : replyTo.image_url
+                      ? "📷 Photo"
+                      : ""}
+                </span>
+              </span>
+              <button type="button" className={styles.chipClose} onClick={() => setReplyTo(null)} aria-label="Cancel reply">
+                ×
               </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        hidden
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) stageImage(f);
-          e.target.value = "";
-        }}
+            </div>
+          ) : undefined
+        }
       />
-
-      {/* Reply + staged-image chips sit above the composer (iMessage-style). */}
-      {replyTo && (
-        <div className={styles.replyBar}>
-          <span className={styles.replyBarBadge} aria-hidden>
-            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-              <path d="M9 17l-5-5 5-5M4 12h11a4 4 0 014 4v2" />
-            </svg>
-          </span>
-          <span className={styles.replyBarText}>
-            <span className={styles.replyBarName}>Replying to {replyTo.sender ? pickName(one(replyTo.sender), mode) : "message"}</span>
-            <span className={styles.replyBarPreview}>
-              {replyTo.content
-                ? replyTo.content.replace(/@\[([^\]]+)\]\([^)]+\)/g, "@$1")
-                : replyTo.image_url
-                  ? "📷 Photo"
-                  : ""}
-            </span>
-          </span>
-          <button type="button" className={styles.chipClose} onClick={() => setReplyTo(null)} aria-label="Cancel reply">
-            ×
-          </button>
-        </div>
-      )}
-      {staged && (
-        <div className={styles.stagedBar}>
-          <img src={staged.preview} alt="" className={styles.stagedThumb} />
-          <button type="button" className={styles.stagedRemove} onClick={clearStaged} aria-label="Remove photo">
-            ×
-          </button>
-        </div>
-      )}
-
-      <div className={styles.inputBar}>
-        <button
-          type="button"
-          className={styles.plusBtn}
-          data-open={panel !== null || undefined}
-          onClick={() => setPanel((cur) => (cur === null ? "menu" : null))}
-          aria-label="Add attachment"
-          disabled={sending}
-        >
-          <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-        </button>
-        <textarea
-          ref={taRef}
-          className={styles.input}
-          value={text}
-          onChange={onTextChange}
-          onFocus={() => setPanel(null)}
-          onPaste={(e) => {
-            const img = Array.from(e.clipboardData.files).find((f) => f.type.startsWith("image/"));
-            if (img) {
-              e.preventDefault();
-              stageImage(img);
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              send();
-            }
-          }}
-          placeholder="Message"
-          rows={1}
-        />
-        <button
-          type="button"
-          className={styles.sendBtn}
-          onClick={send}
-          disabled={(!text.trim() && !staged) || sending}
-          aria-label="Send"
-        >
-          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
-          </svg>
-        </button>
       </div>
 
       {lightbox &&

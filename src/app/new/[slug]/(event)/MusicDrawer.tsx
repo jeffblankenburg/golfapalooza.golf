@@ -58,7 +58,8 @@ export default function MusicDrawer() {
       <div
         onClick={collapseDrawer}
         aria-hidden="true"
-        className={`fixed left-0 right-0 top-[56px] bottom-[calc(60px+env(safe-area-inset-bottom,0px))] z-[50] bg-[#17211d]/20 backdrop-blur-[6px] transition-opacity duration-200 ${
+        style={{ bottom: "var(--nav-h, 0px)" }}
+        className={`fixed left-0 right-0 top-[56px] z-[50] bg-[#17211d]/20 backdrop-blur-[6px] transition-opacity duration-200 ${
           isDrawerExpanded ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       />
@@ -66,7 +67,8 @@ export default function MusicDrawer() {
       {/* Expanded overlay — clips below the top bar (56px + 50px gap) and above
           the bottom nav, mirroring the shell's shared drawer. */}
       <div
-        className={`fixed left-0 right-0 top-[106px] bottom-[calc(60px+env(safe-area-inset-bottom,0px))] z-[55] bg-[var(--paper)] rounded-t-2xl shadow-[0_-12px_30px_-18px_rgba(0,0,0,0.5)] transition-transform duration-300 ease-out flex flex-col ${
+        style={{ bottom: "var(--nav-h, 0px)" }}
+        className={`fixed left-0 right-0 top-[106px] z-[55] bg-[var(--paper)] rounded-t-2xl shadow-[0_-12px_30px_-18px_rgba(0,0,0,0.5)] transition-transform duration-300 ease-out flex flex-col ${
           isDrawerExpanded ? "translate-y-0" : "translate-y-full pointer-events-none"
         }`}
         aria-hidden={!isDrawerExpanded}
@@ -83,9 +85,16 @@ export default function MusicDrawer() {
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">{isDrawerExpanded && <MusicPage />}</div>
       </div>
 
-      {/* Collapsed mini-player — above the bottom nav, hidden while expanded. */}
+      {/* Collapsed mini-player — part of the bottom chrome: sits directly above
+          the bottom nav (--nav-h) and above the function drawers (z-58 > 55), so
+          it's present + on top on every page. Absorbs the safe-area itself when
+          there's no nav below it (e.g. the full-screen scorer). */}
       <div
-        className={`fixed left-0 right-0 bottom-[calc(60px+env(safe-area-inset-bottom,0px))] z-[40] bg-[var(--card)] border-t border-[var(--line)] shadow-lg transition-opacity duration-200 ${
+        style={{
+          bottom: "var(--nav-h, 0px)",
+          paddingBottom: "max(0px, calc(env(safe-area-inset-bottom, 0px) - var(--nav-h, 0px)))",
+        }}
+        className={`fixed left-0 right-0 z-[58] bg-[var(--card)] border-t border-[var(--line)] shadow-lg transition-opacity duration-200 ${
           isDrawerExpanded ? "opacity-0 pointer-events-none" : "opacity-100"
         }`}
         aria-hidden={isDrawerExpanded}

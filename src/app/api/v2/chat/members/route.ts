@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   const [{ data }, mode] = await Promise.all([
     admin
       .from("v2_memberships")
-      .select("user_id, member:v2_profiles(display_name, first_name, last_name, avatar_url)")
+      .select("user_id, member:v2_profiles(display_name, first_name, last_name, nickname, avatar_url)")
       .eq("org_id", orgId)
       .eq("status", "active"),
     orgNameMode(admin, orgId),
@@ -35,10 +35,18 @@ export async function GET(request: Request) {
     .filter((m) => includeSelf || m.user_id !== userId)
     .map((m) => {
       const p = Array.isArray(m.member) ? m.member[0] : m.member;
+      // Searchable across every name part (first/last/nickname/display) even
+      // though callers show just one; lets a search match a real name when the
+      // org displays nicknames, and vice-versa.
+      const search = [p?.display_name, p?.first_name, p?.last_name, p?.nickname]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
       return {
         userId: m.user_id as string,
         displayName: pickName(p, mode),
         avatarUrl: (p?.avatar_url as string | null) ?? null,
+        search,
       };
     })
     .sort((a, b) => a.displayName.localeCompare(b.displayName));

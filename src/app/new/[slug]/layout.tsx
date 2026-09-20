@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { v2AdminClient } from "@/lib/v2/supabase";
+import { getPlatformContext } from "@/lib/v2/context";
 import PwaRegistrar from "./PwaRegistrar";
+import MusicProvider from "./(event)/MusicProvider";
+import { NameModeProvider } from "./(event)/NameMode";
 
 /**
  * Org subtree wrapper. Purely additive: it points the PWA manifest + Apple title
@@ -44,11 +47,37 @@ export async function generateMetadata({
   return meta;
 }
 
-export default function OrgLayout({ children }: { children: React.ReactNode }) {
+export default async function OrgLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  // Mount the music provider + name-mode at the ORG level (not the event group)
+  // so a single audio session survives navigation to any /new/<slug>/* page —
+  // the full-screen scorer, admin, etc. — instead of stopping when the (event)
+  // layout unmounts. The mini-player renders here too, above the bottom nav.
+  // Non-members get plain children; the inner layouts handle the redirect.
+  const ctx = await getPlatformContext();
+  const org = ctx?.orgs.find((o) => o.slug === slug);
+
+  if (!org) {
+    return (
+      <>
+        <PwaRegistrar />
+        {children}
+      </>
+    );
+  }
+
   return (
     <>
       <PwaRegistrar />
-      {children}
+      <NameModeProvider mode={org.name_display}>
+        <MusicProvider orgId={org.id}>{children}</MusicProvider>
+      </NameModeProvider>
     </>
   );
 }

@@ -2,8 +2,6 @@ import { redirect } from "next/navigation";
 import { getPlatformContext } from "@/lib/v2/context";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import EventShell from "./EventShell";
-import MusicProvider from "./MusicProvider";
-import { NameModeProvider } from "./NameMode";
 import { buildEventNav, isFeatureVisible, resolveFeatures, type FeatureRow } from "@/lib/v2/features";
 
 /**
@@ -95,28 +93,27 @@ export default async function EventLayout({
     }
   }
 
+  // NameMode + Music providers now live in the parent [slug] layout so audio
+  // persists across the whole org (incl. the full-screen scorer). This layout
+  // just mounts the event shell.
   return (
-    <NameModeProvider mode={org.name_display}>
-    <MusicProvider orgId={org.id}>
-      <EventShell
-        slug={slug}
-        orgId={org.id}
-        userId={ctx.userId}
-        isAdmin={isAdmin}
-        orgName={org.name}
-        logoUrl={org.logo_url}
-        userAvatarUrl={meRes.data?.avatar_url ?? null}
-        initialUnreadCount={unreadRes.count ?? 0}
-        initialChatUnread={initialChatUnread}
-        pinned={pinned}
-        launcher={launcher}
-        musicEnabled={musicEnabled}
-        chatEnabled={chatEnabled}
-        photosEnabled={photosEnabled}
-      >
-        {children}
-      </EventShell>
-    </MusicProvider>
-    </NameModeProvider>
+    <EventShell
+      slug={slug}
+      orgId={org.id}
+      userId={ctx.userId}
+      isAdmin={isAdmin}
+      orgName={org.name}
+      logoUrl={org.logo_url}
+      userAvatarUrl={meRes.data?.avatar_url ?? null}
+      initialUnreadCount={unreadRes.count ?? 0}
+      initialChatUnread={initialChatUnread}
+      pinned={pinned}
+      launcher={launcher}
+      musicEnabled={musicEnabled}
+      chatEnabled={chatEnabled}
+      photosEnabled={photosEnabled}
+    >
+      {children}
+    </EventShell>
   );
 }

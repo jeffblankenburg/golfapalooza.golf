@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import styles from "@/app/new/new.module.css";
 import { useNameMode } from "./NameMode";
 import { pickName, type NameMode } from "@/lib/v2/profile";
+import ConfirmModal from "@/app/new/_components/ConfirmModal";
 
 interface Hole {
   hole_number: number;
@@ -21,6 +22,7 @@ interface PlayerRow {
 }
 interface Detail {
   id: string;
+  status: "in_progress" | "completed" | "abandoned";
   round_type: "18" | "9-front" | "9-back";
   format: "individual" | "scramble";
   tee_name: string;
@@ -121,10 +123,35 @@ function Nine({ holes, players, totalLabel }: { holes: Hole[]; players: LabeledP
  * Hole / Par / Hcp header plus every player's hole-by-hole scores; the viewer's
  * row is subtly highlighted. Lazy-fetches on first expand.
  */
-export default function RoundDetail({ id }: { id: string }) {
+export default function RoundDetail({
+  id,
+  onResume,
+  onDeleted,
+}: {
+  id: string;
+  onResume?: () => void;
+  onDeleted?: () => void;
+}) {
   const [loaded, setLoaded] = useState(false);
   const [d, setD] = useState<Detail | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const mode = useNameMode();
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/v2/rounds/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setConfirmOpen(false);
+        onDeleted?.();
+      } else {
+        setDeleting(false);
+      }
+    } catch {
+      setDeleting(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -246,6 +273,27 @@ export default function RoundDetail({ id }: { id: string }) {
           Incomplete round — {d.holes_played} of {d.expected_holes} holes. Excluded from your stats and handicap.
         </p>
       )}
+
+      <div className={styles.roundActions}>
+        {d.status === "in_progress" && (
+          <button type="button" className={styles.roundResumeBtn} onClick={onResume}>
+            Resume scoring
+          </button>
+        )}
+        <button type="button" className={styles.roundDeleteBtn} onClick={() => setConfirmOpen(true)}>
+          Delete round
+        </button>
+      </div>
+
+      <ConfirmModal
+        open={confirmOpen}
+        title="Delete this round?"
+        message="This permanently removes the round and all its scores. If it counted toward your handicap, your index will be recalculated. This can't be undone."
+        confirmLabel={deleting ? "Deleting…" : "Delete round"}
+        destructive
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

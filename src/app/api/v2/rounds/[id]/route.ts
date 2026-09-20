@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { formatCourseName } from "@/lib/v2/course-display";
 import { expectedHoleCount, isRoundIncomplete } from "@/lib/rounds/incomplete";
+import { recalculateHandicap } from "@/lib/v2/golf/handicap";
 
 /**
  * GET /api/v2/rounds/[id] — one round's detail for the in-drawer scorecard: a
@@ -125,4 +126,35 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     holes,
     players,
   });
+}
+
+/**
+ * DELETE /api/v2/rounds/[id] — remove a round entirely (scores + roster cascade
+ * via FK). Co-equal ownership: the creator or any player on the round may delete
+ * it. Afterwards, recalc the handicap of every loozer who was on it, since a
+ * completed round dropping out changes their best-8-of-20.
+ */
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { userId } = await v2GetUser(request);
+  if (!userId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const { id } = await params;
+
+  const admin = v2AdminClient();
+  const { data: round } = await admin.from("v2_rounds").select("id, created_by").eq("id", id).maybeSingle();
+  if (!round) return NextResponse.json({ error: "Round not found" }, { status: 404 });
+
+  const { data: roster } = await admin.from("v2_round_players").select("user_id").eq("round_id", id);
+  const isPlayer = (roster || []).some((r) => r.user_id === userId);
+  if (round.created_by !== userId && !isPlayer) {
+    return NextResponse.json({ error: "Only players in this round can delete it" }, { status: 403 });
+  }
+
+  const affectedUserIds = [...new Set((roster || []).map((r) => r.user_id).filter((u): u is string => !!u))];
+
+  const { error } = await admin.from("v2_rounds").delete().eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await Promise.all(affectedUserIds.map((uid) => recalculateHandicap(admin, uid)));
+
+  return NextResponse.json({ ok: true });
 }

@@ -81,6 +81,18 @@ export default function EventShell({
   const [deepLink, setDeepLink] = useState<{ room?: string; photo?: string; msg?: string; bulk?: string }>({});
   const music = useV2Music();
 
+  // Publish the bottom-nav footprint globally while the shell is mounted, so the
+  // (org-level) mini-player can sit directly above the nav and content/drawers
+  // can reserve the combined chrome height. Cleared on unmount (e.g. the
+  // full-screen scorer, which has no bottom nav → --nav-h falls back to 0).
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--nav-h", "calc(60px + env(safe-area-inset-bottom, 0px))");
+    return () => {
+      root.style.removeProperty("--nav-h");
+    };
+  }, []);
+
   const refetchChatUnread = useCallback(async () => {
     try {
       const res = await fetch(`/api/v2/chat/unread?orgId=${orgId}`);

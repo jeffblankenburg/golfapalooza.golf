@@ -131,6 +131,7 @@ function teeLabel(t: { tee_name: string; gender: string | null }): string {
 interface Member {
   userId: string;
   displayName: string;
+  search?: string;
 }
 interface Player {
   key: string;
@@ -187,6 +188,9 @@ export default function RoundForm({
   const [showLookup, setShowLookup] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Final step: pick how to score. "choose" shows the three options; "total"
+  // reveals the quick gross inputs. Hole-by-hole/live navigate straight out.
+  const [scoreMode, setScoreMode] = useState<"choose" | "total">("choose");
   const router = useRouter();
   const slug = (useParams()?.slug as string) || "";
   const courseBoxRef = useRef<HTMLDivElement>(null);
@@ -380,10 +384,48 @@ export default function RoundForm({
     }
   }
 
+  // Hole-by-hole / live: create an in-progress round (no gross) and open the
+  // full-screen scorer. Both modes share one scorer (it's realtime-capable);
+  // the choice is about how the golfer plans to enter scores.
+  async function startScoring() {
+    if (!course || saving) return;
+    const rows = players.map((p) => ({
+      user_id: p.user_id ?? null,
+      guest_name: p.guest_name ?? null,
+      tee_id: teeByPlayer[p.key] || null,
+      final_gross_score: null,
+    }));
+    const roundTee = teeByPlayer[players[0]?.key] || tees[0]?.id;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/v2/rounds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ course_id: course.id, tee_id: roundTee, round_date: date, round_type: roundType, format, players: rows }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error || "Could not start scoring.");
+        setSaving(false);
+        return;
+      }
+      const d = await res.json();
+      onCloseDrawer();
+      router.push(`/new/${slug}/rounds/${d.id}/score`);
+    } catch {
+      setError("Something went wrong.");
+      setSaving(false);
+    }
+  }
+
   const searching = q.trim().length > 0;
   const results = searching ? hits : suggested;
+  const memberQuery = playerSearch.trim().toLowerCase();
   const availableMembers = members.filter(
-    (m) => !players.some((p) => p.key === m.userId) && (!playerSearch || m.displayName.toLowerCase().includes(playerSearch.toLowerCase())),
+    (m) =>
+      !players.some((p) => p.key === m.userId) &&
+      (!memberQuery || (m.search ?? m.displayName.toLowerCase()).includes(memberQuery)),
   );
   // Whether a given step's own requirements are satisfied (so you may leave it).
   const stepComplete = (i: number) =>
@@ -670,26 +712,51 @@ export default function RoundForm({
         </div>
       )}
 
-      {/* Step 5 — Score (gross per player). */}
+      {/* Step 5 — How to score. */}
       {step === 4 && (
         <div className={styles.field}>
-          <label className={styles.label}>Scores</label>
-          <p className={styles.roundFormHint}>Enter each player&apos;s gross, or leave blank to score later.</p>
-          {players.map((p) => (
-            <div key={p.key} className={styles.wizScoreRow}>
-              <span className={styles.wizScoreName}>{p.label}</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                className={styles.wizScoreInput}
-                value={grossByPlayer[p.key] || ""}
-                onChange={(e) => setGrossByPlayer((prev) => ({ ...prev, [p.key]: e.target.value }))}
-                placeholder="Gross"
-                min={18}
-                max={200}
-              />
-            </div>
-          ))}
+          {scoreMode === "choose" ? (
+            <>
+              <label className={styles.label}>How do you want to score?</label>
+              <div className={styles.scoreModes}>
+                <button type="button" className={styles.scoreMode} onClick={() => startScoring()} disabled={saving}>
+                  <span className={styles.scoreModeTitle}>Score hole-by-hole</span>
+                  <span className={styles.scoreModeSub}>Tap in each hole as you play. Tracks putts and more.</span>
+                </button>
+                <button type="button" className={styles.scoreMode} onClick={() => startScoring()} disabled={saving}>
+                  <span className={styles.scoreModeTitle}>Live scoring</span>
+                  <span className={styles.scoreModeSub}>Score together — everyone&apos;s phones stay in sync in real time.</span>
+                </button>
+                <button type="button" className={styles.scoreMode} onClick={() => setScoreMode("total")} disabled={saving}>
+                  <span className={styles.scoreModeTitle}>Enter total score</span>
+                  <span className={styles.scoreModeSub}>Just a final gross per player — quickest to log after the round.</span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <button type="button" className={styles.wizBackLink} onClick={() => setScoreMode("choose")}>
+                ‹ Scoring options
+              </button>
+              <label className={styles.label}>Total score</label>
+              <p className={styles.roundFormHint}>Enter each player&apos;s gross, or leave blank to score later.</p>
+              {players.map((p) => (
+                <div key={p.key} className={styles.wizScoreRow}>
+                  <span className={styles.wizScoreName}>{p.label}</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    className={styles.wizScoreInput}
+                    value={grossByPlayer[p.key] || ""}
+                    onChange={(e) => setGrossByPlayer((prev) => ({ ...prev, [p.key]: e.target.value }))}
+                    placeholder="Gross"
+                    min={18}
+                    max={200}
+                  />
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
 
@@ -697,7 +764,9 @@ export default function RoundForm({
 
       {/* Nav. Step 1 auto-advances when you PICK a course, so it has no nav then;
           but once a course is selected (e.g. after coming Back), show Next so you
-          can return to Details without being forced to change the course. */}
+          can return to Details without being forced to change the course. On the
+          final step, the primary action only appears once "Enter total" is chosen
+          (hole-by-hole / live navigate straight to the scorer). */}
       {(step > 0 || course) && (
         <div className={styles.wizNav}>
           {step > 0 && (
@@ -709,11 +778,11 @@ export default function RoundForm({
             <button type="button" className={styles.createBtn} onClick={() => setStep(step + 1)} disabled={!canAdvance} style={{ opacity: canAdvance ? 1 : 0.6 }}>
               Next
             </button>
-          ) : (
+          ) : scoreMode === "total" ? (
             <button type="button" className={styles.createBtn} onClick={save} disabled={saving} style={{ opacity: saving ? 0.6 : 1 }}>
               {saving ? "Saving…" : "Save round"}
             </button>
-          )}
+          ) : null}
         </div>
       )}
     </div>

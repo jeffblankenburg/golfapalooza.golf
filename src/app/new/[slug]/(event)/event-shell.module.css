@@ -103,7 +103,9 @@
 
 .content {
   padding-top: 56px;
-  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+  /* Reserve the full bottom chrome: nav (--nav-h, incl. safe-area) + the music
+     mini-player (--mini-h) when it's showing. Both published globally via JS. */
+  padding-bottom: calc(var(--nav-h, 0px) + var(--mini-h, 0px));
   min-height: 100dvh;
 }
 
@@ -112,7 +114,7 @@
   top: 56px;
   left: 0;
   right: 0;
-  bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--nav-h, 0px) + var(--mini-h, 0px));
   z-index: 50;
   background: rgba(23, 33, 29, 0.2);
   -webkit-backdrop-filter: blur(6px);
@@ -131,7 +133,7 @@
   top: 106px; /* 56px top bar + 50px gap so the page shows below the nav */
   left: 0;
   right: 0;
-  bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--nav-h, 0px) + var(--mini-h, 0px));
   z-index: 55;
   display: flex;
   flex-direction: column;

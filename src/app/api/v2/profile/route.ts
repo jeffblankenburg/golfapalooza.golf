@@ -86,6 +86,11 @@ export async function PATCH(request: Request) {
   if ("fun_fact" in body) patch.fun_fact = str(body.fun_fact);
   if ("best_shot" in body) patch.best_shot = str(body.best_shot);
   if ("show_on_map" in body) patch.show_on_map = !!body.show_on_map;
+  if ("tracked_stats" in body) {
+    const allowed = ["putts", "fairways", "gir", "penalties"];
+    const arr = Array.isArray(body.tracked_stats) ? body.tracked_stats : [];
+    patch.tracked_stats = [...new Set(arr.filter((s): s is string => typeof s === "string" && allowed.includes(s)))];
+  }
 
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });

@@ -574,6 +574,23 @@ export default function MusicProvider({
     });
   }, [songs, currentIndex, isPlaying, pause, resume, previous, next, seek, mode]);
 
+  // Publish the mini-player's footprint globally so every page + drawer can
+  // reserve space for it (treated like part of the bottom chrome). It sits above
+  // the bottom nav (--nav-h); when there's no nav (e.g. the scorer) it absorbs
+  // the safe-area itself. 0 when hidden.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty(
+      "--mini-h",
+      isVisible
+        ? "calc(58px + max(0px, calc(env(safe-area-inset-bottom, 0px) - var(--nav-h, 0px))))"
+        : "0px",
+    );
+    return () => {
+      root.style.removeProperty("--mini-h");
+    };
+  }, [isVisible]);
+
   return (
     <MusicContext.Provider
       value={{

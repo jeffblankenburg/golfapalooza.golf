@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import styles from "@/app/new/new.module.css";
 import RoundDetail from "./RoundDetail";
 import RoundForm from "./RoundForm";
@@ -74,6 +75,8 @@ export default function RoundsDrawer({
   const [data, setData] = useState<RoundsPayload | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
+  const router = useRouter();
+  const slug = (useParams()?.slug as string) || "";
 
   useEffect(() => {
     if (!active) return;
@@ -171,7 +174,7 @@ export default function RoundsDrawer({
                       {r.status === "in_progress" && <span className={styles.roundBadge} data-live>In progress</span>}
                       {r.is_incomplete && (
                         <span className={styles.roundBadge} data-warn>
-                          Incomplete · {r.holes_played}/{r.expected_holes}
+                          Incomplete ({r.holes_played}/{r.expected_holes})
                         </span>
                       )}
                       {r.tee_name && (
@@ -203,7 +206,19 @@ export default function RoundsDrawer({
                     <path d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                {isOpen && <RoundDetail id={r.id} />}
+                {isOpen && (
+                  <RoundDetail
+                    id={r.id}
+                    onResume={() => {
+                      onCloseDrawer();
+                      router.push(`/new/${slug}/rounds/${r.id}/score`);
+                    }}
+                    onDeleted={() => {
+                      setOpenId(null);
+                      setReload((n) => n + 1);
+                    }}
+                  />
+                )}
               </div>
             );
           })}

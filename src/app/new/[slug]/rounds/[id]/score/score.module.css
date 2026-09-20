@@ -1,0 +1,532 @@
+/* Full-screen hole-by-hole / live scorer — v2 re-skin of the legacy
+   ScoringShell + LiveScoringEntry. Inherits --brand/--paper/--ink from .wrap. */
+
+.screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* Reserve the music mini-player's height (--mini-h) so the scorer's own
+     bottom controls never hide behind it. No bottom nav here, so --nav-h is 0. */
+  bottom: calc(var(--nav-h, 0px) + var(--mini-h, 0px));
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+}
+
+/* Header: close, hole/par/yds, live badge. */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  padding-top: max(10px, env(safe-area-inset-top));
+}
+.iconBtn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: none;
+  background: var(--paper);
+  color: var(--ink-soft);
+  cursor: pointer;
+  flex: none;
+}
+.iconBtn:active {
+  background: var(--line);
+}
+.headMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  min-width: 0;
+}
+.headMeta strong {
+  color: var(--ink);
+}
+.headSep {
+  width: 1px;
+  height: 15px;
+  background: var(--line-strong);
+}
+.liveBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.liveBadge[data-state="live"] {
+  color: #0a7d3c;
+  background: color-mix(in srgb, #0a7d3c 12%, var(--card));
+}
+.liveBadge[data-state="connecting"] {
+  color: #9a6b00;
+  background: color-mix(in srgb, #9a6b00 12%, var(--card));
+}
+.liveBadge[data-state="offline"] {
+  color: #a3341f;
+  background: color-mix(in srgb, #a3341f 12%, var(--card));
+}
+.liveDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+/* Mini scorecard strip. */
+.cardWrap {
+  overflow-x: auto;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.cardTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.625rem;
+  table-layout: fixed;
+}
+.cardTable th,
+.cardTable td {
+  padding: 3px 0;
+  text-align: center;
+}
+.cardHoleBtn {
+  width: 100%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.625rem;
+  color: var(--ink-soft);
+  padding: 3px 0;
+}
+.cardHoleBtn[data-active="true"] {
+  background: var(--brand);
+  color: #fff;
+  border-radius: 6px;
+}
+.cardParRow td,
+.cardHcpRow td {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.cardHcpRow td {
+  color: rgba(89, 99, 91, 0.6);
+  font-weight: 500;
+}
+.cardLead {
+  color: rgba(89, 99, 91, 0.6);
+  font-weight: 700;
+  border-right: 1px solid var(--line);
+  width: 26px;
+}
+.cardTot {
+  border-left: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+.cardInitial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+.cardTotVal {
+  border-left: 1px solid var(--line);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* Score mark (birdie circle, bogey square, etc.). */
+.mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.mark[data-mark="eagle"],
+.mark[data-mark="birdie"] {
+  border-radius: 999px;
+  border: 1.3px solid #c026a0;
+  color: #c026a0;
+}
+.mark[data-mark="eagle"] {
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 3.2px #c026a0;
+}
+.mark[data-mark="bogey"],
+.mark[data-mark="double"] {
+  border-radius: 3px;
+  border: 1.3px solid #2563eb;
+  color: #2563eb;
+}
+.mark[data-mark="double"] {
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 3.2px #2563eb;
+}
+
+/* Course strip + save banner. */
+.courseStrip {
+  position: relative;
+  flex: none;
+  background: var(--ink);
+  padding: 6px 14px;
+  text-align: center;
+}
+.courseName {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #fff;
+}
+.saveBanner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.saveBanner[data-state="saving"] { opacity: 1; background: #eff5ff; color: #2563eb; }
+.saveBanner[data-state="saved"] { opacity: 1; background: #edf9f0; color: #0a7d3c; }
+.saveBanner[data-state="error"] { opacity: 1; background: #fdeeea; color: #a3341f; }
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 999px;
+  animation: scspin 0.7s linear infinite;
+}
+@keyframes scspin { to { transform: rotate(360deg); } }
+
+/* Nav row. */
+.nav {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+.holeName {
+  font-family: var(--font-playfair), serif;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+/* Score panel. */
+.panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 12px calc(14px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.playerRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 9px 11px;
+}
+.playerMain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.playerExtras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+.extraStat {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px 3px 10px;
+  border-radius: 999px;
+  background: var(--paper);
+}
+.extraLabel {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft);
+  margin-right: 1px;
+}
+.extraVal {
+  min-width: 16px;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.playerId {
+  width: 74px;
+  min-width: 0;
+  flex: none;
+}
+.playerName {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.playerTee {
+  font-size: 0.62rem;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.runningTotal {
+  min-width: 40px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+.runningNum {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.runningToPar {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.spacer { flex: 1; }
+
+/* A stat cluster (strokes / putts / penalties). */
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+}
+.stepBtn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: none;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.stepBtn[data-kind="strokes"] {
+  background: var(--brand);
+  color: #fff;
+}
+.stepBtn[data-kind="minor"] {
+  width: 27px;
+  height: 27px;
+  font-size: 0.85rem;
+  background: var(--paper);
+  color: var(--ink-soft);
+}
+.stepBtn:disabled { opacity: 0.3; }
+.statVal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+.statValStrokes {
+  width: 34px;
+}
+.statNum {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.statLabel {
+  font-size: 0.44rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft);
+  margin-top: 1px;
+}
+.statNum[data-mark="eagle"], .statNum[data-mark="birdie"] { color: #c026a0; }
+.statNum[data-mark="bogey"], .statNum[data-mark="double"] { color: #2563eb; }
+
+/* Boolean stat toggle (fairway / GIR). */
+.toggleBtn {
+  width: 40px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.toggleBtn[data-state="yes"] { background: var(--brand); color: #fff; border-color: var(--brand); }
+.toggleBtn[data-state="no"] { background: color-mix(in srgb, #a3341f 12%, var(--card)); color: #a3341f; border-color: color-mix(in srgb, #a3341f 40%, transparent); }
+
+/* Complete + settings. */
+.completeBtn {
+  margin-top: 6px;
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.completeBtn:disabled { opacity: 0.5; }
+.statsConfig {
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 2px 2px;
+}
+.statsConfigLabel {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  margin-right: 2px;
+}
+.statChip {
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.statChip[data-on="true"] {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, var(--card));
+  color: var(--brand);
+}
+
+/* Confirm-complete modal. */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(23, 33, 29, 0.4);
+  backdrop-filter: blur(4px);
+}
+.modal {
+  width: 100%;
+  max-width: 380px;
+  background: var(--card);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 20px 48px rgba(23, 33, 29, 0.28);
+}
+.modalBody {
+  padding: 20px;
+}
+.modalTitle {
+  font-family: var(--font-playfair), serif;
+  font-size: 1.25rem;
+  color: var(--ink);
+  margin: 0 0 8px;
+}
+.modalText {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
+.modalErr {
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: #a3341f;
+}
+.modalActions {
+  display: flex;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+}
+.modalBtnPrimary {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 11px;
+  background: var(--brand);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+.modalBtnGhost {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 11px;
+  background: var(--card);
+  color: var(--ink-soft);
+  font-weight: 700;
+  cursor: pointer;
+}
+.modalBtnPrimary:disabled, .modalBtnGhost:disabled { opacity: 0.6; }
+
+.loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}

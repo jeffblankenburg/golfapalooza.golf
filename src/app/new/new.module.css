@@ -3370,6 +3370,41 @@ button.feedRow:active {
   border-radius: 10px;
   padding: 10px 12px;
 }
+
+/* Round detail actions (Resume / Delete). */
+.roundActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.roundResumeBtn {
+  flex: 1;
+  padding: 11px;
+  border: none;
+  border-radius: 11px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.roundDeleteBtn {
+  padding: 11px 14px;
+  border: 1px solid color-mix(in srgb, #a3341f 40%, transparent);
+  border-radius: 11px;
+  background: none;
+  color: #a3341f;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.roundResumeBtn:only-child,
+.roundDeleteBtn:only-child {
+  flex: 1;
+}
 .scPlayers {
   display: flex;
   flex-direction: column;
@@ -3912,6 +3947,52 @@ button.feedRow:active {
   font-family: var(--font-libre), sans-serif;
   font-size: 1rem;
   text-align: center;
+}
+
+/* Final step — the three scoring modes. */
+.scoreModes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.scoreMode {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: 13px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.scoreMode:active {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 6%, var(--card));
+}
+.scoreMode:disabled {
+  opacity: 0.6;
+}
+.scoreModeTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.scoreModeSub {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+.wizBackLink {
+  align-self: flex-start;
+  margin-bottom: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--brand);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 /* Full-width segmented control (Holes / Format) — sized to match .input boxes

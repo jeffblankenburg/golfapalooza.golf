@@ -3,6 +3,7 @@ import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { formatCourseName } from "@/lib/v2/course-display";
 import { expectedHoleCount, isRoundIncomplete } from "@/lib/rounds/incomplete";
 import { recalculateHandicap } from "@/lib/v2/golf/handicap";
+import { clearRoundActivity } from "@/lib/v2/rounds/round-activity";
 
 /**
  * GET /api/v2/rounds/[id] — one round's detail for the in-drawer scorecard: a
@@ -40,6 +41,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const viewer = playerRows.find((p) => p.user_id === userId) || playerRows[0] || null;
   const course = one(round.course);
   const roundTee = one(round.tee);
+
+  // Comment count for the collapsed "Comments (N)" toggle in the detail view.
+  const { count: commentCount } = await admin
+    .from("v2_round_comments")
+    .select("id", { count: "exact", head: true })
+    .eq("round_id", id);
 
   // The holes that belong to this round's nine (front 1–9, back 10–18, all 18).
   const inNine = (h: number) =>
@@ -123,6 +130,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     is_incomplete: isIncomplete,
     holes_played: viewerHolesPlayed,
     expected_holes: expectedHoleCount(round.round_type),
+    comment_count: commentCount ?? 0,
     holes,
     players,
   });
@@ -140,7 +148,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const { id } = await params;
 
   const admin = v2AdminClient();
-  const { data: round } = await admin.from("v2_rounds").select("id, created_by").eq("id", id).maybeSingle();
+  const { data: round } = await admin.from("v2_rounds").select("id, created_by, status").eq("id", id).maybeSingle();
   if (!round) return NextResponse.json({ error: "Round not found" }, { status: 404 });
 
   const { data: roster } = await admin.from("v2_round_players").select("user_id").eq("round_id", id);
@@ -149,12 +157,29 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     return NextResponse.json({ error: "Only players in this round can delete it" }, { status: 403 });
   }
 
-  const affectedUserIds = [...new Set((roster || []).map((r) => r.user_id).filter((u): u is string => !!u))];
+  const loozerIds = [...new Set((roster || []).map((r) => r.user_id).filter((u): u is string => !!u))];
+  const actorIsPlayer = loozerIds.includes(userId);
+  const otherLoozers = loozerIds.filter((u) => u !== userId);
 
-  const { error } = await admin.from("v2_rounds").delete().eq("id", id);
+  // In-progress rounds delete wholesale (it's a live session). A completed round
+  // shared with other Loozers only removes the actor's own score; the round is
+  // deleted outright only when no other Loozer remains (solo, or the actor is the
+  // last one out), or when a non-player creator deletes it.
+  const deleteWhole = round.status === "in_progress" || !actorIsPlayer || otherLoozers.length === 0;
+
+  if (deleteWhole) {
+    const { error } = await admin.from("v2_rounds").delete().eq("id", id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await clearRoundActivity(admin, id);
+    await Promise.all(loozerIds.map((uid) => recalculateHandicap(admin, uid)));
+    return NextResponse.json({ ok: true, deletedRound: true });
+  }
+
+  // Remove only the actor: their round_player row (scores cascade) + their score
+  // activity row; recalc just their handicap. The round stays for everyone else.
+  const { error } = await admin.from("v2_round_players").delete().eq("round_id", id).eq("user_id", userId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  await Promise.all(affectedUserIds.map((uid) => recalculateHandicap(admin, uid)));
-
-  return NextResponse.json({ ok: true });
+  await admin.from("v2_activity").delete().eq("ref_id", id).eq("kind", "round").eq("actor_id", userId);
+  await recalculateHandicap(admin, userId);
+  return NextResponse.json({ ok: true, deletedRound: false });
 }

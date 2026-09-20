@@ -15,8 +15,8 @@ All fan out to users who **favorited** the player, gated by per-favorite toggles
 - Deep-link to a spectator/read-only scorecard (does v2 have one? may need `/new/[slug]/rounds/[id]` read-only view).
 - **Manageable in notification settings**: register `notify_round_started`, `notify_hole_completed`, `notify_round_completed` in `NOTIFICATION_SECTIONS` (`src/lib/v2/notification-prefs.ts`) so followers can toggle each. (These may double as the per-follow toggles, or the per-follow toggles gate WHO and the settings toggle gates the master per-type — decide during build.)
 
-## ⚠️ Depends on
-The **org-scoping decision** from the round-notifications issue (rounds are global; notifications + follows may cross groups).
+## ✅ Org scoping (resolved)
+Uses the same rule as #186: notifications belong to **`v2_rounds.org_id`** (the group the round was logged under). Follows themselves may still be global (you follow a golfer, not a golfer-in-a-group) — but each spectator notification is created under the round's org, so a follower only gets it if they're a member of that group AND haven't toggled the type off there. (Decide during build whether a follow with no shared group simply never fires.)
 
 ## Notes
 Part of the My Rounds epic (#174). Larger than the roster-based notifications; do that one first.

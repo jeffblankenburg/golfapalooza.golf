@@ -9,11 +9,16 @@ Wire up the **roster-based** notifications for v2 rounds (currently the v2 round
 ## v2 infra available
 - `sendV2Notifications(admin, userIds, {type, title, body, data, orgId})` — per-user prefs + push already handled.
 
-## ⚠️ Design decision: org scoping
-`v2_notifications` rows carry an **`org_id`** and prefs are **org-scoped**, but rounds are **personal & global** (not tied to an org). A round can involve players from different groups, and the v2 scorer URL is org-scoped (`/new/[slug]/rounds/[id]/score`). Need a rule before building:
-- Which `org_id` do round notifications use? (Acting user's current org? Each recipient's own org? Null/global?)
-- What slug does the deep-link use for a global round — the recipient's org context?
-Resolve this first; it shapes the payload + link.
+## ✅ Resolved decisions (org scoping, mentions, deep-link)
+`v2_notifications.org_id` is NOT NULL + prefs are org-scoped, but rounds have no org. Resolution:
+
+- **Org = the group the round was logged under.** Add **`v2_rounds.org_id`** (nullable), stamped at creation from the `/new/{slug}` context the round was logged in. `POST /api/v2/rounds` must accept + store it (RoundForm already has `orgId`). Imported/historical rounds (00225) have `org_id = null` → they don't notify (fine). The round data itself **stays global** in every group's history — `org_id` is only for notification/social routing, not access control.
+- **All round notifications use `round.org_id`**; deep-links resolve that org's slug.
+- **Every recipient is in that org by construction** (roster is picked from org members; mention candidates are org members; guests have no account) → org-scoped prefs resolve with no cross-group edge cases.
+- **Mention scope**: `@` autocompletes **any member of the round's group** (not just players); mentioning a non-player still notifies them.
+- **Deep-links**:
+  - `round_invite` → the scorer (`/new/{slug}/rounds/{id}/score`) — exists.
+  - `round_comment` / `round_mention` → the **standalone round page `/new/{slug}/rounds/{id}` with comments auto-expanded** (see separate standalone-round-page issue). This replaces the earlier "open the drawer" idea, which only worked for players — a mentioned non-player has no round in their My Rounds. The standalone page is group-visible, so it works for everyone. **Depends on that page existing.**
 
 ## Scope
 - Add a `src/lib/v2/rounds/notify.ts` (mirror legacy, v2 tables + `sendV2Notifications`).

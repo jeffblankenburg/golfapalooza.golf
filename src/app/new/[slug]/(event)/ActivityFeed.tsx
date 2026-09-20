@@ -104,6 +104,7 @@ function PhotoStrip({ it }: { it: ActivityRow }) {
 /** Right-aligned accessory. Rounds show score + strokes to par. */
 function Accessory({ it }: { it: ActivityRow }) {
   if (it.kind === "round") {
+    if (it.metadata?.live) return <span className={styles.feedLive}>LIVE</span>;
     const score = num(it.metadata?.score);
     const toPar = num(it.metadata?.toPar);
     if (score === null && toPar === null) return null;

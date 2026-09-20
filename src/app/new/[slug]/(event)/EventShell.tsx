@@ -433,6 +433,7 @@ export default function EventShell({
             <RoundsDrawer
               active={open === "rounds"}
               orgId={orgId}
+              viewerId={userId}
               formOpen={roundsFormOpen}
               onExitForm={() => setRoundsFormOpen(false)}
               onCloseDrawer={() => setOpen(null)}

@@ -61,12 +61,14 @@ function shortDate(iso: string): { mon: string; day: string; year: string } {
 export default function RoundsDrawer({
   active,
   orgId,
+  viewerId,
   formOpen,
   onExitForm,
   onCloseDrawer,
 }: {
   active: boolean;
   orgId: string;
+  viewerId: string;
   formOpen: boolean;
   onExitForm: () => void;
   onCloseDrawer: () => void;
@@ -209,6 +211,8 @@ export default function RoundsDrawer({
                 {isOpen && (
                   <RoundDetail
                     id={r.id}
+                    orgId={orgId}
+                    viewerId={viewerId}
                     onResume={() => {
                       onCloseDrawer();
                       router.push(`/new/${slug}/rounds/${r.id}/score`);

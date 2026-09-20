@@ -365,6 +365,7 @@ export default function RoundForm({
         body: JSON.stringify({
           course_id: course.id,
           tee_id: roundTee,
+          org_id: orgId,
           round_date: date,
           round_type: roundType,
           format,
@@ -402,7 +403,7 @@ export default function RoundForm({
       const res = await fetch("/api/v2/rounds", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ course_id: course.id, tee_id: roundTee, round_date: date, round_type: roundType, format, players: rows }),
+        body: JSON.stringify({ course_id: course.id, tee_id: roundTee, org_id: orgId, round_date: date, round_type: roundType, format, players: rows }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));

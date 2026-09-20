@@ -1926,6 +1926,27 @@ button.feedRow:active {
   gap: 4px;
   padding-left: 8px;
 }
+.feedLive {
+  flex: none;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #a3341f;
+  background: color-mix(in srgb, #a3341f 12%, var(--card));
+}
+.feedLive::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
 .feedScoreNum {
   font-weight: 700;
   font-size: 1.05rem;
@@ -3369,6 +3390,70 @@ button.feedRow:active {
   background: color-mix(in srgb, #b45309 8%, var(--card));
   border-radius: 10px;
   padding: 10px 12px;
+}
+
+/* Standalone round page (group-visible). */
+.roundPage {
+  min-height: 100dvh;
+  padding-bottom: var(--mini-h, 0px);
+}
+.roundPageHeader {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: max(10px, env(safe-area-inset-top)) 14px 10px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+.roundPageBack {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: none;
+  background: var(--paper);
+  color: var(--ink-soft);
+  cursor: pointer;
+  flex: none;
+}
+.roundPageTitle {
+  font-family: var(--font-playfair), serif;
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+.roundPageBody {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 4px 12px 16px;
+}
+
+/* Round detail — collapsible comments. */
+.roundCommentsSection {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.roundCommentsToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 11px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.roundCommentsToggle svg {
+  color: var(--ink-soft);
 }
 
 /* Round detail actions (Resume / Delete). */

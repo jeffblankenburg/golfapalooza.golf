@@ -4,6 +4,7 @@ import { formatCourseName } from "@/lib/v2/course-display";
 import { isRoundIncomplete, expectedHoleCount } from "@/lib/rounds/incomplete";
 import { calculateDifferential } from "@/lib/v2/golf/calculator";
 import { recalculateHandicap } from "@/lib/v2/golf/handicap";
+import { orgSlug, logLiveRound, logRoundScores } from "@/lib/v2/rounds/round-activity";
 
 /**
  * GET /api/v2/rounds — the authed golfer's personal rounds + handicap for the My
@@ -156,6 +157,7 @@ export async function POST(request: Request) {
   let body: {
     course_id?: string;
     tee_id?: string;
+    org_id?: string;
     round_date?: string;
     round_type?: string;
     format?: string;
@@ -167,7 +169,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
-  const { course_id, tee_id } = body;
+  const { course_id, tee_id, org_id } = body;
   const round_type = ROUND_TYPES.includes(body.round_type || "") ? body.round_type! : "18";
   const format = FORMATS.includes(body.format || "") ? body.format! : "individual";
   const round_date = /^\d{4}-\d{2}-\d{2}$/.test(body.round_date || "")
@@ -203,6 +205,7 @@ export async function POST(request: Request) {
       created_by: userId,
       course_id,
       tee_id,
+      org_id: org_id ?? null,
       round_date,
       round_type,
       format,
@@ -250,6 +253,37 @@ export async function POST(request: Request) {
   if (!isScramble) {
     const affected = [...new Set(rows.filter((r) => r.score_differential != null && r.user_id).map((r) => r.user_id!))];
     await Promise.all(affected.map((uid) => recalculateHandicap(admin, uid)));
+  }
+
+  // Activity feed (best-effort): a LIVE entry while in progress, or per-Loozer
+  // score entries when created already-completed (quick total). Keyed to the
+  // round's group.
+  if (org_id) {
+    const [{ data: courseRow }, slug] = await Promise.all([
+      admin.from("v2_courses").select("name, club_name").eq("id", course_id).maybeSingle(),
+      orgSlug(admin, org_id),
+    ]);
+    if (slug) {
+      const courseName = courseRow ? formatCourseName(courseRow) : "a round";
+      const teePar = teeMap.get(tee_id)?.par ?? 72;
+      const par = is18 ? teePar : Math.round(teePar / 2);
+      if (status === "in_progress") {
+        // Player names for the live entry's subtitle ("Jeff, Bob, Guest").
+        const loozerIds = players.map((p) => p.user_id).filter((u): u is string => !!u);
+        const { data: profs } = loozerIds.length
+          ? await admin.from("v2_profiles").select("id, display_name").in("id", loozerIds)
+          : { data: [] as { id: string; display_name: string }[] };
+        const nameById = new Map((profs || []).map((p) => [p.id, p.display_name]));
+        const names = players.map((p) => (p.user_id ? nameById.get(p.user_id) || "Player" : p.guest_name || "Guest"));
+        await logLiveRound(admin, { orgId: org_id, slug, roundId: round.id, creatorId: userId, courseName, subtitle: names.join(", ") });
+      } else {
+        const toPar = (g: number | null) => (g != null ? g - par : null);
+        const entries = isScramble
+          ? [{ actorId: userId, score: rows[0]?.final_gross_score ?? null, toPar: toPar(rows[0]?.final_gross_score ?? null) }]
+          : rows.filter((r) => r.user_id).map((r) => ({ actorId: r.user_id!, score: r.final_gross_score, toPar: toPar(r.final_gross_score) }));
+        await logRoundScores(admin, { orgId: org_id, slug, roundId: round.id, courseName, entries });
+      }
+    }
   }
 
   return NextResponse.json({ id: round.id });

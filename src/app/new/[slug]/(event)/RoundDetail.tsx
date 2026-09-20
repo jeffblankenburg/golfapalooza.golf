@@ -5,6 +5,7 @@ import styles from "@/app/new/new.module.css";
 import { useNameMode } from "./NameMode";
 import { pickName, type NameMode } from "@/lib/v2/profile";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
+import RoundComments from "@/app/new/[slug]/rounds/[id]/score/RoundComments";
 
 interface Hole {
   hole_number: number;
@@ -37,6 +38,7 @@ interface Detail {
   is_incomplete: boolean;
   holes_played: number;
   expected_holes: number;
+  comment_count: number;
   holes: Hole[];
   players: PlayerRow[];
 }
@@ -125,17 +127,24 @@ function Nine({ holes, players, totalLabel }: { holes: Hole[]; players: LabeledP
  */
 export default function RoundDetail({
   id,
+  orgId,
+  viewerId,
   onResume,
   onDeleted,
+  defaultCommentsOpen = false,
 }: {
   id: string;
+  orgId: string;
+  viewerId: string;
   onResume?: () => void;
   onDeleted?: () => void;
+  defaultCommentsOpen?: boolean;
 }) {
   const [loaded, setLoaded] = useState(false);
   const [d, setD] = useState<Detail | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(defaultCommentsOpen);
   const mode = useNameMode();
 
   async function handleDelete() {
@@ -175,6 +184,15 @@ export default function RoundDetail({
   const labeled: LabeledPlayer[] = d.players.map((p) => ({ ...p, label: shortLabel(p, mode) }));
   const front = d.holes.filter((h) => h.hole_number <= 9);
   const back = d.holes.filter((h) => h.hole_number >= 10);
+
+  // A completed round shared with other Loozers only removes YOUR score; an
+  // in-progress or solo round deletes wholesale. Mirror the server rule so the
+  // confirm text is honest about what will happen.
+  const otherLoozers = d.players.filter((p) => !p.is_viewer && !p.is_guest);
+  const wholeDelete = d.status === "in_progress" || otherLoozers.length === 0;
+  const deleteMessage = wholeDelete
+    ? "This permanently removes the round and all its scores for everyone. If it counted toward handicaps, they'll be recalculated. This can't be undone."
+    : "This removes only your score from this round — the other players keep theirs, and your handicap will be recalculated. This can't be undone.";
   const ratingLine =
     d.course_rating != null && d.slope_rating != null
       ? `${d.course_rating.toFixed(1)}/${d.slope_rating}`
@@ -279,6 +297,19 @@ export default function RoundDetail({
         </p>
       )}
 
+      {/* Comments — collapsed by default (opens automatically via a notification
+          deep-link, which passes defaultCommentsOpen). */}
+      <div className={styles.roundCommentsSection}>
+        {commentsOpen ? (
+          <RoundComments roundId={id} viewerId={viewerId} orgId={orgId} />
+        ) : (
+          <button type="button" className={styles.roundCommentsToggle} onClick={() => setCommentsOpen(true)}>
+            <span>Comments{d.comment_count > 0 ? ` (${d.comment_count})` : ""}</span>
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden><path d="M19 9l-7 7-7-7" /></svg>
+          </button>
+        )}
+      </div>
+
       <div className={styles.roundActions}>
         <button type="button" className={styles.roundDeleteBtn} onClick={() => setConfirmOpen(true)}>
           Delete round
@@ -288,7 +319,7 @@ export default function RoundDetail({
       <ConfirmModal
         open={confirmOpen}
         title="Delete this round?"
-        message="This permanently removes the round and all its scores. If it counted toward your handicap, your index will be recalculated. This can't be undone."
+        message={deleteMessage}
         confirmLabel={deleting ? "Deleting…" : "Delete round"}
         destructive
         onConfirm={handleDelete}

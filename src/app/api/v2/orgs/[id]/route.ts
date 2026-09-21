@@ -32,6 +32,7 @@ export async function PATCH(
     system_name?: string;
     member_noun?: string;
     member_noun_plural?: string;
+    onboarding_dismissed?: boolean;
   };
   try {
     body = await request.json();
@@ -89,6 +90,9 @@ export async function PATCH(
     if (!n) return NextResponse.json({ error: "Member label can't be empty" }, { status: 400 });
     if (n.length > 30) return NextResponse.json({ error: "Member label is too long" }, { status: 400 });
     patch.member_noun_plural = n;
+  }
+  if (typeof body.onboarding_dismissed === "boolean") {
+    patch.onboarding_dismissed_at = body.onboarding_dismissed ? new Date().toISOString() : null;
   }
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });

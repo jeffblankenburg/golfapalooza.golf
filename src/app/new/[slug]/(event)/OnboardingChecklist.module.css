@@ -1,0 +1,131 @@
+/* Get-your-group-ready first-run checklist (#196). 400px column, v2 tokens. */
+.card {
+  max-width: 400px;
+  margin: 0 auto 18px;
+  padding: 16px 16px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.title {
+  font-family: var(--font-playfair), serif;
+  font-size: 1.2rem;
+  color: var(--ink);
+  margin: 0;
+}
+.count {
+  font-family: var(--font-libre), sans-serif;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--brand);
+  white-space: nowrap;
+}
+
+.track {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--paper);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--brand);
+  transition: width 0.35s ease;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 8px;
+  border-radius: 11px;
+  text-decoration: none;
+  color: inherit;
+}
+a.row:active {
+  background: var(--paper);
+}
+.row[data-done] {
+  opacity: 0.62;
+}
+
+.mark {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: transparent;
+}
+.mark[data-done] {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+.body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.label {
+  font-family: var(--font-libre), sans-serif;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.2;
+}
+.label[data-done] {
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-soft);
+}
+.desc {
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+  line-height: 1.25;
+}
+
+.arrow {
+  flex: none;
+  color: var(--ink-soft);
+}
+
+.dismiss {
+  display: block;
+  margin: 8px 0 2px auto;
+  padding: 6px 4px;
+  border: none;
+  background: none;
+  font-family: var(--font-libre), sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.dismiss:active {
+  color: var(--ink);
+}

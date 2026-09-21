@@ -4,8 +4,10 @@ import { getPlatformContext } from "@/lib/v2/context";
 import { loadResolvedFeatures } from "@/lib/v2/features-server";
 import { isFeatureVisible } from "@/lib/v2/features";
 import styles from "@/app/new/new.module.css";
+import { getOnboardingState } from "@/lib/v2/onboarding";
 import Countdown from "./Countdown";
 import HomeModules from "./HomeModules";
+import OnboardingChecklist from "./OnboardingChecklist";
 import PwaInstallBanner from "./PwaInstallBanner";
 
 interface EventRow {
@@ -59,9 +61,20 @@ export default async function EventHome({
   const resolved = await loadResolvedFeatures(supabase, org.id, event?.id ?? null);
   const articlesVisible = isFeatureVisible(resolved, "articles", isAdmin);
 
+  // First-run setup checklist — admins only, hidden once done or dismissed.
+  const onboarding = isAdmin ? await getOnboardingState(supabase, org, isAdmin) : null;
+
   return (
     <div className={`${styles.page} ${styles.orgPage}`}>
       <PwaInstallBanner appName={org.name} />
+      {onboarding?.show && (
+        <OnboardingChecklist
+          orgId={org.id}
+          steps={onboarding.steps}
+          completed={onboarding.completed}
+          total={onboarding.total}
+        />
+      )}
       {event ? (
         <>
           <div className={styles.eventHero}>

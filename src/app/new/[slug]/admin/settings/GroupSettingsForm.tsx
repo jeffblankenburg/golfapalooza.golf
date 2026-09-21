@@ -19,6 +19,8 @@ export default function GroupSettingsForm({
   initialNameDisplay,
   initialSystemName,
   initialSystemAvatar,
+  initialMemberNoun,
+  initialMemberNounPlural,
 }: {
   orgId: string;
   slug: string;
@@ -31,6 +33,8 @@ export default function GroupSettingsForm({
   initialNameDisplay: NameMode;
   initialSystemName: string;
   initialSystemAvatar: string | null;
+  initialMemberNoun: string;
+  initialMemberNounPlural: string;
 }) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
@@ -42,6 +46,8 @@ export default function GroupSettingsForm({
   const [logo, setLogo] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(initialLogo);
   const [systemName, setSystemName] = useState(initialSystemName);
+  const [memberNoun, setMemberNoun] = useState(initialMemberNoun);
+  const [memberNounPlural, setMemberNounPlural] = useState(initialMemberNounPlural);
   const [systemAvatar, setSystemAvatar] = useState<File | null>(null);
   const [systemAvatarPreview, setSystemAvatarPreview] = useState<string | null>(initialSystemAvatar);
   const [saving, setSaving] = useState(false);
@@ -78,6 +84,8 @@ export default function GroupSettingsForm({
           store_label: storeLabel.trim() || null,
           store_enabled: storeEnabled,
           system_name: systemName.trim() || "System",
+          member_noun: memberNoun.trim() || "Member",
+          member_noun_plural: memberNounPlural.trim() || "Members",
         }),
       });
       if (!res.ok) {
@@ -257,6 +265,35 @@ export default function GroupSettingsForm({
               <strong> Real names</strong> shows their First Last. Either way, anyone missing the chosen name
               falls back to the other — so a member without a nickname still shows their real name.
             </p>
+          </div>
+        </details>
+
+        {/* Member label — what this group calls its people (singular + plural). */}
+        <details className={styles.accordion}>
+          <summary className={styles.accordionSummary}>
+            <span>Member label</span>
+            <span className={styles.accordionSummaryRight}>
+              <span className={styles.swatchHint}>{memberNounPlural || "Members"}</span>
+              <svg className={styles.chev} width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </span>
+          </summary>
+          <div className={styles.accordionBody}>
+            <p className={styles.swatchHint} style={{ marginTop: 4 }}>
+              What your group calls its people, used across the app (e.g. the members directory). Defaults to
+              &ldquo;Member&rdquo; / &ldquo;Members&rdquo;.
+            </p>
+            <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+              <label style={{ flex: 1 }}>
+                <span className={styles.label}>Singular</span>
+                <input className={styles.input} value={memberNoun} onChange={(e) => setMemberNoun(e.target.value)} maxLength={30} placeholder="Member" />
+              </label>
+              <label style={{ flex: 1 }}>
+                <span className={styles.label}>Plural</span>
+                <input className={styles.input} value={memberNounPlural} onChange={(e) => setMemberNounPlural(e.target.value)} maxLength={30} placeholder="Members" />
+              </label>
+            </div>
           </div>
         </details>
 

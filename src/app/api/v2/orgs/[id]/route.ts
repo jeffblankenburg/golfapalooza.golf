@@ -30,6 +30,8 @@ export async function PATCH(
     store_label?: string | null;
     store_enabled?: boolean;
     system_name?: string;
+    member_noun?: string;
+    member_noun_plural?: string;
   };
   try {
     body = await request.json();
@@ -75,6 +77,18 @@ export async function PATCH(
     if (!sys) return NextResponse.json({ error: "System name can't be empty" }, { status: 400 });
     if (sys.length > 40) return NextResponse.json({ error: "System name is too long" }, { status: 400 });
     patch.system_name = sys;
+  }
+  if (typeof body.member_noun === "string") {
+    const n = body.member_noun.trim();
+    if (!n) return NextResponse.json({ error: "Member label can't be empty" }, { status: 400 });
+    if (n.length > 30) return NextResponse.json({ error: "Member label is too long" }, { status: 400 });
+    patch.member_noun = n;
+  }
+  if (typeof body.member_noun_plural === "string") {
+    const n = body.member_noun_plural.trim();
+    if (!n) return NextResponse.json({ error: "Member label can't be empty" }, { status: 400 });
+    if (n.length > 30) return NextResponse.json({ error: "Member label is too long" }, { status: 400 });
+    patch.member_noun_plural = n;
   }
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });

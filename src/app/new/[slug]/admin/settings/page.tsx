@@ -29,6 +29,8 @@ export default async function GroupSettingsPage({
       initialNameDisplay={org.name_display}
       initialSystemName={org.system_name || "System"}
       initialSystemAvatar={org.system_avatar_url}
+      initialMemberNoun={org.member_noun || "Member"}
+      initialMemberNounPlural={org.member_noun_plural || "Members"}
     />
   );
 }

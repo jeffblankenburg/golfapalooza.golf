@@ -21,6 +21,8 @@ export interface PlatformOrg {
   name_display: NameMode;
   system_name: string | null;
   system_avatar_url: string | null;
+  member_noun: string;
+  member_noun_plural: string;
   role: OrgRole;
 }
 
@@ -44,7 +46,7 @@ export async function getPlatformContext(): Promise<PlatformContext | null> {
   const { data: memberships } = await supabase
     .from("v2_memberships")
     .select(
-      "role, org:v2_organizations(id, name, slug, logo_url, primary_color, secondary_color, store_url, store_label, store_enabled, name_display, system_name, system_avatar_url)"
+      "role, org:v2_organizations(id, name, slug, logo_url, primary_color, secondary_color, store_url, store_label, store_enabled, name_display, system_name, system_avatar_url, member_noun, member_noun_plural)"
     )
     .eq("user_id", user.id)
     .eq("status", "active");

@@ -46,6 +46,17 @@ export const NOTIFICATION_SECTIONS: NotificationSection[] = [
       { type: "gallery_comment", label: "Photo comments", description: "Comments on a photo you're on" },
     ],
   },
+  {
+    // Global mute per type. A follower gets a spectator notification only when
+    // BOTH the per-follow toggle is on AND the type isn't muted here.
+    key: "following",
+    label: "Members you follow",
+    items: [
+      { type: "notify_round_started", label: "Round started", description: "When someone you follow tees off" },
+      { type: "notify_hole_completed", label: "Hole-by-hole", description: "Live scores as someone you follow plays" },
+      { type: "notify_round_completed", label: "Round finished", description: "When someone you follow finishes a round" },
+    ],
+  },
 ];
 
 export const NOTIFICATION_TYPE_KEYS = NOTIFICATION_SECTIONS.flatMap((s) => s.items.map((i) => i.type));

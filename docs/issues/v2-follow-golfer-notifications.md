@@ -26,5 +26,15 @@ All fan out to users who **favorited** the player, gated by per-favorite toggles
 ## ✅ Org scoping (resolved)
 Uses the same rule as #186: notifications belong to **`v2_rounds.org_id`** (the group the round was logged under). Follows themselves may still be global (you follow a golfer, not a golfer-in-a-group) — but each spectator notification is created under the round's org, so a follower only gets it if they're a member of that group AND haven't toggled the type off there. (Decide during build whether a follow with no shared group simply never fires.)
 
+## ⚠️ v1 /loozers parity gaps (tracked, NOT yet built)
+The v2 directory ships Grid + Tree + Map + member detail, but these v1 `/loozers`
+features were dropped in the port and still need doing:
+- **Grid scope toggle** — attending / not-attending / all (v1 `cycleScope`). Needs an `is_attending` signal (active-event roster) added to `/api/v2/members`.
+- **Map "📍 Find me"** — locate-me chip + `userLocation`/`flyToUserNonce` (LoozerMap supports these props; v2 just isn't passing them).
+- **Tree "Real Names: On/Off"** per-view toggle (v2 currently defers to the org name mode).
+- **Jump search** (`LoozerJumpSearch`) — v2 shipped a plain search box instead.
+- **Tab persistence** (remember Grid/Tree/Map choice) — minor.
+- **Member detail**: tagged photos, "start a chat" button, birthday.
+
 ## Notes
 Part of the My Rounds epic (#174). Larger than the roster-based notifications; do that one first.

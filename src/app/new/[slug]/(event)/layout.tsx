@@ -66,6 +66,17 @@ export default async function EventLayout({
     .or(featFilter);
   const resolved = resolveFeatures((featRows as FeatureRow[] | null) ?? [], activeEventId ?? "");
   ({ pinned, launcher } = buildEventNav(slug, resolved, isAdmin));
+
+  // The members directory ("loozers") is labelled per-org: use the group's
+  // configured member noun (e.g. "Loozers") instead of the catalog default.
+  const memberPlural = org.member_noun_plural || "Members";
+  const relabelMembers = <T extends { key: string; label: string; blurb: string }>(f: T): T =>
+    f.key === "loozers"
+      ? { ...f, label: memberPlural, blurb: `The ${(org.member_noun || "member").toLowerCase()} directory.` }
+      : f;
+  pinned = pinned.map(relabelMembers);
+  launcher = launcher.map((g) => ({ ...g, features: g.features.map(relabelMembers) }));
+
   musicEnabled = isFeatureVisible(resolved, "music", isAdmin);
   chatEnabled = isFeatureVisible(resolved, "chat", isAdmin);
   photosEnabled = isFeatureVisible(resolved, "photos", isAdmin);

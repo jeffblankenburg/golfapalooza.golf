@@ -109,7 +109,7 @@ export const FEATURE_CATALOG: FeatureDef[] = [
   { key: "photos", label: "Photos", bucket: "community", scope: "group", icon: "image", status: "available", surface: "drawer", blurb: "The shared photo & video gallery.", topbar: true, defaultEnabled: true },
   { key: "music", label: "Music", bucket: "community", scope: "group", icon: "music", status: "available", surface: "drawer", blurb: "The group jukebox & walk-up songs.", topbar: true, defaultEnabled: true },
   { key: "notebook", label: "Notebook", bucket: "community", scope: "group", icon: "book", status: "planned", surface: "route", blurb: "Shared notes & inside jokes." },
-  { key: "loozers", label: "Members", bucket: "community", scope: "group", icon: "users", status: "planned", surface: "route", blurb: "The member directory." },
+  { key: "loozers", label: "Members", bucket: "community", scope: "group", icon: "users", status: "available", surface: "route", blurb: "The member directory." },
   { key: "add_rookie", label: "Add a Rookie", bucket: "community", scope: "group", icon: "userPlus", status: "planned", surface: "route", blurb: "Nominate new members." },
 
   // ── Stories & Recognition (group-wide) ───────────────────────────────────
@@ -291,6 +291,7 @@ export const MAX_PINNED = 3;
 const FEATURE_ROUTES: Record<string, (slug: string) => string> = {
   articles: (slug) => `/new/${slug}/articles`,
   courses: (slug) => `/new/${slug}/courses`,
+  loozers: (slug) => `/new/${slug}/loozers`,
 };
 
 export function featureHref(slug: string, def: FeatureDef): string | null {

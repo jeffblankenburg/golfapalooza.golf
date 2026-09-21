@@ -18,6 +18,8 @@ interface LoozerMapProps {
   /** Bumped by the parent (Locate-me chip) to request a re-fly to the user pin. */
   flyToUserNonce?: number;
   currentUserId?: string | null;
+  /** Where to load `{ loozers: [...] }` from (v2 passes an org-scoped endpoint). */
+  locationsUrl?: string;
 }
 
 // Golfapalooza HQ — fallback center when neither GPS nor the current user's
@@ -56,7 +58,7 @@ function groupByCoord(loozers: LoozerLocation[]) {
   return Array.from(groups.values());
 }
 
-export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce, currentUserId }: LoozerMapProps) {
+export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce, currentUserId, locationsUrl = "/api/loozers/locations" }: LoozerMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
@@ -78,7 +80,7 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/loozers/locations")
+    fetch(locationsUrl)
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;
@@ -91,7 +93,7 @@ export function LoozerMap({ basePath = "/loozers", userLocation, flyToUserNonce,
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [locationsUrl]);
 
   const groups = useMemo(() => groupByCoord(loozers), [loozers]);
 

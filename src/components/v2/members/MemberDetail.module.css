@@ -1,0 +1,203 @@
+.wrap {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 12px 14px 24px;
+}
+.stub {
+  color: var(--ink-soft);
+  text-align: center;
+  padding: 40px 0;
+}
+.back {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: none;
+  background: var(--card);
+  color: var(--ink-soft);
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0 16px;
+}
+.avatar,
+.avatarFallback {
+  width: 92px;
+  height: 92px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+.avatarFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand);
+  color: #fff;
+  font-size: 2rem;
+  font-weight: 700;
+}
+.name {
+  font-family: var(--font-playfair), serif;
+  font-size: 1.5rem;
+  color: var(--ink);
+  margin: 6px 0 0;
+  text-align: center;
+}
+.sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+.founder {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, var(--card));
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.followBtn {
+  margin-top: 8px;
+  padding: 9px 22px;
+  border-radius: 999px;
+  border: 1px solid var(--brand);
+  background: var(--brand);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.followBtn[data-following] {
+  background: var(--card);
+  color: var(--ink-soft);
+  border-color: var(--line-strong);
+}
+
+.stats {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 6px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+}
+.statVal {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+.statLabel {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft);
+}
+
+.card {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  margin-bottom: 10px;
+}
+.cardTitle {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 10px;
+}
+.funFact {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ink);
+  line-height: 1.4;
+}
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 0;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.bioRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  font-size: 0.88rem;
+}
+.bioKey {
+  color: var(--ink-soft);
+}
+.bioVal {
+  color: var(--ink);
+  font-weight: 600;
+  text-align: right;
+}
+.personRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  text-decoration: none;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.personAvatar,
+.personFallback {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  object-fit: cover;
+  flex: none;
+}
+.personFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--brand) 14%, var(--card));
+  color: var(--brand);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.accoladeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 0.88rem;
+  color: var(--ink);
+  border-top: 1px solid var(--line);
+}
+.accoladeRow:first-of-type {
+  border-top: none;
+}
+.accoladeYear {
+  flex: none;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}

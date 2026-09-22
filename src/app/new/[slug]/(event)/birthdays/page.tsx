@@ -38,7 +38,8 @@ export default async function BirthdaysPage({
     .from("v2_memberships")
     .select("v2_profiles(id, display_name, first_name, last_name, birthdate, avatar_url)")
     .eq("org_id", org.id)
-    .eq("status", "active");
+    .eq("status", "active")
+    .is("archived_at", null);
 
   const people: PersonWithBirthdate[] = ((data as unknown as MemberRow[]) || [])
     .map((r) => r.v2_profiles)

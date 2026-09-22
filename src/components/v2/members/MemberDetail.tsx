@@ -41,6 +41,7 @@ interface Detail {
   accolades: { title: string; year: number | null }[];
   handicap: number | null;
   eventsAttended: number;
+  archived: boolean;
   isFollowing: boolean;
   followToggles: Toggles | null;
 }
@@ -72,6 +73,7 @@ export default function MemberDetail({
   const [d, setD] = useState<Detail | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [following, setFollowing] = useState(false);
+  const [archived, setArchived] = useState(false);
   const [toggles, setToggles] = useState<Toggles>({ notify_round_started: true, notify_hole_completed: true, notify_round_completed: true });
 
   useEffect(() => {
@@ -84,6 +86,7 @@ export default function MemberDetail({
         setD(data);
         if (data) {
           setFollowing(data.isFollowing);
+          setArchived(data.archived);
           if (data.followToggles) setToggles(data.followToggles);
         }
       } finally {
@@ -151,6 +154,7 @@ export default function MemberDetail({
         <h1 className={styles.name}>{name}</h1>
         <div className={styles.sub}>
           {m.is_founder && <span className={styles.founder}>Founder</span>}
+          {archived && <span className={styles.archivedChip}>Archived</span>}
           {location && <span>{location}</span>}
         </div>
         {!self && (

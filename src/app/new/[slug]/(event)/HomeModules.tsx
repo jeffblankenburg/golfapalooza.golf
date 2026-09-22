@@ -86,7 +86,8 @@ export default async function HomeModules({
       .from("v2_memberships")
       .select("user_id, v2_profiles(id, display_name, first_name, last_name, birthdate, avatar_url)")
       .eq("org_id", orgId)
-      .eq("status", "active"),
+      .eq("status", "active")
+      .is("archived_at", null),
     // Latest published article for the org (event-specific scoping comes later).
     supabase
       .from("v2_articles")

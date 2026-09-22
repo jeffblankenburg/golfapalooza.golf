@@ -19,6 +19,7 @@ export async function isOrgAdmin(
     .eq("org_id", orgId)
     .eq("user_id", userId)
     .eq("status", "active")
+    .is("archived_at", null)
     .maybeSingle();
   return !!data && (data.role === "owner" || data.role === "admin");
 }
@@ -34,6 +35,7 @@ export async function isAnyOrgAdmin(admin: SupabaseClient, userId: string): Prom
     .select("id")
     .eq("user_id", userId)
     .eq("status", "active")
+    .is("archived_at", null)
     .in("role", ["owner", "admin"])
     .limit(1)
     .maybeSingle();
@@ -52,6 +54,7 @@ export async function isOrgMember(
     .eq("org_id", orgId)
     .eq("user_id", userId)
     .eq("status", "active")
+    .is("archived_at", null)
     .maybeSingle();
   return !!data;
 }

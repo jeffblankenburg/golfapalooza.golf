@@ -34,6 +34,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       .maybeSingle(),
   ]);
 
+  // archived (inactive) state is per-org, on the membership — orthogonal to status.
+  let archived = false;
+  if (orgId) {
+    const { data: mem } = await admin
+      .from("v2_memberships")
+      .select("archived_at")
+      .eq("org_id", orgId)
+      .eq("user_id", id)
+      .maybeSingle();
+    archived = !!(mem?.archived_at as string | null);
+  }
+
   // events-attended within the org (non-declined RSVPs).
   let eventsAttended = 0;
   if (orgId) {
@@ -57,6 +69,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     accolades: accolades || [],
     handicap: (hcap?.handicap_index as number | null) ?? null,
     eventsAttended,
+    archived,
     isFollowing: !!follow.data,
     followToggles: follow.data ?? null,
   });

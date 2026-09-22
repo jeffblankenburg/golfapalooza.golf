@@ -41,6 +41,7 @@ export async function resolveGalleryItem(
     .eq("org_id", item.org_id)
     .eq("user_id", userId)
     .eq("status", "active")
+    .is("archived_at", null)
     .maybeSingle();
   if (!membership) return { error: "Not a member", status: 403 };
 

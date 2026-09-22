@@ -49,7 +49,8 @@ export async function getPlatformContext(): Promise<PlatformContext | null> {
       "role, org:v2_organizations(id, name, slug, logo_url, primary_color, secondary_color, store_url, store_label, store_enabled, name_display, system_name, system_avatar_url, member_noun, member_noun_plural)"
     )
     .eq("user_id", user.id)
-    .eq("status", "active");
+    .eq("status", "active")
+    .is("archived_at", null);
 
   const orgs: PlatformOrg[] = (memberships || [])
     .map((m) => {

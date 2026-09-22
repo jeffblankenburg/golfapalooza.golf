@@ -986,6 +986,50 @@ details[open] .chev {
   border-radius: 999px;
   padding: 3px 9px;
 }
+/* Archived-members bucket (admin roster) — collapsed group at the bottom. */
+.archivedGroup {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 4px;
+}
+.archivedToggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 2px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.archivedChevron {
+  flex: none;
+  transition: transform 0.18s ease;
+}
+.archivedChevron[data-open] {
+  transform: rotate(90deg);
+}
+.archivedCount {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .inviteForm {
   display: flex;
   gap: 8px;

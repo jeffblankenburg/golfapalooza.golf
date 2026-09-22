@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     admin
       .from("v2_memberships")
       .select(
-        "user_id, member:v2_profiles(id, display_name, first_name, last_name, avatar_url, sponsor_id, is_founder, latitude, longitude, city, state)",
+        "user_id, archived_at, member:v2_profiles(id, display_name, first_name, last_name, avatar_url, sponsor_id, is_founder, latitude, longitude, city, state)",
       )
       .eq("org_id", orgId)
       .eq("status", "active"),
@@ -64,6 +64,7 @@ export async function GET(request: Request) {
         city: (p.city as string | null) ?? null,
         state: (p.state as string | null) ?? null,
         eventsAttended: attended.get(p.id as string)?.size ?? 0,
+        archived: !!(r.archived_at as string | null),
       };
     })
     .filter(Boolean)

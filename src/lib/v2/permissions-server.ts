@@ -19,6 +19,7 @@ export async function hasPermission(
     .eq("org_id", orgId)
     .eq("user_id", userId)
     .eq("status", "active")
+    .is("archived_at", null)
     .maybeSingle();
   if (!data) return false;
   return memberHasPermission(data.role as string, data.permissions as PermissionMap | null, key);

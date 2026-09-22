@@ -52,7 +52,8 @@ export async function GET(request: Request) {
       .from("v2_memberships")
       .select("user_id, profile:v2_profiles(display_name, first_name, last_name, nickname, is_system)")
       .eq("org_id", orgId)
-      .eq("status", "active"),
+      .eq("status", "active")
+      .is("archived_at", null),
     g.admin
       .from("v2_events")
       .select("id, name, year, status")

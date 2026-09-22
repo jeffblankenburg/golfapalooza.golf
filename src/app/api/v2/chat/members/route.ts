@@ -27,7 +27,8 @@ export async function GET(request: Request) {
       .from("v2_memberships")
       .select("user_id, member:v2_profiles(display_name, first_name, last_name, nickname, avatar_url)")
       .eq("org_id", orgId)
-      .eq("status", "active"),
+      .eq("status", "active")
+      .is("archived_at", null),
     orgNameMode(admin, orgId),
   ]);
 

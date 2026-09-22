@@ -62,7 +62,8 @@ export async function GET(request: Request) {
       .from("v2_memberships")
       .select("user_id, profile:v2_profiles(is_system)")
       .eq("org_id", orgId!)
-      .eq("status", "active");
+      .eq("status", "active")
+      .is("archived_at", null);
     rosterIds = (data || [])
       .filter((m) => {
         const p = Array.isArray(m.profile) ? m.profile[0] : m.profile;

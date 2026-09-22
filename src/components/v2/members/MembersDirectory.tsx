@@ -25,6 +25,7 @@ interface Member {
   city: string | null;
   state: string | null;
   eventsAttended: number;
+  archived: boolean;
 }
 
 function initials(name: string): string {
@@ -57,6 +58,7 @@ export default function MembersDirectory({
   const [q, setQ] = useState("");
   const [view, setView] = useState<View>("grid");
   const [busy, setBusy] = useState<Set<string>>(new Set());
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +86,10 @@ export default function MembersDirectory({
   const shown = members.filter(
     (m) => !query || m.displayName.toLowerCase().includes(query) || (m.fullName || "").toLowerCase().includes(query),
   );
+  const activeShown = shown.filter((m) => !m.archived);
+  const archivedShown = shown.filter((m) => m.archived);
+  // While searching, always reveal matching archived members so they're findable.
+  const archivedOpen = showArchived || (!!query && archivedShown.length > 0);
 
   async function toggleFollow(id: string) {
     if (id === viewerId || busy.has(id)) return;
@@ -118,6 +124,42 @@ export default function MembersDirectory({
     }
   }
 
+  function renderCard(m: Member) {
+    const isF = following.has(m.id);
+    const self = m.id === viewerId;
+    return (
+      <Link key={m.id} href={`/new/${slug}/loozers/${m.id}`} className={styles.card}>
+        {!self && (
+          <button
+            type="button"
+            className={styles.star}
+            data-on={isF || undefined}
+            aria-label={isF ? "Unfollow" : "Follow"}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              toggleFollow(m.id);
+            }}
+            disabled={busy.has(m.id)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill={isF ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </svg>
+          </button>
+        )}
+        <span className={styles.avatarWrap}>
+          {m.avatarUrl ? (
+            <img src={m.avatarUrl} alt="" className={styles.avatar} />
+          ) : (
+            <span className={styles.avatarFallback}>{initials(m.displayName)}</span>
+          )}
+          {m.eventsAttended > 0 && <span className={styles.eventsBadge} title={`${m.eventsAttended} events`}>{m.eventsAttended}</span>}
+        </span>
+        <span className={styles.cardName}>{m.displayName}</span>
+      </Link>
+    );
+  }
+
   return (
     <div className={styles.wrap}>
       <div className={styles.head}>
@@ -139,43 +181,42 @@ export default function MembersDirectory({
           ) : shown.length === 0 ? (
             <p className={styles.stub}>No matches.</p>
           ) : (
-            <div className={styles.grid}>
-              {shown.map((m) => {
-                const isF = following.has(m.id);
-                const self = m.id === viewerId;
-                return (
-                  <Link key={m.id} href={`/new/${slug}/loozers/${m.id}`} className={styles.card}>
-                    {!self && (
-                      <button
-                        type="button"
-                        className={styles.star}
-                        data-on={isF || undefined}
-                        aria-label={isF ? "Unfollow" : "Follow"}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          toggleFollow(m.id);
-                        }}
-                        disabled={busy.has(m.id)}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill={isF ? "currentColor" : "none"} stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
-                      </button>
-                    )}
-                    <span className={styles.avatarWrap}>
-                      {m.avatarUrl ? (
-                        <img src={m.avatarUrl} alt="" className={styles.avatar} />
-                      ) : (
-                        <span className={styles.avatarFallback}>{initials(m.displayName)}</span>
-                      )}
-                      {m.eventsAttended > 0 && <span className={styles.eventsBadge} title={`${m.eventsAttended} events`}>{m.eventsAttended}</span>}
-                    </span>
-                    <span className={styles.cardName}>{m.displayName}</span>
-                  </Link>
-                );
-              })}
-            </div>
+            <>
+              {activeShown.length > 0 && <div className={styles.grid}>{activeShown.map(renderCard)}</div>}
+              {activeShown.length === 0 && archivedShown.length > 0 && (
+                <p className={styles.stub}>No active {title.toLowerCase()}.</p>
+              )}
+
+              {archivedShown.length > 0 && (
+                <div className={styles.archived}>
+                  <button
+                    type="button"
+                    className={styles.archivedHead}
+                    aria-expanded={archivedOpen}
+                    onClick={() => setShowArchived((v) => !v)}
+                  >
+                    <svg
+                      className={styles.archivedChevron}
+                      data-open={archivedOpen || undefined}
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="M9 5l7 7-7 7" />
+                    </svg>
+                    <span className={styles.archivedLabel}>Archived</span>
+                    <span className={styles.archivedCount}>{archivedShown.length}</span>
+                  </button>
+                  {archivedOpen && <div className={styles.grid}>{archivedShown.map(renderCard)}</div>}
+                </div>
+              )}
+            </>
           )}
         </>
       )}

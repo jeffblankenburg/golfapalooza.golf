@@ -46,7 +46,7 @@ export async function GET(
   const { data } = await g.admin
     .from("v2_memberships")
     .select(
-      "user_id, role, status, profile:v2_profiles(display_name, first_name, last_name, nickname, birthdate, avatar_url, is_system)",
+      "user_id, role, status, archived_at, profile:v2_profiles(display_name, first_name, last_name, nickname, birthdate, avatar_url, is_system)",
     )
     .eq("org_id", id)
     .order("role");
@@ -75,6 +75,7 @@ export async function GET(
         user_id: m.user_id,
         role: m.role,
         status: m.status,
+        archived: !!(m.archived_at as string | null),
         display_name: p?.display_name || "Member",
         first_name: p?.first_name ?? null,
         last_name: p?.last_name ?? null,
@@ -108,15 +109,16 @@ export async function PATCH(
       birthdate?: string | null;
     };
     permissions?: PermissionMap;
+    archived?: boolean;
   };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
-  const { user_id, role, profile, permissions } = body;
+  const { user_id, role, profile, permissions, archived } = body;
   if (!user_id) return NextResponse.json({ error: "user_id is required" }, { status: 400 });
-  if (!role && !profile && !permissions) {
+  if (!role && !profile && !permissions && typeof archived !== "boolean") {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
 
@@ -140,6 +142,27 @@ export async function PATCH(
     const { error } = await g.admin
       .from("v2_memberships")
       .update({ role })
+      .eq("org_id", id)
+      .eq("user_id", user_id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Archive / restore — optional. Orthogonal to role & status: sets/clears
+  // archived_at only (an archived member keeps access; the directory just tucks
+  // them into a collapsed group). Managing an owner still requires an owner.
+  if (typeof archived === "boolean") {
+    if (archived && user_id === g.userId) {
+      return NextResponse.json({ error: "You can't archive yourself" }, { status: 400 });
+    }
+    if (targetRole === "owner") {
+      const callerRole = await roleOf(g.admin, id, g.userId);
+      if (callerRole !== "owner") {
+        return NextResponse.json({ error: "Only an owner can manage owners" }, { status: 403 });
+      }
+    }
+    const { error } = await g.admin
+      .from("v2_memberships")
+      .update({ archived_at: archived ? new Date().toISOString() : null })
       .eq("org_id", id)
       .eq("user_id", user_id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

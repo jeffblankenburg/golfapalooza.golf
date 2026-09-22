@@ -49,7 +49,8 @@ export async function resolveAnnouncementAudience(
     .from("v2_memberships")
     .select("user_id")
     .eq("org_id", a.org_id)
-    .eq("status", "active");
+    .eq("status", "active")
+    .is("archived_at", null);
   return [...new Set((data || []).map((m) => m.user_id).filter(Boolean))];
 }
 

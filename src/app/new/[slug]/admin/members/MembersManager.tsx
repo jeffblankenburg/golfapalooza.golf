@@ -13,6 +13,7 @@ interface Member {
   user_id: string;
   role: "owner" | "admin" | "member";
   status: string;
+  archived: boolean;
   display_name: string;
   first_name: string | null;
   last_name: string | null;
@@ -85,6 +86,7 @@ export default function MembersManager({
   const [error, setError] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
 
   // Edit-member modal state.
   const [editing, setEditing] = useState<Member | null>(null);
@@ -93,6 +95,7 @@ export default function MembersManager({
   const [eNick, setENick] = useState("");
   const [eBday, setEBday] = useState("");
   const [eRole, setERole] = useState<"owner" | "admin" | "member">("member");
+  const [eArchived, setEArchived] = useState(false);
   const [ePerms, setEPerms] = useState<PermissionMap>({});
   const [eBusy, setEBusy] = useState(false);
   const [eError, setEError] = useState<string | null>(null);
@@ -138,6 +141,11 @@ export default function MembersManager({
         .includes(q),
     );
   }, [sorted, query]);
+  const activeMembers = filtered.filter((m) => !m.archived);
+  const archivedMembers = filtered.filter((m) => m.archived);
+  const activeTotal = members.filter((m) => !m.archived).length;
+  // While searching, reveal matching archived members so they're findable.
+  const archivedOpen = showArchived || (!!query.trim() && archivedMembers.length > 0);
 
   function openEdit(m: Member) {
     setEditing(m);
@@ -146,6 +154,7 @@ export default function MembersManager({
     setENick(m.nickname || "");
     setEBday(m.birthdate || "");
     setERole(m.role);
+    setEArchived(m.archived);
     setEPerms(m.permissions || {});
     setEError(null);
   }
@@ -162,6 +171,7 @@ export default function MembersManager({
       role?: string;
       profile: { first_name: string; last_name: string; nickname: string; birthdate: string | null };
       permissions?: PermissionMap;
+      archived?: boolean;
     } = {
       user_id: editing.user_id,
       profile: {
@@ -171,9 +181,11 @@ export default function MembersManager({
         birthdate: eBday || null,
       },
     };
-    if (canManage && eRole !== editing.role) body.role = eRole;
-    // Only a plain member carries explicit grants; owners/admins have all.
-    if (canManage && eRole === "member") body.permissions = ePerms;
+    if (canManage && eArchived !== editing.archived) body.archived = eArchived;
+    // Role & permissions only apply to an active member — archiving leaves the
+    // stored role untouched so restoring keeps it.
+    if (canManage && !eArchived && eRole !== editing.role) body.role = eRole;
+    if (canManage && !eArchived && eRole === "member") body.permissions = ePerms;
     const res = await fetch(`/api/v2/orgs/${orgId}/members`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -251,6 +263,36 @@ export default function MembersManager({
   const editingCanManage =
     !!editing && !editingSelf && (currentRole === "owner" || editing.role !== "owner");
 
+  function renderMemberRow(m: Member) {
+    const isSelf = m.user_id === currentUserId;
+    const { primary, secondary } = displayLines(m, nameMode);
+    return (
+      <li key={m.user_id} className={styles.memberRow} style={{ padding: 0, border: "none" }}>
+        <button type="button" className={styles.memberRowBtn} onClick={() => openEdit(m)}>
+          {m.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={m.avatar_url} alt="" className={styles.memberAvatar} />
+          ) : (
+            <span className={styles.memberAvatar}>{primary.charAt(0).toUpperCase()}</span>
+          )}
+          <div className={styles.memberMeta}>
+            <span className={styles.memberName}>
+              {primary}
+              {isSelf && <span className={styles.memberYou}> (you)</span>}
+            </span>
+            {secondary && <span className={styles.memberSub}>{secondary}</span>}
+          </div>
+          <span className={styles.roleBadge} style={m.archived ? { opacity: 0.55 } : undefined}>
+            {m.archived ? "archived" : m.role}
+          </span>
+          <svg className={styles.arrow} width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </li>
+    );
+  }
+
   return (
     <>
       <div className={styles.titleRow}>
@@ -272,7 +314,7 @@ export default function MembersManager({
       </div>
 
       <div className={styles.section}>
-        <p className={styles.sectionLabel}>People ({members.length})</p>
+        <p className={styles.sectionLabel}>People ({activeTotal})</p>
         <input
           className={`${styles.input} ${styles.memberSearch}`}
           type="search"
@@ -282,39 +324,48 @@ export default function MembersManager({
           aria-label="Search members"
         />
         <ul className={styles.memberList}>
-          {filtered.map((m) => {
-            const isSelf = m.user_id === currentUserId;
-            const { primary, secondary } = displayLines(m, nameMode);
-            return (
-              <li key={m.user_id} className={styles.memberRow} style={{ padding: 0, border: "none" }}>
-                <button type="button" className={styles.memberRowBtn} onClick={() => openEdit(m)}>
-                  {m.avatar_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={m.avatar_url} alt="" className={styles.memberAvatar} />
-                  ) : (
-                    <span className={styles.memberAvatar}>{primary.charAt(0).toUpperCase()}</span>
-                  )}
-                  <div className={styles.memberMeta}>
-                    <span className={styles.memberName}>
-                      {primary}
-                      {isSelf && <span className={styles.memberYou}> (you)</span>}
-                    </span>
-                    {secondary && <span className={styles.memberSub}>{secondary}</span>}
-                  </div>
-                  <span className={styles.roleBadge}>{m.role}</span>
-                  <svg className={styles.arrow} width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </li>
-            );
-          })}
+          {activeMembers.map(renderMemberRow)}
           {filtered.length === 0 && (
             <p className={styles.dnsHint} style={{ marginTop: 0 }}>
               No members match &ldquo;{query}&rdquo;.
             </p>
           )}
+          {filtered.length > 0 && activeMembers.length === 0 && (
+            <p className={styles.dnsHint} style={{ marginTop: 0 }}>
+              No active members{query.trim() ? " match" : ""}.
+            </p>
+          )}
         </ul>
+
+        {archivedMembers.length > 0 && (
+          <div className={styles.archivedGroup}>
+            <button
+              type="button"
+              className={styles.archivedToggle}
+              aria-expanded={archivedOpen}
+              onClick={() => setShowArchived((v) => !v)}
+            >
+              <svg
+                className={styles.archivedChevron}
+                data-open={archivedOpen || undefined}
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="M9 5l7 7-7 7" />
+              </svg>
+              <span>Archived</span>
+              <span className={styles.archivedCount}>{archivedMembers.length}</span>
+            </button>
+            {archivedOpen && <ul className={styles.memberList}>{archivedMembers.map(renderMemberRow)}</ul>}
+          </div>
+        )}
       </div>
 
       <div className={styles.section}>
@@ -391,19 +442,33 @@ export default function MembersManager({
               <label className={styles.label}>Role</label>
               <select
                 className={styles.roleSelect}
-                value={eRole}
-                onChange={(e) => setERole(e.target.value as "owner" | "admin" | "member")}
+                value={eArchived ? "archived" : eRole}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "archived") setEArchived(true);
+                  else {
+                    setEArchived(false);
+                    setERole(v as "owner" | "admin" | "member");
+                  }
+                }}
               >
                 {roleOptions.map((r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>
                 ))}
+                <option value="archived">archived</option>
               </select>
+              {eArchived && (
+                <p className={styles.swatchHint}>
+                  Archived members keep their access but drop into a collapsed group at the
+                  bottom of the directory. Pick a role to restore them.
+                </p>
+              )}
             </div>
           )}
 
-          {editingCanManage && (
+          {editingCanManage && !eArchived && (
             <div className={styles.field}>
               <label className={styles.label}>Permissions</label>
               {eRole !== "member" ? (

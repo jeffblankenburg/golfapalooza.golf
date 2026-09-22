@@ -152,3 +152,51 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
+
+/* Archived (inactive) members — collapsed accordion at the bottom. */
+.archived {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+.archivedHead {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 4px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--ink-soft);
+}
+.archivedChevron {
+  flex: none;
+  transition: transform 0.18s ease;
+}
+.archivedChevron[data-open] {
+  transform: rotate(90deg);
+}
+.archivedLabel {
+  font-family: var(--font-libre), sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.archivedCount {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.archived .grid {
+  margin-top: 6px;
+}

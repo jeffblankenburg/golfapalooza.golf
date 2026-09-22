@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isAnyOrgAdmin } from "@/lib/v2/orgs";
+import { courseEditGate } from "@/lib/v2/courses/edit-access";
 import { geocodeAddress } from "@/lib/v2/geocode";
 import { compareTees } from "@/lib/v2/golf/tees";
 
@@ -30,6 +31,8 @@ export async function GET(
   const { data: course, error } = await admin.from("v2_courses").select("*").eq("id", id).maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!course) return NextResponse.json({ error: "Course not found" }, { status: 404 });
+
+  const isAdmin = await isAnyOrgAdmin(admin, userId);
 
   const { data: teeData } = await admin
     .from("v2_course_tees").select("*").eq("course_id", id);
@@ -85,7 +88,7 @@ export async function GET(
     composition_tee_ids: compositionTeeIds,
     composition_mappings: mapByTee,
     selected_tee_id: tees[0]?.id ?? null,
-    is_admin: true, // universal edit
+    is_admin: isAdmin, // universal edit, but the lock toggle is admin-only
   });
 }
 
@@ -100,8 +103,8 @@ export async function PUT(
   const { id } = await params;
   const admin = v2AdminClient();
 
-  const { data: exists } = await admin.from("v2_courses").select("id").eq("id", id).maybeSingle();
-  if (!exists) return NextResponse.json({ error: "Course not found" }, { status: 404 });
+  const gate = await courseEditGate(admin, id, userId);
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
   try {
     const body = await request.json();
@@ -150,6 +153,43 @@ export async function PUT(
   } catch {
     return NextResponse.json({ error: "Failed to update course" }, { status: 500 });
   }
+}
+
+/** PATCH — admin-only course flags. Currently just `locked` (freeze/unfreeze the
+ *  course so non-admins can't edit it). Group admins only, like DELETE. */
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const { userId } = await v2GetUser(request);
+  if (!userId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  const admin = v2AdminClient();
+  if (!(await isAnyOrgAdmin(admin, userId))) {
+    return NextResponse.json({ error: "Only group admins can lock or unlock courses" }, { status: 403 });
+  }
+
+  let body: { locked?: boolean };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
+  if (typeof body.locked !== "boolean") {
+    return NextResponse.json({ error: "locked must be a boolean" }, { status: 400 });
+  }
+
+  const { data: exists } = await admin.from("v2_courses").select("id").eq("id", id).maybeSingle();
+  if (!exists) return NextResponse.json({ error: "Course not found" }, { status: 404 });
+
+  const { error } = await admin
+    .from("v2_courses")
+    .update({ locked: body.locked, updated_at: new Date().toISOString(), updated_by: userId })
+    .eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ ok: true, locked: body.locked });
 }
 
 /** DELETE — remove a course entirely (admins only). Cascades tees / holes /

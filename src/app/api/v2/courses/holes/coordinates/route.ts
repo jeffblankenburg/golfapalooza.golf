@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
+import { courseEditGate } from "@/lib/v2/courses/edit-access";
 
 /**
  * GPS-coordinate editor for a hole. Tee location is per (tee, hole); green
@@ -39,6 +40,9 @@ export async function PUT(request: Request) {
     .eq("id", hole_id)
     .maybeSingle();
   if (!row) return NextResponse.json({ error: "Hole not found" }, { status: 404 });
+
+  const gate = await courseEditGate(admin, row.course_id as string, userId);
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
   const teeUpdate: Record<string, unknown> = {};
   if (tee_latitude !== undefined) teeUpdate.tee_latitude = tee_latitude ?? null;

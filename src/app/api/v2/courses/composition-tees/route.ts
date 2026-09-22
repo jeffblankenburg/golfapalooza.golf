@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
+import { courseEditGateByTee } from "@/lib/v2/courses/edit-access";
 
 /**
  * Hybrid ("composition") tee mappings for the universal v2 library. A hybrid tee
@@ -37,6 +38,9 @@ export async function POST(request: Request) {
   }
 
   const admin = v2AdminClient();
+  const gate = await courseEditGateByTee(admin, tee_id, userId);
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+
   const rows = mappings.map((m: { hole_number: number; source_tee_id: string }) => ({
     tee_id, hole_number: m.hole_number, source_tee_id: m.source_tee_id,
   }));
@@ -53,6 +57,9 @@ export async function DELETE(request: Request) {
   if (!tee_id) return NextResponse.json({ error: "tee_id required" }, { status: 400 });
 
   const admin = v2AdminClient();
+  const gate = await courseEditGateByTee(admin, tee_id, userId);
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+
   const { error } = await admin.from("v2_composition_tee_mappings").delete().eq("tee_id", tee_id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });

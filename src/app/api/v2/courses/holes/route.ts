@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
+import { courseEditGate } from "@/lib/v2/courses/edit-access";
 
 /**
  * Per-hole data editor. par/handicap_index/yards are tee-specific; hole_name is
@@ -30,6 +31,9 @@ export async function PUT(request: Request) {
   const courseIds = new Set((rows || []).map((r) => r.course_id));
   if (courseIds.size !== 1) return NextResponse.json({ error: "all holes must belong to the same course" }, { status: 400 });
   const courseId = [...courseIds][0];
+
+  const gate = await courseEditGate(admin, courseId, userId);
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
   const teeFieldUpdates = await Promise.all(
     incoming.map((hole) => {

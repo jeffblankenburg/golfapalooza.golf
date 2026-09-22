@@ -12,7 +12,7 @@ const HoleMapEditor = dynamic(() => import("@/components/v2/courses/HoleMapEdito
 interface Course {
   id: string; name: string; club_name: string | null; city: string | null; state: string | null;
   address: string | null; phone: string | null; website: string | null; hole_count: 9 | 18;
-  latitude: number | null; longitude: number | null;
+  latitude: number | null; longitude: number | null; locked: boolean;
 }
 interface Tee {
   id: string; tee_name: string; tee_color: string | null; gender: string;
@@ -111,9 +111,37 @@ export default function CourseManager({ courseId, slug, viewerIsAdmin = false, o
   // Derived from the preloaded data — switching tees is instant (no refetch).
   const holes = (selectedTeeId && holesByTee[selectedTeeId]) || [];
   const isComposition = !!selectedTeeId && compIds.includes(selectedTeeId);
+  // A locked course is editable only by admins; everyone else sees it read-only.
+  const canEdit = viewerIsAdmin || !course.locked;
+
+  async function toggleLock() {
+    if (!course) return;
+    const next = !course.locked;
+    const res = await fetch(`/api/v2/courses/${courseId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locked: next }),
+    });
+    if (res.ok) { setCourse({ ...course, locked: next }); flash(next ? "Course locked" : "Course unlocked"); }
+    else { flash((await res.json().catch(() => ({}))).error || "Could not update lock"); }
+  }
 
   return (
     <div>
+      {course.locked && (
+        <div className="mb-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" className="shrink-0 text-amber-600" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold text-amber-800">Course locked</div>
+            <div className="text-xs text-amber-700">
+              {viewerIsAdmin ? "Only group admins can edit this course." : "An admin locked this course, so it can't be edited."}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-1 border-b border-gray-200 mb-4 overflow-x-auto">
         {TABS.map((t) => (
           <button
@@ -134,7 +162,10 @@ export default function CourseManager({ courseId, slug, viewerIsAdmin = false, o
       {tab === "info" && (
         <InfoTab
           course={course}
+          canEdit={canEdit}
           canDelete={viewerIsAdmin}
+          viewerIsAdmin={viewerIsAdmin}
+          onToggleLock={toggleLock}
           onDeleteCourse={() => setConfirmDelCourse(true)}
           onSaved={(c) => { setCourse(c); flash("Saved"); onCourseChanged?.(); }}
         />
@@ -144,6 +175,7 @@ export default function CourseManager({ courseId, slug, viewerIsAdmin = false, o
           tees={tees}
           compIds={compIds}
           compMappings={compMappings}
+          canEdit={canEdit}
           onReload={() => reload(selectedTeeId)}
           onDelete={(t) => setConfirmDelTee(t)}
           courseId={courseId}
@@ -157,7 +189,8 @@ export default function CourseManager({ courseId, slug, viewerIsAdmin = false, o
           selectedTeeId={selectedTeeId}
           onSelectTee={setSelectedTeeId}
           onReload={() => reload(selectedTeeId)}
-          readOnly={isComposition}
+          readOnly={isComposition || !canEdit}
+          hybrid={isComposition}
           flash={flash}
         />
       )}
@@ -168,7 +201,8 @@ export default function CourseManager({ courseId, slug, viewerIsAdmin = false, o
           selectedTeeId={selectedTeeId}
           onSelectTee={setSelectedTeeId}
           onOpenHole={setMapHole}
-          readOnly={isComposition}
+          readOnly={isComposition || !canEdit}
+          hybrid={isComposition}
         />
       )}
       {tab === "scorecard" && (
@@ -267,13 +301,14 @@ export default function CourseManager({ courseId, slug, viewerIsAdmin = false, o
 }
 
 /* ── Info ─────────────────────────────────────────────────────────────────── */
-function InfoTab({ course, canDelete, onDeleteCourse, onSaved }: {
-  course: Course; canDelete: boolean; onDeleteCourse: () => void; onSaved: (c: Course) => void;
+function InfoTab({ course, canEdit, canDelete, viewerIsAdmin, onToggleLock, onDeleteCourse, onSaved }: {
+  course: Course; canEdit: boolean; canDelete: boolean; viewerIsAdmin: boolean;
+  onToggleLock: () => void; onDeleteCourse: () => void; onSaved: (c: Course) => void;
 }) {
   const [f, setF] = useState(course);
   const [saving, setSaving] = useState(false);
   const set = (k: keyof Course, v: unknown) => setF((p) => ({ ...p, [k]: v }));
-  const input = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent";
+  const input = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-600 disabled:border-gray-200";
 
   async function save() {
     setSaving(true);
@@ -291,20 +326,38 @@ function InfoTab({ course, canDelete, onDeleteCourse, onSaved }: {
 
   return (
     <div className="space-y-3">
-      <Field label="Course name"><input className={input} value={f.name} onChange={(e) => set("name", e.target.value)} /></Field>
-      <Field label="Club name"><input className={input} value={f.club_name || ""} onChange={(e) => set("club_name", e.target.value)} /></Field>
+      <Field label="Course name"><input disabled={!canEdit} className={input} value={f.name} onChange={(e) => set("name", e.target.value)} /></Field>
+      <Field label="Club name"><input disabled={!canEdit} className={input} value={f.club_name || ""} onChange={(e) => set("club_name", e.target.value)} /></Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="City"><input className={input} value={f.city || ""} onChange={(e) => set("city", e.target.value)} /></Field>
-        <Field label="State"><input className={input} value={f.state || ""} onChange={(e) => set("state", e.target.value)} placeholder="OH" /></Field>
+        <Field label="City"><input disabled={!canEdit} className={input} value={f.city || ""} onChange={(e) => set("city", e.target.value)} /></Field>
+        <Field label="State"><input disabled={!canEdit} className={input} value={f.state || ""} onChange={(e) => set("state", e.target.value)} placeholder="OH" /></Field>
       </div>
-      <Field label="Address"><input className={input} value={f.address || ""} onChange={(e) => set("address", e.target.value)} /></Field>
+      <Field label="Address"><input disabled={!canEdit} className={input} value={f.address || ""} onChange={(e) => set("address", e.target.value)} /></Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Phone"><input className={input} value={f.phone || ""} onChange={(e) => set("phone", e.target.value)} /></Field>
-        <Field label="Website"><input className={input} value={f.website || ""} onChange={(e) => set("website", e.target.value)} /></Field>
+        <Field label="Phone"><input disabled={!canEdit} className={input} value={f.phone || ""} onChange={(e) => set("phone", e.target.value)} /></Field>
+        <Field label="Website"><input disabled={!canEdit} className={input} value={f.website || ""} onChange={(e) => set("website", e.target.value)} /></Field>
       </div>
-      <button type="button" onClick={save} disabled={saving} className="w-full py-3 bg-green-600 text-white font-semibold rounded-lg disabled:opacity-50">
-        {saving ? "Saving…" : "Save course info"}
-      </button>
+      {canEdit && (
+        <button type="button" onClick={save} disabled={saving} className="w-full py-3 bg-green-600 text-white font-semibold rounded-lg disabled:opacity-50">
+          {saving ? "Saving…" : "Save course info"}
+        </button>
+      )}
+
+      {viewerIsAdmin && (
+        <div className="mt-4 flex items-center justify-between gap-3 pt-3 border-t border-gray-100">
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-gray-700">{course.locked ? "Course locked" : "Course unlocked"}</div>
+            <div className="text-xs text-gray-500">{course.locked ? "Only admins can edit." : "Any member can edit."}</div>
+          </div>
+          <button
+            type="button"
+            onClick={onToggleLock}
+            className={`shrink-0 px-3 py-1.5 text-sm font-semibold rounded-lg text-white ${course.locked ? "bg-green-600 active:bg-green-700" : "bg-amber-500 active:bg-amber-600"}`}
+          >
+            {course.locked ? "Unlock" : "Lock"}
+          </button>
+        </div>
+      )}
 
       {canDelete && (
         <div className="mt-4 pt-3 border-t border-gray-100">
@@ -334,15 +387,16 @@ const GENDER_OPTIONS: { value: "all" | "men" | "women"; label: string }[] = [
 ];
 
 /** Segmented control for a tee's gender (men's / women's / unisex). */
-function GenderPicker({ value, onChange }: { value: "all" | "men" | "women"; onChange: (g: "all" | "men" | "women") => void }) {
+function GenderPicker({ value, onChange, disabled }: { value: "all" | "men" | "women"; onChange: (g: "all" | "men" | "women") => void; disabled?: boolean }) {
   return (
     <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden">
       {GENDER_OPTIONS.map((o) => (
         <button
           key={o.value}
           type="button"
+          disabled={disabled}
           onClick={() => onChange(o.value)}
-          className={`px-3 py-1.5 text-xs font-medium ${value === o.value ? "bg-green-600 text-white" : "bg-white text-gray-600"}`}
+          className={`px-3 py-1.5 text-xs font-medium disabled:opacity-60 ${value === o.value ? "bg-green-600 text-white" : "bg-white text-gray-600"}`}
         >
           {o.label}
         </button>
@@ -352,8 +406,8 @@ function GenderPicker({ value, onChange }: { value: "all" | "men" | "women"; onC
 }
 
 /* ── Tees ─────────────────────────────────────────────────────────────────── */
-function TeesTab({ tees, compIds, compMappings, onReload, onDelete, courseId, flash }: {
-  tees: Tee[]; compIds: string[]; compMappings: Record<string, CompMap[]>;
+function TeesTab({ tees, compIds, compMappings, canEdit, onReload, onDelete, courseId, flash }: {
+  tees: Tee[]; compIds: string[]; compMappings: Record<string, CompMap[]>; canEdit: boolean;
   onReload: () => void; onDelete: (t: Tee) => void; courseId: string; flash: (m: string) => void;
 }) {
   const [adding, setAdding] = useState(false);
@@ -391,11 +445,12 @@ function TeesTab({ tees, compIds, compMappings, onReload, onDelete, courseId, fl
           onSave={saveTee}
           onDelete={onDelete}
           onChanged={onReload}
-          canDelete={tees.length > 1}
+          canEdit={canEdit}
+          canDelete={canEdit && tees.length > 1}
         />
       ))}
 
-      {adding ? (
+      {!canEdit ? null : adding ? (
         <div className="space-y-2">
           <div className="flex gap-2">
             <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Tee name (e.g. Blue)"
@@ -412,15 +467,15 @@ function TeesTab({ tees, compIds, compMappings, onReload, onDelete, courseId, fl
   );
 }
 
-function TeeRow({ tee, isComp, eligible, mappingArr, onSave, onDelete, onChanged, canDelete }: {
+function TeeRow({ tee, isComp, eligible, mappingArr, onSave, onDelete, onChanged, canEdit, canDelete }: {
   tee: Tee; isComp: boolean; eligible: Tee[]; mappingArr: CompMap[];
-  onSave: (t: Tee) => void; onDelete: (t: Tee) => void; onChanged: () => void; canDelete: boolean;
+  onSave: (t: Tee) => void; onDelete: (t: Tee) => void; onChanged: () => void; canEdit: boolean; canDelete: boolean;
 }) {
   const [t, setT] = useState(tee);
   // Reset local edits when the tee prop identity changes (after a reload).
   const [seen, setSeen] = useState(tee);
   if (seen !== tee) { setSeen(tee); setT(tee); }
-  const input = "w-full px-2 py-1.5 border border-gray-300 rounded text-sm";
+  const input = "w-full px-2 py-1.5 border border-gray-300 rounded text-sm disabled:bg-gray-50 disabled:text-gray-600 disabled:border-gray-200";
   // Summary reflects saved values (props); the body edits local state.
   const sumCls = getTeeColorClasses(tee.tee_color);
   const dotStyle = (c: ReturnType<typeof getTeeColorClasses>) =>
@@ -446,31 +501,33 @@ function TeeRow({ tee, isComp, eligible, mappingArr, onSave, onDelete, onChanged
       <div className="border-t border-gray-100 px-3 pb-3 pt-3">
         <div className="mb-2">
           <label className="block text-[0.65rem] text-gray-500">Tee name</label>
-          <input value={t.tee_name} onChange={(e) => setT({ ...t, tee_name: e.target.value })} className={input} />
+          <input disabled={!canEdit} value={t.tee_name} onChange={(e) => setT({ ...t, tee_name: e.target.value })} className={input} />
         </div>
         <div className="mb-2">
           <label className="block text-[0.65rem] text-gray-500 mb-1">Color</label>
           <div className="flex flex-wrap gap-1.5">
             {TEE_COLOR_OPTIONS.map((c) => (
-              <button key={c.value} type="button" title={c.label} onClick={() => setT({ ...t, tee_color: c.value })}
-                className={`w-6 h-6 rounded-full ${c.bg} ${t.tee_color === c.value ? "ring-2 ring-green-500 ring-offset-1" : ""}`} />
+              <button key={c.value} type="button" disabled={!canEdit} title={c.label} onClick={() => setT({ ...t, tee_color: c.value })}
+                className={`w-6 h-6 rounded-full disabled:opacity-60 ${c.bg} ${t.tee_color === c.value ? "ring-2 ring-green-500 ring-offset-1" : ""}`} />
             ))}
           </div>
         </div>
         <div className="mb-2">
           <label className="block text-[0.65rem] text-gray-500 mb-1">Tees for</label>
-          <GenderPicker value={(t.gender as "all" | "men" | "women") ?? "all"} onChange={(g) => setT({ ...t, gender: g })} />
+          <GenderPicker value={(t.gender as "all" | "men" | "women") ?? "all"} onChange={(g) => setT({ ...t, gender: g })} disabled={!canEdit} />
         </div>
         <div className="grid grid-cols-3 gap-2">
-          <div><label className="block text-[0.65rem] text-gray-500">Par</label><input type="number" className={input} value={t.par} onChange={(e) => setT({ ...t, par: parseInt(e.target.value) || 0 })} /></div>
-          <div><label className="block text-[0.65rem] text-gray-500">Rating</label><input type="number" step="0.1" className={input} value={t.course_rating ?? ""} onChange={(e) => setT({ ...t, course_rating: e.target.value ? parseFloat(e.target.value) : null })} /></div>
-          <div><label className="block text-[0.65rem] text-gray-500">Slope</label><input type="number" className={input} value={t.slope_rating ?? ""} onChange={(e) => setT({ ...t, slope_rating: e.target.value ? parseInt(e.target.value) : null })} /></div>
+          <div><label className="block text-[0.65rem] text-gray-500">Par</label><input type="number" disabled={!canEdit} className={input} value={t.par} onChange={(e) => setT({ ...t, par: parseInt(e.target.value) || 0 })} /></div>
+          <div><label className="block text-[0.65rem] text-gray-500">Rating</label><input type="number" step="0.1" disabled={!canEdit} className={input} value={t.course_rating ?? ""} onChange={(e) => setT({ ...t, course_rating: e.target.value ? parseFloat(e.target.value) : null })} /></div>
+          <div><label className="block text-[0.65rem] text-gray-500">Slope</label><input type="number" disabled={!canEdit} className={input} value={t.slope_rating ?? ""} onChange={(e) => setT({ ...t, slope_rating: e.target.value ? parseInt(e.target.value) : null })} /></div>
         </div>
-        <div className="mt-3 flex items-center gap-4">
-          <button type="button" onClick={() => onSave(t)} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold">Save tee</button>
-          {canDelete && <button type="button" onClick={() => onDelete(tee)} className="text-sm font-medium text-red-600">Delete</button>}
-        </div>
-        <CompositionEditor tee={tee} isComp={isComp} eligible={eligible} mappingArr={mappingArr} onChanged={onChanged} />
+        {canEdit && (
+          <div className="mt-3 flex items-center gap-4">
+            <button type="button" onClick={() => onSave(t)} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold">Save tee</button>
+            {canDelete && <button type="button" onClick={() => onDelete(tee)} className="text-sm font-medium text-red-600">Delete</button>}
+          </div>
+        )}
+        {canEdit && <CompositionEditor tee={tee} isComp={isComp} eligible={eligible} mappingArr={mappingArr} onChanged={onChanged} />}
       </div>
     </details>
   );
@@ -559,8 +616,8 @@ function CompositionEditor({ tee, isComp, eligible, mappingArr, onChanged }: {
 }
 
 /* ── Holes ────────────────────────────────────────────────────────────────── */
-function HolesTab({ tees, holes, selectedTeeId, onSelectTee, onReload, readOnly, flash }: {
-  tees: Tee[]; holes: Hole[]; selectedTeeId: string | null; onSelectTee: (id: string) => void; onReload: () => void; readOnly: boolean; flash: (m: string) => void;
+function HolesTab({ tees, holes, selectedTeeId, onSelectTee, onReload, readOnly, hybrid, flash }: {
+  tees: Tee[]; holes: Hole[]; selectedTeeId: string | null; onSelectTee: (id: string) => void; onReload: () => void; readOnly: boolean; hybrid: boolean; flash: (m: string) => void;
 }) {
   const [rows, setRows] = useState<Hole[]>(holes);
   const [saving, setSaving] = useState(false);
@@ -591,15 +648,15 @@ function HolesTab({ tees, holes, selectedTeeId, onSelectTee, onReload, readOnly,
   // for a standard tee the circle is transparent (a placeholder holding the exact
   // same space), for a hybrid it's the source tee's color. Nothing else differs.
   const dataRow = (h: Hole) => {
-    const src = readOnly ? teeById.get(h.tee_id) : undefined;
+    const src = hybrid ? teeById.get(h.tee_id) : undefined;
     const cls = src ? getTeeColorClasses(src.tee_color) : null;
     return (
       <tr key={h.id} className="border-b border-gray-100">
         <td className="w-6 py-1 font-medium text-gray-700">{h.hole_number}</td>
         <td className="w-5 py-1 text-center">
-          <span title={readOnly ? src?.tee_name ?? undefined : undefined}
-            className={`inline-block w-3 h-3 rounded-full align-middle ${readOnly ? (cls?.bg ?? "bg-gray-200") : "bg-transparent"}`}
-            style={readOnly && cls?.isGradient ? { background: cls.gradientHex! } : readOnly && cls?.hex ? { background: cls.hex } : undefined} />
+          <span title={hybrid ? src?.tee_name ?? undefined : undefined}
+            className={`inline-block w-3 h-3 rounded-full align-middle ${hybrid ? (cls?.bg ?? "bg-gray-200") : "bg-transparent"}`}
+            style={hybrid && cls?.isGradient ? { background: cls.gradientHex! } : hybrid && cls?.hex ? { background: cls.hex } : undefined} />
         </td>
         <td className="py-1 px-0.5 w-14"><input type="number" tabIndex={100 + h.hole_number} disabled={readOnly} className={cell} value={h.par} onChange={(e) => setRow(h.id, "par", parseInt(e.target.value) || 0)} /></td>
         <td className="py-1 px-0.5 w-14"><input type="number" tabIndex={200 + h.hole_number} disabled={readOnly} className={cell} value={h.handicap_index} onChange={(e) => setRow(h.id, "handicap_index", parseInt(e.target.value) || 0)} /></td>
@@ -646,7 +703,7 @@ function HolesTab({ tees, holes, selectedTeeId, onSelectTee, onReload, readOnly,
           {saving ? "Saving…" : "Save holes"}
         </button>
       )}
-      {readOnly && (
+      {hybrid && (
         <p className="mt-4 text-[0.7rem] text-gray-400">
           Hybrid tee — each hole is played from the source tee marked by the dot. Edit the source tees to change par, handicap, or yards.
         </p>
@@ -656,13 +713,13 @@ function HolesTab({ tees, holes, selectedTeeId, onSelectTee, onReload, readOnly,
 }
 
 /* ── Map ──────────────────────────────────────────────────────────────────── */
-function MapTab({ tees, holes, selectedTeeId, onSelectTee, onOpenHole, readOnly }: {
-  tees: Tee[]; holes: Hole[]; selectedTeeId: string | null; onSelectTee: (id: string) => void; onOpenHole: (h: Hole) => void; readOnly: boolean;
+function MapTab({ tees, holes, selectedTeeId, onSelectTee, onOpenHole, readOnly, hybrid }: {
+  tees: Tee[]; holes: Hole[]; selectedTeeId: string | null; onSelectTee: (id: string) => void; onOpenHole: (h: Hole) => void; readOnly: boolean; hybrid: boolean;
 }) {
   return (
     <div>
       <TeePicker tees={tees} selectedTeeId={selectedTeeId} onSelect={onSelectTee} />
-      {readOnly && (
+      {hybrid && (
         <p className="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
           Hybrid tee — GPS mapping is inherited from its source tees. Map the source tees to change it.
         </p>

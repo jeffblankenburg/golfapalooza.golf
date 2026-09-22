@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
+import { courseEditGate, courseEditGateByTee } from "@/lib/v2/courses/edit-access";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** Tee-box management on the universal library — any signed-in user may edit. */
@@ -23,6 +24,9 @@ export async function POST(request: Request) {
   const teeGender = ["men", "women", "all"].includes(gender ?? "") ? gender : "all";
 
   const admin = v2AdminClient();
+
+  const gate = await courseEditGate(admin, course_id, userId);
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
   let sourceRating = course_rating ?? null;
   let sourceSlope = slope_rating ?? null;
@@ -99,8 +103,9 @@ export async function PUT(request: Request) {
   if (!tee_id) return NextResponse.json({ error: "tee_id is required" }, { status: 400 });
 
   const admin = v2AdminClient();
-  const { data: tee } = await admin.from("v2_course_tees").select("course_id").eq("id", tee_id).maybeSingle();
-  if (!tee) return NextResponse.json({ error: "Tee not found" }, { status: 404 });
+  const gate = await courseEditGateByTee(admin, tee_id, userId);
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+  const tee = { course_id: gate.courseId as string };
 
   const updates: Record<string, unknown> = {};
   if (tee_name !== undefined) updates.tee_name = tee_name || "White";
@@ -129,6 +134,9 @@ export async function DELETE(request: Request) {
   if (!teeId || !courseId) return NextResponse.json({ error: "tee_id and course_id are required" }, { status: 400 });
 
   const admin = v2AdminClient();
+  const gate = await courseEditGate(admin, courseId, userId);
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+
   const { count } = await admin.from("v2_course_tees").select("id", { count: "exact", head: true }).eq("course_id", courseId);
   if ((count || 0) <= 1) return NextResponse.json({ error: "Cannot delete the last tee box" }, { status: 400 });
 

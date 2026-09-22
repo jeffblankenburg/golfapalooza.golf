@@ -54,6 +54,9 @@ export async function PUT(
   const { roomId } = await params;
   const a = await resolveRoomAccess(request, roomId);
   if ("error" in a) return NextResponse.json({ error: a.error }, { status: a.status });
+  if (a.room.room_kind !== "regular") {
+    return NextResponse.json({ error: "This channel is managed automatically and can't be renamed" }, { status: 400 });
+  }
   if (a.room.type !== "group") {
     return NextResponse.json({ error: "Only group chats can be renamed" }, { status: 400 });
   }
@@ -85,6 +88,9 @@ export async function DELETE(
   const { roomId } = await params;
   const a = await resolveRoomAccess(request, roomId);
   if ("error" in a) return NextResponse.json({ error: a.error }, { status: a.status });
+  if (a.room.room_kind !== "regular") {
+    return NextResponse.json({ error: "This channel is managed automatically and can't be left" }, { status: 400 });
+  }
   if (a.room.type !== "group") {
     return NextResponse.json({ error: "You can't leave a direct message" }, { status: 400 });
   }

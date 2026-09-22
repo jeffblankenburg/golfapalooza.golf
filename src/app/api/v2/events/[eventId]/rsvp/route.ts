@@ -3,6 +3,7 @@ import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgMember, orgNameMode } from "@/lib/v2/orgs";
 import { pickName } from "@/lib/v2/profile";
 import { logActivity } from "@/lib/v2/activity";
+import { syncEventChannelMembership } from "@/lib/v2/chat/channels";
 
 /**
  * RSVP for an event. Mirrors the legacy model: a member sets their attendance
@@ -134,6 +135,10 @@ export async function POST(
   );
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // Managed event channel: opting in (on_roster) adds you with full history;
+  // dropping below "Attending" removes you (your past messages stay). Best-effort.
+  await syncEventChannelMembership(g.admin, eventId, g.userId, onRoster).catch(() => {});
+
   // Activity feed: a row per genuine likelihood change. Title is the status only
   // ("Attending 99%") — the feed renders the actor's name + avatar itself.
   if (priorLikelihood !== likelihood) {
@@ -168,6 +173,9 @@ export async function DELETE(
     .eq("event_id", eventId)
     .eq("user_id", g.userId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Clearing an RSVP drops you from the event channel (messages persist).
+  await syncEventChannelMembership(g.admin, eventId, g.userId, false).catch(() => {});
 
   return NextResponse.json({
     likelihood: null,

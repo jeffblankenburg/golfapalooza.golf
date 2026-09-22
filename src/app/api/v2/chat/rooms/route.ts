@@ -107,7 +107,7 @@ export async function GET(request: Request) {
   const pinnedBy = new Map((mine || []).map((m) => [m.room_id, m.is_pinned]));
 
   const [roomsRes, membersRes, receiptsRes, recentRes, hiddenRes, mode] = await Promise.all([
-    admin.from("v2_chat_rooms").select("id, type, name, created_at").in("id", roomIds).eq("org_id", orgId),
+    admin.from("v2_chat_rooms").select("id, type, name, room_kind, created_at").in("id", roomIds).eq("org_id", orgId),
     admin
       .from("v2_chat_room_members")
       .select("room_id, user_id, member:v2_profiles(display_name, first_name, last_name, avatar_url)")
@@ -159,6 +159,7 @@ export async function GET(request: Request) {
     return {
       id: r.id,
       type: r.type,
+      roomKind: r.room_kind,
       name,
       avatarUrl,
       isPinned: !!pinnedBy.get(r.id),

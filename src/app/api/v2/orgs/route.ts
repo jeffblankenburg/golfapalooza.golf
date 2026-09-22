@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
+import { addToAllMembers } from "@/lib/v2/chat/channels";
 
 /**
  * POST /api/v2/orgs — create a new organization (group).
@@ -92,6 +93,9 @@ export async function POST(request: Request) {
     await admin.from("v2_organizations").delete().eq("id", org.id);
     return NextResponse.json({ error: memberErr.message }, { status: 500 });
   }
+
+  // Seed the org's always-on all-members channel with its creator. Best-effort.
+  await addToAllMembers(admin, org.id, userId).catch(() => {});
 
   return NextResponse.json({ slug: org.slug, id: org.id });
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { toE164 } from "@/lib/v2/phone";
 import { cleanProfileFields, displayNameFrom, type ProfileFields } from "@/lib/v2/profile";
+import { addToAllMembers } from "@/lib/v2/chat/channels";
 
 /**
  * POST /api/v2/invites/[code]/accept — redeem a phone-bound, single-use invite.
@@ -89,6 +90,9 @@ export async function POST(
     { onConflict: "org_id,user_id", ignoreDuplicates: true }
   );
   if (mErr) return NextResponse.json({ error: mErr.message }, { status: 500 });
+
+  // Add the new member to the org's always-on all-members channel. Best-effort.
+  await addToAllMembers(admin, invite.org_id, userId).catch(() => {});
 
   await admin
     .from("v2_invites")

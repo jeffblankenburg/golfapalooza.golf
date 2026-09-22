@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
+import { ensureEventRoom } from "@/lib/v2/chat/channels";
 
 /**
  * Events for an org. GET lists (members); POST creates (admins).
@@ -83,5 +84,9 @@ export async function POST(
     .select("id, name, year, start_date, end_date, status")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Every event gets a managed chat channel; members join it by RSVPing "Attending".
+  await ensureEventRoom(g.admin, id, data.id, data.name).catch(() => {});
+
   return NextResponse.json({ event: data });
 }

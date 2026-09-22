@@ -10,7 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export interface RoomAccess {
   admin: SupabaseClient;
   userId: string;
-  room: { id: string; org_id: string; type: string; name: string | null };
+  room: { id: string; org_id: string; type: string; name: string | null; room_kind: string };
 }
 
 export async function resolveRoomAccess(
@@ -23,7 +23,7 @@ export async function resolveRoomAccess(
   const admin = v2AdminClient();
   const { data: room } = await admin
     .from("v2_chat_rooms")
-    .select("id, org_id, type, name")
+    .select("id, org_id, type, name, room_kind")
     .eq("id", roomId)
     .maybeSingle();
   if (!room) return { error: "Room not found", status: 404 };

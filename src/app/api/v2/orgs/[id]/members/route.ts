@@ -3,6 +3,7 @@ import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
 import { cleanProfileFields, displayNameFrom } from "@/lib/v2/profile";
 import { cleanPermissions, type PermissionMap } from "@/lib/v2/permissions";
+import { addToAllMembers, removeFromManagedChannels } from "@/lib/v2/chat/channels";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 async function guard(request: Request, orgId: string) {
@@ -166,6 +167,11 @@ export async function PATCH(
       .eq("org_id", id)
       .eq("user_id", user_id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Managed channels track active membership: archiving drops you from the
+    // all-members (and event) channels; restoring re-adds you to all-members.
+    if (archived) await removeFromManagedChannels(g.admin, id, user_id).catch(() => {});
+    else await addToAllMembers(g.admin, id, user_id).catch(() => {});
   }
 
   // Profile edit (admins can edit any member's identity) — optional. Recompute

@@ -18,6 +18,9 @@ export async function POST(
   const { roomId } = await params;
   const a = await resolveRoomAccess(request, roomId);
   if ("error" in a) return NextResponse.json({ error: a.error }, { status: a.status });
+  if (a.room.room_kind !== "regular") {
+    return NextResponse.json({ error: "This channel manages its own membership" }, { status: 400 });
+  }
   if (a.room.type !== "group") {
     return NextResponse.json({ error: "You can only add people to a group chat" }, { status: 400 });
   }
@@ -57,6 +60,9 @@ export async function DELETE(
   const { roomId } = await params;
   const a = await resolveRoomAccess(request, roomId);
   if ("error" in a) return NextResponse.json({ error: a.error }, { status: a.status });
+  if (a.room.room_kind !== "regular") {
+    return NextResponse.json({ error: "This channel manages its own membership" }, { status: 400 });
+  }
   if (a.room.type !== "group") {
     return NextResponse.json({ error: "You can't remove people from a direct message" }, { status: 400 });
   }

@@ -48,6 +48,7 @@ interface Member {
 interface RoomSummary {
   id: string;
   type: string;
+  roomKind?: string;
   name: string | null;
   avatarUrl: string | null;
   isPinned: boolean;
@@ -696,6 +697,7 @@ function Room({
   const [pinned, setPinned] = useState(!!room?.isPinned);
   const [members, setMembers] = useState<Member[]>(room?.members || []);
   const [roomType, setRoomType] = useState<string | null>(room?.type ?? null);
+  const [roomKind, setRoomKind] = useState<string>(room?.roomKind ?? "regular");
   const [roomName, setRoomName] = useState<string | null>(room?.name ?? null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tapbackFor, setTapbackFor] = useState<string | null>(null);
@@ -770,7 +772,7 @@ function Room({
         setNewerCursor(d.newerCursor ?? null);
         setFarBack((d.newerCount ?? 0) > 100);
         if (rd.members?.length) setMembers(rd.members);
-        if (rd.room) { setRoomType(rd.room.type); setRoomName(rd.room.name); }
+        if (rd.room) { setRoomType(rd.room.type); setRoomName(rd.room.name); setRoomKind(rd.room.room_kind || "regular"); }
         setReady(true);
         const last = d.messages?.[d.messages.length - 1];
         if (last && !target) markRead(last.id);
@@ -1140,7 +1142,9 @@ function Room({
   }
 
   const title = roomName || room?.name || "Conversation";
-  const isGroup = roomType === "group";
+  // Managed channels (all-members / event) run their own membership, so no
+  // rename/add/remove/leave settings — only regular group chats get the gear.
+  const isGroup = roomType === "group" && roomKind === "regular";
 
   return (
     <div className={styles.room}>

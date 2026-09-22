@@ -92,7 +92,7 @@ export default async function HomeModules({
     supabase
       .from("v2_articles")
       .select(
-        "id, title, publish_at, image_url, content, image_focal_x, image_focal_y, author:v2_profiles(display_name, first_name, last_name, avatar_url)",
+        "id, title, publish_at, image_url, content, image_focal_x, image_focal_y, author:v2_profiles!v2_articles_author_id_fkey(display_name, first_name, last_name, avatar_url)",
       )
       .eq("org_id", orgId)
       .not("publish_at", "is", null)

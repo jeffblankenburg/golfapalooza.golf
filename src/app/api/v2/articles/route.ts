@@ -21,7 +21,7 @@ import { broadcastIfNewlyLive } from "@/lib/v2/articles";
  */
 
 const ADMIN_SELECT =
-  "id, org_id, event_id, title, content, image_url, image_focal_x, image_focal_y, publish_at, pinned_at, notify_on_publish, view_count, created_at, updated_at, author_id, author:v2_profiles(display_name, first_name, last_name, avatar_url)";
+  "id, org_id, event_id, title, content, image_url, image_focal_x, image_focal_y, publish_at, pinned_at, notify_on_publish, view_count, created_at, updated_at, author_id, author:v2_profiles!v2_articles_author_id_fkey(display_name, first_name, last_name, avatar_url)";
 
 /** Clamp a focal coordinate to 0–100 (default 50). */
 function focal(v: unknown): number {

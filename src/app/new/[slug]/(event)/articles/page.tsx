@@ -53,7 +53,7 @@ export default async function ArticlesPage({
   const { data } = await supabase
     .from("v2_articles")
     .select(
-      "id, title, content, image_url, image_focal_x, image_focal_y, publish_at, author:v2_profiles(display_name, first_name, last_name, avatar_url)",
+      "id, title, content, image_url, image_focal_x, image_focal_y, publish_at, author:v2_profiles!v2_articles_author_id_fkey(display_name, first_name, last_name, avatar_url)",
     )
     .eq("org_id", org.id)
     .not("publish_at", "is", null)

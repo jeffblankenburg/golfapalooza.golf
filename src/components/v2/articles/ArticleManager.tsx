@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
+import { compressImage } from "@/lib/v2/gallery-compress";
 import { stripMarkdown } from "@/lib/v2/text";
 import styles from "@/app/new/new.module.css";
 /* eslint-disable @next/next/no-img-element */
@@ -14,6 +15,9 @@ interface Article {
   image_focal_x: number | null;
   image_focal_y: number | null;
   publish_at: string | null;
+  pinned_at: string | null;
+  notify_on_publish: boolean | null;
+  view_count: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -56,6 +60,8 @@ export default function ArticleManager({ orgId }: { orgId: string; slug: string 
   const [focalY, setFocalY] = useState(50);
   const [status, setStatus] = useState<Status>("draft");
   const [scheduleAt, setScheduleAt] = useState("");
+  const [pinned, setPinned] = useState(false);
+  const [notifyOnPublish, setNotifyOnPublish] = useState(true);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +97,8 @@ export default function ArticleManager({ orgId }: { orgId: string; slug: string 
     setFocalY(50);
     setStatus("draft");
     setScheduleAt(toLocalInput(null));
+    setPinned(false);
+    setNotifyOnPublish(true);
     setError(null);
   }
 
@@ -103,14 +111,27 @@ export default function ArticleManager({ orgId }: { orgId: string; slug: string 
     setFocalY(a.image_focal_y ?? 50);
     setStatus(statusOf(a.publish_at));
     setScheduleAt(toLocalInput(a.publish_at));
+    setPinned(!!a.pinned_at);
+    setNotifyOnPublish(a.notify_on_publish ?? true);
     setError(null);
   }
 
   async function uploadImage(file: File) {
     setUploading(true);
     setError(null);
+    // Downsize large photos client-side (skip GIF — compression would flatten
+    // the animation). Fall back to the original if compression fails.
+    let upload: File = file;
+    if (file.type !== "image/gif") {
+      try {
+        const { blob } = await compressImage(file, 1600, 0.85);
+        upload = new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+      } catch {
+        /* use original */
+      }
+    }
     const form = new FormData();
-    form.append("file", file);
+    form.append("file", upload);
     form.append("orgId", orgId);
     const res = await fetch("/api/v2/articles/upload-image", { method: "POST", body: form });
     setUploading(false);
@@ -158,6 +179,8 @@ export default function ArticleManager({ orgId }: { orgId: string; slug: string 
       image_focal_x: focalX,
       image_focal_y: focalY,
       publish_at: computePublishAt(),
+      pinned,
+      notify_on_publish: notifyOnPublish,
     };
     const isNew = editing === "new";
     const res = await fetch(isNew ? "/api/v2/articles" : `/api/v2/articles/${(editing as Article).id}`, {
@@ -329,6 +352,30 @@ export default function ArticleManager({ orgId }: { orgId: string; slug: string 
                   ? "Publishes immediately and appears on the home page and Articles list."
                   : "Stays hidden until the scheduled time, then appears automatically."}
             </p>
+
+            <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
+              <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
+              <span className={styles.label} style={{ margin: 0 }}>Pin to top</span>
+            </label>
+            <p className={styles.swatchHint} style={{ marginTop: 4 }}>
+              Pinned articles lead the Articles list and become the featured article on the home page.
+            </p>
+
+            {status !== "draft" && (
+              <>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
+                  <input
+                    type="checkbox"
+                    checked={notifyOnPublish}
+                    onChange={(e) => setNotifyOnPublish(e.target.checked)}
+                  />
+                  <span className={styles.label} style={{ margin: 0 }}>Notify members when it goes live</span>
+                </label>
+                <p className={styles.swatchHint} style={{ marginTop: 4 }}>
+                  Sends one push to everyone the first time it publishes. It appears in the activity feed either way.
+                </p>
+              </>
+            )}
           </div>
 
           {error && <p className={styles.formError}>{error}</p>}
@@ -399,9 +446,19 @@ export default function ArticleManager({ orgId }: { orgId: string; slug: string 
                       <span className={styles.memberAvatar}>{(a.title[0] || "?").toUpperCase()}</span>
                     )}
                     <div className={styles.memberMeta}>
-                      <span className={styles.memberName}>{a.title || "Untitled"}</span>
+                      <span className={styles.memberName}>
+                        {a.pinned_at && (
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-label="Pinned" style={{ marginRight: 5, color: "var(--brand)", verticalAlign: "-1px" }}>
+                            <path d="M16 3l5 5-4 1-3 3-1 5-2-2-4 4-1-1 4-4-2-2 5-1 3-3z" />
+                          </svg>
+                        )}
+                        {a.title || "Untitled"}
+                      </span>
                       <span className={styles.memberSub}>
                         {stateLabel(a.publish_at, now)}
+                        {a.publish_at && new Date(a.publish_at).getTime() <= now && a.view_count != null
+                          ? ` (${a.view_count} view${a.view_count === 1 ? "" : "s"})`
+                          : ""}
                         {preview ? ` — ${preview}` : ""}
                       </span>
                     </div>

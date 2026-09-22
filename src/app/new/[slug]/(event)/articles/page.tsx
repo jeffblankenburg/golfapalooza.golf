@@ -58,6 +58,7 @@ export default async function ArticlesPage({
     .eq("org_id", org.id)
     .not("publish_at", "is", null)
     .lte("publish_at", nowIso)
+    .order("pinned_at", { ascending: false, nullsFirst: false })
     .order("publish_at", { ascending: false });
 
   const articles = ((data as unknown as ArticleRow[] | null) ?? []).map((a) => {

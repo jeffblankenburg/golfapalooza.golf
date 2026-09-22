@@ -47,6 +47,11 @@ export const NOTIFICATION_SECTIONS: NotificationSection[] = [
     ],
   },
   {
+    key: "articles",
+    label: "Articles",
+    items: [{ type: "article", label: "New articles", description: "When a new article is published" }],
+  },
+  {
     // Global mute per type. A follower gets a spectator notification only when
     // BOTH the per-follow toggle is on AND the type isn't muted here.
     key: "following",

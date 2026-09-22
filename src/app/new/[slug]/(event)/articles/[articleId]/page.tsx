@@ -6,6 +6,7 @@ import { getPlatformContext } from "@/lib/v2/context";
 import { pickName } from "@/lib/v2/profile";
 import { loadResolvedFeatures } from "@/lib/v2/features-server";
 import { isFeatureVisible } from "@/lib/v2/features";
+import ArticleViewPing from "../ArticleViewPing";
 import styles from "@/app/new/new.module.css";
 /* eslint-disable @next/next/no-img-element */
 
@@ -103,7 +104,21 @@ export default async function ArticlePage({
         </div>
 
         <div className={styles.articleBody}>
-          <ReactMarkdown>{a.content}</ReactMarkdown>
+          <ReactMarkdown
+            components={{
+              // ![alt](url) renders a <video> when the URL points at a video
+              // file (article videos use the same markdown-image syntax as images).
+              img: ({ src, alt }) =>
+                typeof src === "string" && /\.(mp4|webm|mov)(\?|#|$)/i.test(src) ? (
+                  <video src={src} controls playsInline preload="metadata" className={styles.articleBodyVideo} />
+                ) : (
+                  <img src={typeof src === "string" ? src : undefined} alt={alt || ""} />
+                ),
+            }}
+          >
+            {a.content}
+          </ReactMarkdown>
+          <ArticleViewPing articleId={a.id} />
         </div>
       </article>
     </div>

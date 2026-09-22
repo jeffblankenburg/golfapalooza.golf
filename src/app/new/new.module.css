@@ -1442,6 +1442,13 @@ a.articleCard:active {
   border-radius: 10px;
   margin: 0.5em 0;
 }
+.articleBodyVideo {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  margin: 0.5em 0;
+  background: #000;
+}
 .articleBody blockquote {
   margin: 0 0 1em;
   padding-left: 12px;

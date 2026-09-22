@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { hasPermission } from "@/lib/v2/permissions-server";
+import { broadcastIfNewlyLive } from "@/lib/v2/articles";
 
 /**
  * @swagger
@@ -20,7 +21,7 @@ import { hasPermission } from "@/lib/v2/permissions-server";
  */
 
 const ADMIN_SELECT =
-  "id, org_id, event_id, title, content, image_url, image_focal_x, image_focal_y, publish_at, created_at, updated_at, author_id, author:v2_profiles(display_name, first_name, last_name, avatar_url)";
+  "id, org_id, event_id, title, content, image_url, image_focal_x, image_focal_y, publish_at, pinned_at, notify_on_publish, view_count, created_at, updated_at, author_id, author:v2_profiles(display_name, first_name, last_name, avatar_url)";
 
 /** Clamp a focal coordinate to 0–100 (default 50). */
 function focal(v: unknown): number {
@@ -65,6 +66,7 @@ export async function POST(request: Request) {
     image_focal_x?: number;
     image_focal_y?: number;
     publish_at?: string | null;
+    notify_on_publish?: boolean;
   };
   try {
     body = await request.json();
@@ -95,12 +97,16 @@ export async function POST(request: Request) {
       image_focal_x: focal(body.image_focal_x),
       image_focal_y: focal(body.image_focal_y),
       publish_at: body.publish_at ?? null,
+      notify_on_publish: body.notify_on_publish ?? true,
       created_at: nowIso,
       updated_at: nowIso,
     })
     .select("id")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // If it's created already-live, broadcast (activity feed always; push if opted in).
+  await broadcastIfNewlyLive(admin, data.id);
 
   return NextResponse.json({ id: data.id });
 }

@@ -177,13 +177,14 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Play count tracking
 
 ### Articles & Announcements
-- Admin publishes articles with markdown content
-- Featured images from the gallery
+- Admin publishes articles with markdown content, including inline video embeds (`![](…mp4/webm/mov)` renders a player)
+- Hero images uploaded directly (compressed client-side) with a tap-to-set focal point
 - Draft, scheduled, and published states
-- **Publish notification** — a "Notify all Loozers when this publishes" checkbox (default on) sends one push to every active Loozer the first time the article goes live, whether published immediately or at its scheduled time (via the `articles-publish` cron). Fires exactly once per article; editing an already-published article never re-notifies. Deep-links to the article from both the push and the in-app notification drawer.
-- Article readership tracking (who read what, when)
-- View counts displayed in admin
-- Latest article card on home page with hero image
+- **Pinned articles** — pin any article to lead the Articles list and become the featured article on the home page
+- **Publish notification** — a "Notify members when it goes live" checkbox (default on) sends one push to every active member the first time the article goes live, whether published immediately or at its scheduled time (via cron). Fires exactly once per article; editing an already-published article never re-notifies. The article always appears in the home activity feed on publish, regardless of the notification setting. Deep-links to the article from the push, the notification drawer, and the feed.
+- Article readership tracking (unique per-member views), with counts shown in the admin manager
+- Storage cleanup — deleting an article removes its hero and embedded images from the bucket
+- Latest/pinned article card on home page with hero image
 
 ### Shirt Guide
 - Per-day list of the shirts to wear at the event, each with a photo, name, and optional notes

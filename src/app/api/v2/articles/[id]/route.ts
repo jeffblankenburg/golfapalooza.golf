@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { hasPermission } from "@/lib/v2/permissions-server";
+import { broadcastIfNewlyLive } from "@/lib/v2/articles";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
@@ -58,7 +59,7 @@ export async function GET(
   const { data, error } = await g.admin
     .from("v2_articles")
     .select(
-      "id, org_id, event_id, title, content, image_url, image_focal_x, image_focal_y, publish_at, created_at, updated_at, author_id",
+      "id, org_id, event_id, title, content, image_url, image_focal_x, image_focal_y, publish_at, pinned_at, notify_on_publish, view_count, created_at, updated_at, author_id",
     )
     .eq("id", id)
     .single();
@@ -82,6 +83,8 @@ export async function PUT(
     image_focal_y?: number;
     publish_at?: string | null;
     event_id?: string | null;
+    pinned?: boolean;
+    notify_on_publish?: boolean;
   };
   try {
     body = await request.json();
@@ -90,6 +93,8 @@ export async function PUT(
   }
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (body.pinned !== undefined) patch.pinned_at = body.pinned ? new Date().toISOString() : null;
+  if (body.notify_on_publish !== undefined) patch.notify_on_publish = body.notify_on_publish;
   if (body.title !== undefined) {
     const t = (body.title || "").trim();
     if (!t) return NextResponse.json({ error: "A title is required" }, { status: 400 });
@@ -104,6 +109,10 @@ export async function PUT(
 
   const { error } = await g.admin.from("v2_articles").update(patch).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // A draft/scheduled article edited to publish now goes live here.
+  await broadcastIfNewlyLive(g.admin, id);
+
   return NextResponse.json({ ok: true });
 }
 
@@ -115,7 +124,37 @@ export async function DELETE(
   const g = await guard(request, id);
   if ("error" in g) return NextResponse.json({ error: g.error }, { status: g.status });
 
+  // Grab the hero + inline images before the row is gone, so we can clean up the
+  // storage bucket (v1 left these orphaned).
+  const { data: row } = await g.admin
+    .from("v2_articles")
+    .select("image_url, content")
+    .eq("id", id)
+    .maybeSingle();
+
   const { error } = await g.admin.from("v2_articles").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Best-effort: remove any files we own in the v2-articles bucket (hero image +
+  // markdown-embedded images/videos). Never let cleanup failure fail the delete.
+  if (row) {
+    const marker = "/v2-articles/";
+    const urls = [row.image_url, ...(row.content || "").match(/https?:\/\/[^\s)"']+/g) || []];
+    const paths = [
+      ...new Set(
+        urls
+          .filter((u): u is string => typeof u === "string" && u.includes(marker))
+          .map((u) => u.split(marker)[1].split(/[?#]/)[0]),
+      ),
+    ];
+    if (paths.length) {
+      try {
+        await g.admin.storage.from("v2-articles").remove(paths);
+      } catch {
+        /* best-effort */
+      }
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }

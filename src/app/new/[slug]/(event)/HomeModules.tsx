@@ -97,6 +97,7 @@ export default async function HomeModules({
       .eq("org_id", orgId)
       .not("publish_at", "is", null)
       .lte("publish_at", nowIso)
+      .order("pinned_at", { ascending: false, nullsFirst: false })
       .order("publish_at", { ascending: false })
       .limit(1)
       .maybeSingle(),

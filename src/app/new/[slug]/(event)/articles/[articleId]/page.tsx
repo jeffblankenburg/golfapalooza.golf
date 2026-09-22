@@ -1,6 +1,8 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
+import rehypeRaw from "rehype-raw";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
 import { pickName } from "@/lib/v2/profile";
@@ -105,14 +107,19 @@ export default async function ArticlePage({
 
         <div className={styles.articleBody}>
           <ReactMarkdown
+            // Match v1: single newlines break, and admin-authored raw HTML (inline
+            // <img> with sizing, etc.) renders. Content is trusted (manage_articles).
+            remarkPlugins={[remarkBreaks]}
+            rehypePlugins={[rehypeRaw]}
             components={{
-              // ![alt](url) renders a <video> when the URL points at a video
-              // file (article videos use the same markdown-image syntax as images).
-              img: ({ src, alt }) =>
+              // ![alt](url) — or a raw <img> — renders a <video> when the URL
+              // points at a video file. Otherwise pass the author's attributes
+              // (style/width/etc.) straight through.
+              img: ({ src, alt, ...props }) =>
                 typeof src === "string" && /\.(mp4|webm|mov)(\?|#|$)/i.test(src) ? (
                   <video src={src} controls playsInline preload="metadata" className={styles.articleBodyVideo} />
                 ) : (
-                  <img src={typeof src === "string" ? src : undefined} alt={alt || ""} />
+                  <img src={typeof src === "string" ? src : undefined} alt={alt || ""} {...props} />
                 ),
             }}
           >

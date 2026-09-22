@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { v2BrowserClient } from "@/lib/v2/supabase-browser";
 import { useNameMode } from "./NameMode";
 import { pickName } from "@/lib/v2/profile";
 import ImageLightbox from "./ImageLightbox";
+import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import MessageComposer, { type ComposerPayload } from "@/app/new/_components/MessageComposer";
 import styles from "./chat.module.css";
 /* eslint-disable @next/next/no-img-element */
@@ -40,6 +42,7 @@ interface Member {
   userId: string;
   displayName: string;
   avatarUrl: string | null;
+  role?: string;
   search?: string;
 }
 interface RoomSummary {
@@ -73,7 +76,7 @@ function roomStamp(iso: string, now = new Date()): string {
 }
 
 const MENTION_OR_URL = /@\[([^\]]+)\]\(([^)]+)\)|(https?:\/\/[^\s]+)/g;
-function renderContent(content: string): React.ReactNode[] {
+function renderContent(content: string, slug?: string): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
   let last = 0;
   let m: RegExpExecArray | null;
@@ -82,7 +85,17 @@ function renderContent(content: string): React.ReactNode[] {
   while ((m = MENTION_OR_URL.exec(content)) !== null) {
     if (m.index > last) nodes.push(content.slice(last, m.index));
     if (m[1]) {
-      nodes.push(<span key={key++} className={styles.mention}>@{m[1]}</span>);
+      // Mentions deep-link to the member's profile (v1 parity); fall back to a
+      // plain chip if we don't have a slug to build the link.
+      nodes.push(
+        slug ? (
+          <Link key={key++} href={`/new/${slug}/loozers/${m[2]}`} className={styles.mention} onClick={(e) => e.stopPropagation()}>
+            @{m[1]}
+          </Link>
+        ) : (
+          <span key={key++} className={styles.mention}>@{m[1]}</span>
+        ),
+      );
     } else if (m[3]) {
       nodes.push(
         <a key={key++} className={styles.link} href={m[3]} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
@@ -99,11 +112,13 @@ function renderContent(content: string): React.ReactNode[] {
 export default function ChatDrawer({
   orgId,
   userId,
+  slug,
   initialRoom,
   initialMessageId,
 }: {
   orgId: string;
   userId: string;
+  slug: string;
   initialRoom?: string;
   initialMessageId?: string;
 }) {
@@ -153,6 +168,8 @@ export default function ChatDrawer({
         target={openRoom.target}
         room={room}
         userId={userId}
+        orgId={orgId}
+        slug={slug}
         onBack={() => setOpenRoom(null)}
       />
     );
@@ -263,6 +280,229 @@ function NewChat({
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+/* ── Group settings (rename / add / remove / leave) ───────────────────────── */
+function RoomSettings({
+  roomId,
+  orgId,
+  slug,
+  name: initialName,
+  members: initialMembers,
+  userId,
+  onClose,
+  onRenamed,
+  onMembersChanged,
+  onLeft,
+}: {
+  roomId: string;
+  orgId: string;
+  slug: string;
+  name: string;
+  members: Member[];
+  userId: string;
+  onClose: () => void;
+  onRenamed: (name: string) => void;
+  onMembersChanged: (members: Member[]) => void;
+  onLeft: () => void;
+}) {
+  const [name, setName] = useState(initialName);
+  const [savedName, setSavedName] = useState(initialName);
+  const [saving, setSaving] = useState(false);
+  const [list, setList] = useState<Member[]>(initialMembers);
+  const [adding, setAdding] = useState(false);
+  const [avail, setAvail] = useState<Member[] | null>(null);
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+
+  const iAmCreator = list.find((m) => m.userId === userId)?.role === "creator";
+  const memberIds = new Set(list.map((m) => m.userId));
+
+  useEffect(() => {
+    if (!adding || avail !== null) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/v2/chat/members?orgId=${orgId}`);
+        const d = res.ok ? await res.json() : { members: [] };
+        if (!cancelled) setAvail(d.members || []);
+      } catch {
+        if (!cancelled) setAvail([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [adding, avail, orgId]);
+
+  async function rename() {
+    const n = name.trim();
+    if (!n || n === savedName || saving) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/v2/chat/rooms/${roomId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: n }),
+      });
+      if (!res.ok) throw new Error();
+      setSavedName(n);
+      onRenamed(n);
+    } catch {
+      /* leave the input as-is so they can retry */
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeMember(uid: string) {
+    if (busy) return;
+    setBusy(uid);
+    try {
+      const res = await fetch(`/api/v2/chat/rooms/${roomId}/members`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: uid }),
+      });
+      if (!res.ok) throw new Error();
+      const next = list.filter((m) => m.userId !== uid);
+      setList(next);
+      onMembersChanged(next);
+    } catch {
+      /* no-op */
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function addMember(person: Member) {
+    if (busy) return;
+    setBusy(person.userId);
+    try {
+      const res = await fetch(`/api/v2/chat/rooms/${roomId}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userIds: [person.userId] }),
+      });
+      if (!res.ok) throw new Error();
+      const next = [...list, { ...person, role: "member" }];
+      setList(next);
+      onMembersChanged(next);
+    } catch {
+      /* no-op */
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function leave() {
+    try {
+      const res = await fetch(`/api/v2/chat/rooms/${roomId}`, { method: "DELETE" });
+      if (res.ok) onLeft();
+    } catch {
+      /* no-op */
+    }
+  }
+
+  const pickList = (avail || []).filter((a) => !memberIds.has(a.userId) && a.displayName.toLowerCase().includes(q.toLowerCase()));
+
+  return (
+    <div className={styles.newChat}>
+      <div className={styles.newHeader}>
+        <button type="button" className={styles.backBtn} onClick={onClose} aria-label="Back">
+          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <span className={styles.roomHeaderName}>Group settings</span>
+        <span style={{ width: 32 }} aria-hidden />
+      </div>
+
+      <div className={styles.settingsBody}>
+        <div className={styles.settingsSection}>
+          <p className={styles.settingsLabel}>Name</p>
+          <div className={styles.settingsRename}>
+            <input className={styles.gifSearch} value={name} onChange={(e) => setName(e.target.value)} maxLength={50} placeholder="Group name" />
+            <button type="button" className={styles.startBtn} onClick={rename} disabled={saving || !name.trim() || name.trim() === savedName}>
+              {saving ? "…" : "Save"}
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.settingsSection}>
+          <div className={styles.settingsSectionHead}>
+            <p className={styles.settingsLabel}>People ({list.length})</p>
+            <button type="button" className={styles.settingsAdd} onClick={() => setAdding((v) => !v)}>
+              {adding ? "Done" : "+ Add"}
+            </button>
+          </div>
+
+          {adding && (
+            <>
+              <input className={styles.gifSearch} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search people to add" />
+              <div className={styles.memberList}>
+                {avail === null ? (
+                  <p className={styles.loading}>Loading…</p>
+                ) : pickList.length === 0 ? (
+                  <p className={styles.loading}>No one left to add.</p>
+                ) : (
+                  pickList.map((m) => (
+                    <button key={m.userId} type="button" className={styles.memberRow} onClick={() => addMember(m)} disabled={busy === m.userId}>
+                      {m.avatarUrl ? (
+                        <img src={m.avatarUrl} alt="" className={styles.mentionAvatar} />
+                      ) : (
+                        <span className={styles.mentionAvatarFallback}>{m.displayName.charAt(0).toUpperCase()}</span>
+                      )}
+                      <span>{m.displayName}</span>
+                      <span className={styles.memberCheck} aria-hidden>＋</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+
+          <div className={styles.memberList}>
+            {list.map((m) => {
+              const self = m.userId === userId;
+              const canRemove = self || iAmCreator;
+              return (
+                <div key={m.userId} className={styles.settingsMember}>
+                  <Link href={`/new/${slug}/loozers/${m.userId}`} className={styles.settingsMemberInfo} onClick={onClose}>
+                    {m.avatarUrl ? (
+                      <img src={m.avatarUrl} alt="" className={styles.mentionAvatar} />
+                    ) : (
+                      <span className={styles.mentionAvatarFallback}>{m.displayName.charAt(0).toUpperCase()}</span>
+                    )}
+                    <span>{m.displayName}{self ? " (you)" : ""}</span>
+                    {m.role === "creator" && <span className={styles.settingsCreator}>creator</span>}
+                  </Link>
+                  {canRemove && !self && (
+                    <button type="button" className={styles.settingsRemove} onClick={() => removeMember(m.userId)} disabled={busy === m.userId} aria-label={`Remove ${m.displayName}`}>
+                      Remove
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <button type="button" className={styles.leaveBtn} onClick={() => setConfirmLeave(true)}>
+          Leave group
+        </button>
+      </div>
+
+      <ConfirmModal
+        open={confirmLeave}
+        title="Leave this group?"
+        message="You'll stop receiving messages and drop off the member list. You can be added back later."
+        confirmLabel="Leave"
+        destructive
+        onConfirm={() => { setConfirmLeave(false); leave(); }}
+        onCancel={() => setConfirmLeave(false)}
+      />
     </div>
   );
 }
@@ -429,12 +669,16 @@ function Room({
   roomId,
   room,
   userId,
+  orgId,
+  slug,
   target,
   onBack,
 }: {
   roomId: string;
   room: RoomSummary | null;
   userId: string;
+  orgId: string;
+  slug: string;
   target: string | null;
   onBack: () => void;
 }) {
@@ -451,6 +695,9 @@ function Room({
   const [ready, setReady] = useState(false);
   const [pinned, setPinned] = useState(!!room?.isPinned);
   const [members, setMembers] = useState<Member[]>(room?.members || []);
+  const [roomType, setRoomType] = useState<string | null>(room?.type ?? null);
+  const [roomName, setRoomName] = useState<string | null>(room?.name ?? null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [tapbackFor, setTapbackFor] = useState<string | null>(null);
   const [reactionDetail, setReactionDetail] = useState<{ messageId: string; emoji: string } | null>(null);
   const [replyTo, setReplyTo] = useState<Msg | null>(null);
@@ -523,6 +770,7 @@ function Room({
         setNewerCursor(d.newerCursor ?? null);
         setFarBack((d.newerCount ?? 0) > 100);
         if (rd.members?.length) setMembers(rd.members);
+        if (rd.room) { setRoomType(rd.room.type); setRoomName(rd.room.name); }
         setReady(true);
         const last = d.messages?.[d.messages.length - 1];
         if (last && !target) markRead(last.id);
@@ -891,7 +1139,8 @@ function Room({
     toggleReaction(messageId, emoji);
   }
 
-  const title = room?.name || "Conversation";
+  const title = roomName || room?.name || "Conversation";
+  const isGroup = roomType === "group";
 
   return (
     <div className={styles.room}>
@@ -914,7 +1163,38 @@ function Room({
             <path d="M12 17v5M9 10.76V5a2 2 0 012-2h2a2 2 0 012 2v5.76a2 2 0 00.58 1.42L18 15H6l2.42-2.82A2 2 0 009 10.76z" />
           </svg>
         </button>
+        {isGroup && (
+          <button
+            type="button"
+            className={styles.pinBtn}
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Group settings"
+            title="Group settings"
+          >
+            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+            </svg>
+          </button>
+        )}
       </div>
+
+      {settingsOpen && (
+        <div className={styles.settingsOverlay}>
+          <RoomSettings
+            roomId={roomId}
+            orgId={orgId}
+            slug={slug}
+            name={title}
+            members={members}
+            userId={userId}
+            onClose={() => setSettingsOpen(false)}
+            onRenamed={(n) => setRoomName(n)}
+            onMembersChanged={(m) => setMembers(m)}
+            onLeft={() => { setSettingsOpen(false); onBack(); }}
+          />
+        </div>
+      )}
 
       <div
         className={styles.scroll}
@@ -1056,7 +1336,7 @@ function Room({
                           }}
                         />
                       )}
-                      {m.content && <span className={styles.bubbleText}>{renderContent(m.content)}</span>}
+                      {m.content && <span className={styles.bubbleText}>{renderContent(m.content, slug)}</span>}
                     </div>
                   </div>
                   {agg.size > 0 && (

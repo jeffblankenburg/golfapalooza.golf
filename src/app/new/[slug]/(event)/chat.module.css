@@ -620,6 +620,114 @@
   display: flex;
   flex-direction: column;
 }
+
+/* ── Group settings sheet ─────────────────────────────────────────────────── */
+.settingsOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+}
+.settingsBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 0 16px;
+}
+.settingsSection {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.settingsSectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 14px;
+}
+.settingsLabel {
+  margin: 0 0 2px;
+  padding: 0 14px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+.settingsSectionHead .settingsLabel {
+  padding: 0;
+}
+.settingsRename {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+.settingsRename .gifSearch {
+  margin: 0;
+  flex: 1;
+}
+.settingsAdd {
+  flex: none;
+  border: none;
+  background: none;
+  color: var(--brand);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.settingsMember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+}
+.settingsMemberInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+.settingsCreator {
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+.settingsRemove {
+  flex: none;
+  border: none;
+  background: none;
+  color: #dc2626;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.settingsRemove:disabled {
+  opacity: 0.45;
+}
+.leaveBtn {
+  margin: 16px 14px 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, #dc2626 40%, var(--line));
+  background: none;
+  color: #dc2626;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
 .newHeader {
   flex: none;
   display: flex;

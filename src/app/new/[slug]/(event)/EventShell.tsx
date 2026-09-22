@@ -426,7 +426,7 @@ export default function EventShell({
               onClose={() => setOpen(null)}
             />
           ) : open === "chat" ? (
-            <ChatDrawer orgId={orgId} userId={userId} initialRoom={deepLink.room} initialMessageId={deepLink.msg} />
+            <ChatDrawer orgId={orgId} userId={userId} slug={slug} initialRoom={deepLink.room} initialMessageId={deepLink.msg} />
           ) : open === "photos" ? (
             <PhotosDrawer orgId={orgId} userId={userId} isAdmin={isAdmin} initialPhotoId={deepLink.photo} initialBulkId={deepLink.bulk} />
           ) : open === "rounds" ? (

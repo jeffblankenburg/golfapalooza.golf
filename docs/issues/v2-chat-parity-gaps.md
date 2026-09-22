@@ -3,18 +3,21 @@ Parity sweep of the shipped v2 chat against v1's chat. The composer is now unifi
 (#185) and at parity; these **room-management and polish affordances** from v1 were not
 carried over.
 
-## Gaps
-- **Room settings.** v1 lets a room's members rename the room, add/remove members, and
-  leave. v2 has no room-settings surface at all — rooms are effectively fixed once
-  created.
-- **In-room message search.** v1 can search within a conversation; v2 has no search.
-- **Mention → profile link.** In v1 a rendered `@mention` is tappable and opens that
-  member's profile. v2 renders the name as plain styled text (now that the members
-  directory + member detail exist in #187, the mention can deep-link to
-  `/new/{slug}/loozers/{id}`).
-- **Client-side image compression** before upload. v1 downsizes/compresses; v2 uploads
-  the raw file, which is slower and heavier on mobile data.
-- **Typing-indicator wording.** Minor: v1 shows named typing ("Jeff is typing…"); v2's
-  wording/spacing differs. Align to v1.
+## Shipped
+- **Room settings** — a group-chat settings sheet (gear in the room header, group rooms
+  only): **rename** (any member, 1–50 chars), **add members** (any member; org members
+  only), **remove members** (creator removes others, anyone removes self), and **leave
+  group** (with a confirm). New endpoints: `PUT`/`DELETE /api/v2/chat/rooms/[roomId]` and
+  `POST`/`DELETE /api/v2/chat/rooms/[roomId]/members`. GET now returns each member's role.
+- **Mention → profile link.** Rendered `@mentions` in messages now deep-link to
+  `/new/{slug}/loozers/{id}` (v1 parity), reusing the member detail from #187.
+
+## Not a gap (verified against v1)
+- **In-room search** — v1 has only global (cross-room) message search, which v2 already
+  ships in the room list. No within-room search existed in v1, so nothing to port.
+
+## Deferred (minor, still open)
+- **Client-side image compression** before upload (shared with Photos #193 — do together).
+- **Typing-indicator wording** polish to match v1 exactly.
 
 Part of the Community epic (#172).

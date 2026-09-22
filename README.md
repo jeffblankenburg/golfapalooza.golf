@@ -177,7 +177,8 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Play count tracking
 
 ### Articles & Announcements
-- Admin publishes articles with markdown content, including inline video embeds (`![](…mp4/webm/mov)` renders a player)
+- Admin composes articles in a rich-text editor (headings, bold/italic/underline, links, bullet lists, horizontal rules) with inline images and video — upload new or reuse previously-uploaded media, and resize images (Small 33% / Medium 66% / Full)
+- Author attribution — assign an article to any member, not just the poster
 - Hero images uploaded directly (compressed client-side) with a tap-to-set focal point
 - Draft, scheduled, and published states
 - **Pinned articles** — pin any article to lead the Articles list and become the featured article on the home page

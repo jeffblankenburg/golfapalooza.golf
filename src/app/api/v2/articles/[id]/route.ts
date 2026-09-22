@@ -85,6 +85,7 @@ export async function PUT(
     event_id?: string | null;
     pinned?: boolean;
     notify_on_publish?: boolean;
+    author_id?: string | null;
   };
   try {
     body = await request.json();
@@ -95,6 +96,7 @@ export async function PUT(
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (body.pinned !== undefined) patch.pinned_at = body.pinned ? new Date().toISOString() : null;
   if (body.notify_on_publish !== undefined) patch.notify_on_publish = body.notify_on_publish;
+  if (body.author_id !== undefined) patch.author_id = body.author_id;
   if (body.title !== undefined) {
     const t = (body.title || "").trim();
     if (!t) return NextResponse.json({ error: "A title is required" }, { status: 400 });

@@ -67,6 +67,7 @@ export async function POST(request: Request) {
     image_focal_y?: number;
     publish_at?: string | null;
     notify_on_publish?: boolean;
+    author_id?: string | null;
   };
   try {
     body = await request.json();
@@ -90,7 +91,7 @@ export async function POST(request: Request) {
     .insert({
       org_id: orgId,
       event_id: body.event_id ?? null,
-      author_id: userId,
+      author_id: body.author_id || userId,
       title,
       content: body.content ?? "",
       image_url: body.image_url ?? null,

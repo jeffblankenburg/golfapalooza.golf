@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import { compressImage } from "@/lib/v2/gallery-compress";
 import { stripMarkdown } from "@/lib/v2/text";
+import { RichTextEditor } from "./RichTextEditor";
 import styles from "@/app/new/new.module.css";
 /* eslint-disable @next/next/no-img-element */
 
@@ -18,9 +19,18 @@ interface Article {
   pinned_at: string | null;
   notify_on_publish: boolean | null;
   view_count: number | null;
+  author_id: string | null;
   created_at: string;
   updated_at: string;
 }
+
+interface MemberOption {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+}
+
+const PAGE_SIZE = 15;
 
 type Status = "draft" | "now" | "schedule";
 
@@ -46,11 +56,13 @@ function toLocalInput(iso: string | null): string {
   return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16);
 }
 
-export default function ArticleManager({ orgId }: { orgId: string; slug: string }) {
+export default function ArticleManager({ orgId, userId }: { orgId: string; slug: string; userId: string }) {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(0); // captured once on mount (avoids impure Date.now() in render)
   const [editing, setEditing] = useState<Article | "new" | null>(null);
+  const [members, setMembers] = useState<MemberOption[]>([]);
+  const [page, setPage] = useState(0);
 
   // Editor fields.
   const [title, setTitle] = useState("");
@@ -62,6 +74,7 @@ export default function ArticleManager({ orgId }: { orgId: string; slug: string 
   const [scheduleAt, setScheduleAt] = useState("");
   const [pinned, setPinned] = useState(false);
   const [notifyOnPublish, setNotifyOnPublish] = useState(true);
+  const [authorId, setAuthorId] = useState<string>(userId);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +101,26 @@ export default function ArticleManager({ orgId }: { orgId: string; slug: string 
     };
   }, [fetchArticles]);
 
+  // Members for the author picker.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const r = await fetch(`/api/v2/chat/members?orgId=${orgId}&includeSelf=1`);
+      const d = r.ok ? await r.json() : { members: [] };
+      if (!active) return;
+      setMembers(
+        (d.members || []).map((m: { userId: string; displayName: string; avatarUrl: string | null }) => ({
+          id: m.userId,
+          display_name: m.displayName,
+          avatar_url: m.avatarUrl,
+        })),
+      );
+    })();
+    return () => {
+      active = false;
+    };
+  }, [orgId]);
+
   function openNew() {
     setEditing("new");
     setTitle("");
@@ -99,6 +132,7 @@ export default function ArticleManager({ orgId }: { orgId: string; slug: string 
     setScheduleAt(toLocalInput(null));
     setPinned(false);
     setNotifyOnPublish(true);
+    setAuthorId(userId);
     setError(null);
   }
 
@@ -113,6 +147,7 @@ export default function ArticleManager({ orgId }: { orgId: string; slug: string 
     setScheduleAt(toLocalInput(a.publish_at));
     setPinned(!!a.pinned_at);
     setNotifyOnPublish(a.notify_on_publish ?? true);
+    setAuthorId(a.author_id ?? userId);
     setError(null);
   }
 
@@ -181,6 +216,7 @@ export default function ArticleManager({ orgId }: { orgId: string; slug: string 
       publish_at: computePublishAt(),
       pinned,
       notify_on_publish: notifyOnPublish,
+      author_id: authorId || userId,
     };
     const isNew = editing === "new";
     const res = await fetch(isNew ? "/api/v2/articles" : `/api/v2/articles/${(editing as Article).id}`, {
@@ -309,16 +345,22 @@ export default function ArticleManager({ orgId }: { orgId: string; slug: string 
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label}>
-              Content <span className={styles.optional}>(Markdown)</span>
-            </label>
-            <textarea
-              className={styles.textarea}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={14}
-              placeholder="Write your article… **bold**, _italic_, # headings, [links](https://…), and lists all work."
-            />
+            <label className={styles.label}>Content</label>
+            <RichTextEditor content={content} orgId={orgId} onChange={setContent} />
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Author</label>
+            <select className={styles.input} value={authorId} onChange={(e) => setAuthorId(e.target.value)}>
+              {/* Ensure the current author is selectable even if not in the member list. */}
+              {!members.some((m) => m.id === authorId) && authorId && <option value={authorId}>Current author</option>}
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.display_name}
+                  {m.id === userId ? " (you)" : ""}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className={styles.field}>
@@ -430,7 +472,7 @@ export default function ArticleManager({ orgId }: { orgId: string; slug: string 
           </p>
         ) : (
           <ul className={styles.memberList}>
-            {articles.map((a) => {
+            {articles.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE).map((a) => {
               const preview = stripMarkdown(a.content || "", 90);
               return (
                 <li key={a.id} className={styles.memberRow} style={{ padding: 0, border: "none" }}>
@@ -473,6 +515,30 @@ export default function ArticleManager({ orgId }: { orgId: string; slug: string 
               );
             })}
           </ul>
+        )}
+
+        {articles.length > PAGE_SIZE && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 12 }}>
+            <button
+              type="button"
+              className={styles.createBtnGhost}
+              disabled={page === 0}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+            >
+              Previous
+            </button>
+            <span className={styles.dnsHint} style={{ margin: 0 }}>
+              Page {page + 1} of {Math.ceil(articles.length / PAGE_SIZE)}
+            </span>
+            <button
+              type="button"
+              className={styles.createBtnGhost}
+              disabled={(page + 1) * PAGE_SIZE >= articles.length}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+            </button>
+          </div>
         )}
       </div>
     </>

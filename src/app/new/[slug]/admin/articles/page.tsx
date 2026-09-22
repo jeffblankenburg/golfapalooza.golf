@@ -38,7 +38,7 @@ export default async function AdminArticlesPage({
         </svg>
         Administration
       </Link>
-      <ArticleManager orgId={org.id} slug={slug} />
+      <ArticleManager orgId={org.id} slug={slug} userId={ctx.userId} />
     </div>
   );
 }

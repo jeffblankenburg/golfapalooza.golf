@@ -6,6 +6,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { compressImage, compressVideo, extractVideoFrame } from "@/lib/v2/gallery-compress";
 import { extractExifDate, extractVideoDate } from "@/lib/v2/gallery-exif";
 import MediaViewer, { type ViewerItem, type ViewerUser } from "./MediaViewer";
+import UploadReviewSheet, { type UploadEntry } from "./UploadReviewSheet";
 import { useNameMode } from "./NameMode";
 import { pickName, type NameMode } from "@/lib/v2/profile";
 import styles from "./photos.module.css";
@@ -63,6 +64,7 @@ function toViewerItem(it: Item, userId: string, mode: NameMode): ViewerItem {
     uploader: { display_name: pickName(up, mode), avatar_url: up?.avatar_url ?? null },
     reactions,
     reactionCount: Object.values(reactions).reduce((s, r) => s + r.count, 0),
+    reactors: (it.reactions || []).map((r) => ({ emoji: r.emoji, user_id: r.user_id })),
     tags: (it.tags || []).map((t) => t.tagged_user_id),
     commentCount: it.comments?.[0]?.count ?? 0,
   };
@@ -110,6 +112,8 @@ export default function PhotosDrawer({
   const [taggedUsers, setTaggedUsers] = useState<{ userId: string; displayName: string }[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
   const [upload, setUpload] = useState<{ done: number; total: number } | null>(null);
+  // Files picked but not yet uploaded — held for the caption/tag review sheet.
+  const [reviewFiles, setReviewFiles] = useState<File[] | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const taggedKey = [...taggedIds].sort().join(",");
@@ -170,11 +174,11 @@ export default function PhotosDrawer({
   // The "add photos" + lives in the shared drawer header now (EventShell).
   useEffect(() => {
     const handler = () => {
-      if (!upload) fileRef.current?.click();
+      if (!upload && !reviewFiles) fileRef.current?.click();
     };
     window.addEventListener("ui:photos-add", handler);
     return () => window.removeEventListener("ui:photos-add", handler);
-  }, [upload]);
+  }, [upload, reviewFiles]);
 
   const viewerItems = useMemo(() => items.map((it) => toViewerItem(it, userId, mode)), [items, userId, mode]);
 
@@ -267,7 +271,12 @@ export default function PhotosDrawer({
 
   // Upload one file: compress (photo/video), extract date + video thumbnail,
   // signed direct-to-storage upload, then record the item.
-  async function uploadOne(file: File, bulkId: string): Promise<{ thumb: string | null } | null> {
+  async function uploadOne(
+    file: File,
+    bulkId: string,
+    caption: string | null,
+    taggedUserIds: string[],
+  ): Promise<{ thumb: string | null } | null> {
     const isVideo = file.type.startsWith("video/");
     let blob: Blob;
     let width: number | null = null;
@@ -327,6 +336,8 @@ export default function PhotosDrawer({
           mediaUrl: u.publicUrl,
           thumbnailUrl,
           mediaType: isVideo ? "video" : "photo",
+          caption,
+          taggedUserIds,
           takenAt,
           width,
           height,
@@ -339,30 +350,38 @@ export default function PhotosDrawer({
     }
   }
 
-  async function handleFiles(list: FileList | null) {
+  // Picking files opens the caption/tag review sheet rather than uploading
+  // straight away; the sheet hands back per-file entries via runUpload.
+  function handleFiles(list: FileList | null) {
     const files = list ? Array.from(list) : [];
     if (files.length === 0) return;
+    setReviewFiles(files);
+  }
+
+  async function runUpload(entries: UploadEntry[]) {
+    setReviewFiles(null);
+    if (entries.length === 0) return;
     const bulkId = crypto.randomUUID();
-    setUpload({ done: 0, total: files.length });
+    setUpload({ done: 0, total: entries.length });
     // A few thumbnails to preview the batch in the activity feed (leading image +
     // a small strip). Parallel workers finish out of order — any few will do.
     const thumbs: string[] = [];
     let done = 0;
-    const queue = [...files];
+    const queue = [...entries];
     const worker = async () => {
       while (queue.length) {
-        const f = queue.shift()!;
-        const r = await uploadOne(f, bulkId);
+        const e = queue.shift()!;
+        const r = await uploadOne(e.file, bulkId, e.caption, e.taggedUserIds);
         if (r?.thumb && thumbs.length < 4) thumbs.push(r.thumb);
         done += 1;
-        setUpload({ done, total: files.length });
+        setUpload({ done, total: entries.length });
       }
     };
     await Promise.all([worker(), worker(), worker()]);
     await fetch("/api/v2/gallery/log-upload", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orgId, count: files.length, imageUrl: thumbs[0] ?? null, thumbs, bulkId }),
+      body: JSON.stringify({ orgId, count: entries.length, imageUrl: thumbs[0] ?? null, thumbs, bulkId }),
     }).catch(() => {});
     setUpload(null);
     setReloadKey((k) => k + 1);
@@ -498,6 +517,15 @@ export default function PhotosDrawer({
           e.target.value = "";
         }}
       />
+
+      {reviewFiles && (
+        <UploadReviewSheet
+          files={reviewFiles}
+          allUsers={allUsers}
+          onCancel={() => setReviewFiles(null)}
+          onConfirm={runUpload}
+        />
+      )}
 
       {upload && (
         <div className={styles.uploadToast}>

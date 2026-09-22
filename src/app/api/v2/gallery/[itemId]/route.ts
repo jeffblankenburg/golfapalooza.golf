@@ -34,9 +34,19 @@ export async function PATCH(
   const { itemId } = await params;
   const a = await resolveGalleryItem(request, itemId);
   if ("error" in a) return NextResponse.json({ error: a.error }, { status: a.status });
+
+  // Uploader or org admin — mirrors DELETE, and matches the viewer's "Edit
+  // Caption" affordance (shown to uploader + admins).
   if (a.item.uploader_id !== a.userId) {
-    // Only the uploader edits the caption (admins can via the admin surface later).
-    return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+    const { data: adminRow } = await a.admin
+      .from("v2_memberships")
+      .select("role")
+      .eq("org_id", a.item.org_id)
+      .eq("user_id", a.userId)
+      .maybeSingle();
+    if (!adminRow || !["owner", "admin"].includes(adminRow.role)) {
+      return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+    }
   }
 
   let body: { caption?: string | null };

@@ -154,13 +154,17 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Push notification on new messages
 
 ### Photo & Video Gallery
-- Upload photos and videos with captions
-- Tag other users in media
+- Upload photos and videos, captioning and tagging each one in a pre-upload review carousel (with "apply caption/tags to all" for a batch)
+- Client-side image/video compression before upload
+- Tag other users in media (also editable later in the viewer)
 - Filter by photographer and year
 - Sort by upload or taken date
 - EXIF data extraction for photo dates
-- Emoji reactions on media
+- Emoji reactions on media, updating live for everyone viewing
+- Tap a reaction count to see who reacted
 - Comments on photos/videos
+- Download the full-size photo or video from the viewer menu
+- Lightbox keyboard navigation (arrow keys) and desktop prev/next controls
 - Infinite scroll with lazy loading
 - Deep-link sharing to specific photos
 

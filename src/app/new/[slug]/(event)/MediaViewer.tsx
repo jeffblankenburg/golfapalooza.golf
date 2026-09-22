@@ -23,6 +23,8 @@ export interface ViewerItem {
   uploader: { display_name: string; avatar_url: string | null };
   reactions: Record<string, { count: number; hasReacted: boolean }>;
   reactionCount: number;
+  /** Raw per-user reactions, for the "who reacted" detail sheet. */
+  reactors: { emoji: string; user_id: string }[];
   tags: string[];
   commentCount: number;
 }
@@ -62,6 +64,26 @@ function mediaStamp(s: string, now = new Date()): string {
   return new Date(s).toLocaleDateString();
 }
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
+
+/** Collapse raw per-user reactions into the aggregated map the UI renders. */
+function aggregateReactions(raw: { emoji: string; user_id: string }[], userId: string) {
+  const reactions: Record<string, { count: number; hasReacted: boolean }> = {};
+  for (const r of raw) {
+    const e = reactions[r.emoji] || { count: 0, hasReacted: false };
+    e.count += 1;
+    if (r.user_id === userId) e.hasReacted = true;
+    reactions[r.emoji] = e;
+  }
+  const reactionCount = Object.values(reactions).reduce((s, r) => s + r.count, 0);
+  return { reactions, reactionCount };
+}
+
+/** Build a filename for the download affordance from the media URL. */
+function downloadName(url: string, mediaType: "photo" | "video"): string {
+  const base = url.split("?")[0].split("/").pop() || "";
+  if (base.includes(".")) return base;
+  return `${base || "media"}.${mediaType === "video" ? "mp4" : "jpg"}`;
+}
 
 // ─── MediaPanel: a single photo (pinch-zoom) or video ────────────────────────
 
@@ -289,6 +311,71 @@ function ReactionsSheet({
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Reactors detail (who reacted) ───────────────────────────────────────────
+
+function ReactorsSheet({
+  reactors,
+  allUsers,
+  onClose,
+}: {
+  reactors: { emoji: string; user_id: string }[];
+  allUsers: ViewerUser[];
+  onClose: () => void;
+}) {
+  const groups = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const r of reactors) {
+      const arr = m.get(r.emoji) || [];
+      arr.push(r.user_id);
+      m.set(r.emoji, arr);
+    }
+    return [...m.entries()];
+  }, [reactors]);
+
+  const nameFor = (id: string) => allUsers.find((u) => u.id === id)?.display_name || "Someone";
+  const avatarFor = (id: string) => allUsers.find((u) => u.id === id)?.avatar_url || null;
+
+  return (
+    <div className="absolute inset-0 z-20 flex flex-col justify-end" onClick={onClose}>
+      <div className="bg-white rounded-t-2xl max-h-[60vh] flex flex-col animate-slide-up" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-900 truncate">Reactions</h3>
+          <button onClick={onClose} aria-label="Close" className="w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-gray-500 active:bg-gray-100">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+          {groups.length === 0 && <p className="text-center text-gray-400 text-sm py-8">No reactions yet</p>}
+          {groups.map(([emoji, ids]) => (
+            <div key={emoji}>
+              <div className="flex items-center gap-1.5 mb-2">
+                <span className="text-lg">{emoji}</span>
+                <span className="text-xs font-medium text-gray-400">{ids.length}</span>
+              </div>
+              <div className="space-y-2">
+                {ids.map((id) => (
+                  <div key={emoji + id} className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-full bg-green-700 text-white flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {avatarFor(id) ? (
+                        <img src={avatarFor(id)!} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-[0.625rem] font-semibold">{getInitials(nameFor(id))}</span>
+                      )}
+                    </div>
+                    <span className="text-sm text-gray-900">{nameFor(id)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -609,6 +696,7 @@ export default function MediaViewer({
   const [showOverlay, setShowOverlay] = useState(true);
   const [showComments, setShowComments] = useState(initialShowComments);
   const [showReactions, setShowReactions] = useState(false);
+  const [showReactors, setShowReactors] = useState(false);
   const [showTags, setShowTags] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [editingCaption, setEditingCaption] = useState(false);
@@ -657,8 +745,64 @@ export default function MediaViewer({
     if (!item) onClose();
   }, [item, onClose]);
 
+  // Realtime reactions: when anyone reacts to the current item, refetch its
+  // reactions and reconcile (counts, this-viewer state, and the reactor list).
+  const currentId = item?.id;
+  useEffect(() => {
+    if (!currentId) return;
+    let cancelled = false;
+    let sb: Awaited<ReturnType<typeof v2RealtimeClient>> | null = null;
+    let channel: RealtimeChannel | null = null;
+    (async () => {
+      sb = await v2RealtimeClient();
+      if (cancelled) return;
+      channel = sb
+        .channel(`v2-gallery-reactions-${currentId}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "v2_gallery_reactions", filter: `item_id=eq.${currentId}` },
+          async () => {
+            const res = await fetch(`/api/v2/gallery/${currentId}`);
+            if (!res.ok) return;
+            const d = await res.json();
+            const raw = (d.item?.reactions || []) as { emoji: string; user_id: string }[];
+            const { reactions, reactionCount } = aggregateReactions(raw, userId);
+            setList((prev) =>
+              prev.map((it) => (it.id === currentId ? { ...it, reactions, reactionCount, reactors: raw } : it)),
+            );
+          },
+        )
+        .subscribe();
+    })();
+    return () => {
+      cancelled = true;
+      if (sb && channel) sb.removeChannel(channel);
+    };
+  }, [currentId, userId]);
+
+  // Download the current media (blob → anchor; falls back to a new tab on CORS).
+  const handleDownload = useCallback(async () => {
+    const cur = list[currentIndex];
+    if (!cur) return;
+    try {
+      const res = await fetch(cur.media_url);
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objUrl;
+      a.download = downloadName(cur.media_url, cur.media_type);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objUrl);
+    } catch {
+      window.open(cur.media_url, "_blank", "noopener");
+    }
+  }, [list, currentIndex]);
+
   const canDelete = !!item && (item.uploader_id === userId || isAdmin);
-  const drawerOpen = showComments || showReactions || showTags;
+  const drawerOpen = showComments || showReactions || showReactors || showTags;
 
   const panels = useMemo(() => {
     const result: { item: ViewerItem; position: number }[] = [];
@@ -725,18 +869,21 @@ export default function MediaViewer({
     const isLiked = r?.hasReacted ?? false;
     const reactions = { ...cur.reactions };
     let count = cur.reactionCount;
+    let reactors = cur.reactors;
     if (isLiked) {
       if (r.count <= 1) delete reactions[heart];
       else reactions[heart] = { count: r.count - 1, hasReacted: false };
       count--;
+      reactors = reactors.filter((x) => !(x.emoji === heart && x.user_id === userId));
     } else {
       reactions[heart] = { count: (r?.count ?? 0) + 1, hasReacted: true };
       count++;
+      reactors = [...reactors, { emoji: heart, user_id: userId }];
       const id = heartIdRef.current++;
       setHeartAnimations((prev) => [...prev, { id, x: tapX, y: tapY }]);
       setTimeout(() => setHeartAnimations((prev) => prev.filter((h) => h.id !== id)), 800);
     }
-    mutateItem(currentIndex, { reactions, reactionCount: count });
+    mutateItem(currentIndex, { reactions, reactionCount: count, reactors });
     fetch(`/api/v2/gallery/${cur.id}/reactions`, {
       method: isLiked ? "DELETE" : "POST",
       headers: { "Content-Type": "application/json" },
@@ -838,8 +985,9 @@ export default function MediaViewer({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
-      if (e.key === "ArrowUp" && currentIndex > 0) goTo(currentIndex - 1);
-      if (e.key === "ArrowDown" && currentIndex < list.length - 1) goTo(currentIndex + 1);
+      if ((e.key === "ArrowUp" || e.key === "ArrowLeft") && currentIndex > 0) goTo(currentIndex - 1);
+      if ((e.key === "ArrowDown" || e.key === "ArrowRight") && currentIndex < list.length - 1)
+        goTo(currentIndex + 1);
     };
     window.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
@@ -975,10 +1123,19 @@ export default function MediaViewer({
                   <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg overflow-hidden min-w-[160px]">
                     <button
                       onClick={() => {
-                        setShowTags(true);
+                        handleDownload();
                         setShowMenu(false);
                       }}
                       className="w-full px-4 py-3 text-left text-sm font-medium text-gray-900 hover:bg-gray-50"
+                    >
+                      Download
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowTags(true);
+                        setShowMenu(false);
+                      }}
+                      className="w-full px-4 py-3 text-left text-sm font-medium text-gray-900 hover:bg-gray-50 border-t border-gray-100"
                     >
                       Tag Loozers
                     </button>
@@ -1078,12 +1235,18 @@ export default function MediaViewer({
                 </button>
               )}
 
-              <button onClick={() => setShowReactions(true)} className="flex items-center gap-1.5 text-white">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {item.reactionCount > 0 && <span className="text-sm">{item.reactionCount}</span>}
-              </button>
+              <div className="flex items-center gap-1.5 text-white">
+                <button onClick={() => setShowReactions(true)} aria-label="React" className="flex items-center">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
+                {item.reactionCount > 0 && (
+                  <button onClick={() => setShowReactors(true)} className="text-sm" aria-label="See who reacted">
+                    {item.reactionCount}
+                  </button>
+                )}
+              </div>
 
               <button onClick={() => setShowComments(true)} className="flex items-center gap-1.5 text-white">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1123,13 +1286,23 @@ export default function MediaViewer({
           itemId={item.id}
           reactions={item.reactions}
           onClose={() => setShowReactions(false)}
-          onReactionChanged={(reactions) =>
+          onReactionChanged={(reactions) => {
+            // Rebuild this viewer's reactor entries from the new map; keep others'.
+            const mine = Object.entries(reactions)
+              .filter(([, v]) => v.hasReacted)
+              .map(([emoji]) => ({ emoji, user_id: userId }));
+            const others = item.reactors.filter((x) => x.user_id !== userId);
             mutateItem(currentIndex, {
               reactions,
               reactionCount: Object.values(reactions).reduce((s, r) => s + r.count, 0),
-            })
-          }
+              reactors: [...others, ...mine],
+            });
+          }}
         />
+      )}
+
+      {showReactors && (
+        <ReactorsSheet reactors={item.reactors} allUsers={allUsers} onClose={() => setShowReactors(false)} />
       )}
 
       {showTags && (

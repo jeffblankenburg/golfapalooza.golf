@@ -76,17 +76,25 @@ export function calculateCourseHandicap(
   return Math.round(calculateCourseHandicapRaw(handicapIndex, slopeRating, courseRating, par));
 }
 
+/**
+ * Handicap strokes a player receives on a hole, by its stroke index
+ * (handicap_index 1–18). full = ⌊CH/18⌋ on every hole; one extra on the CH%18
+ * hardest holes. Used for net games (#183) and Net Double Bogey.
+ */
+export function strokesReceivedOnHole(holeHandicapIndex: number, courseHandicap: number): number {
+  const full = Math.floor(courseHandicap / 18);
+  const remaining = courseHandicap % 18;
+  const extra = remaining >= holeHandicapIndex ? 1 : 0;
+  return Math.max(0, full + extra);
+}
+
 /** Net Double Bogey max for a hole = Par + 2 + strokes received on the hole. */
 export function calculateMaxScore(
   holePar: number,
   holeHandicapIndex: number,
   playerCourseHandicap: number,
 ): number {
-  const fullStrokes = Math.floor(playerCourseHandicap / 18);
-  const remainingStrokes = playerCourseHandicap % 18;
-  const extraStroke = remainingStrokes >= holeHandicapIndex ? 1 : 0;
-  const strokesReceived = Math.max(0, fullStrokes + extraStroke);
-  return holePar + 2 + strokesReceived;
+  return holePar + 2 + strokesReceivedOnHole(holeHandicapIndex, playerCourseHandicap);
 }
 
 /** Adjusted gross = sum of each hole capped at its Net Double Bogey. */

@@ -163,6 +163,7 @@ export async function POST(request: Request) {
     format?: string;
     players?: NewPlayer[];
     silent?: boolean;
+    games?: { game_type?: string; is_net?: boolean; value?: number | null; participants?: number[] }[];
   };
   try {
     body = await request.json();
@@ -248,10 +249,36 @@ export async function POST(request: Request) {
     };
   });
 
-  const { error: playersErr } = await admin.from("v2_round_players").insert(rows);
+  const { data: insertedPlayers, error: playersErr } = await admin
+    .from("v2_round_players")
+    .insert(rows)
+    .select("id, player_position");
   if (playersErr) {
     await admin.from("v2_rounds").delete().eq("id", round.id); // roll back the orphan round
     return NextResponse.json({ error: playersErr.message }, { status: 500 });
+  }
+
+  // Side games (#183): participants come in as indexes into `rows`; map them to
+  // the inserted round_player ids via player_position (i → i+1).
+  if (Array.isArray(body.games) && body.games.length) {
+    const idByPosition = new Map((insertedPlayers || []).map((p) => [p.player_position, p.id]));
+    const gameRows = body.games
+      .filter((g) => g && typeof g.game_type === "string" && Array.isArray(g.participants))
+      .map((g) => ({
+        round_id: round.id,
+        game_type: g.game_type as string,
+        is_net: !!g.is_net,
+        config: typeof g.value === "number" && g.value > 0 ? { value: g.value } : {},
+        participant_ids: (g.participants as number[])
+          .map((i) => idByPosition.get(i + 1))
+          .filter((x): x is string => !!x),
+        created_by: userId,
+      }))
+      .filter((g) => g.participant_ids.length >= 2);
+    if (gameRows.length) {
+      const { error: gamesErr } = await admin.from("v2_round_games").insert(gameRows);
+      if (gamesErr) console.error("v2_round_games insert failed:", gamesErr.message);
+    }
   }
 
   // Recalculate the handicap of every loozer whose differential changed.

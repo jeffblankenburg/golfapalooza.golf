@@ -7,6 +7,7 @@ import { subscribeToV2Round } from "@/lib/v2/realtime/round-channel";
 import RoundComments from "./RoundComments";
 import OtherGroups from "./OtherGroups";
 import ScoringMapModal, { anyHoleMapped } from "./ScoringMapModal";
+import SideGameStandings, { type RoundGame } from "./SideGameStandings";
 
 export interface ScoreHole {
   hole_number: number;
@@ -97,6 +98,9 @@ export default function ScoreEntry({
   holes,
   roundTeeColor = null,
   players,
+  games = [],
+  strokesByPlayer = {},
+  brandColor = "#0a5c36",
   initialScores,
   trackedStats: initialTracked,
   initialStatus,
@@ -109,6 +113,9 @@ export default function ScoreEntry({
   holes: ScoreHole[];
   roundTeeColor?: string | null;
   players: ScorePlayer[];
+  games?: RoundGame[];
+  strokesByPlayer?: Record<string, Record<number, number>>;
+  brandColor?: string;
   initialScores: Scores;
   trackedStats: StatKey[];
   initialStatus: string;
@@ -125,6 +132,7 @@ export default function ScoreEntry({
   const anyMapped = anyHoleMapped(holes);
   const [tracked, setTracked] = useState<StatKey[]>(initialTracked);
   const [status, setStatus] = useState(initialStatus);
+  const [gameList, setGameList] = useState<RoundGame[]>(games);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [completeErr, setCompleteErr] = useState<string | null>(null);
@@ -373,6 +381,28 @@ export default function ScoreEntry({
     }
   }
 
+  // Derived for live side-game standings (recomputes as scores change).
+  const gross: Record<string, Record<number, number>> = {};
+  if (gameList.length) {
+    for (const pid in scores) {
+      const m: Record<number, number> = {};
+      const cells = scores[pid];
+      for (const h in cells) {
+        const st = cells[h].strokes;
+        if (st != null) m[Number(h)] = st;
+      }
+      gross[pid] = m;
+    }
+  }
+  const playerNames = Object.fromEntries(players.map((p) => [p.id, p.name]));
+  const holeNumbers = holes.map((h) => h.hole_number);
+  // Players who receive handicap strokes in at least one Net game — drives the
+  // "pops" (stroke dots) shown on the scorecard for the current hole.
+  const netPlayerIds = new Set<string>();
+  for (const g of gameList) {
+    if (g.is_net) for (const id of g.participant_ids) netPlayerIds.add(id);
+  }
+
   return (
     <div className={styles.screen}>
       {/* Header */}
@@ -440,13 +470,37 @@ export default function ScoreEntry({
               {holes.map((h) => (
                 <Fragment key={h.hole_number}>
                   {h.hole_number === 10 && hasBothNines && <td className={styles.cardTot}>{front9.reduce((s, x) => s + x.par, 0)}</td>}
-                  <td>{h.par}</td>
+                  <td className={styles.cardCol} data-active={h.hole_number === hole.hole_number || undefined}>{h.par}</td>
                 </Fragment>
               ))}
               {hasBothNines && <td className={styles.cardTot}>{back9.reduce((s, x) => s + x.par, 0)}</td>}
               <td className={styles.cardTot}>{holes.reduce((s, x) => s + x.par, 0)}</td>
             </tr>
-            {players.map((p) => {
+            {holes.some((h) => h.yards != null) && (
+              <tr className={styles.cardYdsRow}>
+                <td className={styles.cardLead}>Yds</td>
+                {holes.map((h) => (
+                  <Fragment key={h.hole_number}>
+                    {h.hole_number === 10 && hasBothNines && <td className={styles.cardTot}>{front9.reduce((s, x) => s + (x.yards ?? 0), 0) || ""}</td>}
+                    <td className={styles.cardCol} data-active={h.hole_number === hole.hole_number || undefined}>{h.yards ?? ""}</td>
+                  </Fragment>
+                ))}
+                {hasBothNines && <td className={styles.cardTot}>{back9.reduce((s, x) => s + (x.yards ?? 0), 0) || ""}</td>}
+                <td className={styles.cardTot}>{holes.reduce((s, x) => s + (x.yards ?? 0), 0) || ""}</td>
+              </tr>
+            )}
+            <tr className={styles.cardHcpRow}>
+              <td className={styles.cardLead}>Hcp</td>
+              {holes.map((h) => (
+                <Fragment key={h.hole_number}>
+                  {h.hole_number === 10 && hasBothNines && <td className={styles.cardTot} />}
+                  <td className={styles.cardCol} data-active={h.hole_number === hole.hole_number || undefined}>{h.handicap_index || ""}</td>
+                </Fragment>
+              ))}
+              {hasBothNines && <td className={styles.cardTot} />}
+              <td className={styles.cardTot} />
+            </tr>
+            {players.map((p, pi) => {
               const total = holes.reduce((s, h) => s + (scores[p.id]?.[h.hole_number]?.strokes ?? 0), 0);
               const f9 = front9.reduce((s, h) => s + (scores[p.id]?.[h.hole_number]?.strokes ?? 0), 0);
               const b9 = back9.reduce((s, h) => s + (scores[p.id]?.[h.hole_number]?.strokes ?? 0), 0);
@@ -454,23 +508,37 @@ export default function ScoreEntry({
               const anyB = back9.some((h) => scores[p.id]?.[h.hole_number]?.strokes != null);
               const any = holes.some((h) => scores[p.id]?.[h.hole_number]?.strokes != null);
               return (
-                <tr key={p.id}>
+                <tr key={p.id} data-odd={pi % 2 === 1 || undefined}>
                   <td className={styles.cardLead}>
                     <span className={styles.cardInitial} style={teeBadge(p.teeColor)}>{(p.name[0] || "?").toUpperCase()}</span>
                   </td>
                   {holes.map((h) => {
                     const st = scores[p.id]?.[h.hole_number]?.strokes;
+                    // Pops this player gets on this hole (net games) — shown as dots
+                    // at the top of the cell so upcoming strokes read at a glance.
+                    const pops = netPlayerIds.has(p.id) ? strokesByPlayer[p.id]?.[h.hole_number] ?? 0 : 0;
                     return (
                       <Fragment key={h.hole_number}>
-                        {h.hole_number === 10 && hasBothNines && <td className={styles.cardTotVal}>{anyF ? f9 : "·"}</td>}
-                        <td>
-                          {st != null ? <span className={styles.mark} data-mark={markOf(st, h.par)}><span className={styles.markNum}>{st}</span></span> : <span className={styles.mark}>·</span>}
+                        {h.hole_number === 10 && hasBothNines && <td className={styles.cardTotVal}>{anyF ? f9 : ""}</td>}
+                        <td className={styles.cardCell} data-active={h.hole_number === hole.hole_number || undefined}>
+                          {pops > 0 && (
+                            <span className={styles.cardPops}>
+                              {Array.from({ length: pops }).map((_, i) => (
+                                <span key={i} className={styles.cardPop} />
+                              ))}
+                            </span>
+                          )}
+                          {st != null && (
+                            <span className={styles.mark} data-mark={markOf(st, h.par)}>
+                              <span className={styles.markNum}>{st}</span>
+                            </span>
+                          )}
                         </td>
                       </Fragment>
                     );
                   })}
-                  {hasBothNines && <td className={styles.cardTotVal}>{anyB ? b9 : "·"}</td>}
-                  <td className={styles.cardTotVal}>{any ? total : "·"}</td>
+                  {hasBothNines && <td className={styles.cardTotVal}>{anyB ? b9 : ""}</td>}
+                  <td className={styles.cardTotVal}>{any ? total : ""}</td>
                 </tr>
               );
             })}
@@ -521,11 +589,22 @@ export default function ScoreEntry({
           const parPlayed = played.reduce((s, h) => s + h.par, 0);
           const toPar = roundTotal - parPlayed;
           const toParLabel = toPar === 0 ? "E" : toPar > 0 ? `+${toPar}` : `${toPar}`;
+          // Pops: handicap strokes this player gets on the current hole (net games only).
+          const pops = netPlayerIds.has(p.id) ? strokesByPlayer[p.id]?.[hole.hole_number] ?? 0 : 0;
           return (
             <div key={p.id} className={styles.playerRow}>
               <div className={styles.playerMain}>
                 <div className={styles.playerId}>
-                  <div className={styles.playerName}>{p.name}</div>
+                  <div className={styles.playerNameRow}>
+                    {pops > 0 && (
+                      <span className={styles.pops} aria-label={`${pops} handicap stroke${pops > 1 ? "s" : ""} this hole`}>
+                        {Array.from({ length: pops }).map((_, i) => (
+                          <span key={i} className={styles.pop} />
+                        ))}
+                      </span>
+                    )}
+                    <span className={styles.playerName}>{p.name}</span>
+                  </div>
                   {p.teeName && <div className={styles.playerTee}>{p.teeName}</div>}
                 </div>
                 <div className={styles.runningTotal}>
@@ -614,6 +693,20 @@ export default function ScoreEntry({
             </button>
           ))}
         </div>
+
+        {/* Side-game standings (Skins, Nassau) — live, just above the chatter. */}
+        <SideGameStandings
+          games={gameList}
+          playerNames={playerNames}
+          holeNumbers={holeNumbers}
+          gross={gross}
+          strokesByPlayer={strokesByPlayer}
+          roundId={roundId}
+          rosterOrder={players.map((p) => p.id)}
+          brandColor={brandColor}
+          onGameSaved={(g) => setGameList((prev) => prev.map((x) => (x.id === g.id ? g : x)))}
+          onGameRemoved={(id) => setGameList((prev) => prev.filter((x) => x.id !== id))}
+        />
 
         {/* Live comments — the group chatters while scoring. */}
         <RoundComments roundId={roundId} viewerId={viewerId} orgId={orgId} />

@@ -3,7 +3,9 @@ import { getPlatformContext } from "@/lib/v2/context";
 import { v2AdminClient } from "@/lib/v2/supabase";
 import { pickName } from "@/lib/v2/profile";
 import { formatCourseName } from "@/lib/v2/course-display";
+import { calculateCourseHandicap, strokesReceivedOnHole } from "@/lib/v2/golf/calculator";
 import ScoreEntry, { type ScoreHole, type ScorePlayer } from "./ScoreEntry";
+import { type RoundGame } from "./SideGameStandings";
 
 type StatKey = "putts" | "fairways" | "gir" | "penalties";
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
@@ -30,7 +32,7 @@ export default async function ScorePage({ params }: { params: Promise<{ slug: st
 
   const { data: roster } = await admin
     .from("v2_round_players")
-    .select("id, user_id, guest_name, tee_id, player_position, profile:v2_profiles(display_name, first_name, last_name, nickname), player_tee:v2_course_tees!v2_round_players_tee_id_fkey(tee_name, tee_color)")
+    .select("id, user_id, guest_name, tee_id, player_position, profile:v2_profiles(display_name, first_name, last_name, nickname), player_tee:v2_course_tees!v2_round_players_tee_id_fkey(tee_name, tee_color, course_rating, slope_rating, par)")
     .eq("round_id", id)
     .order("player_position", { ascending: true });
 
@@ -84,6 +86,62 @@ export default async function ScorePage({ params }: { params: Promise<{ slug: st
     };
   });
 
+  // Side games on this round (Skins, …) for live standings.
+  const { data: gameRows } = await admin
+    .from("v2_round_games")
+    .select("id, game_type, is_net, participant_ids, config")
+    .eq("round_id", id);
+  const games: RoundGame[] = (gameRows || []).map((g) => ({
+    id: g.id,
+    game_type: g.game_type,
+    is_net: g.is_net,
+    participant_ids: g.participant_ids || [],
+    value: typeof g.config?.value === "number" ? g.config.value : null,
+  }));
+
+  // Each player's handicap strokes ("pops") per hole, played off the low. Computed
+  // always (not only when a net game exists) so switching a game to Net mid-round
+  // works, and so the scorecard can show pops the moment a net game is added.
+  // The lowest course handicap on the round plays to scratch (0 pops); everyone
+  // else's strokes shift down by that amount. Players with no handicap on file
+  // (or guests) receive no strokes and don't set the low.
+  const strokesByPlayer: Record<string, Record<number, number>> = {};
+  {
+    const userIds = [...new Set((roster || []).map((r) => r.user_id).filter((u): u is string => !!u))];
+    const { data: hcaps } = userIds.length
+      ? await admin.from("v2_player_handicaps").select("user_id, handicap_index").in("user_id", userIds)
+      : { data: [] };
+    const hiByUser = new Map((hcaps || []).map((h) => [h.user_id, h.handicap_index]));
+
+    // First pass: each player's course handicap (null if no handicap / guest).
+    const chById = new Map<string, number | null>();
+    for (const r of roster || []) {
+      const tee = one(r.player_tee);
+      const hi = r.user_id ? hiByUser.get(r.user_id) : null;
+      chById.set(
+        r.id,
+        hi == null || tee?.slope_rating == null || tee?.course_rating == null
+          ? null
+          : calculateCourseHandicap(Number(hi), tee.slope_rating, Number(tee.course_rating), tee.par ?? 72),
+      );
+    }
+    const chValues = [...chById.values()].filter((v): v is number => v != null);
+    const low = chValues.length ? Math.min(...chValues) : 0;
+
+    // Second pass: allocate strokes off the relative (played-off-the-low) handicap.
+    for (const r of roster || []) {
+      const ch = chById.get(r.id);
+      if (ch == null) {
+        strokesByPlayer[r.id] = {};
+        continue;
+      }
+      const rel = ch - low;
+      const m: Record<number, number> = {};
+      for (const h of holes) m[h.hole_number] = strokesReceivedOnHole(h.handicap_index, rel);
+      strokesByPlayer[r.id] = m;
+    }
+  }
+
   // Existing scores, grouped by round_player_id.
   const { data: scoreRows } = await admin
     .from("v2_round_scores")
@@ -117,6 +175,9 @@ export default async function ScorePage({ params }: { params: Promise<{ slug: st
         courseName={course ? formatCourseName(course) : "Round"}
         holes={holes}
         roundTeeColor={roundTeeColor}
+        games={games}
+        strokesByPlayer={strokesByPlayer}
+        brandColor={org.primary_color || "#0a5c36"}
         players={players}
         initialScores={initialScores}
         trackedStats={trackedStats}

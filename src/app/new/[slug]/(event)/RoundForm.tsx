@@ -169,8 +169,26 @@ const STEPS = [
   { key: "details", label: "Details" },
   { key: "players", label: "Players" },
   { key: "tees", label: "Tees" },
+  { key: "games", label: "Games" },
   { key: "score", label: "Score" },
 ];
+
+interface GameDraft {
+  key: string;
+  type: "skins" | "nassau";
+  isNet: boolean;
+  value: number | null; // optional $ stake (per skin / per bet)
+  participantKeys: string[]; // Player.key of those in this game
+}
+
+const GAME_LABEL: Record<GameDraft["type"], string> = { skins: "Skins", nassau: "Nassau" };
+const GAME_DESC: Record<GameDraft["type"], string> = {
+  skins: "Low score wins the hole. Ties carry over, so the next hole is worth more.",
+  nassau: "Match play as three bets: the front 9, the back 9, and the full 18.",
+};
+
+// Nassau is 1-on-1, so a pair is identified regardless of order.
+const pairKey = (a: string, b: string) => [a, b].sort().join("|");
 
 /**
  * Log a round — a 5-step wizard mirroring the legacy flow:
@@ -201,6 +219,7 @@ export default function RoundForm({
   const [members, setMembers] = useState<Member[]>([]);
   const [players, setPlayers] = useState<Player[]>([{ key: "me", label: "You", self: true }]);
   const [teeByPlayer, setTeeByPlayer] = useState<Record<string, string>>({});
+  const [games, setGames] = useState<GameDraft[]>([]);
   const [grossByPlayer, setGrossByPlayer] = useState<Record<string, string>>({});
   const [playerSearch, setPlayerSearch] = useState("");
   const [guestName, setGuestName] = useState("");
@@ -391,6 +410,15 @@ export default function RoundForm({
           round_type: roundType,
           format,
           players: rows,
+          // Side games ride along, referencing players by index into `rows`.
+          games: games
+            .filter((g) => g.participantKeys.length >= 2)
+            .map((g) => ({
+              game_type: g.type,
+              is_net: g.isNet,
+              value: g.value && g.value > 0 ? g.value : null,
+              participants: g.participantKeys.map((k) => players.findIndex((p) => p.key === k)).filter((i) => i >= 0),
+            })),
         }),
       });
       if (!res.ok) {
@@ -424,7 +452,25 @@ export default function RoundForm({
       const res = await fetch("/api/v2/rounds", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ course_id: course.id, tee_id: roundTee, org_id: orgId, round_date: date, round_type: roundType, format, players: rows, silent }),
+        body: JSON.stringify({
+          course_id: course.id,
+          tee_id: roundTee,
+          org_id: orgId,
+          round_date: date,
+          round_type: roundType,
+          format,
+          players: rows,
+          silent,
+          // Side games ride along, referencing players by index into `rows`.
+          games: games
+            .filter((g) => g.participantKeys.length >= 2)
+            .map((g) => ({
+              game_type: g.type,
+              is_net: g.isNet,
+              value: g.value && g.value > 0 ? g.value : null,
+              participants: g.participantKeys.map((k) => players.findIndex((p) => p.key === k)).filter((i) => i >= 0),
+            })),
+        }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -745,8 +791,144 @@ export default function RoundForm({
         </div>
       )}
 
-      {/* Step 5 — How to score. */}
+      {/* Step 5 — Side games (optional). */}
       {step === 4 && (
+        <div className={styles.field}>
+          <label className={styles.label}>
+            Side games <span className={styles.optional}>(optional)</span>
+          </label>
+          <p className={styles.roundFormHint} style={{ marginTop: -2 }}>
+            Add a friendly game and watch live standings while you score. Skip if you just want scores.
+          </p>
+          <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+            <button
+              type="button"
+              className={styles.createBtnGhost}
+              disabled={games.some((g) => g.type === "skins")}
+              style={{ opacity: games.some((g) => g.type === "skins") ? 0.5 : 1 }}
+              onClick={() => setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "skins", isNet: false, value: null, participantKeys: players.map((p) => p.key) }])}
+            >
+              + Skins
+            </button>
+            {(() => {
+              // Every distinct pair of players, and which are already matched up.
+              const allPairs: [string, string][] = [];
+              for (let i = 0; i < players.length; i++)
+                for (let j = i + 1; j < players.length; j++) allPairs.push([players[i].key, players[j].key]);
+              const taken = new Set(
+                games
+                  .filter((g) => g.type === "nassau" && g.participantKeys.length === 2)
+                  .map((g) => pairKey(g.participantKeys[0], g.participantKeys[1])),
+              );
+              const nextPair = allPairs.find(([a, b]) => !taken.has(pairKey(a, b)));
+              const noPairsLeft = !nextPair;
+              return (
+                <button
+                  type="button"
+                  className={styles.createBtnGhost}
+                  disabled={noPairsLeft}
+                  style={{ opacity: noPairsLeft ? 0.5 : 1 }}
+                  onClick={() =>
+                    setGames((gs) => [
+                      ...gs,
+                      { key: crypto.randomUUID(), type: "nassau", isNet: false, value: null, participantKeys: nextPair ? [...nextPair] : [] },
+                    ])
+                  }
+                >
+                  + Nassau
+                </button>
+              );
+            })()}
+          </div>
+          {games.map((g) => (
+            <div key={g.key} className={styles.gameCard}>
+              <div className={styles.gameCardHead}>
+                <span className={styles.gameCardTitle}>
+                  {GAME_LABEL[g.type]}
+                  {g.type === "nassau" && <span className={styles.optional}> (pick 2)</span>}
+                </span>
+                <button type="button" className={styles.wizBackLink} onClick={() => setGames((gs) => gs.filter((x) => x.key !== g.key))}>
+                  Remove
+                </button>
+              </div>
+              <p className={styles.roundFormHint} style={{ marginTop: -4 }}>{GAME_DESC[g.type]}</p>
+              <div className={styles.wizSegToggle} role="group" aria-label="Gross or Net">
+                <button type="button" className={styles.wizSegOption} data-on={!g.isNet || undefined} onClick={() => setGames((gs) => gs.map((x) => (x.key === g.key ? { ...x, isNet: false } : x)))}>
+                  Gross
+                </button>
+                <button type="button" className={styles.wizSegOption} data-on={g.isNet || undefined} onClick={() => setGames((gs) => gs.map((x) => (x.key === g.key ? { ...x, isNet: true } : x)))}>
+                  Net
+                </button>
+              </div>
+              <span className={styles.gamePlayersHint}>
+                {g.type === "nassau" ? "Nassau is 1-on-1, so pick exactly two players" : "Tap players to include or leave out"}
+              </span>
+              <div className={styles.gamePlayers}>
+                {players.map((p) => {
+                  const inGame = g.participantKeys.includes(p.key);
+                  // Pairs already claimed by OTHER Nassau games — a pair can only play one Nassau.
+                  const otherPairs = new Set(
+                    games
+                      .filter((x) => x.type === "nassau" && x.key !== g.key && x.participantKeys.length === 2)
+                      .map((x) => pairKey(x.participantKeys[0], x.participantKeys[1])),
+                  );
+                  // Nassau is head-to-head: block a third player, or a pick that would
+                  // duplicate a pair already matched up in another Nassau.
+                  const wouldDupe =
+                    g.type === "nassau" &&
+                    !inGame &&
+                    g.participantKeys.length === 1 &&
+                    otherPairs.has(pairKey(g.participantKeys[0], p.key));
+                  const locked = g.type === "nassau" && !inGame && (g.participantKeys.length >= 2 || wouldDupe);
+                  return (
+                    <button
+                      key={p.key}
+                      type="button"
+                      className={styles.gamePlayerChip}
+                      data-on={inGame || undefined}
+                      disabled={locked}
+                      style={locked ? { opacity: 0.3, cursor: "not-allowed" } : undefined}
+                      onClick={() =>
+                        setGames((gs) =>
+                          gs.map((x) =>
+                            x.key === g.key
+                              ? { ...x, participantKeys: inGame ? x.participantKeys.filter((k) => k !== p.key) : [...x.participantKeys, p.key] }
+                              : x,
+                          ),
+                        )
+                      }
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className={styles.gameStake}>
+                <span className={styles.gameStakeLabel}>$ per {g.type === "nassau" ? "bet" : "skin"}</span>
+                <span className={styles.gameStakeInput}>
+                  <span aria-hidden>$</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="1"
+                    placeholder="0"
+                    value={g.value ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value === "" ? null : Math.max(0, Number(e.target.value));
+                      setGames((gs) => gs.map((x) => (x.key === g.key ? { ...x, value: v } : x)));
+                    }}
+                  />
+                </span>
+                <span className={styles.optional}>optional</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Step 6 — How to score. */}
+      {step === 5 && (
         <div className={styles.field}>
           {scoreMode === "choose" ? (
             <>
@@ -754,7 +936,7 @@ export default function RoundForm({
               <div className={styles.scoreModes}>
                 <button type="button" className={styles.scoreMode} onClick={() => startScoring(true)} disabled={saving}>
                   <span className={styles.scoreModeTitle}>Score hole-by-hole</span>
-                  <span className={styles.scoreModeSub}>Enter each hole yourself — putts, penalties, and more. Nothing broadcasts; best for a round already played.</span>
+                  <span className={styles.scoreModeSub}>Enter each hole yourself (putts, penalties, and more). Nothing broadcasts; best for a round already played.</span>
                 </button>
                 <button type="button" className={styles.scoreMode} onClick={() => startScoring(false)} disabled={saving}>
                   <span className={styles.scoreModeTitle}>Live scoring</span>

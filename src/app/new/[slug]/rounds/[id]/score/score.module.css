@@ -121,13 +121,32 @@
   border-radius: 6px;
 }
 .cardParRow td,
+.cardYdsRow td,
 .cardHcpRow td {
   color: var(--ink-soft);
   font-weight: 600;
 }
+.cardYdsRow td,
 .cardHcpRow td {
   color: rgba(89, 99, 91, 0.6);
   font-weight: 500;
+}
+/* Info block (par / yds / hcp) — striped so the reference rows read as a group,
+   with a pronounced rule separating them from the player scores below. */
+.cardParRow,
+.cardHcpRow {
+  background: rgba(23, 33, 29, 0.05);
+}
+.cardYdsRow {
+  background: rgba(23, 33, 29, 0.02);
+}
+.cardHcpRow td {
+  border-bottom: 2px solid var(--line-strong);
+}
+/* Grand-total ("Tot") column — a stronger line on its left = a line right of "In". */
+.cardTable th:last-child,
+.cardTable td:last-child {
+  border-left: 1.5px solid var(--line-strong);
 }
 .cardLead {
   color: rgba(89, 99, 91, 0.6);
@@ -191,6 +210,41 @@
 }
 .mark[data-mark="double"] {
   box-shadow: 0 0 0 2px var(--card), 0 0 0 3.2px var(--ink);
+}
+
+/* Scorecard legibility without placeholder dots: subtle zebra rows + a tinted
+   active-hole column. Row bg sits on the <tr>; the active cell paints over it. */
+.cardTable tbody tr[data-odd] {
+  background: rgba(23, 33, 29, 0.03);
+}
+.cardTable td[data-active] {
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+}
+.cardCol {
+  position: relative;
+}
+/* Score cell reserves a top strip for pops (handicap-stroke dots). */
+.cardTable td.cardCell {
+  position: relative;
+  padding-top: 6px;
+  padding-bottom: 2px;
+}
+.cardPops {
+  position: absolute;
+  top: 1px;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5px;
+  pointer-events: none;
+}
+.cardPop {
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--brand);
 }
 
 /* Course strip + save banner. */
@@ -260,6 +314,420 @@
   flex-direction: column;
   align-items: center;
   gap: 3px;
+}
+/* Live side-game standings strip (#183). */
+.sideGames {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sideGame {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 10px 12px;
+}
+.sideGameHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.sideGameTitle {
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+.sideGameCarry {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+.sideGameThru {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+.sideGameRows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+.sideGameRow {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.sideGameName {
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+.sideGameWon {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+.sideGameStake {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.sideGameCash {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--brand);
+}
+.sideGameCashDown {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.sideGameSettle {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+/* Skins: one tile per player (name + net). */
+.sideGameGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.sideGameTile {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--paper);
+}
+.sideGameTileTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+.sideGameTileName {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sideGameTileSkins {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.sideGameTileSkinsInline {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.sideGameTileUp {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0a7d3c;
+}
+.sideGameTileDown {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #a3341f;
+}
+.sideGameTileEven {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+/* Nassau: one tile per segment (Front / Back / Total). */
+.sideGameSegs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.sideGameSegs[data-single] {
+  grid-template-columns: 1fr;
+}
+.sideGameSeg {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--paper);
+}
+.sideGameSegLabel {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.sideGameSegVal {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+.sideGameSegSquare {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+.sideGameDormie {
+  font-size: 0.58rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #9a6b00;
+}
+.sideGameFinal {
+  font-size: 0.58rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--brand);
+}
+
+/* Gear button on each game card. */
+.sideGameGear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: 4px;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  border-radius: 8px;
+}
+.sideGameGear:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink);
+}
+
+/* Pops (handicap strokes) on the scorecard for the current hole. */
+.playerNameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pops {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.pop {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--brand);
+}
+
+/* Game settings modal. Portals to document.body (outside .wrap), so the design
+   tokens must be re-declared here; --brand is set inline from the org color. */
+.gsOverlay {
+  --brand: #0a5c36;
+  --paper: #f6f6f1;
+  --card: #ffffff;
+  --ink: #17211c;
+  --ink-soft: #59635b;
+  --line: rgba(23, 33, 29, 0.12);
+  --line-strong: rgba(23, 33, 29, 0.22);
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 16px;
+}
+.gsModal {
+  width: 100%;
+  max-width: 420px;
+  background: var(--card);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(88vh, 640px);
+  overflow-y: auto;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+.gsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+.gsTitle {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+.gsClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  border-radius: 8px;
+}
+.gsClose:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.gsLabel {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink);
+  margin-top: 8px;
+}
+.gsOptional {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.gsSeg {
+  display: flex;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.gsSegOption {
+  flex: 1;
+  padding: 9px 0;
+  border: none;
+  background: var(--card);
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.gsSegOption[data-on] {
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+  color: var(--brand);
+}
+.gsStake {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+.gsStake input {
+  width: 60px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 0;
+  outline: none;
+}
+.gsStakeUnit {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+.gsPlayers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.gsChip {
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: 1px dashed var(--line-strong);
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  opacity: 0.75;
+}
+.gsChip[data-on] {
+  border-style: solid;
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+  border-color: var(--brand);
+  color: var(--brand);
+  opacity: 1;
+}
+.gsChip:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.gsErr {
+  font-size: 0.82rem;
+  color: #a3341f;
+  margin: 2px 0 0;
+}
+.gsActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+}
+.gsActionsRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gsRemove {
+  padding: 9px 12px;
+  border: none;
+  background: transparent;
+  color: #a3341f;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 10px;
+}
+.gsRemove:hover { background: color-mix(in srgb, #a3341f 10%, transparent); }
+.gsCancel {
+  padding: 10px 16px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 10px;
+}
+.gsSave {
+  padding: 10px 18px;
+  border: none;
+  background: var(--brand);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 10px;
+}
+.gsSave:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .mapPill {
   display: inline-flex;

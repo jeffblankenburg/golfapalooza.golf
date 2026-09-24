@@ -15,3 +15,19 @@ There's two options missing from the Nassau.
   1. The idea of a "press".
   2. The idea of dormie or a loss before all the holes have been completed.  If a player is up 5 holes to 0, with 4 holes remaining, the match is already over.  The losing player doesn't have enough holes to catch up.
   3. It makes me wonder if people traditionally play a nassau with stroke or match play, or if we should offer that as an option.
+
+---
+
+I have installed the "entire" CLI, but it doesn't seem to be collecting any data.  Do you know the git tool entire?
+
+---
+
+I did commit and push.  And didn't see anything in entire's dashboard.  That's why I'm asking.
+
+---
+
+I think we have everything committed and pushed currently.
+
+---
+
+yep

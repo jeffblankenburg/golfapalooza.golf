@@ -3556,6 +3556,69 @@ button.feedRow:active {
 .roundDeleteBtn:only-child {
   flex: 1;
 }
+/* Other groups on the course (live scorer accordions). */
+.otherGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 18px;
+}
+.otherGroupsLabel {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+.groupAccordion {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  overflow: hidden;
+}
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+.groupNames {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.groupThru {
+  flex: none;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+.groupChevron {
+  flex: none;
+  color: var(--ink-soft);
+  transition: transform 0.18s ease;
+}
+.groupChevron[data-open] {
+  transform: rotate(180deg);
+}
+.groupBody {
+  padding: 0 12px 12px;
+}
+.groupLoading {
+  padding: 8px 2px 4px;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
 /* Public watch page (#205). */
 .watchWrap {
   max-width: 640px;

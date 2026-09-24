@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import styles from "./score.module.css";
 import { subscribeToV2Round } from "@/lib/v2/realtime/round-channel";
 import RoundComments from "./RoundComments";
+import OtherGroups from "./OtherGroups";
+import ScoringMapModal, { anyHoleMapped } from "./ScoringMapModal";
 
 export interface ScoreHole {
   hole_number: number;
@@ -12,6 +14,20 @@ export interface ScoreHole {
   handicap_index: number;
   yards: number | null;
   hole_name: string | null;
+  // Per-hole GPS + imagery (map modal); sparse — only mapped holes have these.
+  tee_latitude?: number | null;
+  tee_longitude?: number | null;
+  green_latitude?: number | null;
+  green_longitude?: number | null;
+  green_front_latitude?: number | null;
+  green_front_longitude?: number | null;
+  green_back_latitude?: number | null;
+  green_back_longitude?: number | null;
+  drive_latitude?: number | null;
+  drive_longitude?: number | null;
+  center_line?: [number, number][] | null;
+  overhead_image_url?: string | null;
+  green_image_url?: string | null;
 }
 export interface ScorePlayer {
   id: string; // round_player_id — the canonical local key
@@ -79,6 +95,7 @@ export default function ScoreEntry({
   roundId,
   courseName,
   holes,
+  roundTeeColor = null,
   players,
   initialScores,
   trackedStats: initialTracked,
@@ -90,6 +107,7 @@ export default function ScoreEntry({
   roundId: string;
   courseName: string;
   holes: ScoreHole[];
+  roundTeeColor?: string | null;
   players: ScorePlayer[];
   initialScores: Scores;
   trackedStats: StatKey[];
@@ -103,6 +121,8 @@ export default function ScoreEntry({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [liveStatus, setLiveStatus] = useState<"live" | "connecting" | "offline">("connecting");
   const [sharedCopied, setSharedCopied] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
+  const anyMapped = anyHoleMapped(holes);
   const [tracked, setTracked] = useState<StatKey[]>(initialTracked);
   const [status, setStatus] = useState(initialStatus);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -212,7 +232,12 @@ export default function ScoreEntry({
           return next;
         });
       },
-      onRosterChange: () => window.location.reload(),
+      onRosterChange: ({ kind }) => {
+        // Only a real add/remove of a player is structural enough to reload. Ignore
+        // bookkeeping UPDATEs — every score save stamps v2_round_players.final_gross_score,
+        // which would otherwise reload the page mid-scoring (notably on hole 1).
+        if (kind === "INSERT" || kind === "DELETE") window.location.reload();
+      },
       onRoundChange: ({ row }) => {
         if (row?.status) setStatus(row.status);
       },
@@ -468,11 +493,23 @@ export default function ScoreEntry({
         <button type="button" className={styles.iconBtn} onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0} aria-label="Previous hole">
           <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" /></svg>
         </button>
-        {hole.hole_name ? <span className={styles.holeName}>{hole.hole_name}</span> : <span />}
+        <div className={styles.navCenter}>
+          {hole.hole_name && <span className={styles.holeName}>{hole.hole_name}</span>}
+          {anyMapped && (
+            <button type="button" className={styles.mapPill} onClick={() => setMapOpen(true)} aria-label="Open map">
+              <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <path d="M9 20l-6-2V4l6 2m0 14l6-2m-6 2V6m6 12l6 2V6l-6-2m0 14V4" />
+              </svg>
+              Map
+            </button>
+          )}
+        </div>
         <button type="button" className={styles.iconBtn} onClick={() => setIdx((i) => Math.min(holes.length - 1, i + 1))} disabled={idx === holes.length - 1} aria-label="Next hole">
           <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg>
         </button>
       </div>
+
+      {mapOpen && <ScoringMapModal holes={holes} startIndex={idx} roundTeeColor={roundTeeColor} onClose={() => setMapOpen(false)} />}
 
       {/* Panel */}
       <div className={styles.panel}>
@@ -565,7 +602,7 @@ export default function ScoreEntry({
           <button type="button" className={styles.completeBtn} onClick={() => setConfirmOpen(true)}>Complete round</button>
         )}
         {status === "completed" && (
-          <button type="button" className={styles.completeBtn} onClick={close}>Done — back to My Rounds</button>
+          <button type="button" className={styles.completeBtn} onClick={close}>Done, back to My Rounds</button>
         )}
 
         {/* Configurable tracked stats */}
@@ -580,6 +617,9 @@ export default function ScoreEntry({
 
         {/* Live comments — the group chatters while scoring. */}
         <RoundComments roundId={roundId} viewerId={viewerId} orgId={orgId} />
+
+        {/* Other groups out on this course right now, each expandable to its card. */}
+        <OtherGroups roundId={roundId} />
       </div>
 
       {confirmOpen && (

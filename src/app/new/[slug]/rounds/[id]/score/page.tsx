@@ -43,13 +43,34 @@ export default async function ScorePage({ params }: { params: Promise<{ slug: st
   const { data: holeRows } = round.tee_id
     ? await admin
         .from("v2_course_holes")
-        .select("hole_number, par, handicap_index, yards, hole_name")
+        .select(
+          "hole_number, par, handicap_index, yards, hole_name, tee_latitude, tee_longitude, green_latitude, green_longitude, green_front_latitude, green_front_longitude, green_back_latitude, green_back_longitude, drive_latitude, drive_longitude, center_line, overhead_image_url, green_image_url",
+        )
         .eq("tee_id", round.tee_id)
         .order("hole_number", { ascending: true })
     : { data: [] };
   const holes: ScoreHole[] = (holeRows || [])
     .filter((h) => inNine(h.hole_number))
-    .map((h) => ({ hole_number: h.hole_number, par: h.par, handicap_index: h.handicap_index, yards: h.yards ?? null, hole_name: h.hole_name ?? null }));
+    .map((h) => ({
+      hole_number: h.hole_number,
+      par: h.par,
+      handicap_index: h.handicap_index,
+      yards: h.yards ?? null,
+      hole_name: h.hole_name ?? null,
+      tee_latitude: h.tee_latitude ?? null,
+      tee_longitude: h.tee_longitude ?? null,
+      green_latitude: h.green_latitude ?? null,
+      green_longitude: h.green_longitude ?? null,
+      green_front_latitude: h.green_front_latitude ?? null,
+      green_front_longitude: h.green_front_longitude ?? null,
+      green_back_latitude: h.green_back_latitude ?? null,
+      green_back_longitude: h.green_back_longitude ?? null,
+      drive_latitude: h.drive_latitude ?? null,
+      drive_longitude: h.drive_longitude ?? null,
+      center_line: (h.center_line as [number, number][] | null) ?? null,
+      overhead_image_url: h.overhead_image_url ?? null,
+      green_image_url: h.green_image_url ?? null,
+    }));
 
   const players: ScorePlayer[] = (roster || []).map((r) => {
     const prof = one(r.profile);
@@ -86,6 +107,7 @@ export default async function ScorePage({ params }: { params: Promise<{ slug: st
   );
 
   const course = one(round.course);
+  const roundTeeColor = one(roster?.[0]?.player_tee)?.tee_color ?? null;
 
   return (
     <div style={{ ["--brand" as string]: org.primary_color || "#0a5c36" } as React.CSSProperties}>
@@ -94,6 +116,7 @@ export default async function ScorePage({ params }: { params: Promise<{ slug: st
         roundId={round.id}
         courseName={course ? formatCourseName(course) : "Round"}
         holes={holes}
+        roundTeeColor={roundTeeColor}
         players={players}
         initialScores={initialScores}
         trackedStats={trackedStats}

@@ -1,0 +1,94 @@
+{
+  "cli_version": "0.11.2",
+  "checkpoint_id": "01M3AW22RVSZEGX3CWCEAP3SZY",
+  "session_id": "3f8be6d7-7fe4-4356-a2b3-21f7db5ec944",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-24T23:29:54.659753Z",
+  "branch": "main",
+  "checkpoints_count": 7,
+  "save_step_count": 4,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8",
+  "turn_id": "f6d933a6b827",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 51434,
+    "cache_creation_tokens": 2501933,
+    "cache_read_tokens": 351245065,
+    "output_tokens": 810743,
+    "api_call_count": 812
+  },
+  "session_metrics": {
+    "turn_count": 7
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 1634,
+      "user_lines_removed": 19,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/settings.json": 90,
+        "src/app/api/v2/rounds/[id]/games/[gameId]/route.ts": 95,
+        "src/app/api/v2/rounds/route.ts": 28,
+        "src/app/new/[slug]/(event)/RoundForm.tsx": 185,
+        "src/app/new/[slug]/rounds/[id]/score/GameSettingsModal.tsx": 172,
+        "src/app/new/[slug]/rounds/[id]/score/ScoreEntry.tsx": 102,
+        "src/app/new/[slug]/rounds/[id]/score/SideGameStandings.tsx": 209,
+        "src/app/new/[slug]/rounds/[id]/score/page.tsx": 62,
+        "src/app/new/[slug]/rounds/[id]/score/score.module.css": 454,
+        "src/app/new/new.module.css": 80,
+        "src/lib/v2/golf/calculator.ts": 13,
+        "src/lib/v2/rounds/nassau.ts": 46,
+        "src/lib/v2/rounds/skins.ts": 59,
+        "supabase/migrations/00241_v2_round_games.sql": 39
+      },
+      "user_removed_per_file": {
+        "src/app/api/v2/rounds/route.ts": 1,
+        "src/app/new/[slug]/(event)/RoundForm.tsx": 3,
+        "src/app/new/[slug]/rounds/[id]/score/ScoreEntry.tsx": 9,
+        "src/app/new/[slug]/rounds/[id]/score/page.tsx": 1,
+        "src/lib/v2/golf/calculator.ts": 5
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 90,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1544,
+      "agent_lines_removed": 19,
+      "user_added_per_file": {
+        ".claude/settings.json": 90
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 90,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1545,
+      "agent_lines_removed": 19,
+      "user_added_per_file": {
+        ".claude/settings.json": 90
+      }
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 90,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1545,
+      "agent_lines_removed": 19,
+      "user_added_per_file": {
+        ".claude/settings.json": 90
+      }
+    },
+    {
+      "checkpoint_number": 5,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}

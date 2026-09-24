@@ -28,7 +28,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
        players:v2_round_players(
          id, user_id, guest_name, tee_id, player_position,
          final_gross_score, final_adjusted_score, score_differential,
-         profile:v2_profiles(display_name, first_name, last_name, nickname, avatar_url)
+         profile:v2_profiles(display_name, first_name, last_name, nickname, avatar_url),
+         pt:v2_course_tees!v2_round_players_tee_id_fkey(tee_color)
        )`,
     )
     .eq("id", id)
@@ -63,25 +64,35 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { data: holeRows } = gridTeeId
     ? await admin
         .from("v2_course_holes")
-        .select("hole_number, par, handicap_index")
+        .select("hole_number, par, handicap_index, yards")
         .eq("tee_id", gridTeeId)
         .order("hole_number", { ascending: true })
     : { data: [] };
   const holes = (holeRows || [])
     .filter((h) => inNine(h.hole_number))
-    .map((h) => ({ hole_number: h.hole_number, par: h.par, handicap_index: h.handicap_index }));
+    .map((h) => ({ hole_number: h.hole_number, par: h.par, handicap_index: h.handicap_index, yards: h.yards ?? null }));
 
-  // Every player's hole scores for this round, grouped by player.
+  // Every player's hole scores for this round, grouped by player, plus per-player
+  // trackable aggregates (putts / fairways / GIR / penalties).
   const { data: scoreRows } = await admin
     .from("v2_round_scores")
-    .select("round_player_id, hole_number, strokes")
+    .select("round_player_id, hole_number, strokes, putts, fairway_hit, green_in_regulation, penalty_strokes")
     .eq("round_id", id);
   const scoresByPlayer = new Map<string, Record<number, number>>();
+  type Agg = { puttsSum: number; puttsN: number; firHit: number; firN: number; girHit: number; girN: number; pen: number };
+  const aggByPlayer = new Map<string, Agg>();
   for (const s of scoreRows || []) {
     if (!inNine(s.hole_number)) continue;
     const m = scoresByPlayer.get(s.round_player_id) || {};
     if (s.strokes != null) m[s.hole_number] = s.strokes;
     scoresByPlayer.set(s.round_player_id, m);
+
+    const a = aggByPlayer.get(s.round_player_id) || { puttsSum: 0, puttsN: 0, firHit: 0, firN: 0, girHit: 0, girN: 0, pen: 0 };
+    if (s.putts != null) { a.puttsSum += s.putts; a.puttsN += 1; }
+    if (s.fairway_hit != null) { a.firN += 1; if (s.fairway_hit) a.firHit += 1; }
+    if (s.green_in_regulation != null) { a.girN += 1; if (s.green_in_regulation) a.girHit += 1; }
+    if (s.penalty_strokes) a.pen += s.penalty_strokes;
+    aggByPlayer.set(s.round_player_id, a);
   }
 
   const teePar = roundTee?.par ?? 72;
@@ -97,10 +108,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const scores = scoresByPlayer.get(p.id) || {};
     const gross = p.final_gross_score ?? null;
     const prof = one(p.profile);
+    const a = aggByPlayer.get(p.id);
+    const stats = {
+      putts: a && a.puttsN > 0 ? a.puttsSum : null,
+      fairways: a && a.firN > 0 ? { hit: a.firHit, of: a.firN } : null,
+      gir: a && a.girN > 0 ? { hit: a.girHit, of: a.girN } : null,
+      penalties: a && a.pen > 0 ? a.pen : null,
+    };
     return {
       is_viewer: viewer ? p.id === viewer.id : false,
       is_guest: !p.user_id,
       guest_name: p.guest_name ?? null,
+      tee_color: one(p.pt)?.tee_color ?? null,
       profile: prof
         ? {
             display_name: prof.display_name,
@@ -113,6 +132,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       gross,
       to_par: gross != null ? gross - par : null,
       scores,
+      stats,
     };
   });
 

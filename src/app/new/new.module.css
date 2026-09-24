@@ -3369,26 +3369,25 @@ button.feedRow:active {
   line-height: 1;
   transform: translateY(0.75px);
 }
+/* Monochrome, like a real scorecard: circle = under par, square = over; the
+   outer ring doubles it (eagle / double-bogey+). No color, thin/soft strokes. */
 .scMark[data-mark="birdie"] {
-  border: 1.5px solid #16a34a;
+  border: 1px solid color-mix(in srgb, var(--ink) 55%, transparent);
   border-radius: 50%;
-  color: #15803d;
 }
 .scMark[data-mark="eagle"] {
-  border: 1.5px solid #16a34a;
+  border: 1px solid color-mix(in srgb, var(--ink) 55%, transparent);
   border-radius: 50%;
-  color: #15803d;
-  box-shadow: 0 0 0 2px var(--card), 0 0 0 3.5px #16a34a;
+  box-shadow: 0 0 0 1.5px var(--card), 0 0 0 2.5px color-mix(in srgb, var(--ink) 55%, transparent);
 }
 .scMark[data-mark="bogey"] {
-  border: 1.5px solid var(--ink);
+  border: 1px solid color-mix(in srgb, var(--ink) 55%, transparent);
   border-radius: 4px;
 }
 .scMark[data-mark="double"] {
-  border: 1.5px solid #b91c1c;
+  border: 1px solid color-mix(in srgb, var(--ink) 55%, transparent);
   border-radius: 4px;
-  color: #b91c1c;
-  box-shadow: 0 0 0 2px var(--card), 0 0 0 3.5px #b91c1c;
+  box-shadow: 0 0 0 1.5px var(--card), 0 0 0 2.5px color-mix(in srgb, var(--ink) 55%, transparent);
 }
 .scMark[data-mark="none"] {
   color: var(--line-strong);
@@ -3537,6 +3536,22 @@ button.feedRow:active {
   font-weight: 600;
   cursor: pointer;
 }
+.roundShareBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 11px;
+  background: var(--card);
+  color: var(--brand);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.roundShareBtn:disabled {
+  opacity: 0.6;
+}
 .roundResumeBtn:only-child,
 .roundDeleteBtn:only-child {
   flex: 1;
@@ -3545,6 +3560,71 @@ button.feedRow:active {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+/* Totals as a compact headered table: name (with tee dot) + Score + trackables. */
+.scStatTable {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.scStatHead,
+.scStatRow {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+}
+.scStatRow {
+  border-top: 1px solid var(--line);
+}
+.scStatRow[data-viewer] {
+  background: color-mix(in srgb, var(--brand) 8%, var(--card));
+}
+.scStatName {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.scStatCol {
+  flex: none;
+  width: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.scStatHead .scStatCol {
+  font-size: 0.56rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+.scStatGross {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1;
+}
+/* Superscript to-par next to the gross. */
+.scStatPar {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  line-height: 1;
+  margin-left: 1px;
+  font-variant-numeric: tabular-nums;
 }
 .scPlayersLabel {
   font-size: 0.62rem;

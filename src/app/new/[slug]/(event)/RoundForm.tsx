@@ -6,7 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import CourseLookupModal from "@/components/v2/courses/CourseLookupModal";
 import styles from "@/app/new/new.module.css";
 import { formatCourseName } from "@/lib/v2/course-display";
-import { getTeeDotStyle } from "@/lib/utils/tee-colors";
+import { getTeeDotStyle, TEE_HEX_COLORS } from "@/lib/utils/tee-colors";
+import type { CSSProperties } from "react";
 
 const MAX_PLAYERS = 5;
 
@@ -14,6 +15,26 @@ const MAX_PLAYERS = 5;
 function TeeDot({ color }: { color: string | null }) {
   const { className, style } = getTeeDotStyle(color);
   return <span className={`${styles.teeDot} ${className || ""}`} style={style} />;
+}
+
+// Tint a summary pill with the player's tee color: contrast text, a border for
+// light tees, and the split gradient for composition tees. Returns undefined for
+// unknown/unset colors so the pill keeps its default brand style.
+function pillTeeStyle(teeColor: string | null | undefined): CSSProperties | undefined {
+  if (!teeColor) return undefined;
+  if (teeColor.includes("/")) {
+    const [a, b] = teeColor.split("/").map((c) => c.trim());
+    const h1 = TEE_HEX_COLORS[a] || "#9ca3af";
+    const h2 = TEE_HEX_COLORS[b] || h1;
+    return { background: `linear-gradient(135deg, ${h1} 50%, ${h2} 50%)`, color: "#fff", border: "1px solid transparent" };
+  }
+  const hex = /^#[0-9a-fA-F]{6}$/.test(teeColor) ? teeColor : TEE_HEX_COLORS[teeColor] || TEE_HEX_COLORS[teeColor.toLowerCase()];
+  if (!hex) return undefined;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const bl = parseInt(hex.slice(5, 7), 16);
+  const light = (0.299 * r + 0.587 * g + 0.114 * bl) / 255 > 0.6;
+  return { background: hex, color: light ? "#111827" : "#fff", border: light ? "1px solid #d1d5db" : "1px solid transparent" };
 }
 
 interface TeeOption {
@@ -388,7 +409,7 @@ export default function RoundForm({
   // Hole-by-hole / live: create an in-progress round (no gross) and open the
   // full-screen scorer. Both modes share one scorer (it's realtime-capable);
   // the choice is about how the golfer plans to enter scores.
-  async function startScoring() {
+  async function startScoring(silent: boolean) {
     if (!course || saving) return;
     const rows = players.map((p) => ({
       user_id: p.user_id ?? null,
@@ -403,7 +424,7 @@ export default function RoundForm({
       const res = await fetch("/api/v2/rounds", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ course_id: course.id, tee_id: roundTee, org_id: orgId, round_date: date, round_type: roundType, format, players: rows }),
+        body: JSON.stringify({ course_id: course.id, tee_id: roundTee, org_id: orgId, round_date: date, round_type: roundType, format, players: rows, silent }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -490,11 +511,15 @@ export default function RoundForm({
           {step >= 3 && players.length > 0 && (
             <div className={styles.wizSummaryChips}>
               {players.map((p) => {
-                const pt = step >= 4 ? tees.find((t) => t.id === teeByPlayer[p.key]) : null;
+                const pt = tees.find((t) => t.id === teeByPlayer[p.key]);
                 return (
-                  <span key={p.key} className={styles.wizChip}>
+                  <span
+                    key={p.key}
+                    className={styles.wizChip}
+                    style={pt ? pillTeeStyle(pt.tee_color) : undefined}
+                    title={pt ? teeLabel(pt) : undefined}
+                  >
                     {p.label}
-                    {pt ? ` (${teeLabel(pt)})` : ""}
                   </span>
                 );
               })}
@@ -612,6 +637,13 @@ export default function RoundForm({
                 Scramble
               </button>
             </div>
+            <p className={styles.roundFormHint} style={{ marginTop: -2 }}>
+              {format === "scramble"
+                ? "Your whole group plays one ball. You'll enter a single team score per hole, and the round won't affect anyone's handicap."
+                : roundType === "18"
+                  ? "Everyone plays their own ball. Counts toward your handicap when it's a completed 18."
+                  : "Everyone plays their own ball. Nine-hole rounds don't count toward your handicap."}
+            </p>
           </div>
         </>
       )}
@@ -720,13 +752,13 @@ export default function RoundForm({
             <>
               <label className={styles.label}>How do you want to score?</label>
               <div className={styles.scoreModes}>
-                <button type="button" className={styles.scoreMode} onClick={() => startScoring()} disabled={saving}>
+                <button type="button" className={styles.scoreMode} onClick={() => startScoring(true)} disabled={saving}>
                   <span className={styles.scoreModeTitle}>Score hole-by-hole</span>
-                  <span className={styles.scoreModeSub}>Tap in each hole as you play. Tracks putts and more.</span>
+                  <span className={styles.scoreModeSub}>Enter each hole yourself — putts, penalties, and more. Nothing broadcasts; best for a round already played.</span>
                 </button>
-                <button type="button" className={styles.scoreMode} onClick={() => startScoring()} disabled={saving}>
+                <button type="button" className={styles.scoreMode} onClick={() => startScoring(false)} disabled={saving}>
                   <span className={styles.scoreModeTitle}>Live scoring</span>
-                  <span className={styles.scoreModeSub}>Score together — everyone&apos;s phones stay in sync in real time.</span>
+                  <span className={styles.scoreModeSub}>Score as you play. Posts a live update to the group and keeps everyone&apos;s phones in sync.</span>
                 </button>
                 <button type="button" className={styles.scoreMode} onClick={() => setScoreMode("total")} disabled={saving}>
                   <span className={styles.scoreModeTitle}>Enter total score</span>

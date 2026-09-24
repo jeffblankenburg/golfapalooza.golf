@@ -162,6 +162,7 @@ export async function POST(request: Request) {
     round_type?: string;
     format?: string;
     players?: NewPlayer[];
+    silent?: boolean;
   };
   try {
     body = await request.json();
@@ -197,6 +198,9 @@ export async function POST(request: Request) {
 
   const anyGross = players.some((p) => p.final_gross_score != null);
   const status = anyGross ? "completed" : "in_progress";
+  // Silent = a quiet hole-by-hole back-fill of a past round: no "LIVE now"
+  // broadcast (and, later, no teed-off/per-hole push). Completion still posts.
+  const silent = body.silent === true;
   const nowIso = new Date().toISOString();
 
   const { data: round, error: roundErr } = await admin
@@ -210,6 +214,7 @@ export async function POST(request: Request) {
       round_type,
       format,
       status,
+      silent,
       completed_at: status === "completed" ? nowIso : null,
     })
     .select("id")
@@ -267,7 +272,7 @@ export async function POST(request: Request) {
       const courseName = courseRow ? formatCourseName(courseRow) : "a round";
       const teePar = teeMap.get(tee_id)?.par ?? 72;
       const par = is18 ? teePar : Math.round(teePar / 2);
-      if (status === "in_progress") {
+      if (status === "in_progress" && !silent) {
         // Player names for the live entry's subtitle ("Jeff, Bob, Guest").
         const loozerIds = players.map((p) => p.user_id).filter((u): u is string => !!u);
         const { data: profs } = loozerIds.length

@@ -6,26 +6,43 @@ import { useNameMode } from "./NameMode";
 import { pickName, type NameMode } from "@/lib/v2/profile";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import RoundComments from "@/app/new/[slug]/rounds/[id]/score/RoundComments";
+import ShareRoundButton from "./ShareRoundButton";
+import { getTeeDotStyle } from "@/lib/utils/tee-colors";
+
+function TeeDot({ color }: { color: string | null }) {
+  const { className, style } = getTeeDotStyle(color);
+  return <span className={`${styles.teeDot} ${className || ""}`} style={{ marginRight: 6, ...style }} />;
+}
 
 interface Hole {
   hole_number: number;
   par: number;
   handicap_index: number;
+  yards: number | null;
+}
+interface PlayerStats {
+  putts: number | null;
+  fairways: { hit: number; of: number } | null;
+  gir: { hit: number; of: number } | null;
+  penalties: number | null;
 }
 interface PlayerRow {
   is_viewer: boolean;
   is_guest: boolean;
   guest_name: string | null;
+  tee_color: string | null;
   profile: { display_name: string; first_name: string | null; last_name: string | null; nickname: string | null; avatar_url: string | null } | null;
   gross: number | null;
   to_par: number | null;
   scores: Record<number, number>;
+  stats: PlayerStats;
 }
 interface Detail {
   id: string;
   status: "in_progress" | "completed" | "abandoned";
   round_type: "18" | "9-front" | "9-back";
   format: "individual" | "scramble";
+  course_name: string;
   tee_name: string;
   tee_color: string | null;
   tee_gender: string | null;
@@ -72,8 +89,11 @@ function shortLabel(p: PlayerRow, mode: NameMode): string {
 
 function Nine({ holes, players, totalLabel }: { holes: Hole[]; players: LabeledPlayer[]; totalLabel: string }) {
   const outPar = holes.reduce((s, h) => s + h.par, 0);
+  const anyYards = holes.some((h) => h.yards != null);
+  const outYards = holes.reduce((s, h) => s + (h.yards ?? 0), 0);
   return (
     <div className={styles.scNine}>
+      {/* Established order: Hole, Yards, HDCP, Par. */}
       <div className={styles.scRow}>
         <span className={styles.scRowLabel}>Hole</span>
         {holes.map((h) => (
@@ -81,19 +101,28 @@ function Nine({ holes, players, totalLabel }: { holes: Hole[]; players: LabeledP
         ))}
         <span className={styles.scHead} data-total>{totalLabel}</span>
       </div>
+      {anyYards && (
+        <div className={styles.scRow}>
+          <span className={styles.scRowLabel}>Yards</span>
+          {holes.map((h) => (
+            <span key={h.hole_number} className={styles.scHcp}>{h.yards ?? ""}</span>
+          ))}
+          <span className={styles.scHcp} data-total>{outYards || ""}</span>
+        </div>
+      )}
+      <div className={styles.scRow}>
+        <span className={styles.scRowLabel}>HDCP</span>
+        {holes.map((h) => (
+          <span key={h.hole_number} className={styles.scHcp}>{h.handicap_index}</span>
+        ))}
+        <span className={styles.scHcp} data-total />
+      </div>
       <div className={styles.scRow}>
         <span className={styles.scRowLabel}>Par</span>
         {holes.map((h) => (
           <span key={h.hole_number} className={styles.scPar}>{h.par}</span>
         ))}
         <span className={styles.scPar} data-total>{outPar}</span>
-      </div>
-      <div className={styles.scRow}>
-        <span className={styles.scRowLabel}>Hcp</span>
-        {holes.map((h) => (
-          <span key={h.hole_number} className={styles.scHcp}>{h.handicap_index}</span>
-        ))}
-        <span className={styles.scHcp} data-total />
       </div>
       {players.map((pl, i) => {
         const played = holes.filter((h) => pl.scores[h.hole_number] != null);
@@ -194,11 +223,6 @@ export default function RoundDetail({
   const deleteMessage = wholeDelete
     ? "This permanently removes the round and all its scores for everyone. If it counted toward handicaps, they'll be recalculated. This can't be undone."
     : "This removes only your score from this round — the other players keep theirs, and your handicap will be recalculated. This can't be undone.";
-  const ratingLine =
-    d.course_rating != null && d.slope_rating != null
-      ? `${d.course_rating.toFixed(1)}/${d.slope_rating}`
-      : null;
-
   // Scramble = one team ball. Every roster row carries the SAME score, so show a
   // single "Team" row (not one per player) on both the scorecard and the totals.
   const isScramble = d.format === "scramble";
@@ -218,15 +242,23 @@ export default function RoundDetail({
 
   const totalRows = isScramble
     ? teamRow
-      ? [{ name: "Team", isViewer: false, isGuest: false, gross: teamRow.gross, toPar: teamRow.to_par }]
+      ? [{ name: "Team", isViewer: false, isGuest: false, teeColor: teamRow.tee_color, gross: teamRow.gross, toPar: teamRow.to_par, stats: teamRow.stats }]
       : []
     : d.players.map((p) => ({
         name: p.is_viewer ? "You" : p.is_guest ? p.guest_name || "Guest" : p.profile ? pickName(p.profile, mode) : "Player",
         isViewer: p.is_viewer,
         isGuest: p.is_guest,
+        teeColor: p.tee_color,
         gross: p.gross,
         toPar: p.to_par,
+        stats: p.stats,
       }));
+
+  // Only show trackable columns the round actually has data for.
+  const showPutts = totalRows.some((r) => r.stats?.putts != null);
+  const showFir = totalRows.some((r) => r.stats?.fairways != null);
+  const showGir = totalRows.some((r) => r.stats?.gir != null);
+  const showPen = totalRows.some((r) => r.stats?.penalties != null);
 
   return (
     <div className={styles.roundBody}>
@@ -235,14 +267,6 @@ export default function RoundDetail({
           Resume scoring
         </button>
       )}
-      {(d.tee_name || ratingLine) && (
-        <p className={styles.roundBodyMeta}>
-          {d.tee_name ? `${d.tee_name}${d.tee_gender === "women" ? " (Women's)" : ""} tees` : ""}
-          {d.tee_name && ratingLine ? " — " : ""}
-          {ratingLine || ""}
-        </p>
-      )}
-
       {d.holes.length > 0 ? (
         <div className={styles.scCard}>
           {front.length > 0 && <Nine holes={front} players={scorecardPlayers} totalLabel={d.round_type === "18" ? "Out" : "Tot"} />}
@@ -252,25 +276,43 @@ export default function RoundDetail({
         <p className={styles.scQuickNote}>Quick entry — gross score only, no hole-by-hole card.</p>
       )}
 
-      {/* Totals — a single Team row for scrambles, else gross + to-par per player. */}
+      {/* Totals — per-player tee dot + score, plus trackable columns (only the
+          ones the round has data for). A single Team row for scrambles. */}
       <div className={styles.scPlayers}>
         <p className={styles.scPlayersLabel}>{isScramble ? "Team score" : "Totals"}</p>
-        {totalRows.map((row, i) => (
-          <div key={i} className={styles.scPlayerRow} data-viewer={row.isViewer || undefined}>
-            <span className={styles.scPlayerName}>
-              {row.name}
-              {row.isGuest && <span className={styles.scGuestTag}>guest</span>}
-            </span>
-            <span className={styles.scPlayerTotals}>
-              <span className={styles.scPlayerGross}>{row.gross ?? "—"}</span>
-              {row.toPar != null && (
-                <span className={styles.scPlayerPar} data-sign={row.toPar < 0 ? "under" : row.toPar > 0 ? "over" : "even"}>
-                  {toParLabel(row.toPar)}
-                </span>
-              )}
-            </span>
+        <div className={styles.scStatTable}>
+          <div className={styles.scStatHead}>
+            <span className={styles.scStatName} />
+            <span className={styles.scStatCol}>Score</span>
+            {showPutts && <span className={styles.scStatCol}>Putts</span>}
+            {showFir && <span className={styles.scStatCol}>FIR</span>}
+            {showGir && <span className={styles.scStatCol}>GIR</span>}
+            {showPen && <span className={styles.scStatCol}>Pen</span>}
           </div>
-        ))}
+          {totalRows.map((row, i) => (
+            <div key={i} className={styles.scStatRow} data-viewer={row.isViewer || undefined}>
+              <span className={styles.scStatName}>
+                <TeeDot color={row.teeColor} />
+                {row.name}
+                {row.isGuest && <span className={styles.scGuestTag}>guest</span>}
+              </span>
+              <span className={styles.scStatCol}>
+                <span style={{ display: "inline-flex", alignItems: "flex-start" }}>
+                  <span className={styles.scStatGross}>{row.gross ?? "—"}</span>
+                  {row.toPar != null && <span className={styles.scStatPar}>{toParLabel(row.toPar)}</span>}
+                </span>
+              </span>
+              {showPutts && <span className={styles.scStatCol}>{row.stats?.putts ?? "—"}</span>}
+              {showFir && (
+                <span className={styles.scStatCol}>{row.stats?.fairways ? `${row.stats.fairways.hit}/${row.stats.fairways.of}` : "—"}</span>
+              )}
+              {showGir && (
+                <span className={styles.scStatCol}>{row.stats?.gir ? `${row.stats.gir.hit}/${row.stats.gir.of}` : "—"}</span>
+              )}
+              {showPen && <span className={styles.scStatCol}>{row.stats?.penalties ?? "—"}</span>}
+            </div>
+          ))}
+        </div>
         {teamNames.length > 0 && <p className={styles.scTeamNames}>{teamNames.join(", ")}</p>}
       </div>
 
@@ -310,6 +352,12 @@ export default function RoundDetail({
           </button>
         )}
       </div>
+
+      {d.status === "completed" && (
+        <div style={{ marginTop: 4, marginBottom: d.can_manage ? 10 : 0 }}>
+          <ShareRoundButton roundId={id} courseName={d.course_name} />
+        </div>
+      )}
 
       {d.can_manage && (
         <div className={styles.roundActions}>

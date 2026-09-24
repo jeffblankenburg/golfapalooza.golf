@@ -7,12 +7,7 @@ import { pickName, type NameMode } from "@/lib/v2/profile";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import RoundComments from "@/app/new/[slug]/rounds/[id]/score/RoundComments";
 import ShareRoundButton from "./ShareRoundButton";
-import { getTeeDotStyle } from "@/lib/utils/tee-colors";
-
-function TeeDot({ color }: { color: string | null }) {
-  const { className, style } = getTeeDotStyle(color);
-  return <span className={`${styles.teeDot} ${className || ""}`} style={{ marginRight: 6, ...style }} />;
-}
+import RoundScorecard, { type SCPlayer } from "./RoundScorecard";
 
 interface Hole {
   hole_number: number;
@@ -60,94 +55,11 @@ interface Detail {
   holes: Hole[];
   players: PlayerRow[];
 }
-interface LabeledPlayer extends PlayerRow {
-  label: string;
-}
-
-function toParLabel(n: number): string {
-  if (n === 0) return "E";
-  return n > 0 ? `+${n}` : `−${Math.abs(n)}`;
-}
-
-/** Golf scorecard mark for a hole score relative to par. */
-function mark(strokes: number | null, par: number): string {
-  if (strokes == null) return "none";
-  const d = strokes - par;
-  if (d <= -2) return "eagle";
-  if (d === -1) return "birdie";
-  if (d === 0) return "par";
-  if (d === 1) return "bogey";
-  return "double";
-}
-
 function shortLabel(p: PlayerRow, mode: NameMode): string {
   if (p.is_viewer) return "You";
   const full = p.is_guest ? p.guest_name || "Guest" : p.profile ? pickName(p.profile, mode) : "Player";
   const first = full.trim().split(/\s+/)[0] || full;
   return first.length > 8 ? first.slice(0, 8) : first;
-}
-
-function Nine({ holes, players, totalLabel }: { holes: Hole[]; players: LabeledPlayer[]; totalLabel: string }) {
-  const outPar = holes.reduce((s, h) => s + h.par, 0);
-  const anyYards = holes.some((h) => h.yards != null);
-  const outYards = holes.reduce((s, h) => s + (h.yards ?? 0), 0);
-  return (
-    <div className={styles.scNine}>
-      {/* Established order: Hole, Yards, HDCP, Par. */}
-      <div className={styles.scRow}>
-        <span className={styles.scRowLabel}>Hole</span>
-        {holes.map((h) => (
-          <span key={h.hole_number} className={styles.scHead}>{h.hole_number}</span>
-        ))}
-        <span className={styles.scHead} data-total>{totalLabel}</span>
-      </div>
-      {anyYards && (
-        <div className={styles.scRow}>
-          <span className={styles.scRowLabel}>Yards</span>
-          {holes.map((h) => (
-            <span key={h.hole_number} className={styles.scHcp}>{h.yards ?? ""}</span>
-          ))}
-          <span className={styles.scHcp} data-total>{outYards || ""}</span>
-        </div>
-      )}
-      <div className={styles.scRow}>
-        <span className={styles.scRowLabel}>HDCP</span>
-        {holes.map((h) => (
-          <span key={h.hole_number} className={styles.scHcp}>{h.handicap_index}</span>
-        ))}
-        <span className={styles.scHcp} data-total />
-      </div>
-      <div className={styles.scRow}>
-        <span className={styles.scRowLabel}>Par</span>
-        {holes.map((h) => (
-          <span key={h.hole_number} className={styles.scPar}>{h.par}</span>
-        ))}
-        <span className={styles.scPar} data-total>{outPar}</span>
-      </div>
-      {players.map((pl, i) => {
-        const played = holes.filter((h) => pl.scores[h.hole_number] != null);
-        const outScore = played.length ? played.reduce((s, h) => s + pl.scores[h.hole_number], 0) : null;
-        return (
-          <div key={i} className={styles.scScoreRow} data-viewer={pl.is_viewer || undefined}>
-            <span className={styles.scNameLabel}>{pl.label}</span>
-            {holes.map((h) => {
-              const st = pl.scores[h.hole_number] ?? null;
-              return (
-                <span key={h.hole_number} className={styles.scCell}>
-                  <span className={styles.scMark} data-mark={mark(st, h.par)} data-two={st != null && st >= 10 ? "" : undefined}>
-                    <span className={styles.scNum}>{st ?? "·"}</span>
-                  </span>
-                </span>
-              );
-            })}
-            <span className={styles.scCell} data-total>
-              <span className={styles.scTotalNum}>{outScore ?? "·"}</span>
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
 }
 
 /**
@@ -211,10 +123,6 @@ export default function RoundDetail({
   if (!loaded) return <div className={styles.roundBody}><p className={styles.drawerStub}>Loading…</p></div>;
   if (!d) return <div className={styles.roundBody}><p className={styles.drawerStub}>Couldn&apos;t load this round.</p></div>;
 
-  const labeled: LabeledPlayer[] = d.players.map((p) => ({ ...p, label: shortLabel(p, mode) }));
-  const front = d.holes.filter((h) => h.hole_number <= 9);
-  const back = d.holes.filter((h) => h.hole_number >= 10);
-
   // A completed round shared with other Loozers only removes YOUR score; an
   // in-progress or solo round deletes wholesale. Mirror the server rule so the
   // confirm text is honest about what will happen.
@@ -222,15 +130,22 @@ export default function RoundDetail({
   const wholeDelete = d.status === "in_progress" || otherLoozers.length === 0;
   const deleteMessage = wholeDelete
     ? "This permanently removes the round and all its scores for everyone. If it counted toward handicaps, they'll be recalculated. This can't be undone."
-    : "This removes only your score from this round — the other players keep theirs, and your handicap will be recalculated. This can't be undone.";
-  // Scramble = one team ball. Every roster row carries the SAME score, so show a
-  // single "Team" row (not one per player) on both the scorecard and the totals.
+    : "This removes only your score from this round. The other players keep theirs, and your handicap will be recalculated. This can't be undone.";
+
   const isScramble = d.format === "scramble";
-  const teamRow: LabeledPlayer | null =
-    isScramble && d.players[0]
-      ? { ...d.players[0], is_viewer: false, is_guest: false, guest_name: null, profile: null, label: "Team" }
-      : null;
-  const scorecardPlayers = isScramble ? (teamRow ? [teamRow] : []) : labeled;
+
+  // Names/labels resolved here (name-mode context) so RoundScorecard stays pure.
+  const scPlayers: SCPlayer[] = d.players.map((p) => ({
+    name: p.is_viewer ? "You" : p.is_guest ? p.guest_name || "Guest" : p.profile ? pickName(p.profile, mode) : "Player",
+    shortLabel: shortLabel(p, mode),
+    is_viewer: p.is_viewer,
+    is_guest: p.is_guest,
+    tee_color: p.tee_color,
+    gross: p.gross,
+    to_par: p.to_par,
+    scores: p.scores,
+    stats: p.stats,
+  }));
 
   // Who was on the scramble team (the shared ball is one score, but list the members).
   const teamNames = isScramble
@@ -240,26 +155,6 @@ export default function RoundDetail({
       })
     : [];
 
-  const totalRows = isScramble
-    ? teamRow
-      ? [{ name: "Team", isViewer: false, isGuest: false, teeColor: teamRow.tee_color, gross: teamRow.gross, toPar: teamRow.to_par, stats: teamRow.stats }]
-      : []
-    : d.players.map((p) => ({
-        name: p.is_viewer ? "You" : p.is_guest ? p.guest_name || "Guest" : p.profile ? pickName(p.profile, mode) : "Player",
-        isViewer: p.is_viewer,
-        isGuest: p.is_guest,
-        teeColor: p.tee_color,
-        gross: p.gross,
-        toPar: p.to_par,
-        stats: p.stats,
-      }));
-
-  // Only show trackable columns the round actually has data for.
-  const showPutts = totalRows.some((r) => r.stats?.putts != null);
-  const showFir = totalRows.some((r) => r.stats?.fairways != null);
-  const showGir = totalRows.some((r) => r.stats?.gir != null);
-  const showPen = totalRows.some((r) => r.stats?.penalties != null);
-
   return (
     <div className={styles.roundBody}>
       {d.status === "in_progress" && d.can_manage && (
@@ -267,54 +162,13 @@ export default function RoundDetail({
           Resume scoring
         </button>
       )}
-      {d.holes.length > 0 ? (
-        <div className={styles.scCard}>
-          {front.length > 0 && <Nine holes={front} players={scorecardPlayers} totalLabel={d.round_type === "18" ? "Out" : "Tot"} />}
-          {back.length > 0 && <Nine holes={back} players={scorecardPlayers} totalLabel={d.round_type === "18" ? "In" : "Tot"} />}
-        </div>
-      ) : (
-        <p className={styles.scQuickNote}>Quick entry — gross score only, no hole-by-hole card.</p>
-      )}
-
-      {/* Totals — per-player tee dot + score, plus trackable columns (only the
-          ones the round has data for). A single Team row for scrambles. */}
-      <div className={styles.scPlayers}>
-        <p className={styles.scPlayersLabel}>{isScramble ? "Team score" : "Totals"}</p>
-        <div className={styles.scStatTable}>
-          <div className={styles.scStatHead}>
-            <span className={styles.scStatName} />
-            <span className={styles.scStatCol}>Score</span>
-            {showPutts && <span className={styles.scStatCol}>Putts</span>}
-            {showFir && <span className={styles.scStatCol}>FIR</span>}
-            {showGir && <span className={styles.scStatCol}>GIR</span>}
-            {showPen && <span className={styles.scStatCol}>Pen</span>}
-          </div>
-          {totalRows.map((row, i) => (
-            <div key={i} className={styles.scStatRow} data-viewer={row.isViewer || undefined}>
-              <span className={styles.scStatName}>
-                <TeeDot color={row.teeColor} />
-                {row.name}
-                {row.isGuest && <span className={styles.scGuestTag}>guest</span>}
-              </span>
-              <span className={styles.scStatCol}>
-                <span style={{ display: "inline-flex", alignItems: "flex-start" }}>
-                  <span className={styles.scStatGross}>{row.gross ?? "—"}</span>
-                  {row.toPar != null && <span className={styles.scStatPar}>{toParLabel(row.toPar)}</span>}
-                </span>
-              </span>
-              {showPutts && <span className={styles.scStatCol}>{row.stats?.putts ?? "—"}</span>}
-              {showFir && (
-                <span className={styles.scStatCol}>{row.stats?.fairways ? `${row.stats.fairways.hit}/${row.stats.fairways.of}` : "—"}</span>
-              )}
-              {showGir && (
-                <span className={styles.scStatCol}>{row.stats?.gir ? `${row.stats.gir.hit}/${row.stats.gir.of}` : "—"}</span>
-              )}
-              {showPen && <span className={styles.scStatCol}>{row.stats?.penalties ?? "—"}</span>}
-            </div>
-          ))}
-        </div>
-        {teamNames.length > 0 && <p className={styles.scTeamNames}>{teamNames.join(", ")}</p>}
-      </div>
+      <RoundScorecard
+        holes={d.holes}
+        players={scPlayers}
+        roundType={d.round_type}
+        isScramble={isScramble}
+        teamNames={teamNames}
+      />
 
       {/* Your handicap detail (viewer-specific). */}
       {(d.adjusted != null || d.differential != null) && (

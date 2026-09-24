@@ -3556,6 +3556,46 @@ button.feedRow:active {
 .roundDeleteBtn:only-child {
   flex: 1;
 }
+/* Public watch page (#205). */
+.watchWrap {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px 16px calc(60px + env(safe-area-inset-bottom, 0px));
+}
+.watchHeader {
+  margin-bottom: 16px;
+}
+.watchOrg {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand);
+}
+.watchCourse {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--ink);
+  margin: 2px 0 0;
+}
+.watchSub {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+.watchLive {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #fff;
+  background: #c0392b;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
 .scPlayers {
   display: flex;
   flex-direction: column;

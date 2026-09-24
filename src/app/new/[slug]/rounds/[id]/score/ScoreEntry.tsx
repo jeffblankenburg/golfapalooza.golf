@@ -102,6 +102,7 @@ export default function ScoreEntry({
   const [idx, setIdx] = useState(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [liveStatus, setLiveStatus] = useState<"live" | "connecting" | "offline">("connecting");
+  const [sharedCopied, setSharedCopied] = useState(false);
   const [tracked, setTracked] = useState<StatKey[]>(initialTracked);
   const [status, setStatus] = useState(initialStatus);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -323,6 +324,30 @@ export default function ScoreEntry({
 
   const liveLabel = liveStatus === "live" ? "Live" : liveStatus === "offline" ? "Offline" : "Connecting";
 
+  // Share the public watch link so spectators can follow this round live.
+  async function shareWatch() {
+    const url = `${window.location.origin}/new/${slug}/rounds/${roundId}/watch`;
+    const nav = navigator as Navigator & { share?: (d: ShareData) => Promise<void> };
+    try {
+      if (nav.share) {
+        await nav.share({ title: `Watch ${courseName}`, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setSharedCopied(true);
+      setTimeout(() => setSharedCopied(false), 1500);
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError") return;
+      try {
+        await navigator.clipboard.writeText(url);
+        setSharedCopied(true);
+        setTimeout(() => setSharedCopied(false), 1500);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
   return (
     <div className={styles.screen}>
       {/* Header */}
@@ -341,6 +366,23 @@ export default function ScoreEntry({
             </>
           )}
         </div>
+        <button
+          type="button"
+          className={styles.iconBtn}
+          onClick={shareWatch}
+          aria-label="Share live link"
+          title={sharedCopied ? "Link copied" : "Share live link"}
+        >
+          {sharedCopied ? (
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" /></svg>
+          ) : (
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+              <path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7" />
+              <path d="M16 6l-4-4-4 4" />
+              <path d="M12 2v13" />
+            </svg>
+          )}
+        </button>
         <span className={styles.liveBadge} data-state={liveStatus}>
           <span className={styles.liveDot} />
           {liveLabel}

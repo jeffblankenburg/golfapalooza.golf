@@ -38,6 +38,8 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/verify");
   const isPublicRoute =
     request.nextUrl.pathname.startsWith("/spectator") ||
+    // Public spectator watch page for a round (#205): /new/<slug>/rounds/<id>/watch
+    /^\/new\/[^/]+\/rounds\/[^/]+\/watch\/?$/.test(request.nextUrl.pathname) ||
     request.nextUrl.pathname === "/privacy" ||
     request.nextUrl.pathname === "/terms";
   const isProtectedRoute =

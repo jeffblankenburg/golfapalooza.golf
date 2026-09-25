@@ -4,6 +4,7 @@ import { formatCourseName } from "@/lib/v2/course-display";
 import { expectedHoleCount, isRoundIncomplete } from "@/lib/rounds/incomplete";
 import { recalculateHandicap } from "@/lib/v2/golf/handicap";
 import { clearRoundActivity } from "@/lib/v2/rounds/round-activity";
+import { calculateCourseHandicap, strokesReceivedOnHole } from "@/lib/v2/golf/calculator";
 
 /**
  * GET /api/v2/rounds/[id] — one round's detail for the in-drawer scorecard: a
@@ -29,7 +30,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
          id, user_id, guest_name, tee_id, player_position,
          final_gross_score, final_adjusted_score, score_differential,
          profile:v2_profiles(display_name, first_name, last_name, nickname, avatar_url),
-         pt:v2_course_tees!v2_round_players_tee_id_fkey(tee_color)
+         pt:v2_course_tees!v2_round_players_tee_id_fkey(tee_color, course_rating, slope_rating, par)
        )`,
     )
     .eq("id", id)
@@ -116,6 +117,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       penalties: a && a.pen > 0 ? a.pen : null,
     };
     return {
+      id: p.id,
       is_viewer: viewer ? p.id === viewer.id : false,
       is_guest: !p.user_id,
       guest_name: p.guest_name ?? null,
@@ -135,6 +137,54 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       stats,
     };
   });
+
+  // Side games + per-hole net strokes (played off the low) so the detail page can
+  // show the final results by reusing the live standings renderer, read-only.
+  const { data: gameRows } = await admin
+    .from("v2_round_games")
+    .select("id, game_type, is_net, participant_ids, config")
+    .eq("round_id", id);
+  const games = (gameRows || []).map((g) => ({
+    id: g.id,
+    game_type: g.game_type,
+    is_net: g.is_net,
+    participant_ids: g.participant_ids || [],
+    value: typeof g.config?.value === "number" ? g.config.value : null,
+    carry: g.config?.carry === true,
+  }));
+
+  const strokesByPlayer: Record<string, Record<number, number>> = {};
+  if (games.length) {
+    const uids = [...new Set(playerRows.map((p) => p.user_id).filter((u): u is string => !!u))];
+    const { data: hcaps } = uids.length
+      ? await admin.from("v2_player_handicaps").select("user_id, handicap_index").in("user_id", uids)
+      : { data: [] };
+    const hiByUser = new Map((hcaps || []).map((h) => [h.user_id, h.handicap_index]));
+    const chById = new Map<string, number | null>();
+    for (const p of playerRows) {
+      const t = one(p.pt);
+      const hi = p.user_id ? hiByUser.get(p.user_id) : null;
+      chById.set(
+        p.id,
+        hi == null || t?.slope_rating == null || t?.course_rating == null
+          ? null
+          : calculateCourseHandicap(Number(hi), t.slope_rating, Number(t.course_rating), t.par ?? 72),
+      );
+    }
+    const chVals = [...chById.values()].filter((v): v is number => v != null);
+    const low = chVals.length ? Math.min(...chVals) : 0;
+    for (const p of playerRows) {
+      const ch = chById.get(p.id);
+      if (ch == null) {
+        strokesByPlayer[p.id] = {};
+        continue;
+      }
+      const rel = ch - low;
+      const m: Record<number, number> = {};
+      for (const h of holes) m[h.hole_number] = strokesReceivedOnHole(h.handicap_index, rel);
+      strokesByPlayer[p.id] = m;
+    }
+  }
 
   return NextResponse.json({
     id: round.id,
@@ -160,6 +210,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     can_manage: canManage,
     holes,
     players,
+    games,
+    strokes_by_player: strokesByPlayer,
   });
 }
 
@@ -202,11 +254,44 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     return NextResponse.json({ ok: true, deletedRound: true });
   }
 
+  // The actor's round_player id — grab it BEFORE the delete so we can scrub side
+  // games (participant_ids is a UUID[], not an FK, so it won't clean up on its own).
+  const { data: myRow } = await admin
+    .from("v2_round_players")
+    .select("id")
+    .eq("round_id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+
   // Remove only the actor: their round_player row (scores cascade) + their score
   // activity row; recalc just their handicap. The round stays for everyone else.
   const { error } = await admin.from("v2_round_players").delete().eq("round_id", id).eq("user_id", userId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   await admin.from("v2_activity").delete().eq("ref_id", id).eq("kind", "round").eq("actor_id", userId);
+
+  // Scrub the departed player from any side game: drop them from participant_ids,
+  // and delete the game outright if it falls below its required roster size.
+  if (myRow?.id) {
+    const rpId = myRow.id;
+    const { data: gameRows } = await admin
+      .from("v2_round_games")
+      .select("id, game_type, participant_ids")
+      .eq("round_id", id);
+    for (const g of gameRows || []) {
+      const ids: string[] = g.participant_ids || [];
+      if (!ids.includes(rpId)) continue;
+      const remaining = ids.filter((x) => x !== rpId);
+      const stillValid =
+        g.game_type === "nassau"
+          ? remaining.length === 2
+          : g.game_type === "sixes" || g.game_type === "vegas"
+            ? remaining.length === 4
+            : remaining.length >= 2;
+      if (stillValid) await admin.from("v2_round_games").update({ participant_ids: remaining }).eq("id", g.id);
+      else await admin.from("v2_round_games").delete().eq("id", g.id);
+    }
+  }
+
   await recalculateHandicap(admin, userId);
   return NextResponse.json({ ok: true, deletedRound: false });
 }

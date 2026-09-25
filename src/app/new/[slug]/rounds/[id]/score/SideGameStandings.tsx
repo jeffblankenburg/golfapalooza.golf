@@ -81,7 +81,8 @@ export default function SideGameStandings({
   parByHole = {},
   roundId,
   rosterOrder,
-  brandColor,
+  brandColor = "#0a5c36",
+  readOnly = false,
   onGameSaved,
   onGameRemoved,
 }: {
@@ -93,9 +94,10 @@ export default function SideGameStandings({
   parByHole?: Record<number, number>;
   roundId: string;
   rosterOrder: string[];
-  brandColor: string;
-  onGameSaved: (g: RoundGame) => void;
-  onGameRemoved: (id: string) => void;
+  brandColor?: string;
+  readOnly?: boolean; // completed-round detail: show results, no editing
+  onGameSaved?: (g: RoundGame) => void;
+  onGameRemoved?: (id: string) => void;
 }) {
   const [editing, setEditing] = useState<RoundGame | null>(null);
   const [vegasPop, setVegasPop] = useState<{ ph: VegasHole; teamA: string[]; teamB: string[]; x: number; y: number } | null>(null);
@@ -143,7 +145,7 @@ export default function SideGameStandings({
               </span>
               {r.carrying > 0 && <span className={styles.sideGameCarry}>{r.carrying} carrying</span>}
               <span className={styles.sideGameThru}>{r.resolved > 0 ? `thru ${r.resolved}` : "not started"}</span>
-              <GearButton onClick={() => setEditing(g)} />
+              {!readOnly && <GearButton onClick={() => setEditing(g)} />}
             </div>
             <div className={styles.sideGameGrid}>
               {standings.map((s) => (
@@ -176,7 +178,7 @@ export default function SideGameStandings({
               <div className={styles.sideGameHead}>
                 <span className={styles.sideGameTitle}>Nassau{g.is_net ? " (Net)" : ""}</span>
                 <span className={styles.sideGameThru} />
-                <GearButton onClick={() => setEditing(g)} />
+                {!readOnly && <GearButton onClick={() => setEditing(g)} />}
               </div>
               <div className={styles.sideGameRows}>
                 <span className={styles.sideGameName}>Needs two players.</span>
@@ -207,7 +209,7 @@ export default function SideGameStandings({
                 Nassau
                 {g.value ? <span className={styles.sideGameStake}> {money(g.value)}/bet</span> : null}
               </span>
-              <GearButton onClick={() => setEditing(g)} />
+              {!readOnly && <GearButton onClick={() => setEditing(g)} />}
             </div>
             <div className={styles.sideGameSegs} data-single={r.segments.length === 1 || undefined}>
               {r.segments.map((s) => {
@@ -249,7 +251,7 @@ export default function SideGameStandings({
               <div className={styles.sideGameHead}>
                 <span className={styles.sideGameTitle}>6-6-6</span>
                 <span className={styles.sideGameThru} />
-                <GearButton onClick={() => setEditing(g)} />
+                {!readOnly && <GearButton onClick={() => setEditing(g)} />}
               </div>
               <div className={styles.sideGameRows}>
                 <span className={styles.sideGameName}>Needs four players.</span>
@@ -270,7 +272,7 @@ export default function SideGameStandings({
               <span className={styles.sideGameThru}>
                 {g.value ? <span className={styles.sideGameStake}>{money(g.value)}/seg</span> : null}
               </span>
-              <GearButton onClick={() => setEditing(g)} />
+              {!readOnly && <GearButton onClick={() => setEditing(g)} />}
             </div>
             <div className={styles.sixesRows}>
               {r.segments.map((s) => {
@@ -312,7 +314,7 @@ export default function SideGameStandings({
               <div className={styles.sideGameHead}>
                 <span className={styles.sideGameTitle}>Vegas</span>
                 <span className={styles.sideGameThru} />
-                <GearButton onClick={() => setEditing(g)} />
+                {!readOnly && <GearButton onClick={() => setEditing(g)} />}
               </div>
               <div className={styles.sideGameRows}>
                 <span className={styles.sideGameName}>Needs four players.</span>
@@ -335,7 +337,7 @@ export default function SideGameStandings({
               <span className={styles.sideGameThru}>
                 {g.value ? <span className={styles.sideGameStake}>{money(g.value)}/pt</span> : null}
               </span>
-              <GearButton onClick={() => setEditing(g)} />
+              {!readOnly && <GearButton onClick={() => setEditing(g)} />}
             </div>
             <div className={styles.sixesMatch}>
               <span className={aWin ? styles.sixesTeamWin : undefined}>
@@ -382,11 +384,11 @@ export default function SideGameStandings({
           roundId={roundId}
           brandColor={brandColor}
           onSaved={(g) => {
-            onGameSaved(g);
+            onGameSaved?.(g);
             setEditing(null);
           }}
           onRemoved={(id) => {
-            onGameRemoved(id);
+            onGameRemoved?.(id);
             setEditing(null);
           }}
           onClose={() => setEditing(null)}

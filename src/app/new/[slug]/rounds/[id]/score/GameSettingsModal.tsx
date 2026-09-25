@@ -152,18 +152,25 @@ export default function GameSettingsModal({
         </div>
 
         <label className={styles.gsLabel}>
-          Players <span className={styles.gsOptional}>{exact != null ? `pick ${exact}` : "2 or more"}</span>
+          Players{" "}
+          <span className={styles.gsOptional}>
+            {isVegas ? "pick 4 — first two vs last two" : exact != null ? `pick ${exact}` : "2 or more"}
+          </span>
         </label>
         <div className={styles.gsPlayers}>
           {rosterOrder.map((id) => {
-            const on = selected.includes(id);
+            const idx = selected.indexOf(id);
+            const on = idx >= 0;
             const locked = exact != null && !on && selected.length >= exact;
+            // Vegas colours the two teams by pick order (first two vs last two).
+            const team = isVegas && on ? (idx < 2 ? "a" : "b") : undefined;
             return (
               <button
                 key={id}
                 type="button"
                 className={styles.gsChip}
-                data-on={on || undefined}
+                data-on={on && !isVegas ? true : undefined}
+                data-team={team}
                 disabled={locked}
                 onClick={() => toggle(id)}
               >

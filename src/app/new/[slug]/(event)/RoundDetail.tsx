@@ -8,6 +8,7 @@ import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import RoundComments from "@/app/new/[slug]/rounds/[id]/score/RoundComments";
 import ShareRoundButton from "./ShareRoundButton";
 import RoundScorecard, { type SCPlayer } from "./RoundScorecard";
+import SideGameStandings, { type RoundGame } from "@/app/new/[slug]/rounds/[id]/score/SideGameStandings";
 
 interface Hole {
   hole_number: number;
@@ -22,6 +23,7 @@ interface PlayerStats {
   penalties: number | null;
 }
 interface PlayerRow {
+  id: string;
   is_viewer: boolean;
   is_guest: boolean;
   guest_name: string | null;
@@ -54,6 +56,8 @@ interface Detail {
   can_manage: boolean;
   holes: Hole[];
   players: PlayerRow[];
+  games: RoundGame[];
+  strokes_by_player: Record<string, Record<number, number>>;
 }
 function shortLabel(p: PlayerRow, mode: NameMode): string {
   if (p.is_viewer) return "You";
@@ -147,6 +151,15 @@ export default function RoundDetail({
     stats: p.stats,
   }));
 
+  // Side-game results (read-only). Keyed by round_player id, real names (not "You").
+  const gameNameById: Record<string, string> = {};
+  const grossById: Record<string, Record<number, number>> = {};
+  for (const p of d.players) {
+    gameNameById[p.id] = p.is_guest ? p.guest_name || "Guest" : p.profile ? pickName(p.profile, mode) : "Player";
+    grossById[p.id] = p.scores;
+  }
+  const parByHole = Object.fromEntries(d.holes.map((h) => [h.hole_number, h.par]));
+
   // Who was on the scramble team (the shared ball is one score, but list the members).
   const teamNames = isScramble
     ? d.players.map((p) => {
@@ -192,6 +205,23 @@ export default function RoundDetail({
         <p className={styles.scIncomplete}>
           Incomplete round — {d.holes_played} of {d.expected_holes} holes. Excluded from your stats and handicap.
         </p>
+      )}
+
+      {/* Side-game results — read-only final standings + settlement. */}
+      {d.games && d.games.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <SideGameStandings
+            games={d.games}
+            playerNames={gameNameById}
+            holeNumbers={d.holes.map((h) => h.hole_number)}
+            gross={grossById}
+            strokesByPlayer={d.strokes_by_player}
+            parByHole={parByHole}
+            roundId={d.id}
+            rosterOrder={d.players.map((p) => p.id)}
+            readOnly
+          />
+        </div>
       )}
 
       {/* Comments — collapsed by default (opens automatically via a notification

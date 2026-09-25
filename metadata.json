@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.11.2",
+  "checkpoint_id": "01M3B7TA40SHZ8KHDP5Y1G1751",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 6,
+  "files_touched": [
+    "src/app/api/v2/rounds/[id]/route.ts",
+    "src/app/new/[slug]/(event)/RoundDetail.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/GameSettingsModal.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/SideGameStandings.tsx"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 61494,
+    "cache_creation_tokens": 3102409,
+    "cache_read_tokens": 454649587,
+    "output_tokens": 1020126,
+    "api_call_count": 1079
+  }
+}

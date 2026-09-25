@@ -1,0 +1,151 @@
+For the Nassau box, the title of the box should be the two player names.  Not "Nassau (Net)".  That can swap positions with the player names.
+
+---
+
+For the nassau, the (net) or (raw) should be after the player names.  Nassau can stay by iteself.
+
+---
+
+I don't like the arrows you're using.  I'd prefer something chunkier. [Image #11]
+
+---
+
+There's two options missing from the Nassau.
+
+  1. The idea of a "press".
+  2. The idea of dormie or a loss before all the holes have been completed.  If a player is up 5 holes to 0, with 4 holes remaining, the match is already over.  The losing player doesn't have enough holes to catch up.
+  3. It makes me wonder if people traditionally play a nassau with stroke or match play, or if we should offer that as an option.
+
+---
+
+I have installed the "entire" CLI, but it doesn't seem to be collecting any data.  Do you know the git tool entire?
+
+---
+
+I did commit and push.  And didn't see anything in entire's dashboard.  That's why I'm asking.
+
+---
+
+I think we have everything committed and pushed currently.
+
+---
+
+yep
+
+---
+
+That worked!
+
+---
+
+let's work on some of the other games
+
+---
+
+For 6-6-6, I really need to see who owes who money.  Or do you think it is obvious enough?
+
+---
+
+Now we have boxes with totals AND sentences saying who owes who.  Be more creative in this approach.  Can we do it with the boxes alone?
+
+---
+
+Without running a manual test, I'm curious:  if player A owes $5 to player B after the first 6 holes, and then on the 2nd match, player B owes $5 to player A, do you eliminate the debts, or do you keep both?
+
+---
+
+That's a brilliant and elegant solution.  Nice work.  Sounds perfect.
+
+---
+
+Update the issue with our current progress.
+
+---
+
+Can we be more concise with the 6-6-6 balance boxes?  I'm starting to think we only show data about those that owe.  I'd like to reframe it to just be a number and a name.  Like "$5/Quack" saying that Chef owes Quack $5.
+
+---
+
+I still don't like how the teams in 6-6-6 are shown and overlap when closed.[Image #12]
+
+---
+
+In the debt boxes, let's do "Chef owes", or "Long O owes"
+
+---
+
+The "add a game" modal should only show games that are available to add.  Right now, certain game types are just disabled.
+
+---
+
+what other games can we do?
+
+---
+
+I like Vegas. . With the birdie twist.
+
+---
+
+I like Vegas. . With the birdie twist.
+
+---
+
+I think we should have a default value denomination for each type of game.  They can always edit them.
+
+Skins: $2
+Nassau: $5
+6-6-6: $5
+
+I don't know what a score in Vegas should or would be.  What do you think a reasonable price per point is?  Feels like maybe $0.10?
+
+---
+
+As for picking teammates in Vegas, they should be two colors.  First two picked are one color, second two another color.  They should not be selected by default, and can't be added until all players are assigned to a team.
+
+---
+
+I don't see green and blue.  [Image #13]
+
+---
+
+Instead of the line that says "up 29", there should just be a T box at the end of however many holes have been completed that shows the total in points, in the appropriate color.
+
+---
+
+The T box doesn't need to be green.
+
+---
+
+Let's put a single pixel vertical line before the T box.
+
+---
+
+If a user presses on one of the differences in the table, can we show the math above their fat finger press?
+
+---
+
+This is awesome.
+
+---
+
+update the issue.  I'm going to commit and push.
+
+---
+
+what's next
+
+---
+
+Editing the vegas game doesn't show the team pills
+
+---
+
+1 it is
+
+---
+
+Does deleting a round orphan the game records, or cascade delete them?
+
+---
+
+I think that the likelihood of someone deleting their round is incredibly low.  I almost want to make it so that completed rounds aren't deleteable.  I'm not sure of the right approach here, but if we allow a delete, that should delete the affected games as well.

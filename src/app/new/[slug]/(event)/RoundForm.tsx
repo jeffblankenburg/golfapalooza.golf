@@ -523,10 +523,26 @@ export default function RoundForm({
     return true;
   };
 
+  // Side games need individual balls — a scramble is one shared score, so the
+  // Games step is skipped entirely for scramble rounds.
+  const gamesEnabled = format === "individual";
+  const stepVisible = (i: number) => !(STEPS[i]?.key === "games" && !gamesEnabled);
+  const goNext = () => {
+    let n = step + 1;
+    while (n < STEPS.length && !stepVisible(n)) n += 1;
+    setStep(n);
+  };
+  const goBack = () => {
+    let n = step - 1;
+    while (n > 0 && !stepVisible(n)) n -= 1;
+    setStep(n);
+  };
+
   return (
     <div className={styles.roundsWrap}>
       <div className={styles.wizSteps}>
         {STEPS.map((s, i) => {
+          if (!stepVisible(i)) return null;
           const reachable = i === step || canReach(i);
           return (
             <button
@@ -689,7 +705,16 @@ export default function RoundForm({
               <button type="button" className={styles.wizSegOption} data-on={format === "individual" || undefined} aria-pressed={format === "individual"} onClick={() => setFormat("individual")}>
                 Individual
               </button>
-              <button type="button" className={styles.wizSegOption} data-on={format === "scramble" || undefined} aria-pressed={format === "scramble"} onClick={() => setFormat("scramble")}>
+              <button
+                type="button"
+                className={styles.wizSegOption}
+                data-on={format === "scramble" || undefined}
+                aria-pressed={format === "scramble"}
+                onClick={() => {
+                  setFormat("scramble");
+                  setGames([]); // no side games in a scramble
+                }}
+              >
                 Scramble
               </button>
             </div>
@@ -801,8 +826,8 @@ export default function RoundForm({
         </div>
       )}
 
-      {/* Step 5 — Side games (optional). */}
-      {step === 4 && (
+      {/* Step 5 — Side games (optional; individual rounds only). */}
+      {step === 4 && gamesEnabled && (
         <div className={styles.field}>
           <label className={styles.label}>
             Side games <span className={styles.optional}>(optional)</span>
@@ -811,17 +836,18 @@ export default function RoundForm({
             Add a friendly game and watch live standings while you score. Skip if you just want scores.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
-            <button
-              type="button"
-              className={styles.createBtnGhost}
-              disabled={games.some((g) => g.type === "skins")}
-              style={{ opacity: games.some((g) => g.type === "skins") ? 0.5 : 1 }}
-              onClick={() => setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "skins", isNet: false, carry: false, value: GAME_DEFAULT_VALUE.skins, participantKeys: players.map((p) => p.key) }])}
-            >
-              + Skins
-            </button>
+            {/* Only games playable with the current roster/holes are shown. */}
+            {!games.some((g) => g.type === "skins") && players.length >= 2 && (
+              <button
+                type="button"
+                className={styles.createBtnGhost}
+                onClick={() => setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "skins", isNet: false, carry: false, value: GAME_DEFAULT_VALUE.skins, participantKeys: players.map((p) => p.key) }])}
+              >
+                + Skins
+              </button>
+            )}
             {(() => {
-              // Every distinct pair of players, and which are already matched up.
+              // Nassau shows only while a distinct, not-yet-matched pair remains.
               const allPairs: [string, string][] = [];
               for (let i = 0; i < players.length; i++)
                 for (let j = i + 1; j < players.length; j++) allPairs.push([players[i].key, players[j].key]);
@@ -831,67 +857,45 @@ export default function RoundForm({
                   .map((g) => pairKey(g.participantKeys[0], g.participantKeys[1])),
               );
               const nextPair = allPairs.find(([a, b]) => !taken.has(pairKey(a, b)));
-              const noPairsLeft = !nextPair;
+              if (!nextPair) return null;
               return (
                 <button
                   type="button"
                   className={styles.createBtnGhost}
-                  disabled={noPairsLeft}
-                  style={{ opacity: noPairsLeft ? 0.5 : 1 }}
                   onClick={() =>
-                    setGames((gs) => [
-                      ...gs,
-                      { key: crypto.randomUUID(), type: "nassau", isNet: false, carry: false, value: GAME_DEFAULT_VALUE.nassau, participantKeys: nextPair ? [...nextPair] : [] },
-                    ])
+                    setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "nassau", isNet: false, carry: false, value: GAME_DEFAULT_VALUE.nassau, participantKeys: [...nextPair] }])
                   }
                 >
                   + Nassau
                 </button>
               );
             })()}
-            {(() => {
-              const has = games.some((g) => g.type === "sixes");
-              const disabled = has || players.length < 4 || roundType !== "18";
-              return (
-                <button
-                  type="button"
-                  className={styles.createBtnGhost}
-                  disabled={disabled}
-                  style={{ opacity: disabled ? 0.5 : 1 }}
-                  title={roundType !== "18" ? "6-6-6 needs a full 18 holes" : players.length < 4 ? "6-6-6 needs four players" : undefined}
-                  onClick={() =>
-                    setGames((gs) => [
-                      ...gs,
-                      { key: crypto.randomUUID(), type: "sixes", isNet: false, carry: false, value: GAME_DEFAULT_VALUE.sixes, participantKeys: players.slice(0, 4).map((p) => p.key) },
-                    ])
-                  }
-                >
-                  + 6-6-6
-                </button>
-              );
-            })()}
-            {(() => {
-              const has = games.some((g) => g.type === "vegas");
-              const disabled = has || players.length < 4;
-              return (
-                <button
-                  type="button"
-                  className={styles.createBtnGhost}
-                  disabled={disabled}
-                  style={{ opacity: disabled ? 0.5 : 1 }}
-                  title={players.length < 4 ? "Vegas needs four players" : undefined}
-                  onClick={() =>
-                    setGames((gs) => [
-                      ...gs,
-                      { key: crypto.randomUUID(), type: "vegas", isNet: false, carry: false, value: GAME_DEFAULT_VALUE.vegas, participantKeys: [] },
-                    ])
-                  }
-                >
-                  + Vegas
-                </button>
-              );
-            })()}
+            {!games.some((g) => g.type === "sixes") && players.length >= 4 && roundType === "18" && (
+              <button
+                type="button"
+                className={styles.createBtnGhost}
+                onClick={() =>
+                  setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "sixes", isNet: false, carry: false, value: GAME_DEFAULT_VALUE.sixes, participantKeys: players.slice(0, 4).map((p) => p.key) }])
+                }
+              >
+                + 6-6-6
+              </button>
+            )}
+            {!games.some((g) => g.type === "vegas") && players.length >= 4 && (
+              <button
+                type="button"
+                className={styles.createBtnGhost}
+                onClick={() => setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "vegas", isNet: false, carry: false, value: GAME_DEFAULT_VALUE.vegas, participantKeys: [] }])}
+              >
+                + Vegas
+              </button>
+            )}
           </div>
+          {players.length < 2 && games.length === 0 && (
+            <p className={styles.roundFormHint} style={{ marginTop: 0 }}>
+              Add at least two players to enable games.
+            </p>
+          )}
           {games.map((g) => (
             <div key={g.key} className={styles.gameCard}>
               <div className={styles.gameCardHead}>
@@ -1058,12 +1062,12 @@ export default function RoundForm({
       {(step > 0 || course) && (
         <div className={styles.wizNav}>
           {step > 0 && (
-            <button type="button" className={styles.wizBackBtn} onClick={() => setStep(step - 1)}>
+            <button type="button" className={styles.wizBackBtn} onClick={goBack}>
               Back
             </button>
           )}
           {step < STEPS.length - 1 ? (
-            <button type="button" className={styles.createBtn} onClick={() => setStep(step + 1)} disabled={!canAdvance} style={{ opacity: canAdvance ? 1 : 0.6 }}>
+            <button type="button" className={styles.createBtn} onClick={goNext} disabled={!canAdvance} style={{ opacity: canAdvance ? 1 : 0.6 }}>
               Next
             </button>
           ) : scoreMode === "total" ? (

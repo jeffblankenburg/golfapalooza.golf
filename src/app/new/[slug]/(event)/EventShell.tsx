@@ -327,10 +327,16 @@ export default function EventShell({
               <path d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
             </TopIcon>
           )}
-          <TopIcon label="Rounds" active={open === "rounds"} onClick={() => toggle("rounds")}>
-            <path d="M6 21V3" strokeLinecap="round" />
-            <path d="M6 4h11l-2.5 3L17 10H6" />
-            <circle cx="6" cy="21" r="1.4" />
+          <TopIcon label="Rounds" active={open === "rounds"} onClick={() => toggle("rounds")} viewBox="10.8 9.5 48 48">
+            {/* v1 courses icon — golf flag in a hole (noun-golf-flag-5010192). */}
+            <path
+              fill="currentColor"
+              stroke="currentColor"
+              strokeWidth={1.6}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              d="M39.688,26.247c3.334.455,7.113.973,11.121-2.517a1,1,0,0,0-.949-1.709c-2.957.9-5.8-1.447-8.815-3.932-2.955-2.439-6-4.945-9.482-4.543l.153-1.669a2,2,0,1,0-1.975-.362L26.386,48.156c-3.977.363-7.538,1.59-7.538,3.821,0,2.706,5.24,3.938,10.109,3.938s10.11-1.232,10.11-3.938-5.241-3.939-10.11-3.939c-.184,0-.368.005-.553.009l1.814-19.812C33.512,25.407,36.376,25.793,39.688,26.247Zm.084-6.615c2.215,1.826,4.48,3.7,6.94,4.349-2.236.9-4.38.609-6.754.285-2.814-.385-5.948-.815-9.267,1.163l.9-9.875C34.319,15.14,36.976,17.325,39.772,19.632ZM20.847,51.98c.085-.466,1.966-1.435,5.354-1.8l-.325,3.552C22.7,53.344,20.929,52.426,20.847,51.98Zm8.11-1.942c5.106,0,7.991,1.356,8.109,1.939-.118.583-3,1.938-8.109,1.938-.376,0-.736-.009-1.088-.023l.352-3.842C28.462,50.044,28.705,50.038,28.957,50.038Z"
+            />
           </TopIcon>
           <span className={styles.bellWrap}>
             <TopIcon label="Notifications" active={open === "notifications"} onClick={() => toggle("notifications")}>
@@ -539,11 +545,13 @@ function TopIcon({
   active,
   onClick,
   children,
+  viewBox = "0 0 24 24",
 }: {
   label: string;
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
+  viewBox?: string; // override for filled/imported icons drawn on a different grid
 }) {
   return (
     <button
@@ -554,7 +562,7 @@ function TopIcon({
       aria-label={label}
       aria-pressed={active}
     >
-      <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden>
+      <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox={viewBox} aria-hidden>
         {children}
       </svg>
     </button>

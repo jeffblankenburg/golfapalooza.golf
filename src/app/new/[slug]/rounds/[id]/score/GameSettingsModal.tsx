@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import styles from "./score.module.css";
 import type { RoundGame } from "./SideGameStandings";
+import { formatStake, parseStake } from "@/lib/v2/rounds/stake";
 
 /**
  * Edit or remove a side game mid-round (#183) — stake, gross/net, and who's in.
@@ -30,11 +31,15 @@ export default function GameSettingsModal({
 }) {
   const isNassau = game.game_type === "nassau";
   const isSixes = game.game_type === "sixes";
-  const exact = isNassau ? 2 : isSixes ? 4 : null; // fixed roster size, or any 2+
-  const gameName = isNassau ? "Nassau" : isSixes ? "6-6-6" : "Skins";
-  const stakeUnit = isNassau ? "bet" : isSixes ? "segment" : "skin";
+  const isVegas = game.game_type === "vegas";
+  const isSkins = game.game_type === "skins";
+  const exact = isNassau ? 2 : isSixes || isVegas ? 4 : null; // fixed roster size, or any 2+
+  const gameName = isNassau ? "Nassau" : isSixes ? "6-6-6" : isVegas ? "Vegas" : "Skins";
+  const stakeUnit = isNassau ? "bet" : isSixes ? "segment" : isVegas ? "pt" : "skin";
   const [isNet, setIsNet] = useState(game.is_net);
+  const [carry, setCarry] = useState(game.carry === true);
   const [value, setValue] = useState<number | null>(game.value);
+  const [valueStr, setValueStr] = useState(formatStake(game.value));
   const [selected, setSelected] = useState<string[]>(game.participant_ids);
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -69,7 +74,7 @@ export default function GameSettingsModal({
       const res = await fetch(`/api/v2/rounds/${roundId}/games/${game.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_net: isNet, value: value && value > 0 ? value : null, participant_ids: selected }),
+        body: JSON.stringify({ is_net: isNet, value: value && value > 0 ? value : null, carry: isSkins ? carry : undefined, participant_ids: selected }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -119,17 +124,29 @@ export default function GameSettingsModal({
           <button type="button" className={styles.gsSegOption} data-on={isNet || undefined} onClick={() => setIsNet(true)}>Net</button>
         </div>
 
+        {isSkins && (
+          <>
+            <label className={styles.gsLabel}>Tied holes</label>
+            <div className={styles.gsSeg} role="group" aria-label="Skins carryover">
+              <button type="button" className={styles.gsSegOption} data-on={!carry || undefined} onClick={() => setCarry(false)}>No carry</button>
+              <button type="button" className={styles.gsSegOption} data-on={carry || undefined} onClick={() => setCarry(true)}>Carry over</button>
+            </div>
+          </>
+        )}
+
         <label className={styles.gsLabel}>Stake <span className={styles.gsOptional}>optional</span></label>
         <div className={styles.gsStake}>
           <span aria-hidden>$</span>
           <input
-            type="number"
+            type="text"
             inputMode="decimal"
-            min="0"
-            step="1"
             placeholder="0"
-            value={value ?? ""}
-            onChange={(e) => setValue(e.target.value === "" ? null : Math.max(0, Number(e.target.value)))}
+            value={valueStr}
+            onChange={(e) => {
+              setValueStr(e.target.value);
+              setValue(parseStake(e.target.value));
+            }}
+            onBlur={() => setValueStr(formatStake(value))}
           />
           <span className={styles.gsStakeUnit}>per {stakeUnit}</span>
         </div>

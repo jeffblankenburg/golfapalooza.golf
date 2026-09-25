@@ -3872,6 +3872,21 @@ button.feedRow:active {
   color: var(--brand);
   opacity: 1;
 }
+/* Vegas teams: first two picked vs last two, each its own colour. */
+.gamePlayerChip[data-team="a"] {
+  border-style: solid;
+  background: color-mix(in srgb, #0a7d3c 14%, transparent);
+  border-color: #0a7d3c;
+  color: #0a7d3c;
+  opacity: 1;
+}
+.gamePlayerChip[data-team="b"] {
+  border-style: solid;
+  background: color-mix(in srgb, #2563eb 14%, transparent);
+  border-color: #2563eb;
+  color: #2563eb;
+  opacity: 1;
+}
 .gameStake {
   display: flex;
   align-items: center;

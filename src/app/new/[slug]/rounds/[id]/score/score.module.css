@@ -462,6 +462,127 @@
 .sixesDebts {
   margin-top: 10px;
 }
+
+/* Vegas per-hole difference strip — horizontally scrollable, coloured by which
+   team won the hole (green = team A, blue = team B). */
+.vegasHoles {
+  display: flex;
+  gap: 0;
+  margin-top: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.vegasHole {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 30px;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  background: transparent;
+}
+/* Zebra columns for readability — shading instead of grid lines. */
+.vegasHole:nth-child(even) {
+  background: rgba(23, 33, 29, 0.04);
+}
+.vegasHoleNum {
+  width: 100%;
+  text-align: center;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+  padding: 3px 0;
+  background: rgba(23, 33, 29, 0.06);
+}
+.vegasHoleDiff {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--ink-soft);
+  padding: 4px 0;
+}
+.vegasHoleDiff[data-team="a"] {
+  color: #0a7d3c;
+}
+.vegasHoleDiff[data-team="b"] {
+  color: #2563eb;
+}
+/* The running-total "T" cell — neutral shading to stand apart, pinned right. */
+.vegasTotal {
+  position: sticky;
+  right: 0;
+  background: rgba(23, 33, 29, 0.07);
+  border-left: 1px solid var(--line-strong);
+}
+.vegasTotal .vegasHoleNum {
+  color: var(--ink);
+  background: rgba(23, 33, 29, 0.11);
+}
+.vegasTotal {
+  cursor: default;
+}
+.vegasTotal .vegasHoleDiff {
+  font-size: 0.95rem;
+}
+
+/* Tap-a-hole math popover. Portals to body, so re-declare the design tokens. */
+.vegasPopBackdrop {
+  --card: #ffffff;
+  --ink: #17211c;
+  --ink-soft: #59635b;
+  --line: rgba(23, 33, 29, 0.12);
+  --line-strong: rgba(23, 33, 29, 0.22);
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+}
+.vegasPop {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  max-width: 260px;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  padding: 8px 10px;
+  font-size: 0.78rem;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.vegasPopHole {
+  font-weight: 800;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+.vegasPopLine {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  white-space: nowrap;
+}
+.vegasPopNum {
+  font-weight: 800;
+}
+.vegasPopFlip {
+  color: #a3341f;
+  font-weight: 700;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+}
+.vegasPopResult {
+  border-top: 1px solid var(--line);
+  padding-top: 4px;
+  margin-top: 2px;
+  font-weight: 700;
+}
 /* Compact debt display: an amount stacked over a small recipient name, so a
    player owing several others fits on one row. */
 .sideGamePayRow {
@@ -781,6 +902,21 @@
   background: color-mix(in srgb, var(--brand) 14%, transparent);
   border-color: var(--brand);
   color: var(--brand);
+  opacity: 1;
+}
+/* Vegas teams: first two picked vs last two, each its own colour. */
+.gsChip[data-team="a"] {
+  border-style: solid;
+  background: color-mix(in srgb, #0a7d3c 14%, transparent);
+  border-color: #0a7d3c;
+  color: #0a7d3c;
+  opacity: 1;
+}
+.gsChip[data-team="b"] {
+  border-style: solid;
+  background: color-mix(in srgb, #2563eb 14%, transparent);
+  border-color: #2563eb;
+  color: #2563eb;
   opacity: 1;
 }
 .gsChip:disabled {

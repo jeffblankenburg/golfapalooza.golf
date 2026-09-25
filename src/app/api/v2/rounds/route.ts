@@ -163,7 +163,7 @@ export async function POST(request: Request) {
     format?: string;
     players?: NewPlayer[];
     silent?: boolean;
-    games?: { game_type?: string; is_net?: boolean; value?: number | null; participants?: number[] }[];
+    games?: { game_type?: string; is_net?: boolean; value?: number | null; carry?: boolean; participants?: number[] }[];
   };
   try {
     body = await request.json();
@@ -268,7 +268,10 @@ export async function POST(request: Request) {
         round_id: round.id,
         game_type: g.game_type as string,
         is_net: !!g.is_net,
-        config: typeof g.value === "number" && g.value > 0 ? { value: g.value } : {},
+        config: {
+          ...(typeof g.value === "number" && g.value > 0 ? { value: g.value } : {}),
+          ...(g.game_type === "skins" && g.carry ? { carry: true } : {}),
+        },
         participant_ids: (g.participants as number[])
           .map((i) => idByPosition.get(i + 1))
           .filter((x): x is string => !!x),
@@ -277,7 +280,7 @@ export async function POST(request: Request) {
       .filter((g) =>
         g.game_type === "nassau"
           ? g.participant_ids.length === 2
-          : g.game_type === "sixes"
+          : g.game_type === "sixes" || g.game_type === "vegas"
             ? g.participant_ids.length === 4
             : g.participant_ids.length >= 2,
       );

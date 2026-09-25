@@ -398,6 +398,7 @@ export default function ScoreEntry({
   }
   const playerNames = Object.fromEntries(players.map((p) => [p.id, p.name]));
   const holeNumbers = holes.map((h) => h.hole_number);
+  const parByHole = Object.fromEntries(holes.map((h) => [h.hole_number, h.par]));
   // Players who receive handicap strokes in at least one Net game — drives the
   // "pops" (stroke dots) shown on the scorecard for the current hole.
   const netPlayerIds = new Set<string>();
@@ -703,6 +704,7 @@ export default function ScoreEntry({
           holeNumbers={holeNumbers}
           gross={gross}
           strokesByPlayer={strokesByPlayer}
+          parByHole={parByHole}
           roundId={roundId}
           rosterOrder={players.map((p) => p.id)}
           brandColor={brandColor}

@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import CourseLookupModal from "@/components/v2/courses/CourseLookupModal";
 import styles from "@/app/new/new.module.css";
 import { formatCourseName } from "@/lib/v2/course-display";
+import { formatStake, parseStake } from "@/lib/v2/rounds/stake";
 import { getTeeDotStyle, TEE_HEX_COLORS } from "@/lib/utils/tee-colors";
 import type { CSSProperties } from "react";
 
@@ -175,20 +176,24 @@ const STEPS = [
 
 interface GameDraft {
   key: string;
-  type: "skins" | "nassau" | "sixes";
+  type: "skins" | "nassau" | "sixes" | "vegas";
   isNet: boolean;
-  value: number | null; // optional $ stake (per skin / per bet / per segment)
+  carry: boolean; // skins only — roll tied skins forward (default off)
+  value: number | null; // optional $ stake (per skin / bet / segment / point)
   participantKeys: string[]; // Player.key of those in this game
 }
 
-const GAME_LABEL: Record<GameDraft["type"], string> = { skins: "Skins", nassau: "Nassau", sixes: "6-6-6" };
+const GAME_LABEL: Record<GameDraft["type"], string> = { skins: "Skins", nassau: "Nassau", sixes: "6-6-6", vegas: "Vegas" };
 const GAME_DESC: Record<GameDraft["type"], string> = {
   skins: "Low score wins the hole. Ties carry over, so the next hole is worth more.",
   nassau: "Match play as three bets: the front 9, the back 9, and the full 18.",
   sixes: "Foursome, best ball. Partners rotate every 6 holes so you team with everyone once.",
+  vegas: "Two-player teams. Scores combine into a number, low team wins the difference. Opponents' birdies flip your number.",
 };
 // Fixed roster size for team/head-to-head games (skins takes any 2+).
-const GAME_EXACT: Partial<Record<GameDraft["type"], number>> = { nassau: 2, sixes: 4 };
+const GAME_EXACT: Partial<Record<GameDraft["type"], number>> = { nassau: 2, sixes: 4, vegas: 4 };
+// Sensible default stakes, pre-filled and editable. Vegas is per point (small).
+const GAME_DEFAULT_VALUE: Record<GameDraft["type"], number> = { skins: 2, nassau: 5, sixes: 5, vegas: 0.1 };
 
 // Nassau is 1-on-1, so a pair is identified regardless of order.
 const pairKey = (a: string, b: string) => [a, b].sort().join("|");
@@ -420,6 +425,7 @@ export default function RoundForm({
               game_type: g.type,
               is_net: g.isNet,
               value: g.value && g.value > 0 ? g.value : null,
+              carry: g.type === "skins" ? g.carry : undefined,
               participants: g.participantKeys.map((k) => players.findIndex((p) => p.key === k)).filter((i) => i >= 0),
             })),
         }),
@@ -471,6 +477,7 @@ export default function RoundForm({
               game_type: g.type,
               is_net: g.isNet,
               value: g.value && g.value > 0 ? g.value : null,
+              carry: g.type === "skins" ? g.carry : undefined,
               participants: g.participantKeys.map((k) => players.findIndex((p) => p.key === k)).filter((i) => i >= 0),
             })),
         }),
@@ -809,7 +816,7 @@ export default function RoundForm({
               className={styles.createBtnGhost}
               disabled={games.some((g) => g.type === "skins")}
               style={{ opacity: games.some((g) => g.type === "skins") ? 0.5 : 1 }}
-              onClick={() => setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "skins", isNet: false, value: null, participantKeys: players.map((p) => p.key) }])}
+              onClick={() => setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "skins", isNet: false, carry: false, value: GAME_DEFAULT_VALUE.skins, participantKeys: players.map((p) => p.key) }])}
             >
               + Skins
             </button>
@@ -834,7 +841,7 @@ export default function RoundForm({
                   onClick={() =>
                     setGames((gs) => [
                       ...gs,
-                      { key: crypto.randomUUID(), type: "nassau", isNet: false, value: null, participantKeys: nextPair ? [...nextPair] : [] },
+                      { key: crypto.randomUUID(), type: "nassau", isNet: false, carry: false, value: GAME_DEFAULT_VALUE.nassau, participantKeys: nextPair ? [...nextPair] : [] },
                     ])
                   }
                 >
@@ -855,11 +862,32 @@ export default function RoundForm({
                   onClick={() =>
                     setGames((gs) => [
                       ...gs,
-                      { key: crypto.randomUUID(), type: "sixes", isNet: false, value: null, participantKeys: players.slice(0, 4).map((p) => p.key) },
+                      { key: crypto.randomUUID(), type: "sixes", isNet: false, carry: false, value: GAME_DEFAULT_VALUE.sixes, participantKeys: players.slice(0, 4).map((p) => p.key) },
                     ])
                   }
                 >
                   + 6-6-6
+                </button>
+              );
+            })()}
+            {(() => {
+              const has = games.some((g) => g.type === "vegas");
+              const disabled = has || players.length < 4;
+              return (
+                <button
+                  type="button"
+                  className={styles.createBtnGhost}
+                  disabled={disabled}
+                  style={{ opacity: disabled ? 0.5 : 1 }}
+                  title={players.length < 4 ? "Vegas needs four players" : undefined}
+                  onClick={() =>
+                    setGames((gs) => [
+                      ...gs,
+                      { key: crypto.randomUUID(), type: "vegas", isNet: false, carry: false, value: GAME_DEFAULT_VALUE.vegas, participantKeys: [] },
+                    ])
+                  }
+                >
+                  + Vegas
                 </button>
               );
             })()}
@@ -884,12 +912,24 @@ export default function RoundForm({
                   Net
                 </button>
               </div>
+              {g.type === "skins" && (
+                <div className={styles.wizSegToggle} role="group" aria-label="Skins carryover">
+                  <button type="button" className={styles.wizSegOption} data-on={!g.carry || undefined} onClick={() => setGames((gs) => gs.map((x) => (x.key === g.key ? { ...x, carry: false } : x)))}>
+                    No carry
+                  </button>
+                  <button type="button" className={styles.wizSegOption} data-on={g.carry || undefined} onClick={() => setGames((gs) => gs.map((x) => (x.key === g.key ? { ...x, carry: true } : x)))}>
+                    Carry over
+                  </button>
+                </div>
+              )}
               <span className={styles.gamePlayersHint}>
                 {g.type === "nassau"
                   ? "Nassau is 1-on-1, so pick exactly two players"
                   : g.type === "sixes"
                     ? "6-6-6 is a foursome, so pick exactly four players"
-                    : "Tap players to include or leave out"}
+                    : g.type === "vegas"
+                      ? "Vegas is two teams of two — pick four (first two vs last two)"
+                      : "Tap players to include or leave out"}
               </span>
               <div className={styles.gamePlayers}>
                 {players.map((p) => {
@@ -909,12 +949,16 @@ export default function RoundForm({
                     otherPairs.has(pairKey(g.participantKeys[0], p.key));
                   const exact = GAME_EXACT[g.type];
                   const locked = !inGame && ((exact != null && g.participantKeys.length >= exact) || wouldDupe);
+                  // Vegas colours the two teams by pick order (first two vs last two).
+                  const vegasIdx = g.type === "vegas" ? g.participantKeys.indexOf(p.key) : -1;
+                  const team = vegasIdx >= 0 ? (vegasIdx < 2 ? "a" : "b") : undefined;
                   return (
                     <button
                       key={p.key}
                       type="button"
                       className={styles.gamePlayerChip}
-                      data-on={inGame || undefined}
+                      data-on={inGame && g.type !== "vegas" ? true : undefined}
+                      data-team={team}
                       disabled={locked}
                       style={locked ? { opacity: 0.3, cursor: "not-allowed" } : undefined}
                       onClick={() =>
@@ -933,18 +977,18 @@ export default function RoundForm({
                 })}
               </div>
               <div className={styles.gameStake}>
-                <span className={styles.gameStakeLabel}>$ per {g.type === "nassau" ? "bet" : "skin"}</span>
+                <span className={styles.gameStakeLabel}>
+                  $ per {g.type === "nassau" ? "bet" : g.type === "sixes" ? "segment" : g.type === "vegas" ? "pt" : "skin"}
+                </span>
                 <span className={styles.gameStakeInput}>
                   <span aria-hidden>$</span>
                   <input
-                    type="number"
+                    type="text"
                     inputMode="decimal"
-                    min="0"
-                    step="1"
                     placeholder="0"
-                    value={g.value ?? ""}
+                    defaultValue={formatStake(g.value)}
                     onChange={(e) => {
-                      const v = e.target.value === "" ? null : Math.max(0, Number(e.target.value));
+                      const v = parseStake(e.target.value);
                       setGames((gs) => gs.map((x) => (x.key === g.key ? { ...x, value: v } : x)));
                     }}
                   />

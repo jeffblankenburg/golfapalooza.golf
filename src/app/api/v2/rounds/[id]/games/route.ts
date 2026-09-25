@@ -26,7 +26,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   const rosterIds = new Set((roster || []).map((r) => r.id));
 
-  let body: { game_type?: string; is_net?: boolean; value?: number | null; participant_ids?: string[] };
+  let body: { game_type?: string; is_net?: boolean; value?: number | null; carry?: boolean; participant_ids?: string[] };
   try {
     body = await request.json();
   } catch {
@@ -34,7 +34,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const gameType = body.game_type;
-  if (gameType !== "skins" && gameType !== "nassau" && gameType !== "sixes") {
+  if (gameType !== "skins" && gameType !== "nassau" && gameType !== "sixes" && gameType !== "vegas") {
     return NextResponse.json({ error: "Unknown game type" }, { status: 400 });
   }
 
@@ -46,6 +46,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (round.round_type !== "18") return NextResponse.json({ error: "6-6-6 needs a full 18 holes." }, { status: 400 });
     if (ids.length !== 4) return NextResponse.json({ error: "6-6-6 needs exactly four players." }, { status: 400 });
   }
+  if (gameType === "vegas" && ids.length !== 4) {
+    return NextResponse.json({ error: "Vegas needs exactly four players." }, { status: 400 });
+  }
   if (ids.length < 2) {
     return NextResponse.json({ error: "A game needs at least two players." }, { status: 400 });
   }
@@ -56,7 +59,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       round_id: roundId,
       game_type: gameType,
       is_net: !!body.is_net,
-      config: typeof body.value === "number" && body.value > 0 ? { value: body.value } : {},
+      config: {
+        ...(typeof body.value === "number" && body.value > 0 ? { value: body.value } : {}),
+        ...(gameType === "skins" && body.carry ? { carry: true } : {}),
+      },
       participant_ids: ids,
       created_by: userId,
     })
@@ -71,6 +77,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       is_net: created.is_net,
       participant_ids: created.participant_ids || [],
       value: typeof created.config?.value === "number" ? created.config.value : null,
+      carry: created.config?.carry === true,
     },
   });
 }

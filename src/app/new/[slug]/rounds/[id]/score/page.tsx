@@ -97,6 +97,7 @@ export default async function ScorePage({ params }: { params: Promise<{ slug: st
     is_net: g.is_net,
     participant_ids: g.participant_ids || [],
     value: typeof g.config?.value === "number" ? g.config.value : null,
+    carry: g.config?.carry === true,
   }));
 
   // Each player's handicap strokes ("pops") per hole, played off the low. Computed

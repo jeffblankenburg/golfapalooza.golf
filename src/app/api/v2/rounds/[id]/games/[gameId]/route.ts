@@ -35,7 +35,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .maybeSingle();
   if (!game || game.round_id !== roundId) return NextResponse.json({ error: "Game not found" }, { status: 404 });
 
-  let body: { is_net?: boolean; value?: number | null; participant_ids?: string[] };
+  let body: { is_net?: boolean; value?: number | null; carry?: boolean; participant_ids?: string[] };
   try {
     body = await request.json();
   } catch {
@@ -46,9 +46,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (typeof body.is_net === "boolean") patch.is_net = body.is_net;
 
-  if ("value" in body) {
-    const v = body.value;
-    patch.config = typeof v === "number" && v > 0 ? { value: v } : {};
+  // The editor sends the complete config, so rebuild it wholesale.
+  if ("value" in body || "carry" in body) {
+    const cfg: Record<string, unknown> = {};
+    if (typeof body.value === "number" && body.value > 0) cfg.value = body.value;
+    if (game.game_type === "skins" && body.carry) cfg.carry = true;
+    patch.config = cfg;
   }
 
   if (Array.isArray(body.participant_ids)) {
@@ -58,6 +61,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
     if (game.game_type === "sixes" && ids.length !== 4) {
       return NextResponse.json({ error: "6-6-6 needs exactly four players." }, { status: 400 });
+    }
+    if (game.game_type === "vegas" && ids.length !== 4) {
+      return NextResponse.json({ error: "Vegas needs exactly four players." }, { status: 400 });
     }
     if (ids.length < 2) {
       return NextResponse.json({ error: "A game needs at least two players." }, { status: 400 });
@@ -82,6 +88,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       is_net: updated.is_net,
       participant_ids: updated.participant_ids || [],
       value: typeof updated.config?.value === "number" ? updated.config.value : null,
+      carry: updated.config?.carry === true,
     },
   });
 }

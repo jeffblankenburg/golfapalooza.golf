@@ -1,0 +1,38 @@
+{
+  "cli_version": "0.11.2",
+  "checkpoint_id": "01M3CZBJRR2JVN5SBRH8VVBEWZ",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 4,
+  "files_touched": [
+    "src/app/api/v2/orgs/[id]/events/[eventId]/route.ts",
+    "src/app/api/v2/orgs/[id]/events/route.ts",
+    "src/app/api/v2/orgs/[id]/members/route.ts",
+    "src/app/api/v2/profile/route.ts",
+    "src/app/api/v2/profile/sync-phone/route.ts",
+    "src/app/new/[slug]/(event)/EventLocation.tsx",
+    "src/app/new/[slug]/(event)/PhoneEditor.tsx",
+    "src/app/new/[slug]/(event)/ProfileDrawer.tsx",
+    "src/app/new/[slug]/(event)/page.tsx",
+    "src/app/new/[slug]/EventsSection.tsx",
+    "src/app/new/[slug]/admin/members/MembersManager.tsx",
+    "src/app/new/new.module.css",
+    "supabase/migrations/00242_v2_events_location.sql"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 75932,
+    "cache_creation_tokens": 4711518,
+    "cache_read_tokens": 673933332,
+    "output_tokens": 1231005,
+    "api_call_count": 1401
+  }
+}

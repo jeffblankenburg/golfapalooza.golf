@@ -545,9 +545,14 @@
   gap: 6px;
 }
 .sixesRow {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sixesRowTop {
+  display: flex;
   align-items: baseline;
+  justify-content: space-between;
   gap: 8px;
 }
 .sixesLabel {
@@ -558,26 +563,33 @@
   color: var(--ink-soft);
   white-space: nowrap;
 }
-.sixesMatch {
-  font-size: 0.78rem;
-  color: var(--ink-soft);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.sixesStatus {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
   white-space: nowrap;
+}
+.sixesMatch {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+.sixesTeamWin {
+  color: var(--ink);
+  font-weight: 800;
+}
+.sixesVs {
+  color: var(--ink-soft);
 }
 .sixesResult {
   font-size: 0.85rem;
   font-weight: 800;
   color: var(--ink);
-  text-align: right;
   white-space: nowrap;
 }
 .sixesResultSquare {
   font-size: 0.85rem;
   font-weight: 800;
   color: var(--ink-soft);
-  text-align: right;
   white-space: nowrap;
 }
 

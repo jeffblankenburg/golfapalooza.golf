@@ -34,10 +34,14 @@ export default function GameCreateModal({
   onClose: () => void;
 }) {
   // A round holds one Skins pot and one 6-6-6; Nassau can stack (one per pair).
+  // A game also needs enough players (2, or 4 for 6-6-6 on 18 holes).
   const hasSkins = games.some((g) => g.game_type === "skins");
   const hasSixes = games.some((g) => g.game_type === "sixes");
-  const disabledType = (t: GameType) => (t === "skins" ? hasSkins : t === "sixes" ? hasSixes || !allowSixes : false);
-  const firstAvailable = (["skins", "nassau", "sixes"] as GameType[]).find((t) => !disabledType(t)) ?? "nassau";
+  const rosterCount = rosterOrder.length;
+  const available = (["skins", "nassau", "sixes"] as GameType[]).filter((t) =>
+    t === "skins" ? !hasSkins && rosterCount >= 2 : t === "nassau" ? rosterCount >= 2 : !hasSixes && allowSixes,
+  );
+  const firstAvailable = available[0] ?? "nassau";
 
   const [type, setType] = useState<GameType>(firstAvailable);
   const [isNet, setIsNet] = useState(false);
@@ -111,20 +115,17 @@ export default function GameCreateModal({
         </div>
 
         <label className={styles.gsLabel}>Game</label>
-        <div className={styles.gsSeg} role="group" aria-label="Game type">
-          {(["skins", "nassau", "sixes"] as GameType[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              className={styles.gsSegOption}
-              data-on={type === t || undefined}
-              disabled={disabledType(t)}
-              onClick={() => pickType(t)}
-            >
-              {LABEL[t]}
-            </button>
-          ))}
-        </div>
+        {available.length === 0 ? (
+          <p className={styles.gsOptional}>No other games can be added to this round.</p>
+        ) : (
+          <div className={styles.gsSeg} role="group" aria-label="Game type">
+            {available.map((t) => (
+              <button key={t} type="button" className={styles.gsSegOption} data-on={type === t || undefined} onClick={() => pickType(t)}>
+                {LABEL[t]}
+              </button>
+            ))}
+          </div>
+        )}
 
         <label className={styles.gsLabel}>Scoring</label>
         <div className={styles.gsSeg} role="group" aria-label="Gross or Net">

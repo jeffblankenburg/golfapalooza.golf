@@ -234,25 +234,26 @@ export default function SideGameStandings({
             </div>
             <div className={styles.sixesRows}>
               {r.segments.map((s) => {
-                const winTeam = s.leader === "A" ? s.teamA : s.leader === "B" ? s.teamB : null;
-                const result = !winTeam
-                  ? "AS"
-                  : s.closeout
-                    ? `${teamLabel(winTeam)} ${s.up}&${s.remaining}`
-                    : s.complete
-                      ? `${teamLabel(winTeam)} ${s.up} up`
-                      : `${teamLabel(winTeam)} ${s.up}▲`;
+                // A match decided on the final hole is "1 up", not "1&0"; the "X&Y"
+                // notation only applies when there are still holes left (Y >= 1).
+                const status = !s.leader ? "AS" : s.closeout && s.remaining > 0 ? `${s.up}&${s.remaining}` : `${s.up} up`;
+                const aWin = s.leader === "A";
+                const bWin = s.leader === "B";
                 return (
                   <div key={s.key} className={styles.sixesRow}>
-                    <span className={styles.sixesLabel}>{s.label}</span>
-                    <span className={styles.sixesMatch}>
-                      {teamLabel(s.teamA)} v {teamLabel(s.teamB)}
-                    </span>
-                    <span className={winTeam ? styles.sixesResult : styles.sixesResultSquare}>
-                      {result}
-                      {s.dormie && <span className={styles.sideGameDormie}> dormie</span>}
-                      {s.decided && winTeam && <span className={styles.sideGameFinal}> final</span>}
-                    </span>
+                    <div className={styles.sixesRowTop}>
+                      <span className={styles.sixesLabel}>{s.label}</span>
+                      <span className={styles.sixesStatus}>
+                        <span className={s.leader ? styles.sixesResult : styles.sixesResultSquare}>{status}</span>
+                        {s.dormie && <span className={styles.sideGameDormie}>dormie</span>}
+                        {s.decided && s.leader && <span className={styles.sideGameFinal}>final</span>}
+                      </span>
+                    </div>
+                    <div className={styles.sixesMatch}>
+                      <span className={aWin ? styles.sixesTeamWin : undefined}>{teamLabel(s.teamA)}</span>
+                      <span className={styles.sixesVs}> v </span>
+                      <span className={bWin ? styles.sixesTeamWin : undefined}>{teamLabel(s.teamB)}</span>
+                    </div>
                   </div>
                 );
               })}
@@ -273,7 +274,7 @@ export default function SideGameStandings({
                     {[...byPayer.entries()].map(([from, list]) => (
                       <div key={from} className={styles.sideGameTile} data-settle="down">
                         <div className={styles.sideGameTileTop}>
-                          <span className={styles.sideGameTileName}>{playerNames[from] || "Player"}</span>
+                          <span className={styles.sideGameTileName}>{playerNames[from] || "Player"} owes</span>
                         </div>
                         <div className={styles.sideGamePayRow}>
                           {list.map((t, i) => (

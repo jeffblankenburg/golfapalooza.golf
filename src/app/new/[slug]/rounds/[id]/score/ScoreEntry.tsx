@@ -8,6 +8,7 @@ import RoundComments from "./RoundComments";
 import OtherGroups from "./OtherGroups";
 import ScoringMapModal, { anyHoleMapped } from "./ScoringMapModal";
 import SideGameStandings, { type RoundGame } from "./SideGameStandings";
+import GameCreateModal from "./GameCreateModal";
 
 export interface ScoreHole {
   hole_number: number;
@@ -133,6 +134,7 @@ export default function ScoreEntry({
   const [tracked, setTracked] = useState<StatKey[]>(initialTracked);
   const [status, setStatus] = useState(initialStatus);
   const [gameList, setGameList] = useState<RoundGame[]>(games);
+  const [addGameOpen, setAddGameOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [completeErr, setCompleteErr] = useState<string | null>(null);
@@ -694,7 +696,7 @@ export default function ScoreEntry({
           ))}
         </div>
 
-        {/* Side-game standings (Skins, Nassau) — live, just above the chatter. */}
+        {/* Side-game standings (Skins, Nassau, 6-6-6) — live, just above the chatter. */}
         <SideGameStandings
           games={gameList}
           playerNames={playerNames}
@@ -707,6 +709,26 @@ export default function ScoreEntry({
           onGameSaved={(g) => setGameList((prev) => prev.map((x) => (x.id === g.id ? g : x)))}
           onGameRemoved={(id) => setGameList((prev) => prev.filter((x) => x.id !== id))}
         />
+
+        {/* Add a game mid-round. Shows below existing games, or on its own if none. */}
+        <button type="button" className={styles.addGameBtn} onClick={() => setAddGameOpen(true)}>
+          + Add a game
+        </button>
+        {addGameOpen && (
+          <GameCreateModal
+            playerNames={playerNames}
+            rosterOrder={players.map((p) => p.id)}
+            roundId={roundId}
+            brandColor={brandColor}
+            games={gameList}
+            allowSixes={holeNumbers.length === 18 && players.length >= 4}
+            onCreated={(g) => {
+              setGameList((prev) => [...prev, g]);
+              setAddGameOpen(false);
+            }}
+            onClose={() => setAddGameOpen(false)}
+          />
+        )}
 
         {/* Live comments — the group chatters while scoring. */}
         <RoundComments roundId={roundId} viewerId={viewerId} orgId={orgId} />

@@ -274,7 +274,13 @@ export async function POST(request: Request) {
           .filter((x): x is string => !!x),
         created_by: userId,
       }))
-      .filter((g) => g.participant_ids.length >= 2);
+      .filter((g) =>
+        g.game_type === "nassau"
+          ? g.participant_ids.length === 2
+          : g.game_type === "sixes"
+            ? g.participant_ids.length === 4
+            : g.participant_ids.length >= 2,
+      );
     if (gameRows.length) {
       const { error: gamesErr } = await admin.from("v2_round_games").insert(gameRows);
       if (gamesErr) console.error("v2_round_games insert failed:", gamesErr.message);

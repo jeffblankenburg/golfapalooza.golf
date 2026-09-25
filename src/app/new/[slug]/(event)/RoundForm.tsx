@@ -175,17 +175,20 @@ const STEPS = [
 
 interface GameDraft {
   key: string;
-  type: "skins" | "nassau";
+  type: "skins" | "nassau" | "sixes";
   isNet: boolean;
-  value: number | null; // optional $ stake (per skin / per bet)
+  value: number | null; // optional $ stake (per skin / per bet / per segment)
   participantKeys: string[]; // Player.key of those in this game
 }
 
-const GAME_LABEL: Record<GameDraft["type"], string> = { skins: "Skins", nassau: "Nassau" };
+const GAME_LABEL: Record<GameDraft["type"], string> = { skins: "Skins", nassau: "Nassau", sixes: "6-6-6" };
 const GAME_DESC: Record<GameDraft["type"], string> = {
   skins: "Low score wins the hole. Ties carry over, so the next hole is worth more.",
   nassau: "Match play as three bets: the front 9, the back 9, and the full 18.",
+  sixes: "Foursome, best ball. Partners rotate every 6 holes so you team with everyone once.",
 };
+// Fixed roster size for team/head-to-head games (skins takes any 2+).
+const GAME_EXACT: Partial<Record<GameDraft["type"], number>> = { nassau: 2, sixes: 4 };
 
 // Nassau is 1-on-1, so a pair is identified regardless of order.
 const pairKey = (a: string, b: string) => [a, b].sort().join("|");
@@ -800,7 +803,7 @@ export default function RoundForm({
           <p className={styles.roundFormHint} style={{ marginTop: -2 }}>
             Add a friendly game and watch live standings while you score. Skip if you just want scores.
           </p>
-          <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
             <button
               type="button"
               className={styles.createBtnGhost}
@@ -839,13 +842,34 @@ export default function RoundForm({
                 </button>
               );
             })()}
+            {(() => {
+              const has = games.some((g) => g.type === "sixes");
+              const disabled = has || players.length < 4 || roundType !== "18";
+              return (
+                <button
+                  type="button"
+                  className={styles.createBtnGhost}
+                  disabled={disabled}
+                  style={{ opacity: disabled ? 0.5 : 1 }}
+                  title={roundType !== "18" ? "6-6-6 needs a full 18 holes" : players.length < 4 ? "6-6-6 needs four players" : undefined}
+                  onClick={() =>
+                    setGames((gs) => [
+                      ...gs,
+                      { key: crypto.randomUUID(), type: "sixes", isNet: false, value: null, participantKeys: players.slice(0, 4).map((p) => p.key) },
+                    ])
+                  }
+                >
+                  + 6-6-6
+                </button>
+              );
+            })()}
           </div>
           {games.map((g) => (
             <div key={g.key} className={styles.gameCard}>
               <div className={styles.gameCardHead}>
                 <span className={styles.gameCardTitle}>
                   {GAME_LABEL[g.type]}
-                  {g.type === "nassau" && <span className={styles.optional}> (pick 2)</span>}
+                  {GAME_EXACT[g.type] && <span className={styles.optional}> (pick {GAME_EXACT[g.type]})</span>}
                 </span>
                 <button type="button" className={styles.wizBackLink} onClick={() => setGames((gs) => gs.filter((x) => x.key !== g.key))}>
                   Remove
@@ -861,7 +885,11 @@ export default function RoundForm({
                 </button>
               </div>
               <span className={styles.gamePlayersHint}>
-                {g.type === "nassau" ? "Nassau is 1-on-1, so pick exactly two players" : "Tap players to include or leave out"}
+                {g.type === "nassau"
+                  ? "Nassau is 1-on-1, so pick exactly two players"
+                  : g.type === "sixes"
+                    ? "6-6-6 is a foursome, so pick exactly four players"
+                    : "Tap players to include or leave out"}
               </span>
               <div className={styles.gamePlayers}>
                 {players.map((p) => {
@@ -879,7 +907,8 @@ export default function RoundForm({
                     !inGame &&
                     g.participantKeys.length === 1 &&
                     otherPairs.has(pairKey(g.participantKeys[0], p.key));
-                  const locked = g.type === "nassau" && !inGame && (g.participantKeys.length >= 2 || wouldDupe);
+                  const exact = GAME_EXACT[g.type];
+                  const locked = !inGame && ((exact != null && g.participantKeys.length >= exact) || wouldDupe);
                   return (
                     <button
                       key={p.key}

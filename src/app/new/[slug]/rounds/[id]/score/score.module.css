@@ -448,6 +448,44 @@
   font-weight: 800;
   color: var(--ink);
 }
+/* Settlement encoded in the tiles: green = owed money, red = owes it (with an
+   arrow to whom). Follow a red tile's arrow to that person's green tile. */
+.sideGameTile[data-settle="up"] {
+  border-color: color-mix(in srgb, #0a7d3c 45%, var(--line));
+  background: color-mix(in srgb, #0a7d3c 7%, var(--paper));
+}
+.sideGameTile[data-settle="down"] {
+  border-color: color-mix(in srgb, #a3341f 45%, var(--line));
+  background: color-mix(in srgb, #a3341f 7%, var(--paper));
+}
+/* A little breathing room between the 6-6-6 segments and the debt boxes. */
+.sixesDebts {
+  margin-top: 10px;
+}
+/* Compact debt display: an amount stacked over a small recipient name, so a
+   player owing several others fits on one row. */
+.sideGamePayRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+}
+.sideGamePayChip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.05;
+}
+.sideGamePayAmt {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #a3341f;
+}
+.sideGamePayTo {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
 
 /* Nassau: one tile per segment (Front / Back / Total). */
 .sideGameSegs {
@@ -497,6 +535,66 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  color: var(--brand);
+}
+
+/* 6-6-6 rotating-partner segments (full-width rows fit two-name teams better). */
+.sixesRows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sixesRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 8px;
+}
+.sixesLabel {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.sixesMatch {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sixesResult {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--ink);
+  text-align: right;
+  white-space: nowrap;
+}
+.sixesResultSquare {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--ink-soft);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Add-a-game button on the scorer (below any existing games). */
+.addGameBtn {
+  align-self: flex-start;
+  padding: 8px 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.addGameBtn:hover {
+  border-color: var(--brand);
   color: var(--brand);
 }
 

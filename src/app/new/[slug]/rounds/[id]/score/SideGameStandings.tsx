@@ -4,6 +4,8 @@ import { useState } from "react";
 import styles from "./score.module.css";
 import { computeSkins } from "@/lib/v2/rounds/skins";
 import { computeNassau } from "@/lib/v2/rounds/nassau";
+import { computeSixSixSix, sixesNetUnits } from "@/lib/v2/rounds/sixes";
+import { settleUp } from "@/lib/v2/rounds/settle";
 import GameSettingsModal from "./GameSettingsModal";
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
@@ -60,7 +62,8 @@ export default function SideGameStandings({
   const [editing, setEditing] = useState<RoundGame | null>(null);
   const skins = games.filter((g) => g.game_type === "skins");
   const nassau = games.filter((g) => g.game_type === "nassau");
-  if (skins.length === 0 && nassau.length === 0) return null;
+  const sixes = games.filter((g) => g.game_type === "sixes");
+  if (skins.length === 0 && nassau.length === 0 && sixes.length === 0) return null;
 
   // Net: subtract each player's per-hole handicap strokes before scoring.
   const netScores = (): Record<string, Record<number, number>> => {
@@ -193,6 +196,98 @@ export default function SideGameStandings({
                   : "All square"}
               </div>
             )}
+          </div>
+        );
+      })}
+
+      {sixes.map((g) => {
+        const scores = g.is_net ? netScores() : gross;
+        const players = g.participant_ids;
+        if (players.length !== 4) {
+          return (
+            <div key={g.id} className={styles.sideGame}>
+              <div className={styles.sideGameHead}>
+                <span className={styles.sideGameTitle}>6-6-6</span>
+                <span className={styles.sideGameThru} />
+                <GearButton onClick={() => setEditing(g)} />
+              </div>
+              <div className={styles.sideGameRows}>
+                <span className={styles.sideGameName}>Needs four players.</span>
+              </div>
+            </div>
+          );
+        }
+        const r = computeSixSixSix(holeNumbers, scores, players);
+        const teamLabel = (team: string[]) => `${firstName(playerNames[team[0]] || "")}+${firstName(playerNames[team[1]] || "")}`;
+        const units = g.value ? sixesNetUnits(r, players) : null;
+        return (
+          <div key={g.id} className={styles.sideGame}>
+            <div className={styles.sideGameHead}>
+              <span className={styles.sideGameTitle}>
+                6-6-6
+                <span className={styles.sideGameStake}> ({g.is_net ? "Net" : "Raw"})</span>
+              </span>
+              <span className={styles.sideGameThru}>
+                {g.value ? <span className={styles.sideGameStake}>{money(g.value)}/seg</span> : null}
+              </span>
+              <GearButton onClick={() => setEditing(g)} />
+            </div>
+            <div className={styles.sixesRows}>
+              {r.segments.map((s) => {
+                const winTeam = s.leader === "A" ? s.teamA : s.leader === "B" ? s.teamB : null;
+                const result = !winTeam
+                  ? "AS"
+                  : s.closeout
+                    ? `${teamLabel(winTeam)} ${s.up}&${s.remaining}`
+                    : s.complete
+                      ? `${teamLabel(winTeam)} ${s.up} up`
+                      : `${teamLabel(winTeam)} ${s.up}▲`;
+                return (
+                  <div key={s.key} className={styles.sixesRow}>
+                    <span className={styles.sixesLabel}>{s.label}</span>
+                    <span className={styles.sixesMatch}>
+                      {teamLabel(s.teamA)} v {teamLabel(s.teamB)}
+                    </span>
+                    <span className={winTeam ? styles.sixesResult : styles.sixesResultSquare}>
+                      {result}
+                      {s.dormie && <span className={styles.sideGameDormie}> dormie</span>}
+                      {s.decided && winTeam && <span className={styles.sideGameFinal}> final</span>}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            {units &&
+              (() => {
+                const netById = Object.fromEntries(players.map((id) => [id, (units[id] ?? 0) * (g.value ?? 0)]));
+                const transfers = settleUp(netById);
+                if (transfers.length === 0) return <div className={styles.sideGameSettle}>All square</div>;
+                // One box per player who owes — "amount/recipient" (a debtor may owe two).
+                const byPayer = new Map<string, { to: string; amount: number }[]>();
+                for (const t of transfers) {
+                  if (!byPayer.has(t.from)) byPayer.set(t.from, []);
+                  byPayer.get(t.from)!.push({ to: t.to, amount: t.amount });
+                }
+                return (
+                  <div className={`${styles.sideGameGrid} ${styles.sixesDebts}`}>
+                    {[...byPayer.entries()].map(([from, list]) => (
+                      <div key={from} className={styles.sideGameTile} data-settle="down">
+                        <div className={styles.sideGameTileTop}>
+                          <span className={styles.sideGameTileName}>{playerNames[from] || "Player"}</span>
+                        </div>
+                        <div className={styles.sideGamePayRow}>
+                          {list.map((t, i) => (
+                            <span key={i} className={styles.sideGamePayChip}>
+                              <span className={styles.sideGamePayAmt}>{money(t.amount)}</span>
+                              <span className={styles.sideGamePayTo}>{firstName(playerNames[t.to] || "")}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
           </div>
         );
       })}

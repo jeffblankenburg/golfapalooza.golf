@@ -56,6 +56,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (game.game_type === "nassau" && ids.length !== 2) {
       return NextResponse.json({ error: "Nassau needs exactly two players." }, { status: 400 });
     }
+    if (game.game_type === "sixes" && ids.length !== 4) {
+      return NextResponse.json({ error: "6-6-6 needs exactly four players." }, { status: 400 });
+    }
     if (ids.length < 2) {
       return NextResponse.json({ error: "A game needs at least two players." }, { status: 400 });
     }

@@ -1,0 +1,59 @@
+{
+  "cli_version": "0.11.2",
+  "checkpoint_id": "01M3CRBA2K7GVJNFF9B17RBSMF",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 6,
+  "files_touched": [
+    "docs/issues/v2-simulator.md",
+    "src/app/api/v2/articles/[id]/view/route.ts",
+    "src/app/api/v2/rounds/[id]/comments/route.ts",
+    "src/app/api/v2/rounds/route.ts",
+    "src/app/api/v2/sim/route.ts",
+    "src/app/api/v2/sim/time/route.ts",
+    "src/app/new/[slug]/(event)/ActivityFeed.tsx",
+    "src/app/new/[slug]/(event)/ChatDrawer.tsx",
+    "src/app/new/[slug]/(event)/Countdown.tsx",
+    "src/app/new/[slug]/(event)/EventShell.tsx",
+    "src/app/new/[slug]/(event)/HomeModules.tsx",
+    "src/app/new/[slug]/(event)/MediaViewer.tsx",
+    "src/app/new/[slug]/(event)/ProfileDrawer.tsx",
+    "src/app/new/[slug]/(event)/RoundForm.tsx",
+    "src/app/new/[slug]/(event)/SimBanner.tsx",
+    "src/app/new/[slug]/(event)/SimControl.tsx",
+    "src/app/new/[slug]/(event)/SimTime.tsx",
+    "src/app/new/[slug]/(event)/articles/page.tsx",
+    "src/app/new/[slug]/(event)/layout.tsx",
+    "src/app/new/[slug]/(event)/page.tsx",
+    "src/app/new/[slug]/admin/page.tsx",
+    "src/app/new/[slug]/admin/simulator/SimulatorPanel.tsx",
+    "src/app/new/[slug]/admin/simulator/page.tsx",
+    "src/app/new/[slug]/layout.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/GameCreateModal.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/GameSettingsModal.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/RoundComments.tsx",
+    "src/app/new/new.module.css",
+    "src/lib/v2/birthday.ts",
+    "src/lib/v2/context.ts",
+    "src/lib/v2/notification-prefs.ts",
+    "src/lib/v2/rounds/notify.ts",
+    "src/lib/v2/simulator.ts",
+    "src/lib/v2/supabase.ts"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 73862,
+    "cache_creation_tokens": 3858723,
+    "cache_read_tokens": 612033446,
+    "output_tokens": 1188510,
+    "api_call_count": 1322
+  }
+}

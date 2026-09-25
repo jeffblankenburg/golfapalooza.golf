@@ -20,6 +20,7 @@ interface Member {
   nickname: string | null;
   birthdate: string | null;
   avatar_url: string | null;
+  phone: string | null;
   permissions: PermissionMap;
 }
 interface Invite {
@@ -94,6 +95,7 @@ export default function MembersManager({
   const [eLast, setELast] = useState("");
   const [eNick, setENick] = useState("");
   const [eBday, setEBday] = useState("");
+  const [ePhone, setEPhone] = useState("");
   const [eRole, setERole] = useState<"owner" | "admin" | "member">("member");
   const [eArchived, setEArchived] = useState(false);
   const [ePerms, setEPerms] = useState<PermissionMap>({});
@@ -153,6 +155,7 @@ export default function MembersManager({
     setELast(m.last_name || "");
     setENick(m.nickname || "");
     setEBday(m.birthdate || "");
+    setEPhone(m.phone || "");
     setERole(m.role);
     setEArchived(m.archived);
     setEPerms(m.permissions || {});
@@ -172,6 +175,7 @@ export default function MembersManager({
       profile: { first_name: string; last_name: string; nickname: string; birthdate: string | null };
       permissions?: PermissionMap;
       archived?: boolean;
+      phone?: string;
     } = {
       user_id: editing.user_id,
       profile: {
@@ -181,6 +185,7 @@ export default function MembersManager({
         birthdate: eBday || null,
       },
     };
+    if (canManage && ePhone.trim() && ePhone.trim() !== (editing.phone || "")) body.phone = ePhone.trim();
     if (canManage && eArchived !== editing.archived) body.archived = eArchived;
     // Role & permissions only apply to an active member — archiving leaves the
     // stored role untouched so restoring keeps it.
@@ -437,6 +442,13 @@ export default function MembersManager({
             </label>
             <input className={styles.input} type="date" value={eBday} onChange={(e) => setEBday(e.target.value)} />
           </div>
+          {editingCanManage && (
+            <div className={styles.field}>
+              <label className={styles.label}>Phone <span className={styles.optional}>(login number)</span></label>
+              <input className={styles.input} type="tel" inputMode="tel" value={ePhone} onChange={(e) => setEPhone(e.target.value)} placeholder="Mobile number" />
+              <p className={styles.dnsHint} style={{ marginTop: 4 }}>Updates their SMS login number directly — no code sent to them.</p>
+            </div>
+          )}
           {editingCanManage && (
             <div className={styles.field}>
               <label className={styles.label}>Role</label>

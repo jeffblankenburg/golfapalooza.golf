@@ -13,9 +13,10 @@ interface EventRow {
   start_date: string | null;
   end_date: string | null;
   status: "draft" | "active" | "archived";
+  location: string | null;
 }
 
-const empty = { name: "", year: "", start_date: "", end_date: "", status: "draft" };
+const empty = { name: "", year: "", start_date: "", end_date: "", status: "draft", location: "" };
 
 export default function EventsSection({
   orgId,
@@ -61,6 +62,7 @@ export default function EventsSection({
       start_date: e.start_date || "",
       end_date: e.end_date || "",
       status: e.status,
+      location: e.location || "",
     });
     setError(null);
     setEditing(e);
@@ -77,6 +79,7 @@ export default function EventsSection({
       start_date: form.start_date || null,
       end_date: form.end_date || null,
       status: form.status,
+      location: form.location.trim() || null,
     };
     const isNew = editing === "new";
     const res = await fetch(
@@ -190,6 +193,16 @@ export default function EventsSection({
             <label className={styles.label}>End date <span className={styles.optional}>(optional)</span></label>
             <input className={styles.input} type="date" value={form.end_date}
               onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Location <span className={styles.optional}>(optional)</span></label>
+            <input
+              className={styles.input}
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+              placeholder="e.g. Thorn Apple Country Club, Grand Rapids, MI"
+              maxLength={120}
+            />
           </div>
           <div className={styles.field}>
             <label className={styles.label}>Status</label>

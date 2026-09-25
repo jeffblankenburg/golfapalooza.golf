@@ -7,6 +7,7 @@ import { formatPhone } from "@/lib/v2/phone";
 import { pickName } from "@/lib/v2/profile";
 import { useNameMode } from "./NameMode";
 import SimControl from "./SimControl";
+import PhoneEditor from "./PhoneEditor";
 import styles from "@/app/new/new.module.css";
 /* eslint-disable @next/next/no-img-element */
 
@@ -42,6 +43,7 @@ export default function ProfileDrawer({ active, orgId, canSim }: { active: boole
   const router = useRouter();
   const mode = useNameMode();
   const [p, setP] = useState<Profile | null>(null);
+  const [self, setSelf] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -60,7 +62,10 @@ export default function ProfileDrawer({ active, orgId, canSim }: { active: boole
         }
         return r.json();
       })
-      .then((d) => setP(d.profile))
+      .then((d) => {
+        setP(d.profile);
+        setSelf(!!d.self);
+      })
       .catch((e) => setError(e.message || "Couldn't load your profile"))
       .finally(() => setLoaded(true));
   }, [active]);
@@ -171,12 +176,16 @@ export default function ProfileDrawer({ active, orgId, canSim }: { active: boole
       <Field label="Nickname">
         <input className={styles.input} value={p.nickname || ""} onChange={(e) => set("nickname", e.target.value)} placeholder="Your handle" />
       </Field>
-      {phone && (
-        <Field label="Phone">
-          <p className={styles.readonlyValue}>
-            {phone.flag} {phone.text}
-          </p>
-        </Field>
+      {self ? (
+        <PhoneEditor current={p.phone} onChanged={(ph) => set("phone", ph)} />
+      ) : (
+        phone && (
+          <Field label="Phone">
+            <p className={styles.readonlyValue}>
+              {phone.flag} {phone.text}
+            </p>
+          </Field>
+        )
       )}
       <Field label="Birthday">
         <input type="date" className={styles.input} value={p.birthdate || ""} onChange={(e) => set("birthdate", e.target.value || null)} />

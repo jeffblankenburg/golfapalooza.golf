@@ -33,6 +33,7 @@ export async function PATCH(
     start_date?: string | null;
     end_date?: string | null;
     status?: string;
+    location?: string | null;
   };
   try {
     body = await request.json();
@@ -49,6 +50,7 @@ export async function PATCH(
   if ("year" in body) patch.year = body.year ?? null;
   if ("start_date" in body) patch.start_date = body.start_date || null;
   if ("end_date" in body) patch.end_date = body.end_date || null;
+  if ("location" in body) patch.location = body.location?.trim() || null;
   if (typeof body.status === "string") {
     if (!STATUSES.includes(body.status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });

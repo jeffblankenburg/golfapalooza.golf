@@ -10,6 +10,7 @@ import Countdown from "./Countdown";
 import HomeModules from "./HomeModules";
 import OnboardingChecklist from "./OnboardingChecklist";
 import PwaInstallBanner from "./PwaInstallBanner";
+import EventLocation from "./EventLocation";
 
 interface EventRow {
   id: string;
@@ -18,6 +19,7 @@ interface EventRow {
   start_date: string | null;
   end_date: string | null;
   status: string;
+  location: string | null;
 }
 
 function dateRange(start: string | null, end: string | null): string | null {
@@ -48,7 +50,7 @@ export default async function EventHome({
   const supabase = await v2ServerClient();
   const { data } = await supabase
     .from("v2_events")
-    .select("id, name, year, start_date, end_date, status")
+    .select("id, name, year, start_date, end_date, status, location")
     .eq("org_id", org.id)
     .eq("status", "active")
     .order("start_date", { ascending: false })
@@ -85,6 +87,12 @@ export default async function EventHome({
             <div className={styles.dateBand}>
               {range && <span className={styles.dateText}>{range}</span>}
               {event.start_date && <Countdown start={event.start_date} end={event.end_date} nowMs={(await v2Now()).getTime()} />}
+            </div>
+          )}
+
+          {event.location && (
+            <div className={styles.locationBand}>
+              <EventLocation location={event.location} />
             </div>
           )}
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
 import { cleanProfileFields, displayNameFrom } from "@/lib/v2/profile";
+import { toE164 } from "@/lib/v2/phone";
 import { cleanPermissions, type PermissionMap } from "@/lib/v2/permissions";
 import { addToAllMembers, removeFromManagedChannels } from "@/lib/v2/chat/channels";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -47,7 +48,7 @@ export async function GET(
   const { data } = await g.admin
     .from("v2_memberships")
     .select(
-      "user_id, role, status, archived_at, profile:v2_profiles(display_name, first_name, last_name, nickname, birthdate, avatar_url, is_system)",
+      "user_id, role, status, archived_at, profile:v2_profiles(display_name, first_name, last_name, nickname, birthdate, avatar_url, is_system, phone)",
     )
     .eq("org_id", id)
     .order("role");
@@ -71,6 +72,7 @@ export async function GET(
         birthdate?: string | null;
         avatar_url?: string | null;
         is_system?: boolean | null;
+        phone?: string | null;
       } | null;
       return {
         user_id: m.user_id,
@@ -84,6 +86,7 @@ export async function GET(
         birthdate: p?.birthdate ?? null,
         avatar_url: p?.avatar_url || null,
         is_system: !!p?.is_system,
+        phone: p?.phone ?? null,
         permissions: permsByUser.get(m.user_id) ?? {},
       };
     })
@@ -111,15 +114,16 @@ export async function PATCH(
     };
     permissions?: PermissionMap;
     archived?: boolean;
+    phone?: string;
   };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
-  const { user_id, role, profile, permissions, archived } = body;
+  const { user_id, role, profile, permissions, archived, phone } = body;
   if (!user_id) return NextResponse.json({ error: "user_id is required" }, { status: 400 });
-  if (!role && !profile && !permissions && typeof archived !== "boolean") {
+  if (!role && !profile && !permissions && typeof archived !== "boolean" && phone === undefined) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
 
@@ -195,6 +199,23 @@ export async function PATCH(
       })
       .eq("id", user_id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Phone change (admin override, no OTP). Sets the member's SMS-login credential
+  // directly via the service-role auth API and mirrors it into their profile.
+  // Changing an owner's phone requires an owner (it's account-takeover-grade).
+  if (phone !== undefined) {
+    const e164 = toE164(phone || "");
+    if (!e164) return NextResponse.json({ error: "Enter a valid mobile number" }, { status: 400 });
+    if (targetRole === "owner") {
+      const callerRole = await roleOf(g.admin, id, g.userId);
+      if (callerRole !== "owner") {
+        return NextResponse.json({ error: "Only an owner can change an owner's phone" }, { status: 403 });
+      }
+    }
+    const { error: authErr } = await g.admin.auth.admin.updateUserById(user_id, { phone: e164, phone_confirm: true });
+    if (authErr) return NextResponse.json({ error: authErr.message }, { status: 400 });
+    await g.admin.from("v2_profiles").update({ phone: e164, updated_at: new Date().toISOString() }).eq("id", user_id);
   }
 
   // Granular permission grants (caller is already guaranteed an org admin).

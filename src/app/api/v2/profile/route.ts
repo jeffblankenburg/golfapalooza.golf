@@ -22,7 +22,7 @@ const str = (v: unknown) => {
 };
 
 export async function GET(request: Request) {
-  const { userId } = await v2GetUser(request);
+  const { userId, realUserId, simulating } = await v2GetUser(request);
   if (!userId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   const admin = v2AdminClient();
@@ -32,7 +32,9 @@ export async function GET(request: Request) {
     .eq("id", userId)
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ profile: data });
+  // `self` = viewing your own real profile (not simulating) — gates auth-critical
+  // edits like the phone number, which act on the live session.
+  return NextResponse.json({ profile: data, self: !simulating && userId === realUserId });
 }
 
 export async function PATCH(request: Request) {

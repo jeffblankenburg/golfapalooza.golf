@@ -4,6 +4,9 @@ import { getPlatformContext } from "@/lib/v2/context";
 import PwaRegistrar from "./PwaRegistrar";
 import MusicProvider from "./(event)/MusicProvider";
 import { NameModeProvider } from "./(event)/NameMode";
+import SimBanner from "./(event)/SimBanner";
+import { SimTimeProvider } from "./(event)/SimTime";
+import { getSimAt, v2Now } from "@/lib/v2/simulator";
 
 /**
  * Org subtree wrapper. Purely additive: it points the PWA manifest + Apple title
@@ -62,6 +65,8 @@ export default async function OrgLayout({
   // Non-members get plain children; the inner layouts handle the redirect.
   const ctx = await getPlatformContext();
   const org = ctx?.orgs.find((o) => o.slug === slug);
+  const simAt = await getSimAt();
+  const serverNowMs = (await v2Now()).getTime();
 
   if (!org) {
     return (
@@ -75,9 +80,12 @@ export default async function OrgLayout({
   return (
     <>
       <PwaRegistrar />
-      <NameModeProvider mode={org.name_display}>
-        <MusicProvider orgId={org.id}>{children}</MusicProvider>
-      </NameModeProvider>
+      {(ctx?.simulating || simAt) && <SimBanner name={ctx?.simulating ? ctx.simName : null} at={simAt} />}
+      <SimTimeProvider serverNowMs={serverNowMs}>
+        <NameModeProvider mode={org.name_display}>
+          <MusicProvider orgId={org.id}>{children}</MusicProvider>
+        </NameModeProvider>
+      </SimTimeProvider>
     </>
   );
 }

@@ -3,6 +3,7 @@ import { getPlatformContext } from "@/lib/v2/context";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import EventShell from "./EventShell";
 import { buildEventNav, isFeatureVisible, resolveFeatures, type FeatureRow } from "@/lib/v2/features";
+import { v2Now } from "@/lib/v2/simulator";
 
 /**
  * Wraps the member-facing event experience in the fixed top-bar/bottom-nav shell.
@@ -65,7 +66,7 @@ export default async function EventLayout({
     .eq("org_id", org.id)
     .or(featFilter);
   const resolved = resolveFeatures((featRows as FeatureRow[] | null) ?? [], activeEventId ?? "");
-  ({ pinned, launcher } = buildEventNav(slug, resolved, isAdmin));
+  ({ pinned, launcher } = buildEventNav(slug, resolved, isAdmin, await v2Now()));
 
   // The members directory ("loozers") is labelled per-org: use the group's
   // configured member noun (e.g. "Loozers") instead of the catalog default.

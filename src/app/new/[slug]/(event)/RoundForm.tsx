@@ -7,6 +7,7 @@ import CourseLookupModal from "@/components/v2/courses/CourseLookupModal";
 import styles from "@/app/new/new.module.css";
 import { formatCourseName } from "@/lib/v2/course-display";
 import { formatStake, parseStake } from "@/lib/v2/rounds/stake";
+import { useSimOffset } from "./SimTime";
 import { getTeeDotStyle, TEE_HEX_COLORS } from "@/lib/utils/tee-colors";
 import type { CSSProperties } from "react";
 
@@ -185,7 +186,7 @@ interface GameDraft {
 
 const GAME_LABEL: Record<GameDraft["type"], string> = { skins: "Skins", nassau: "Nassau", sixes: "6-6-6", vegas: "Vegas" };
 const GAME_DESC: Record<GameDraft["type"], string> = {
-  skins: "Low score wins the hole. Ties carry over, so the next hole is worth more.",
+  skins: "Low score wins the hole. Ties are a push unless you turn on carryover.",
   nassau: "Match play as three bets: the front 9, the back 9, and the full 18.",
   sixes: "Foursome, best ball. Partners rotate every 6 holes so you team with everyone once.",
   vegas: "Two-player teams. Scores combine into a number, low team wins the difference. Opponents' birdies flip your number.",
@@ -221,7 +222,8 @@ export default function RoundForm({
   const [basis, setBasis] = useState<"nearby" | "recent">("recent");
   const [course, setCourse] = useState<CourseHit | null>(null);
   const [tees, setTees] = useState<Tee[]>([]);
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const simOffset = useSimOffset();
+  const [date, setDate] = useState(() => new Date(Date.now() + simOffset).toISOString().slice(0, 10));
   const [roundType, setRoundType] = useState<RoundType>("18");
   const [format, setFormat] = useState<"individual" | "scramble">("individual");
   const [members, setMembers] = useState<Member[]>([]);
@@ -841,7 +843,7 @@ export default function RoundForm({
               <button
                 type="button"
                 className={styles.createBtnGhost}
-                onClick={() => setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "skins", isNet: false, carry: false, value: GAME_DEFAULT_VALUE.skins, participantKeys: players.map((p) => p.key) }])}
+                onClick={() => setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "skins", isNet: true, carry: false, value: GAME_DEFAULT_VALUE.skins, participantKeys: players.map((p) => p.key) }])}
               >
                 + Skins
               </button>
@@ -863,7 +865,7 @@ export default function RoundForm({
                   type="button"
                   className={styles.createBtnGhost}
                   onClick={() =>
-                    setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "nassau", isNet: false, carry: false, value: GAME_DEFAULT_VALUE.nassau, participantKeys: [...nextPair] }])
+                    setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "nassau", isNet: true, carry: false, value: GAME_DEFAULT_VALUE.nassau, participantKeys: [...nextPair] }])
                   }
                 >
                   + Nassau
@@ -875,7 +877,7 @@ export default function RoundForm({
                 type="button"
                 className={styles.createBtnGhost}
                 onClick={() =>
-                  setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "sixes", isNet: false, carry: false, value: GAME_DEFAULT_VALUE.sixes, participantKeys: players.slice(0, 4).map((p) => p.key) }])
+                  setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "sixes", isNet: true, carry: false, value: GAME_DEFAULT_VALUE.sixes, participantKeys: players.slice(0, 4).map((p) => p.key) }])
                 }
               >
                 + 6-6-6
@@ -885,7 +887,7 @@ export default function RoundForm({
               <button
                 type="button"
                 className={styles.createBtnGhost}
-                onClick={() => setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "vegas", isNet: false, carry: false, value: GAME_DEFAULT_VALUE.vegas, participantKeys: [] }])}
+                onClick={() => setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "vegas", isNet: true, carry: false, value: GAME_DEFAULT_VALUE.vegas, participantKeys: [] }])}
               >
                 + Vegas
               </button>
@@ -908,12 +910,12 @@ export default function RoundForm({
                 </button>
               </div>
               <p className={styles.roundFormHint} style={{ marginTop: -4 }}>{GAME_DESC[g.type]}</p>
-              <div className={styles.wizSegToggle} role="group" aria-label="Gross or Net">
-                <button type="button" className={styles.wizSegOption} data-on={!g.isNet || undefined} onClick={() => setGames((gs) => gs.map((x) => (x.key === g.key ? { ...x, isNet: false } : x)))}>
-                  Gross
-                </button>
+              <div className={styles.wizSegToggle} role="group" aria-label="Net or Gross">
                 <button type="button" className={styles.wizSegOption} data-on={g.isNet || undefined} onClick={() => setGames((gs) => gs.map((x) => (x.key === g.key ? { ...x, isNet: true } : x)))}>
                   Net
+                </button>
+                <button type="button" className={styles.wizSegOption} data-on={!g.isNet || undefined} onClick={() => setGames((gs) => gs.map((x) => (x.key === g.key ? { ...x, isNet: false } : x)))}>
+                  Gross
                 </button>
               </div>
               {g.type === "skins" && (

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
+import { notifyRoundComment } from "@/lib/v2/rounds/notify";
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
 
@@ -49,6 +50,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .select("id, body, image_url, created_at, sender_id, sender:v2_profiles!v2_round_comments_sender_id_fkey(id, display_name, avatar_url)")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Roster + @mention notifications (#186). Best-effort.
+  await notifyRoundComment(admin, { roundId: id, body: body || null, actorUserId: userId });
 
   return NextResponse.json({ comment: { ...data, sender: one(data.sender) } });
 }

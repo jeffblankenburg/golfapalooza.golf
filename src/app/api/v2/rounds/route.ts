@@ -5,6 +5,8 @@ import { isRoundIncomplete, expectedHoleCount } from "@/lib/rounds/incomplete";
 import { calculateDifferential } from "@/lib/v2/golf/calculator";
 import { recalculateHandicap } from "@/lib/v2/golf/handicap";
 import { orgSlug, logLiveRound, logRoundScores } from "@/lib/v2/rounds/round-activity";
+import { notifyRoundInvite } from "@/lib/v2/rounds/notify";
+import { v2Now } from "@/lib/v2/simulator";
 
 /**
  * GET /api/v2/rounds — the authed golfer's personal rounds + handicap for the My
@@ -176,7 +178,7 @@ export async function POST(request: Request) {
   const format = FORMATS.includes(body.format || "") ? body.format! : "individual";
   const round_date = /^\d{4}-\d{2}-\d{2}$/.test(body.round_date || "")
     ? body.round_date!
-    : new Date().toISOString().slice(0, 10);
+    : (await v2Now()).toISOString().slice(0, 10);
   // A player with no identity defaults to the authed golfer (the "me" quick-entry
   // case). Then keep only valid rows (member XOR guest).
   const players = (body.players || [])
@@ -326,6 +328,14 @@ export async function POST(request: Request) {
       }
     }
   }
+
+  // Round invites (#186): ping every added Loozer except the creator. Guests have
+  // no user_id and are filtered out. Best-effort; org-less rounds don't notify.
+  await notifyRoundInvite(admin, {
+    roundId: round.id,
+    playerUserIds: rows.map((r) => r.user_id).filter((u): u is string => !!u),
+    actorUserId: userId,
+  });
 
   return NextResponse.json({ id: round.id });
 }

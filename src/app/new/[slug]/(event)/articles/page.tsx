@@ -5,6 +5,7 @@ import { getPlatformContext } from "@/lib/v2/context";
 import { pickName } from "@/lib/v2/profile";
 import { stripMarkdown } from "@/lib/v2/text";
 import { loadResolvedFeatures } from "@/lib/v2/features-server";
+import { v2Now } from "@/lib/v2/simulator";
 import { isFeatureVisible } from "@/lib/v2/features";
 import styles from "@/app/new/new.module.css";
 /* eslint-disable @next/next/no-img-element */
@@ -49,7 +50,7 @@ export default async function ArticlesPage({
   const resolved = await loadResolvedFeatures(supabase, org.id, null);
   if (!isFeatureVisible(resolved, "articles", isAdmin)) redirect(`/new/${slug}`);
 
-  const nowIso = new Date().toISOString();
+  const nowIso = (await v2Now()).toISOString();
   const { data } = await supabase
     .from("v2_articles")
     .select(

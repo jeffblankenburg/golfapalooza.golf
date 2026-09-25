@@ -48,6 +48,13 @@ export default async function AdminHub({
           ]}
         />
       </div>
+
+      <div className={styles.section}>
+        <p className={styles.sectionLabel}>Developer</p>
+        <AdminGrid
+          items={[{ label: "Simulator", href: `/new/${slug}/admin/simulator`, desc: "View as a member, or override the clock" }]}
+        />
+      </div>
     </div>
   );
 }

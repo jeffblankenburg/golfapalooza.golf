@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { v2RealtimeClient } from "@/lib/v2/supabase-browser";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useNameMode } from "./NameMode";
+import { useSimNow } from "./SimTime";
 import { pickName } from "@/lib/v2/profile";
 /* eslint-disable @next/next/no-img-element */
 
@@ -399,6 +400,7 @@ interface CommentRow {
 
 function CommentsSheet({ itemId, onClose, onCountChange }: { itemId: string; onClose: () => void; onCountChange: (n: number) => void }) {
   const mode = useNameMode();
+  const simNow = useSimNow();
   const [comments, setComments] = useState<CommentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
@@ -509,7 +511,7 @@ function CommentsSheet({ itemId, onClose, onCountChange }: { itemId: string; onC
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2">
                     <span className="text-sm font-semibold text-gray-900">{senderName}</span>
-                    <span className="text-[0.6875rem] text-gray-400">{commentStamp(c.created_at)}</span>
+                    <span className="text-[0.6875rem] text-gray-400">{commentStamp(c.created_at, simNow)}</span>
                   </div>
                   <p className="text-sm text-gray-700 break-words">{c.content}</p>
                 </div>
@@ -690,6 +692,7 @@ export default function MediaViewer({
   onDelete: (itemId: string) => void;
   initialShowComments?: boolean;
 }) {
+  const simNow = useSimNow();
   // Internal, mutable copy so reaction/tag/caption edits survive parent re-renders.
   const [list, setList] = useState<ViewerItem[]>(items);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -1178,7 +1181,7 @@ export default function MediaViewer({
                 )}
               </div>
               <span className="text-white font-medium text-sm">{item.uploader.display_name}</span>
-              <span className="text-white/60 text-xs">{mediaStamp(item.taken_at || item.created_at)}</span>
+              <span className="text-white/60 text-xs">{mediaStamp(item.taken_at || item.created_at, simNow)}</span>
             </div>
 
             {editingCaption ? (

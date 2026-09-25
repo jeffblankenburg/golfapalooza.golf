@@ -47,7 +47,10 @@ export function pickBirthdaySubtitle(age: number): string {
 }
 
 /** Today's calendar date in a given timezone (defaults to the golf group's ET). */
-export function todayInTimezone(tz = "America/New_York"): {
+export function todayInTimezone(
+  tz = "America/New_York",
+  now: Date = new Date(),
+): {
   month: number;
   day: number;
   year: number;
@@ -57,7 +60,7 @@ export function todayInTimezone(tz = "America/New_York"): {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).formatToParts(new Date());
+  }).formatToParts(now);
   const get = (t: string) => parseInt(parts.find((p) => p.type === t)!.value, 10);
   return { month: get("month"), day: get("day"), year: get("year") };
 }

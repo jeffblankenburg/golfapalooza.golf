@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgMember } from "@/lib/v2/orgs";
+import { v2Now } from "@/lib/v2/simulator";
 
 /**
  * @swagger
@@ -32,7 +33,7 @@ export async function POST(
   }
 
   // Only count reads of live articles (an admin previewing a draft doesn't count).
-  if (art.publish_at && new Date(art.publish_at) <= new Date()) {
+  if (art.publish_at && new Date(art.publish_at) <= (await v2Now())) {
     await admin
       .from("v2_article_views")
       .upsert({ article_id: id, user_id: userId }, { onConflict: "article_id,user_id", ignoreDuplicates: true });

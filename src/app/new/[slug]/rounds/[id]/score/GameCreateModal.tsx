@@ -53,7 +53,7 @@ export default function GameCreateModal({
   const firstAvailable = available[0] ?? "nassau";
 
   const [type, setType] = useState<GameType>(firstAvailable);
-  const [isNet, setIsNet] = useState(false);
+  const [isNet, setIsNet] = useState(true); // Net is the default scoring basis
   const [carry, setCarry] = useState(false); // skins: roll tied skins forward (default off)
   const [value, setValue] = useState<number | null>(DEFAULT_STAKE[firstAvailable]);
   const [valueStr, setValueStr] = useState(formatStake(DEFAULT_STAKE[firstAvailable]));
@@ -148,9 +148,9 @@ export default function GameCreateModal({
         )}
 
         <label className={styles.gsLabel}>Scoring</label>
-        <div className={styles.gsSeg} role="group" aria-label="Gross or Net">
-          <button type="button" className={styles.gsSegOption} data-on={!isNet || undefined} onClick={() => setIsNet(false)}>Gross</button>
+        <div className={styles.gsSeg} role="group" aria-label="Net or Gross">
           <button type="button" className={styles.gsSegOption} data-on={isNet || undefined} onClick={() => setIsNet(true)}>Net</button>
+          <button type="button" className={styles.gsSegOption} data-on={!isNet || undefined} onClick={() => setIsNet(false)}>Gross</button>
         </div>
 
         {type === "skins" && (

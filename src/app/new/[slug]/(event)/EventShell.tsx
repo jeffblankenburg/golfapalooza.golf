@@ -424,7 +424,7 @@ export default function EventShell({
         </div>
         <div className={styles.drawerBody} data-flush={open === "chat" || open === "photos" || undefined}>
           {open === "profile" ? (
-            <ProfileDrawer active={open === "profile"} />
+            <ProfileDrawer active={open === "profile"} orgId={orgId} canSim={isAdmin} />
           ) : open === "notifications" ? (
             <NotificationDrawer
               active={open === "notifications"}

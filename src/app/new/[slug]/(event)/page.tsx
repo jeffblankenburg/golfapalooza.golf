@@ -5,6 +5,7 @@ import { loadResolvedFeatures } from "@/lib/v2/features-server";
 import { isFeatureVisible } from "@/lib/v2/features";
 import styles from "@/app/new/new.module.css";
 import { getOnboardingState } from "@/lib/v2/onboarding";
+import { v2Now } from "@/lib/v2/simulator";
 import Countdown from "./Countdown";
 import HomeModules from "./HomeModules";
 import OnboardingChecklist from "./OnboardingChecklist";
@@ -83,7 +84,7 @@ export default async function EventHome({
           {(range || event.start_date) && (
             <div className={styles.dateBand}>
               {range && <span className={styles.dateText}>{range}</span>}
-              {event.start_date && <Countdown start={event.start_date} end={event.end_date} />}
+              {event.start_date && <Countdown start={event.start_date} end={event.end_date} nowMs={(await v2Now()).getTime()} />}
             </div>
           )}
 

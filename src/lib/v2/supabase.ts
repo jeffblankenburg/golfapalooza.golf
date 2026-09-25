@@ -56,28 +56,37 @@ export function v2TokenClient(token: string): SupabaseClient {
 
 export interface V2Auth {
   userId: string | null;
+  /** The authenticated user (differs from userId only while simulating). */
+  realUserId: string | null;
+  /** True when acting as another member via the user simulator. */
+  simulating: boolean;
   /** RLS-scoped client for the caller (bearer token client, or cookie client). */
   supabase: SupabaseClient;
 }
 
 /**
  * Resolve the caller for an API route from either a bearer token (native) or the
- * cookie session (web), and return an RLS-scoped client for them. Privileged
- * writes should still use v2AdminClient() after checking `userId`.
+ * cookie session (web), and return an RLS-scoped client for them. `userId` is the
+ * EFFECTIVE user — the same as the real user unless an authorized simulator is
+ * active (see `resolveEffectiveUser`). Privileged writes should still use
+ * v2AdminClient() after checking `userId`.
  */
 export async function v2GetUser(request: Request): Promise<V2Auth> {
   const header = request.headers.get("authorization") || request.headers.get("Authorization");
   if (header?.startsWith("Bearer ")) {
+    // Native (bearer) requests don't carry the sim cookie — no simulation.
     const token = header.slice(7).trim();
     const supabase = v2TokenClient(token);
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    return { userId: user?.id ?? null, supabase };
+    return { userId: user?.id ?? null, realUserId: user?.id ?? null, simulating: false, supabase };
   }
   const supabase = await v2ServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  return { userId: user?.id ?? null, supabase };
+  const { resolveEffectiveUser } = await import("./simulator");
+  const eff = await resolveEffectiveUser(user?.id ?? null);
+  return { userId: eff.userId, realUserId: eff.realUserId, simulating: eff.simulating, supabase };
 }

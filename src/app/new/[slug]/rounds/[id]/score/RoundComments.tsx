@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import styles from "./score.module.css";
 import MessageComposer, { type ComposerMember, type ComposerPayload } from "@/app/new/_components/MessageComposer";
+import { useSimOffset } from "@/app/new/[slug]/(event)/SimTime";
 
 interface Comment {
   id: string;
@@ -20,9 +21,9 @@ function initials(name: string): string {
   return (name[0] || "?").toUpperCase();
 }
 
-function formatTime(dateStr: string) {
+function formatTime(dateStr: string, offset = 0) {
   const d = new Date(dateStr);
-  const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+  const mins = Math.floor((Date.now() + offset - d.getTime()) / 60000);
   if (mins < 1) return "now";
   if (mins < 60) return `${mins}m`;
   const hrs = Math.floor(mins / 60);
@@ -58,6 +59,7 @@ function renderContent(content: string): React.ReactNode[] {
  * emoji via the shared MessageComposer). Own realtime channel.
  */
 export default function RoundComments({ roundId, viewerId, orgId }: { roundId: string; viewerId: string; orgId: string }) {
+  const simOffset = useSimOffset();
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<ComposerMember[]>([]);
@@ -166,7 +168,7 @@ export default function RoundComments({ roundId, viewerId, orgId }: { roundId: s
             <div className={styles.commentBody}>
               <div className={styles.commentHead}>
                 <span className={styles.commentName}>{c.sender?.display_name || "Player"}</span>
-                <span className={styles.commentTime}>{formatTime(c.created_at)}</span>
+                <span className={styles.commentTime}>{formatTime(c.created_at, simOffset)}</span>
                 {c.sender_id === viewerId && (
                   <button type="button" className={styles.commentDelete} onClick={() => remove(c.id)} aria-label="Delete comment">
                     Delete

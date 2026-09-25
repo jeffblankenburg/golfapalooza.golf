@@ -52,6 +52,15 @@ export const NOTIFICATION_SECTIONS: NotificationSection[] = [
     items: [{ type: "article", label: "New articles", description: "When a new article is published" }],
   },
   {
+    key: "rounds",
+    label: "My Rounds",
+    items: [
+      { type: "round_invite", label: "Round invites", description: "When someone adds you to a round" },
+      { type: "round_comment", label: "Round comments", description: "Comments on a round you're playing" },
+      { type: "round_mention", label: "Round mentions", description: "When someone @mentions you in a round comment" },
+    ],
+  },
+  {
     // Global mute per type. A follower gets a spectator notification only when
     // BOTH the per-follow toggle is on AND the type isn't muted here.
     key: "following",

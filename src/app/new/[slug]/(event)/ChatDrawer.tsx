@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import Link from "next/link";
 import { v2BrowserClient } from "@/lib/v2/supabase-browser";
 import { useNameMode } from "./NameMode";
+import { useSimNow } from "./SimTime";
 import { pickName } from "@/lib/v2/profile";
 import ImageLightbox from "./ImageLightbox";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
@@ -542,6 +543,7 @@ function RoomList({
   onNew: () => void;
   orgId: string;
 }) {
+  const simNow = useSimNow();
   const [q, setQ] = useState("");
   const [results, setResults] = useState<{ q: string; items: SearchResult[] } | null>(null);
   const query = q.trim();
@@ -592,7 +594,7 @@ function RoomList({
                   </span>
                 </span>
                 <span className={styles.roomRight}>
-                  <span className={styles.roomTime}>{roomStamp(r.createdAt)}</span>
+                  <span className={styles.roomTime}>{roomStamp(r.createdAt, simNow)}</span>
                 </span>
               </button>
             ))}
@@ -627,7 +629,7 @@ function RoomList({
                   <span className={styles.roomPreview}>{preview}</span>
                 </span>
                 <span className={styles.roomRight}>
-                  {r.lastMessage && <span className={styles.roomTime}>{roomStamp(r.lastMessage.createdAt)}</span>}
+                  {r.lastMessage && <span className={styles.roomTime}>{roomStamp(r.lastMessage.createdAt, simNow)}</span>}
                   {r.unread > 0 && <span className={styles.roomUnread}>{r.unread > 99 ? "99+" : r.unread}</span>}
                 </span>
               </button>

@@ -7,25 +7,32 @@ import styles from "@/app/new/new.module.css";
  * Live countdown to an event's start. Shows days when far out, and drops to
  * hours/minutes/seconds as it approaches. "Underway" once it starts. Renders
  * nothing until mounted (the server has no clock — avoids a hydration mismatch).
+ *
+ * `nowMs` is the server's EFFECTIVE now (honors the time simulator). We tick off
+ * the browser clock but apply the sim offset so the countdown reflects the
+ * simulated time when active, and normal time otherwise.
  */
 export default function Countdown({
   start,
   end,
+  nowMs,
 }: {
   start: string;
   end?: string | null;
+  nowMs: number;
 }) {
   const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
-    const tick = () => setNow(Date.now());
+    const offset = nowMs - Date.now(); // simulated-now minus real-now (≈0 when not simulating)
+    const tick = () => setNow(Date.now() + offset);
     const raf = requestAnimationFrame(tick); // first update off the effect body
     const id = setInterval(tick, 1000);
     return () => {
       cancelAnimationFrame(raf);
       clearInterval(id);
     };
-  }, []);
+  }, [nowMs]);
 
   if (now === null) return null;
 

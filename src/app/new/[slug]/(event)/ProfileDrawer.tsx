@@ -6,6 +6,7 @@ import { v2BrowserClient } from "@/lib/v2/supabase-browser";
 import { formatPhone } from "@/lib/v2/phone";
 import { pickName } from "@/lib/v2/profile";
 import { useNameMode } from "./NameMode";
+import SimControl from "./SimControl";
 import styles from "@/app/new/new.module.css";
 /* eslint-disable @next/next/no-img-element */
 
@@ -37,7 +38,7 @@ const SHIRTS = ["S", "M", "L", "XL", "2XL", "3XL", "4XL"];
 
 /** Profile & settings drawer content. Loads the caller's profile the first time
  *  it's opened; edits save to /api/v2/profile. */
-export default function ProfileDrawer({ active }: { active: boolean }) {
+export default function ProfileDrawer({ active, orgId, canSim }: { active: boolean; orgId?: string; canSim?: boolean }) {
   const router = useRouter();
   const mode = useNameMode();
   const [p, setP] = useState<Profile | null>(null);
@@ -237,6 +238,8 @@ export default function ProfileDrawer({ active }: { active: boolean }) {
       </label>
 
       {error && <p className={styles.formError}>{error}</p>}
+
+      {canSim && orgId && <SimControl orgId={orgId} active={active} />}
 
       <div className={styles.profileActions}>
         <button type="button" className={styles.createBtn} onClick={save} disabled={saving} style={{ opacity: saving ? 0.6 : 1 }}>

@@ -4458,3 +4458,134 @@ button.feedRow:active {
   font-size: 0.75rem;
   color: var(--ink-soft);
 }
+
+/* ── User simulator (dev/admin) ─────────────────────────────────────────────── */
+.simBanner {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--nav-h, 56px) + var(--mini-h, 0px) + 12px);
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 8px 7px 14px;
+  border-radius: 999px;
+  background: #9a6b00;
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+  font-size: 0.82rem;
+  font-weight: 600;
+  max-width: calc(100vw - 24px);
+}
+.simBannerText {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.simBannerExit {
+  flex: none;
+  border: none;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 4px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.simBannerExit:hover {
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.simControl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  margin-top: 4px;
+}
+.simList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.simMember {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  border-radius: 9px;
+  cursor: pointer;
+  text-align: left;
+}
+.simMember:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+.simMember:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.simMemberAvatar,
+.simMemberAvatarFallback {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  flex: none;
+  object-fit: cover;
+}
+.simMemberAvatarFallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+  color: var(--brand);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+.simMemberName {
+  font-size: 0.9rem;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.simMember[data-current] {
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+}
+.simActiveRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #9a6b00 12%, transparent);
+  color: var(--ink);
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+}
+.simStopBtn {
+  flex: none;
+  border: none;
+  background: #9a6b00;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.simBannerSep {
+  display: inline-block;
+  width: 1px;
+  height: 12px;
+  margin: 0 8px;
+  background: rgba(255, 255, 255, 0.4);
+  vertical-align: middle;
+}

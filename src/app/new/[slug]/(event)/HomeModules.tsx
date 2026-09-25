@@ -3,6 +3,7 @@ import { v2ServerClient } from "@/lib/v2/supabase";
 import { stripMarkdown } from "@/lib/v2/text";
 import { pickName, type NameMode } from "@/lib/v2/profile";
 import { todayInTimezone, ageTurningToday } from "@/lib/v2/birthday";
+import { v2Now } from "@/lib/v2/simulator";
 import BirthdayBanner, { type BirthdayPerson } from "./BirthdayBanner";
 import RsvpModule, { type Likelihood } from "./RsvpModule";
 import AdCarousel, { type Ad } from "./AdCarousel";
@@ -37,8 +38,9 @@ interface MemberProfile {
 function birthdaysToday(
   rows: { v2_profiles: MemberProfile | null }[],
   mode: NameMode,
+  now: Date,
 ): BirthdayPerson[] {
-  const today = todayInTimezone();
+  const today = todayInTimezone("America/New_York", now);
   const mmdd = `${String(today.month).padStart(2, "0")}-${String(today.day).padStart(2, "0")}`;
   return rows
     .map((r) => r.v2_profiles)
@@ -77,7 +79,8 @@ export default async function HomeModules({
 }) {
   const supabase = await v2ServerClient();
 
-  const nowIso = new Date().toISOString();
+  const now = await v2Now();
+  const nowIso = now.toISOString();
 
   // Birthdays + article + RSVP + attending count + ads + activity, in parallel.
   const [membersRes, articleRes, myRsvpRes, goingRes, attendingRes, adsRes, activityRes, orgSysRes] =
@@ -152,6 +155,7 @@ export default async function HomeModules({
   const birthdays = birthdaysToday(
     (membersRes.data as unknown as { v2_profiles: MemberProfile | null }[]) || [],
     nameDisplay,
+    now,
   );
 
   // Featured article (null until 00185 is applied / an article is published).

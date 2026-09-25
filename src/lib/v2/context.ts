@@ -1,4 +1,5 @@
-import { v2ServerClient } from "@/lib/v2/supabase";
+import { v2ServerClient, v2AdminClient } from "@/lib/v2/supabase";
+import { resolveEffectiveUser } from "@/lib/v2/simulator";
 import type { NameMode } from "@/lib/v2/profile";
 
 /**
@@ -27,7 +28,14 @@ export interface PlatformOrg {
 }
 
 export interface PlatformContext {
+  /** Effective user — the simulated member when simulating, else the real user. */
   userId: string;
+  /** The authenticated user (differs from userId only while simulating). */
+  realUserId: string;
+  /** True when viewing the app as another member via the simulator. */
+  simulating: boolean;
+  /** Display name of the simulated member (only while simulating). */
+  simName: string | null;
   orgs: PlatformOrg[];
 }
 
@@ -43,12 +51,18 @@ export async function getPlatformContext(): Promise<PlatformContext | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: memberships } = await supabase
+  const eff = await resolveEffectiveUser(user.id);
+  const effUserId = eff.userId ?? user.id;
+  // When simulating, the RLS client can't read the simulated member's own rows —
+  // fetch their memberships with the service-role client instead.
+  const client = eff.simulating ? v2AdminClient() : supabase;
+
+  const { data: memberships } = await client
     .from("v2_memberships")
     .select(
       "role, org:v2_organizations(id, name, slug, logo_url, primary_color, secondary_color, store_url, store_label, store_enabled, name_display, system_name, system_avatar_url, member_noun, member_noun_plural)"
     )
-    .eq("user_id", user.id)
+    .eq("user_id", effUserId)
     .eq("status", "active")
     .is("archived_at", null);
 
@@ -61,5 +75,11 @@ export async function getPlatformContext(): Promise<PlatformContext | null> {
     .filter((o): o is PlatformOrg => o !== null)
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  return { userId: user.id, orgs };
+  let simName: string | null = null;
+  if (eff.simulating) {
+    const { data: prof } = await client.from("v2_profiles").select("display_name").eq("id", effUserId).maybeSingle();
+    simName = prof?.display_name ?? null;
+  }
+
+  return { userId: effUserId, realUserId: user.id, simulating: eff.simulating, simName, orgs };
 }

@@ -119,9 +119,9 @@ export default function GameSettingsModal({
         </div>
 
         <label className={styles.gsLabel}>Scoring</label>
-        <div className={styles.gsSeg} role="group" aria-label="Gross or Net">
-          <button type="button" className={styles.gsSegOption} data-on={!isNet || undefined} onClick={() => setIsNet(false)}>Gross</button>
+        <div className={styles.gsSeg} role="group" aria-label="Net or Gross">
           <button type="button" className={styles.gsSegOption} data-on={isNet || undefined} onClick={() => setIsNet(true)}>Net</button>
+          <button type="button" className={styles.gsSegOption} data-on={!isNet || undefined} onClick={() => setIsNet(false)}>Gross</button>
         </div>
 
         {isSkins && (

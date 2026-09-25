@@ -7,6 +7,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { timeAgo, type ActivityRow } from "@/lib/v2/activity";
 import { pickName } from "@/lib/v2/profile";
 import { useNameMode } from "./NameMode";
+import { useSimNow } from "./SimTime";
 import styles from "@/app/new/new.module.css";
 /* eslint-disable @next/next/no-img-element */
 
@@ -128,6 +129,7 @@ function Accessory({ it }: { it: ActivityRow }) {
  *  like every other kind, not in the sentence. */
 function Body({ it, systemName }: { it: ActivityRow; systemName: string }) {
   const mode = useNameMode();
+  const now = useSimNow();
   const name = isSystemAuthored(it) ? systemName : it.actor ? pickName(it.actor, mode) : null;
   const likelihood = it.kind === "rsvp" ? num(it.metadata?.likelihood) : null;
   const action = it.kind === "rsvp" ? `Marked their RSVP as ${it.title}` : it.title;
@@ -145,7 +147,7 @@ function Body({ it, systemName }: { it: ActivityRow; systemName: string }) {
             <span className={styles.feedMetaName}>{name}</span>,{" "}
           </>
         )}
-        {timeAgo(it.created_at)}
+        {timeAgo(it.created_at, now)}
       </span>
     </span>
   );

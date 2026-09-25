@@ -1,0 +1,39 @@
+{
+  "cli_version": "0.11.2",
+  "checkpoint_id": "01M3B6PSAH4KHKYJA5DA8XMJDW",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 10,
+  "files_touched": [
+    "src/app/api/v2/rounds/[id]/games/[gameId]/route.ts",
+    "src/app/api/v2/rounds/[id]/games/route.ts",
+    "src/app/api/v2/rounds/route.ts",
+    "src/app/new/[slug]/(event)/RoundForm.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/GameCreateModal.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/GameSettingsModal.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/ScoreEntry.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/SideGameStandings.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/page.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/score.module.css",
+    "src/app/new/new.module.css",
+    "src/lib/v2/rounds/skins.ts",
+    "src/lib/v2/rounds/stake.ts",
+    "src/lib/v2/rounds/vegas.ts"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 56876,
+    "cache_creation_tokens": 3059717,
+    "cache_read_tokens": 433909600,
+    "output_tokens": 992087,
+    "api_call_count": 1037
+  }
+}

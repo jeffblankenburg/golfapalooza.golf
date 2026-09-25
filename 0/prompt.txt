@@ -192,3 +192,7 @@ What's next?
 ---
 
 Actually check the commits.  We're mostly up to date.
+
+---
+
+passing on more games for now.  review the issue list and lets get something meaningful built.

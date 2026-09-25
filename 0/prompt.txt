@@ -1,0 +1,274 @@
+For the Nassau box, the title of the box should be the two player names.  Not "Nassau (Net)".  That can swap positions with the player names.
+
+---
+
+For the nassau, the (net) or (raw) should be after the player names.  Nassau can stay by iteself.
+
+---
+
+I don't like the arrows you're using.  I'd prefer something chunkier. [Image #11]
+
+---
+
+There's two options missing from the Nassau.
+
+  1. The idea of a "press".
+  2. The idea of dormie or a loss before all the holes have been completed.  If a player is up 5 holes to 0, with 4 holes remaining, the match is already over.  The losing player doesn't have enough holes to catch up.
+  3. It makes me wonder if people traditionally play a nassau with stroke or match play, or if we should offer that as an option.
+
+---
+
+I have installed the "entire" CLI, but it doesn't seem to be collecting any data.  Do you know the git tool entire?
+
+---
+
+I did commit and push.  And didn't see anything in entire's dashboard.  That's why I'm asking.
+
+---
+
+I think we have everything committed and pushed currently.
+
+---
+
+yep
+
+---
+
+That worked!
+
+---
+
+let's work on some of the other games
+
+---
+
+For 6-6-6, I really need to see who owes who money.  Or do you think it is obvious enough?
+
+---
+
+Now we have boxes with totals AND sentences saying who owes who.  Be more creative in this approach.  Can we do it with the boxes alone?
+
+---
+
+Without running a manual test, I'm curious:  if player A owes $5 to player B after the first 6 holes, and then on the 2nd match, player B owes $5 to player A, do you eliminate the debts, or do you keep both?
+
+---
+
+That's a brilliant and elegant solution.  Nice work.  Sounds perfect.
+
+---
+
+Update the issue with our current progress.
+
+---
+
+Can we be more concise with the 6-6-6 balance boxes?  I'm starting to think we only show data about those that owe.  I'd like to reframe it to just be a number and a name.  Like "$5/Quack" saying that Chef owes Quack $5.
+
+---
+
+I still don't like how the teams in 6-6-6 are shown and overlap when closed.[Image #12]
+
+---
+
+In the debt boxes, let's do "Chef owes", or "Long O owes"
+
+---
+
+The "add a game" modal should only show games that are available to add.  Right now, certain game types are just disabled.
+
+---
+
+what other games can we do?
+
+---
+
+I like Vegas. . With the birdie twist.
+
+---
+
+I like Vegas. . With the birdie twist.
+
+---
+
+I think we should have a default value denomination for each type of game.  They can always edit them.
+
+Skins: $2
+Nassau: $5
+6-6-6: $5
+
+I don't know what a score in Vegas should or would be.  What do you think a reasonable price per point is?  Feels like maybe $0.10?
+
+---
+
+As for picking teammates in Vegas, they should be two colors.  First two picked are one color, second two another color.  They should not be selected by default, and can't be added until all players are assigned to a team.
+
+---
+
+I don't see green and blue.  [Image #13]
+
+---
+
+Instead of the line that says "up 29", there should just be a T box at the end of however many holes have been completed that shows the total in points, in the appropriate color.
+
+---
+
+The T box doesn't need to be green.
+
+---
+
+Let's put a single pixel vertical line before the T box.
+
+---
+
+If a user presses on one of the differences in the table, can we show the math above their fat finger press?
+
+---
+
+This is awesome.
+
+---
+
+update the issue.  I'm going to commit and push.
+
+---
+
+what's next
+
+---
+
+Editing the vegas game doesn't show the team pills
+
+---
+
+1 it is
+
+---
+
+Does deleting a round orphan the game records, or cascade delete them?
+
+---
+
+I think that the likelihood of someone deleting their round is incredibly low.  I almost want to make it so that completed rounds aren't deleteable.  I'm not sure of the right approach here, but if we allow a delete, that should delete the affected games as well.
+
+---
+
+A couple of notes:
+
+1. If, when a user creates a new round, they select scramble, that immediately negates the option for games.  Can't play games in a scramble, as far as I know, since nobody is ever playing their own ball.
+2. If the group is smaller than 4, that automatically eliminates some games.  They shouldn't be shown if they can't be played.
+
+---
+
+For the "my rounds" icon in the top navigation, we need something that is more "golf".
+
+---
+
+Let's see the golf ball on a tee.
+
+---
+
+On v1, we have a quick link for courses that has an excellent flag in a hole.  Can we just use that?
+
+---
+
+WEll, I still need it to have the same weight and prominence as the rest of the icons up there.
+
+---
+
+It's still a little thin. [Image #14]
+
+---
+
+That's almost a little too heavy.
+
+---
+
+THat's perfect.
+
+---
+
+What's next?
+
+---
+
+Actually check the commits.  We're mostly up to date.
+
+---
+
+passing on more games for now.  review the issue list and lets get something meaningful built.
+
+---
+
+As the solo developer and user of this new version, can you make my life easier?  v1 had a time simulator, and a user simulator.  Those would be super handy as we're creating features that can only be seen by others.
+
+---
+
+Seems great.  Can you assure me that when I am simulating another user, that the entire app works as if I am that user?
+
+---
+
+great.  now time simulator.  I don't mind the user simulation living in the profile tab, but it's not obvious.  It should be a dedicated admin page.  Also, in the profile, the list of users only shows the first 10 or so.  Does not scroll the entire list.
+
+---
+
+The countdown timer in the home page header doesn't appear to be affected by the time simulator.  Doesn't give me much confidence that it works.
+
+---
+
+I need the site to reflect everything as if the time is the simulated time.  That means everything.
+
+---
+
+Everything is pushed.
+
+Can we work on that location header text issue?
+
+---
+
+Love it.  Don't need the icon.  It should be tappable to launch their default mapping application.
+
+---
+
+I just noticed that I don't currently have a way, in v2, to update a user's phone number. Since this is what they use for authentication, make sure it gets updated appropriately.
+
+Question: if a user is logged in on their phone, and we update their phone number, does that affect their current session?  Or does it just change the number they'll need to use next time?
+
+---
+
+I think this is great for individuals that need to change their own phone number.  But group administrators might also need the ability to update a user's phone number in the admin without the OTP.
+
+---
+
+Let's put the geolocation icon after the location text in the home page header.
+
+---
+
+what's next?
+
+---
+
+let's close those that are complete.
+
+---
+
+I think I want to spend a little time thinking about what the experience for a group admin (or a set of group admins) is like for setting up a new event.
+
+The big things that come to mind revolve around the "schedule."  
+
+First, they've decided that on Day #1 of their event, they need to have a Ryder Cup event.  On Day #2, they want to have a scramble, a calcutta auction, dinner, and a singles cornhole tournament.  Obviously we need to build the modules for those activities, but they also need to be able to add those elements to their event schedule.
+
+Part of me feels like offering an Outlook-style calendar, where they can add events, and then configure those events all from the calendar.  (A normal calendar event might be a virtual meeting, in-person meeting, phont call,e tc.  In our case, a calendar event could be a golf match, a cornhole tournament, or a calcutta auction.
+
+There will also be additional events occuring throughout the day, like sporting events that are televised.  Nobody participates, but it's good to know when a game is on.  Same goes for things like meals.  It's just a calendar event, but there's nothing more than a date/time, location, and maybe a menu.
+
+---
+
+I need to board a plane.  If it has wi-fi, we can work on this on the plane.
+
+---
+
+commit the plan to an issue just in case.
+
+---
+
+241 and 242 have been completed.

@@ -125,3 +125,7 @@ If a user presses on one of the differences in the table, can we show the math a
 ---
 
 This is awesome.
+
+---
+
+update the issue.  I'm going to commit and push.

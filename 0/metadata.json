@@ -1,0 +1,64 @@
+{
+  "cli_version": "0.11.2",
+  "checkpoint_id": "01M3AYY9RQXPG9B6E68ZEY9G0D",
+  "session_id": "3f8be6d7-7fe4-4356-a2b3-21f7db5ec944",
+  "strategy": "manual-commit",
+  "created_at": "2026-09-25T00:20:15.737791Z",
+  "branch": "main",
+  "checkpoints_count": 3,
+  "save_step_count": 4,
+  "files_touched": [
+    "src/app/new/[slug]/rounds/[id]/score/GameCreateModal.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/SideGameStandings.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/score.module.css"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8",
+  "turn_id": "9382cd8a8df8",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 53347,
+    "cache_creation_tokens": 2592693,
+    "cache_read_tokens": 373941146,
+    "output_tokens": 886075,
+    "api_call_count": 889
+  },
+  "session_metrics": {
+    "turn_count": 19
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-09-25T00:20:15.471404Z",
+    "agent_lines": 57,
+    "agent_removed": 43,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 57,
+    "total_lines_changed": 100,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 39,
+      "agent_lines_removed": 26
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 40,
+      "agent_lines_removed": 27
+    }
+  ]
+}

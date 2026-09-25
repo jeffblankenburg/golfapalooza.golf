@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.11.2",
+  "checkpoint_id": "01M3AYY9RQXPG9B6E68ZEY9G0D",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "src/app/new/[slug]/rounds/[id]/score/GameCreateModal.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/SideGameStandings.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/score.module.css"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 53347,
+    "cache_creation_tokens": 2592693,
+    "cache_read_tokens": 373941146,
+    "output_tokens": 886075,
+    "api_call_count": 889
+  }
+}

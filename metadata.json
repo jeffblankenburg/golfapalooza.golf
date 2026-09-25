@@ -1,0 +1,36 @@
+{
+  "cli_version": "0.11.2",
+  "checkpoint_id": "01M3AYFZBXNYHPZZFT0PP4R046",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 9,
+  "files_touched": [
+    "src/app/api/v2/rounds/[id]/games/[gameId]/route.ts",
+    "src/app/api/v2/rounds/[id]/games/route.ts",
+    "src/app/api/v2/rounds/route.ts",
+    "src/app/new/[slug]/(event)/RoundForm.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/GameCreateModal.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/GameSettingsModal.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/ScoreEntry.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/SideGameStandings.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/score.module.css",
+    "src/lib/v2/rounds/settle.ts",
+    "src/lib/v2/rounds/sixes.ts"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 53067,
+    "cache_creation_tokens": 2580616,
+    "cache_read_tokens": 370278342,
+    "output_tokens": 875392,
+    "api_call_count": 878
+  }
+}

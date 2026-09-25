@@ -1,0 +1,65 @@
+For the Nassau box, the title of the box should be the two player names.  Not "Nassau (Net)".  That can swap positions with the player names.
+
+---
+
+For the nassau, the (net) or (raw) should be after the player names.  Nassau can stay by iteself.
+
+---
+
+I don't like the arrows you're using.  I'd prefer something chunkier. [Image #11]
+
+---
+
+There's two options missing from the Nassau.
+
+  1. The idea of a "press".
+  2. The idea of dormie or a loss before all the holes have been completed.  If a player is up 5 holes to 0, with 4 holes remaining, the match is already over.  The losing player doesn't have enough holes to catch up.
+  3. It makes me wonder if people traditionally play a nassau with stroke or match play, or if we should offer that as an option.
+
+---
+
+I have installed the "entire" CLI, but it doesn't seem to be collecting any data.  Do you know the git tool entire?
+
+---
+
+I did commit and push.  And didn't see anything in entire's dashboard.  That's why I'm asking.
+
+---
+
+I think we have everything committed and pushed currently.
+
+---
+
+yep
+
+---
+
+That worked!
+
+---
+
+let's work on some of the other games
+
+---
+
+For 6-6-6, I really need to see who owes who money.  Or do you think it is obvious enough?
+
+---
+
+Now we have boxes with totals AND sentences saying who owes who.  Be more creative in this approach.  Can we do it with the boxes alone?
+
+---
+
+Without running a manual test, I'm curious:  if player A owes $5 to player B after the first 6 holes, and then on the 2nd match, player B owes $5 to player A, do you eliminate the debts, or do you keep both?
+
+---
+
+That's a brilliant and elegant solution.  Nice work.  Sounds perfect.
+
+---
+
+Update the issue with our current progress.
+
+---
+
+Can we be more concise with the 6-6-6 balance boxes?  I'm starting to think we only show data about those that owe.  I'd like to reframe it to just be a number and a name.  Like "$5/Quack" saying that Chef owes Quack $5.

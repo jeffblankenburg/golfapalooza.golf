@@ -638,10 +638,17 @@
   background: color-mix(in srgb, var(--brand) 14%, transparent);
 }
 .locationLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: var(--ink);
   font-weight: 500;
   font-size: 0.85rem;
   text-decoration: none;
+}
+.locationPin {
+  flex: none;
+  color: var(--brand);
 }
 
 .orgHead {

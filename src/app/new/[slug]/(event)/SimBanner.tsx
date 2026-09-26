@@ -37,7 +37,12 @@ export default function SimBanner({ name, at }: { name: string | null; at: strin
         {name && at && <span className={styles.simBannerSep} />}
         {at && (
           <>
-            <span aria-hidden>🕐</span> <strong>{new Date(at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</strong>
+            <span aria-hidden>🕐</span>{" "}
+            {/* Formatted in the viewer's local tz; SSR uses the server's tz, so let
+                the client value win instead of erroring on the mismatch. */}
+            <strong suppressHydrationWarning>
+              {new Date(at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+            </strong>
           </>
         )}
       </span>

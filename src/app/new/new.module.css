@@ -4612,3 +4612,188 @@ button.feedRow:active {
   background: rgba(255, 255, 255, 0.4);
   vertical-align: middle;
 }
+
+/* ── Event schedule / per-day agenda (#208) ─────────────────────────────────── */
+.schedDayTabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin: 0 -2px 12px;
+  -webkit-overflow-scrolling: touch;
+}
+.schedDayTab {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 58px;
+  padding: 7px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.schedDayTab[data-on] {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+  color: var(--brand);
+}
+.schedDayDow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.schedDayNum {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.schedDayTab[data-on] .schedDayNum {
+  color: var(--brand);
+}
+.schedList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.schedItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  cursor: pointer;
+  width: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+.schedItem:hover {
+  border-color: var(--line-strong);
+}
+.schedTime {
+  flex: 0 0 auto;
+  width: 62px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--brand);
+  padding-top: 1px;
+}
+.schedItemMain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.schedItemTitle {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.schedItemMeta {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+/* Preserve line breaks the admin typed into an item's notes/description. */
+.schedItemDesc {
+  white-space: pre-line;
+}
+/* Which event a merged-feed entry belongs to (e.g. "Fall Scramble 2027"). */
+.schedItemContext {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brand);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* Breadcrumb pages sit tight under the top bar (the position loved on Schedule).
+   Overrides the default .page top padding on any page that leads with a "< Back". */
+.page:has(> .back) {
+  padding-top: 14px;
+}
+/* Schedule leads with the static header, which supplies its own top padding. */
+.schedPage {
+  padding-top: 0;
+}
+.schedPage .back {
+  margin-bottom: 6px;
+}
+/* Static header — breadcrumb + title + "Add to calendar" stay put while the list
+   scrolls beneath. It's sticky at top:56 (just under the fixed top bar) AND sits
+   flush at the page top, so its resting position equals its pinned position → no
+   shift, nothing disappears. Below the shell bars (z-60), above the scrolling
+   list; bleeds to the page edges so its paper background masks content underneath. */
+.schedHeader {
+  position: sticky;
+  top: 56px;
+  z-index: 20;
+  background: var(--paper);
+  margin: 0 -10px;
+  padding: 14px 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.schedTitleRow {
+  display: flex;
+  align-items: center; /* the calendar icon centers cleanly against the big title */
+  justify-content: space-between;
+  gap: 12px;
+}
+/* Single "add to calendar" icon action in the schedule header. */
+.schedSubIcon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: none;
+  color: var(--brand);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.schedSubIcon:active {
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+}
+
+/* Schedule List view — date headers with items grouped beneath (#208). */
+.schedGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin-top: 16px;
+}
+.schedGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scroll-margin-top: 150px; /* clear the top bar (56) + the static schedule header */
+}
+.schedDateHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.schedToday {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+  padding: 1px 7px;
+  border-radius: 999px;
+}

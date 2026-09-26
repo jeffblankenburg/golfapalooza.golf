@@ -75,7 +75,7 @@ export default async function EventAdmin({
             { label: "Tee Times", desc: "Groups & start times" },
             { label: "Teams", desc: "Team assignments" },
             { label: "Lodging", desc: "Rooms & housing" },
-            { label: "Schedule", desc: "Itinerary" },
+            { label: "Schedule", href: `/new/${slug}/admin/events/${eventId}/schedule`, desc: "Per-day agenda & activities" },
             { label: "Financials", desc: "Buy-ins & payouts" },
             { label: "Attendance", desc: "RSVPs & roster" },
             { label: "Shirts", desc: "Sizes & orders" },

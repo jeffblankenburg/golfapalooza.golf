@@ -96,7 +96,7 @@ export const FEATURE_CATALOG: FeatureDef[] = [
   { key: "pickem", label: "Pick'em", bucket: "scores", scope: "event", icon: "check", status: "planned", surface: "route", blurb: "Pick winners before play." },
 
   // ── Schedule & Logistics (mostly per event) ──────────────────────────────
-  { key: "schedule", label: "Schedule", bucket: "schedule", scope: "event", icon: "calendar", status: "planned", surface: "route", blurb: "The event itinerary." },
+  { key: "schedule", label: "Schedule", bucket: "schedule", scope: "event", icon: "calendar", status: "available", surface: "route", blurb: "The event itinerary." },
   { key: "courses", label: "Courses", bucket: "schedule", scope: "group", icon: "map", status: "available", surface: "route", blurb: "Course library & scorecards." },
   { key: "rooms", label: "Rooms", bucket: "schedule", scope: "event", icon: "bed", status: "planned", surface: "route", blurb: "Lodging & room assignments." },
   { key: "trip_info", label: "Trip Info", bucket: "schedule", scope: "event", icon: "info", status: "planned", surface: "route", blurb: "Logistics, links & the essentials." },
@@ -292,6 +292,7 @@ const FEATURE_ROUTES: Record<string, (slug: string) => string> = {
   articles: (slug) => `/new/${slug}/articles`,
   courses: (slug) => `/new/${slug}/courses`,
   loozers: (slug) => `/new/${slug}/loozers`,
+  schedule: (slug) => `/new/${slug}/schedule`,
 };
 
 export function featureHref(slug: string, def: FeatureDef): string | null {

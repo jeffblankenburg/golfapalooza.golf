@@ -24,6 +24,7 @@ export interface PlatformOrg {
   system_avatar_url: string | null;
   member_noun: string;
   member_noun_plural: string;
+  show_birthdays: boolean;
   role: OrgRole;
 }
 
@@ -60,7 +61,7 @@ export async function getPlatformContext(): Promise<PlatformContext | null> {
   const { data: memberships } = await client
     .from("v2_memberships")
     .select(
-      "role, org:v2_organizations(id, name, slug, logo_url, primary_color, secondary_color, store_url, store_label, store_enabled, name_display, system_name, system_avatar_url, member_noun, member_noun_plural)"
+      "role, org:v2_organizations(id, name, slug, logo_url, primary_color, secondary_color, store_url, store_label, store_enabled, name_display, system_name, system_avatar_url, member_noun, member_noun_plural, show_birthdays)"
     )
     .eq("user_id", effUserId)
     .eq("status", "active")

@@ -1,0 +1,45 @@
+{
+  "cli_version": "0.11.2",
+  "checkpoint_id": "01M3DJJF8FBZFWRZSJ898CV6FX",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 24,
+  "files_touched": [
+    "src/app/api/v2/ical/[eventId]/route.ts",
+    "src/app/api/v2/ical/org/[orgId]/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/schedule/[itemId]/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/schedule/route.ts",
+    "src/app/new/[slug]/(event)/EventLocation.tsx",
+    "src/app/new/[slug]/(event)/ScheduleAgenda.tsx",
+    "src/app/new/[slug]/(event)/ScheduleSubscribe.tsx",
+    "src/app/new/[slug]/(event)/SimBanner.tsx",
+    "src/app/new/[slug]/(event)/schedule/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/schedule/ScheduleEditor.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/schedule/page.tsx",
+    "src/app/new/new.module.css",
+    "src/lib/v2/context.ts",
+    "src/lib/v2/features.ts",
+    "src/lib/v2/schedule-feed.ts",
+    "src/lib/v2/schedule.ts",
+    "supabase/migrations/00243_v2_schedule_items.sql",
+    "supabase/migrations/00244_v2_schedule_items_end_day.sql",
+    "supabase/migrations/00245_v2_schedule_group_scope.sql"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 103657,
+    "cache_creation_tokens": 5966929,
+    "cache_read_tokens": 832527913,
+    "output_tokens": 1445006,
+    "api_call_count": 1660
+  }
+}

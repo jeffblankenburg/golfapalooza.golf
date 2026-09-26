@@ -35,6 +35,7 @@ export default async function AdminHub({
         <AdminGrid
           items={[
             { label: "Members", href: `/new/${slug}/admin/members`, desc: "Roster, roles & invites" },
+            { label: "Schedule", href: `/new/${slug}/admin/schedule`, desc: "Group calendar (non-event dates)" },
             { label: "Features", href: `/new/${slug}/admin/features`, desc: "Turn group-wide features on & off" },
             { label: "Settings", href: `/new/${slug}/admin/settings`, desc: "Name, logo, colors, domains" },
             { label: "Courses", desc: "Course library" },

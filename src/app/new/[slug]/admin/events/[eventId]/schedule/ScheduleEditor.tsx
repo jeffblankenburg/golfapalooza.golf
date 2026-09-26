@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import Modal from "@/app/new/_components/Modal";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import {
@@ -9,6 +10,7 @@ import {
   ACTIVITY_LABEL,
   fmtTime,
   fmtDateShort,
+  daysBetween,
   sortDayItems,
   type ScheduleItem,
 } from "@/lib/v2/schedule";
@@ -45,15 +47,23 @@ const emptyForm = {
  * scheduled, grouped under date headers in chronological order. Add on any date.
  */
 export default function ScheduleEditor({
-  orgId,
-  eventId,
+  apiBase,
   today,
   initialItems,
+  backHref,
+  backLabel,
+  title = "Schedule",
+  eventSpan,
 }: {
-  orgId: string;
-  eventId: string;
+  apiBase: string; // schedule collection endpoint (event- or group-scoped)
   today: string; // YYYY-MM-DD (simulator-aware)
   initialItems: ScheduleItem[];
+  backHref: string;
+  backLabel: string;
+  title?: string;
+  // Event scope only: shows the event as an all-day banner atop each of its days
+  // (matches the member agenda). Omitted for the group schedule.
+  eventSpan?: { title: string; start: string; end: string | null };
 }) {
   const [items, setItems] = useState<ScheduleItem[]>(initialItems);
   const [editing, setEditing] = useState<ScheduleItem | "new" | null>(null);
@@ -62,12 +72,20 @@ export default function ScheduleEditor({
   const [error, setError] = useState<string | null>(null);
   const [confirmDel, setConfirmDel] = useState<ScheduleItem | null>(null);
 
-  // Group by start day, chronologically — only days that actually have items.
+  // The event's own days get an all-day banner atop them (like the member agenda).
+  const eventDays = useMemo(
+    () => (eventSpan ? new Set(daysBetween(eventSpan.start, eventSpan.end || eventSpan.start)) : new Set<string>()),
+    [eventSpan],
+  );
+
+  // Group by start day, chronologically. Days with items, PLUS every event day
+  // (so empty event days still show with just the banner, matching the member view).
   const groups = useMemo(() => {
     const byDay = new Map<string, ScheduleItem[]>();
     for (const it of items) (byDay.get(it.day) || byDay.set(it.day, []).get(it.day)!).push(it);
+    for (const d of eventDays) if (!byDay.has(d)) byDay.set(d, []);
     return [...byDay.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([day, its]) => ({ day, items: sortDayItems(its) }));
-  }, [items]);
+  }, [items, eventDays]);
 
   // Open scrolled to the next upcoming day, leaving past days to scroll up to.
   // Only when there ARE past days above (otherwise the natural top is correct).
@@ -129,8 +147,7 @@ export default function ScheduleEditor({
       activity_type: form.kind === "activity" ? form.activity_type || null : null,
     };
     const isNew = editing === "new";
-    const base = `/api/v2/orgs/${orgId}/events/${eventId}/schedule`;
-    const res = await fetch(isNew ? base : `${base}/${(editing as ScheduleItem).id}`, {
+    const res = await fetch(isNew ? apiBase : `${apiBase}/${(editing as ScheduleItem).id}`, {
       method: isNew ? "POST" : "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -147,22 +164,32 @@ export default function ScheduleEditor({
 
   async function remove(it: ScheduleItem) {
     setItems((prev) => prev.filter((x) => x.id !== it.id));
-    await fetch(`/api/v2/orgs/${orgId}/events/${eventId}/schedule/${it.id}`, { method: "DELETE" });
+    await fetch(`${apiBase}/${it.id}`, { method: "DELETE" });
   }
 
   return (
-    <div>
-      <div className={styles.titleRow}>
-        <h1 className={styles.title}>Schedule</h1>
-        <button type="button" className={styles.circleAdd} aria-label="Add schedule item" onClick={openNew}>
-          <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14" />
+    <>
+      {/* Static header — breadcrumb + title + add stay put; the list scrolls
+          beneath (mirrors the member schedule layout). */}
+      <div className={styles.schedHeader}>
+        <Link href={backHref} className={styles.back}>
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 19l-7-7 7-7" />
           </svg>
-        </button>
+          {backLabel}
+        </Link>
+        <div className={styles.schedTitleRow}>
+          <h1 className={styles.title}>{title}</h1>
+          <button type="button" className={styles.circleAdd} aria-label="Add schedule item" onClick={openNew}>
+            <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14M5 12h14" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {groups.length === 0 ? (
-        <p className={styles.dnsHint}>Nothing scheduled yet. Add registration dates, meals, matches — anything, on any date.</p>
+        <p className={styles.dnsHint}>Nothing scheduled yet. Add registration dates, meals, matches, anything, on any date.</p>
       ) : (
         <div className={styles.schedGroups}>
           {groups.map((g) => (
@@ -172,6 +199,14 @@ export default function ScheduleEditor({
                 {g.day === today && <span className={styles.schedToday}>Today</span>}
               </div>
               <div className={styles.schedList}>
+                {eventDays.has(g.day) && eventSpan && (
+                  <div className={styles.schedItem} data-source="event-span" style={{ cursor: "default" }}>
+                    <span className={styles.schedTime}>All day</span>
+                    <span className={styles.schedItemMain}>
+                      <span className={styles.schedItemTitle}>{eventSpan.title}</span>
+                    </span>
+                  </div>
+                )}
                 {g.items.map((it) => (
                   <button key={it.id} type="button" className={styles.schedItem} onClick={() => openEdit(it)}>
                     <span className={styles.schedTime}>{it.all_day ? "All day" : fmtTime(it.start_time) || "—"}</span>
@@ -183,11 +218,14 @@ export default function ScheduleEditor({
                         </span>
                       )}
                       {(it.location || (it.kind === "activity" && it.activity_type)) && (
-                        <span className={styles.schedItemMeta}>
+                        <span className={`${styles.schedItemMeta} ${styles.schedItemLoc}`}>
                           {it.kind === "activity" && it.activity_type ? ACTIVITY_LABEL[it.activity_type] || it.activity_type : ""}
                           {it.kind === "activity" && it.activity_type && it.location ? ", " : ""}
                           {it.location || ""}
                         </span>
+                      )}
+                      {it.description && (
+                        <span className={`${styles.schedItemMeta} ${styles.schedItemDesc}`}>{it.description}</span>
                       )}
                     </span>
                   </button>
@@ -218,9 +256,9 @@ export default function ScheduleEditor({
 
           <div className={styles.field}>
             <label className={styles.label}>Type</label>
-            <div className={styles.wizSegToggle} role="group" aria-label="Item type" style={{ flexWrap: "wrap" }}>
+            <div className={styles.pillRow} role="group" aria-label="Item type">
               {KINDS.map((k) => (
-                <button key={k.key} type="button" className={styles.wizSegOption} data-on={form.kind === k.key || undefined} onClick={() => setForm({ ...form, kind: k.key })}>
+                <button key={k.key} type="button" className={styles.pill} data-on={form.kind === k.key || undefined} onClick={() => setForm({ ...form, kind: k.key })}>
                   {k.label}
                 </button>
               ))}
@@ -229,7 +267,7 @@ export default function ScheduleEditor({
 
           {form.kind === "activity" && (
             <div className={styles.field}>
-              <label className={styles.label}>Activity <span className={styles.optional}>(module — coming soon)</span></label>
+              <label className={styles.label}>Activity <span className={styles.optional}>(module, coming soon)</span></label>
               <select className={styles.roleSelect} value={form.activity_type} onChange={(e) => setForm({ ...form, activity_type: e.target.value })}>
                 <option value="">Unspecified</option>
                 {ACTIVITY_TYPES.map((a) => (
@@ -296,6 +334,6 @@ export default function ScheduleEditor({
         }}
         onCancel={() => setConfirmDel(null)}
       />
-    </div>
+    </>
   );
 }

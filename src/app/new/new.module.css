@@ -2210,6 +2210,14 @@ button.feedRow:active {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+/* Let each column shrink below the native input's intrinsic width (date/time
+   inputs otherwise overflow the grid track and run off the modal). */
+.profileTwoCol > * {
+  min-width: 0;
+}
+.profileTwoCol .input {
+  min-width: 0;
+}
 .textarea {
   width: 100%;
   padding: 12px 14px;
@@ -4462,6 +4470,31 @@ button.feedRow:active {
   color: #fff;
 }
 
+/* Compact selectable pills (e.g. schedule item Type) — wrap naturally, sized to
+   their label rather than a big full-width segmented bar. */
+.pillRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pill {
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink-soft);
+  font-family: var(--font-libre), sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.pill[data-on] {
+  background: var(--brand);
+  color: #fff;
+  border-color: var(--brand);
+}
+
 /* A small color chip for a tee, plus a concise women's marker. */
 .teeDot {
   display: inline-block;
@@ -4677,6 +4710,19 @@ button.feedRow:active {
 .schedItem:hover {
   border-color: var(--line-strong);
 }
+/* The event banner sits atop each of its days (Apple-style) — brand-tinted so the
+   event period reads at a glance. */
+.schedItem[data-source="event-span"] {
+  background: color-mix(in srgb, var(--brand) 9%, var(--card));
+  border-color: color-mix(in srgb, var(--brand) 24%, var(--line));
+  cursor: default;
+}
+.schedItem[data-source="event-span"] .schedItemTitle {
+  color: var(--brand);
+}
+.schedItem[data-source="event-span"] .schedTime {
+  color: color-mix(in srgb, var(--brand) 70%, var(--ink));
+}
 .schedTime {
   flex: 0 0 auto;
   width: 62px;
@@ -4700,9 +4746,18 @@ button.feedRow:active {
   font-size: 0.78rem;
   color: var(--ink-soft);
 }
-/* Preserve line breaks the admin typed into an item's notes/description. */
+/* Location (the place) reads as the stronger secondary line. */
+.schedItemLoc {
+  color: var(--ink);
+  font-weight: 500;
+}
+/* Notes/details — lighter and set off from the location above, with line breaks
+   preserved. */
 .schedItemDesc {
   white-space: pre-line;
+  margin-top: 5px;
+  font-size: 0.76rem;
+  color: color-mix(in srgb, var(--ink-soft) 82%, var(--paper));
 }
 /* Which event a merged-feed entry belongs to (e.g. "Fall Scramble 2027"). */
 .schedItemContext {

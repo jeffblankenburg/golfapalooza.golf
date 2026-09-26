@@ -46,10 +46,10 @@ export default async function AdminLayout({
         </Link>
       </header>
 
-      {/* Nav is fixed (56px, out of flow) and .page adds 40px top padding, so
-          32px here yields a 16px gap above the back link — matching .back's
-          16px margin-bottom for equal spacing around it. */}
-      <main style={{ paddingTop: 32, paddingBottom: "var(--mini-h, 0px)" }}>{children}</main>
+      {/* Clear the fixed 56px top bar (matches the event shell's content padding),
+          so pages sit consistently below it — including breadcrumb pages, whose
+          tighter .page top padding would otherwise tuck under the bar. */}
+      <main style={{ paddingTop: 56, paddingBottom: "var(--mini-h, 0px)" }}>{children}</main>
     </>
   );
 }

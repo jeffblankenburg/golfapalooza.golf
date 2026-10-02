@@ -1,0 +1,718 @@
+{
+  "cli_version": "0.11.2",
+  "checkpoint_id": "01M3X6V42FPMCGA3HQKCNV6A5H",
+  "session_id": "3f8be6d7-7fe4-4356-a2b3-21f7db5ec944",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-02T02:24:40.589311Z",
+  "branch": "main",
+  "checkpoints_count": 71,
+  "save_step_count": 60,
+  "files_touched": [
+    "docs/issues/209-amendment-aggregate-contests.md",
+    "docs/issues/phase2-activity-contests.md",
+    "docs/issues/v2-financials.md",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/contests/[contestId]/participants/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/contests/[contestId]/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/contests/[contestId]/scores/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/contests/[contestId]/teams/handicaps/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/contests/[contestId]/teams/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/contests/[contestId]/winner/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/contests/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/cost-items/[itemId]/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/cost-items/route.ts",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/AddCompetition.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/AddScramble.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ScoringManager.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/SideGames.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/TeamsManager.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/scoring/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/teams/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/financials/FinancialsManager.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/financials/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/schedule/ScheduleEditor.tsx",
+    "src/app/new/_components/ConfirmModal.tsx",
+    "src/app/new/_components/Modal.tsx",
+    "src/app/new/_components/scrollLock.ts",
+    "src/app/new/new.module.css",
+    "src/lib/v2/contests.ts",
+    "src/lib/v2/contests/holes.ts",
+    "src/lib/v2/contests/skins.ts",
+    "src/lib/v2/cost-items.ts",
+    "src/lib/v2/schedule-feed.ts",
+    "supabase/migrations/00246_v2_contests.sql",
+    "supabase/migrations/00247_v2_contests_start_time.sql",
+    "supabase/migrations/00248_v2_contests_course.sql",
+    "supabase/migrations/00249_v2_cost_items.sql",
+    "supabase/migrations/00250_v2_contest_buyin_single_source.sql"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "fa26396583af",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 156566,
+    "cache_creation_tokens": 8625454,
+    "cache_read_tokens": 1152859199,
+    "output_tokens": 2174332,
+    "api_call_count": 2311
+  },
+  "session_metrics": {
+    "turn_count": 166
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-02T02:24:40.096999Z",
+    "agent_lines": 5903,
+    "agent_removed": 0,
+    "human_added": 5718,
+    "human_modified": 134,
+    "human_removed": 0,
+    "total_committed": 11755,
+    "total_lines_changed": 11825,
+    "agent_percentage": 49.91966173361522,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 132,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 187,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 5,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 366,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 6,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 697,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 7,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1265,
+      "agent_lines_removed": 1
+    },
+    {
+      "checkpoint_number": 8,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1272,
+      "agent_lines_removed": 20
+    },
+    {
+      "checkpoint_number": 9,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1272,
+      "agent_lines_removed": 20
+    },
+    {
+      "checkpoint_number": 10,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1303,
+      "agent_lines_removed": 26
+    },
+    {
+      "checkpoint_number": 11,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1303,
+      "agent_lines_removed": 26
+    },
+    {
+      "checkpoint_number": 12,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1303,
+      "agent_lines_removed": 26
+    },
+    {
+      "checkpoint_number": 13,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1303,
+      "agent_lines_removed": 26
+    },
+    {
+      "checkpoint_number": 14,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1303,
+      "agent_lines_removed": 26
+    },
+    {
+      "checkpoint_number": 15,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1334,
+      "agent_lines_removed": 26
+    },
+    {
+      "checkpoint_number": 16,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1493,
+      "agent_lines_removed": 26
+    },
+    {
+      "checkpoint_number": 17,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1510,
+      "agent_lines_removed": 35
+    },
+    {
+      "checkpoint_number": 18,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1508,
+      "agent_lines_removed": 29
+    },
+    {
+      "checkpoint_number": 19,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 1508,
+      "agent_lines_removed": 29
+    },
+    {
+      "checkpoint_number": 20,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 2092,
+      "agent_lines_removed": 29
+    },
+    {
+      "checkpoint_number": 21,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 2092,
+      "agent_lines_removed": 29
+    },
+    {
+      "checkpoint_number": 22,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 2092,
+      "agent_lines_removed": 29
+    },
+    {
+      "checkpoint_number": 23,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 2233,
+      "agent_lines_removed": 29
+    },
+    {
+      "checkpoint_number": 24,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 2289,
+      "agent_lines_removed": 29
+    },
+    {
+      "checkpoint_number": 25,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 2289,
+      "agent_lines_removed": 29
+    },
+    {
+      "checkpoint_number": 26,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 2457,
+      "agent_lines_removed": 29
+    },
+    {
+      "checkpoint_number": 27,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 2463,
+      "agent_lines_removed": 29
+    },
+    {
+      "checkpoint_number": 28,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 2463,
+      "agent_lines_removed": 29
+    },
+    {
+      "checkpoint_number": 29,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 2503,
+      "agent_lines_removed": 29
+    },
+    {
+      "checkpoint_number": 30,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 2539,
+      "agent_lines_removed": 29
+    },
+    {
+      "checkpoint_number": 31,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 2555,
+      "agent_lines_removed": 29
+    },
+    {
+      "checkpoint_number": 32,
+      "user_lines_added": 5,
+      "user_lines_removed": 5,
+      "agent_lines_added": 2555,
+      "agent_lines_removed": 29,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/page.tsx": 1
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/page.tsx": 1
+      }
+    },
+    {
+      "checkpoint_number": 33,
+      "user_lines_added": 5,
+      "user_lines_removed": 5,
+      "agent_lines_added": 2576,
+      "agent_lines_removed": 29,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/page.tsx": 1
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/page.tsx": 1
+      }
+    },
+    {
+      "checkpoint_number": 34,
+      "user_lines_added": 5,
+      "user_lines_removed": 5,
+      "agent_lines_added": 2593,
+      "agent_lines_removed": 29,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/page.tsx": 1
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/page.tsx": 1
+      }
+    },
+    {
+      "checkpoint_number": 35,
+      "user_lines_added": 5,
+      "user_lines_removed": 5,
+      "agent_lines_added": 2726,
+      "agent_lines_removed": 29,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/page.tsx": 1
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/page.tsx": 1
+      }
+    },
+    {
+      "checkpoint_number": 36,
+      "user_lines_added": 4,
+      "user_lines_removed": 4,
+      "agent_lines_added": 3468,
+      "agent_lines_removed": 29,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 37,
+      "user_lines_added": 4,
+      "user_lines_removed": 4,
+      "agent_lines_added": 3560,
+      "agent_lines_removed": 29,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 38,
+      "user_lines_added": 4,
+      "user_lines_removed": 4,
+      "agent_lines_added": 3572,
+      "agent_lines_removed": 29,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 39,
+      "user_lines_added": 36,
+      "user_lines_removed": 36,
+      "agent_lines_added": 3572,
+      "agent_lines_removed": 29,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ScoringManager.tsx": 32
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ScoringManager.tsx": 32
+      }
+    },
+    {
+      "checkpoint_number": 40,
+      "user_lines_added": 4,
+      "user_lines_removed": 4,
+      "agent_lines_added": 3570,
+      "agent_lines_removed": 29,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 41,
+      "user_lines_added": 4,
+      "user_lines_removed": 4,
+      "agent_lines_added": 3612,
+      "agent_lines_removed": 29,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 42,
+      "user_lines_added": 4,
+      "user_lines_removed": 4,
+      "agent_lines_added": 3613,
+      "agent_lines_removed": 29,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 43,
+      "user_lines_added": 4,
+      "user_lines_removed": 4,
+      "agent_lines_added": 3652,
+      "agent_lines_removed": 29,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 44,
+      "user_lines_added": 4,
+      "user_lines_removed": 4,
+      "agent_lines_added": 3672,
+      "agent_lines_removed": 29,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 45,
+      "user_lines_added": 4,
+      "user_lines_removed": 4,
+      "agent_lines_added": 3734,
+      "agent_lines_removed": 29,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 46,
+      "user_lines_added": 4,
+      "user_lines_removed": 4,
+      "agent_lines_added": 4146,
+      "agent_lines_removed": 29,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 47,
+      "user_lines_added": 4,
+      "user_lines_removed": 4,
+      "agent_lines_added": 4323,
+      "agent_lines_removed": 29,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 48,
+      "user_lines_added": 4,
+      "user_lines_removed": 4,
+      "agent_lines_added": 4345,
+      "agent_lines_removed": 29,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 49,
+      "user_lines_added": 4,
+      "user_lines_removed": 4,
+      "agent_lines_added": 4395,
+      "agent_lines_removed": 29,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 50,
+      "user_lines_added": 4,
+      "user_lines_removed": 4,
+      "agent_lines_added": 4932,
+      "agent_lines_removed": 30,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 51,
+      "user_lines_added": 4,
+      "user_lines_removed": 4,
+      "agent_lines_added": 4932,
+      "agent_lines_removed": 30,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 52,
+      "user_lines_added": 2,
+      "user_lines_removed": 2,
+      "agent_lines_added": 5052,
+      "agent_lines_removed": 30,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 53,
+      "user_lines_added": 2,
+      "user_lines_removed": 2,
+      "agent_lines_added": 5052,
+      "agent_lines_removed": 30,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 54,
+      "user_lines_added": 2,
+      "user_lines_removed": 2,
+      "agent_lines_added": 5135,
+      "agent_lines_removed": 30,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 55,
+      "user_lines_added": 2,
+      "user_lines_removed": 2,
+      "agent_lines_added": 5135,
+      "agent_lines_removed": 30,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 56,
+      "user_lines_added": 2,
+      "user_lines_removed": 2,
+      "agent_lines_added": 5200,
+      "agent_lines_removed": 30,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 57,
+      "user_lines_added": 2,
+      "user_lines_removed": 2,
+      "agent_lines_added": 5220,
+      "agent_lines_removed": 30,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 58,
+      "user_lines_added": 2,
+      "user_lines_removed": 2,
+      "agent_lines_added": 5317,
+      "agent_lines_removed": 30,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 59,
+      "user_lines_added": 2,
+      "user_lines_removed": 2,
+      "agent_lines_added": 5317,
+      "agent_lines_removed": 30,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    },
+    {
+      "checkpoint_number": 60,
+      "user_lines_added": 2,
+      "user_lines_removed": 2,
+      "agent_lines_added": 5416,
+      "agent_lines_removed": 30,
+      "user_added_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 2
+      }
+    }
+  ]
+}

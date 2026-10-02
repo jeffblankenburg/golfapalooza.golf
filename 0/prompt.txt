@@ -1,0 +1,770 @@
+For the Nassau box, the title of the box should be the two player names.  Not "Nassau (Net)".  That can swap positions with the player names.
+
+---
+
+For the nassau, the (net) or (raw) should be after the player names.  Nassau can stay by iteself.
+
+---
+
+I don't like the arrows you're using.  I'd prefer something chunkier. [Image #11]
+
+---
+
+There's two options missing from the Nassau.
+
+  1. The idea of a "press".
+  2. The idea of dormie or a loss before all the holes have been completed.  If a player is up 5 holes to 0, with 4 holes remaining, the match is already over.  The losing player doesn't have enough holes to catch up.
+  3. It makes me wonder if people traditionally play a nassau with stroke or match play, or if we should offer that as an option.
+
+---
+
+I have installed the "entire" CLI, but it doesn't seem to be collecting any data.  Do you know the git tool entire?
+
+---
+
+I did commit and push.  And didn't see anything in entire's dashboard.  That's why I'm asking.
+
+---
+
+I think we have everything committed and pushed currently.
+
+---
+
+yep
+
+---
+
+That worked!
+
+---
+
+let's work on some of the other games
+
+---
+
+For 6-6-6, I really need to see who owes who money.  Or do you think it is obvious enough?
+
+---
+
+Now we have boxes with totals AND sentences saying who owes who.  Be more creative in this approach.  Can we do it with the boxes alone?
+
+---
+
+Without running a manual test, I'm curious:  if player A owes $5 to player B after the first 6 holes, and then on the 2nd match, player B owes $5 to player A, do you eliminate the debts, or do you keep both?
+
+---
+
+That's a brilliant and elegant solution.  Nice work.  Sounds perfect.
+
+---
+
+Update the issue with our current progress.
+
+---
+
+Can we be more concise with the 6-6-6 balance boxes?  I'm starting to think we only show data about those that owe.  I'd like to reframe it to just be a number and a name.  Like "$5/Quack" saying that Chef owes Quack $5.
+
+---
+
+I still don't like how the teams in 6-6-6 are shown and overlap when closed.[Image #12]
+
+---
+
+In the debt boxes, let's do "Chef owes", or "Long O owes"
+
+---
+
+The "add a game" modal should only show games that are available to add.  Right now, certain game types are just disabled.
+
+---
+
+what other games can we do?
+
+---
+
+I like Vegas. . With the birdie twist.
+
+---
+
+I like Vegas. . With the birdie twist.
+
+---
+
+I think we should have a default value denomination for each type of game.  They can always edit them.
+
+Skins: $2
+Nassau: $5
+6-6-6: $5
+
+I don't know what a score in Vegas should or would be.  What do you think a reasonable price per point is?  Feels like maybe $0.10?
+
+---
+
+As for picking teammates in Vegas, they should be two colors.  First two picked are one color, second two another color.  They should not be selected by default, and can't be added until all players are assigned to a team.
+
+---
+
+I don't see green and blue.  [Image #13]
+
+---
+
+Instead of the line that says "up 29", there should just be a T box at the end of however many holes have been completed that shows the total in points, in the appropriate color.
+
+---
+
+The T box doesn't need to be green.
+
+---
+
+Let's put a single pixel vertical line before the T box.
+
+---
+
+If a user presses on one of the differences in the table, can we show the math above their fat finger press?
+
+---
+
+This is awesome.
+
+---
+
+update the issue.  I'm going to commit and push.
+
+---
+
+what's next
+
+---
+
+Editing the vegas game doesn't show the team pills
+
+---
+
+1 it is
+
+---
+
+Does deleting a round orphan the game records, or cascade delete them?
+
+---
+
+I think that the likelihood of someone deleting their round is incredibly low.  I almost want to make it so that completed rounds aren't deleteable.  I'm not sure of the right approach here, but if we allow a delete, that should delete the affected games as well.
+
+---
+
+A couple of notes:
+
+1. If, when a user creates a new round, they select scramble, that immediately negates the option for games.  Can't play games in a scramble, as far as I know, since nobody is ever playing their own ball.
+2. If the group is smaller than 4, that automatically eliminates some games.  They shouldn't be shown if they can't be played.
+
+---
+
+For the "my rounds" icon in the top navigation, we need something that is more "golf".
+
+---
+
+Let's see the golf ball on a tee.
+
+---
+
+On v1, we have a quick link for courses that has an excellent flag in a hole.  Can we just use that?
+
+---
+
+WEll, I still need it to have the same weight and prominence as the rest of the icons up there.
+
+---
+
+It's still a little thin. [Image #14]
+
+---
+
+That's almost a little too heavy.
+
+---
+
+THat's perfect.
+
+---
+
+What's next?
+
+---
+
+Actually check the commits.  We're mostly up to date.
+
+---
+
+passing on more games for now.  review the issue list and lets get something meaningful built.
+
+---
+
+As the solo developer and user of this new version, can you make my life easier?  v1 had a time simulator, and a user simulator.  Those would be super handy as we're creating features that can only be seen by others.
+
+---
+
+Seems great.  Can you assure me that when I am simulating another user, that the entire app works as if I am that user?
+
+---
+
+great.  now time simulator.  I don't mind the user simulation living in the profile tab, but it's not obvious.  It should be a dedicated admin page.  Also, in the profile, the list of users only shows the first 10 or so.  Does not scroll the entire list.
+
+---
+
+The countdown timer in the home page header doesn't appear to be affected by the time simulator.  Doesn't give me much confidence that it works.
+
+---
+
+I need the site to reflect everything as if the time is the simulated time.  That means everything.
+
+---
+
+Everything is pushed.
+
+Can we work on that location header text issue?
+
+---
+
+Love it.  Don't need the icon.  It should be tappable to launch their default mapping application.
+
+---
+
+I just noticed that I don't currently have a way, in v2, to update a user's phone number. Since this is what they use for authentication, make sure it gets updated appropriately.
+
+Question: if a user is logged in on their phone, and we update their phone number, does that affect their current session?  Or does it just change the number they'll need to use next time?
+
+---
+
+I think this is great for individuals that need to change their own phone number.  But group administrators might also need the ability to update a user's phone number in the admin without the OTP.
+
+---
+
+Let's put the geolocation icon after the location text in the home page header.
+
+---
+
+what's next?
+
+---
+
+let's close those that are complete.
+
+---
+
+I think I want to spend a little time thinking about what the experience for a group admin (or a set of group admins) is like for setting up a new event.
+
+The big things that come to mind revolve around the "schedule."  
+
+First, they've decided that on Day #1 of their event, they need to have a Ryder Cup event.  On Day #2, they want to have a scramble, a calcutta auction, dinner, and a singles cornhole tournament.  Obviously we need to build the modules for those activities, but they also need to be able to add those elements to their event schedule.
+
+Part of me feels like offering an Outlook-style calendar, where they can add events, and then configure those events all from the calendar.  (A normal calendar event might be a virtual meeting, in-person meeting, phont call,e tc.  In our case, a calendar event could be a golf match, a cornhole tournament, or a calcutta auction.
+
+There will also be additional events occuring throughout the day, like sporting events that are televised.  Nobody participates, but it's good to know when a game is on.  Same goes for things like meals.  It's just a calendar event, but there's nothing more than a date/time, location, and maybe a menu.
+
+---
+
+I need to board a plane.  If it has wi-fi, we can work on this on the plane.
+
+---
+
+commit the plan to an issue just in case.
+
+---
+
+241 and 242 have been completed.
+
+---
+
+resume #208
+
+---
+
+Initially, this looks great.  I like the daily tabs, HOWEVER, for an annual event, there's actually many items that need to be on the schedule that span the entire year: registation, options selection, room assignments, pairing announcements, etc.  I need the ability to create an event on ANY day.
+
+---
+
+The button says "Add to Tuesday"
+
+---
+
+243 complete.
+
+---
+
+We need to be able to assign a start date and an end date.  End date is optional, but available.
+
+---
+
+You're adding the iCal links to the admin schedule page.  Those belong on the user-facing schedule page we haven't built yet.
+
+---
+
+Let's make the admin "add" button just a small + circle, like the others.
+
+---
+
+That + button should be larger, and on the same line as the page title.  Please reference our existing design when creating new.
+
+---
+
+1. Need some space between the header and the first calendar item. [Image #15] 
+2. When there are many items on the schedule, and some of them are in the past, the top item shown on the page should be the NEXT event, and previous events should still be able to be scrolled to.
+
+---
+
+I don't think I like the emoji markers.
+
+---
+
+where do I find the member schedule page?
+
+---
+
+Can you verify your claim?  I don't see it in the features admin.
+
+---
+
+OK. I have turned it on.  But when I click the Everything navigation button, I get redirected to the home page.
+
+---
+
+OK. Great. Now, I want practically the same interface that you created on the admin one.  No date tabs (at least not yet).  Also, the add to calendar is HUGE. . Needs to be small, out of the way, but available.
+
+---
+
+Some problem solving to do:  a "group" has a calendar.  it includes things like birthdays, logistics, EVENTS, etc.  also, an event has a calendar that includes all of the things an event needs, which could span a significant amount of time.  groups could also have multiple events in a year.  events have activities, which will also have time sensitive items, like tee times in a scramble.  The "schedule" that the members see needs to be a combination of all of these things at once, as one seamless calendar.
+
+---
+
+245 complete.
+
+---
+
+I need the calendar to scroll behind the header, so that the calendar link is always available.  Also, our spacing is terrible in the header. [Image #16]
+
+---
+
+Ok. I love where "< HOME" is now.  The breadcrumbs should be positioned like that on every page that has breadcrumbs.
+
+But the page header is still too far below that. [Image #17]
+
+---
+
+Also, I think I misspoke about how I want the calendar to scroll.  The header moves, shifts, and the breadcrumb disappears.  I want the header static at all times, and the content to scroll otherwise.
+
+---
+
+More questions: when someone subscribes to the calendar, does their calendar update as events are added?
+
+---
+
+That's OK. . Let's replace the add and copy buttons with just an "add to calendar" icon.
+
+---
+
+ydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+See more info here: https://nextjs.org/docs/messages/react-hydration-error
+
+
+  ...
+    <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+      <LoadingBoundary name="new/" loading={null}>
+        <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/new/golfa..." tree={[...]} params={{slug:"golf..."}} cacheNode={{...}} ...>
+                <SegmentViewNode type="layout" pagePath="new/[slug]...">
+                  <SegmentTrieNode>
+                  <link>
+                  <script>
+                  <script>
+                  <script>
+                  <OrgLayout>
+                    <PwaRegistrar>
+                    <OrgLayout>
+                      <SimBanner name={null} at="2026-10-18...">
+                        <div className="new-module..." role="status">
+                          <span className="new-module...">
+                            <span>
+                            <strong>
++                             Oct 17, 2026, 6:26 PM
+-                             Oct 17, 2026, 5:26 PM
+                          ...
+                    ...
+              ...
+src/app/new/[slug]/(event)/SimBanner.tsx (40:41) @ SimBanner
+
+---
+
+Calendar events should respect line breaks if they are included. [Image #19]
+
+---
+
+The calendar events that have a location will not always be actual, mappable addresses.  Can we determine if it's actually an address, and if it's not, don't make it clickable or show the icon?
+
+---
+
+On the schedule, you seem to be putting the name of the event on each item.  No need.
+
+---
+
+Maybe there's a way to shade the background of the calendar entries that are part of an event? Or maybe the event date range is shaded entirely?
+
+---
+
+The admin schedule page should have the same layouts and scrolling as the member version.
+
+---
+
+I also don't think that we have a data entry point for "group schedule" events go.
+
+---
+
+A few more things for the admin event calendar layout.  Not sure why you can't check for parity without me noticing the inconsistencies.
+
+1. Admin doesn't show the notes like the member version does.
+2. Admin doesn't show the event "all-day" markers like the member version does.
+
+---
+
+Need some visual distinction between the location and the notes data. [Image #20]
+
+---
+
+Lots of visual fixes needed on the add calendar item dialog. [Image #21] 
+
+1. End date runs off the page.
+2. The type is huge and unnecessary.  Could we do a select list or some small pills instead?
+
+---
+
+For our "activity" types, an admin can pick scramble, but when they do, they'll eventually be able to configure rules like 2-man or 4-man scramble, set rosters and tee times, etc.  Right?
+
+---
+
+yes, lets capture our plans in the issue, and then call it a night.
+
+---
+
+lets get started again
+
+---
+
+everything has been committed and pushed.
+
+---
+
+This is where things start to get complicated.
+
+Could use your insight and clarification on this.
+
+Let's say a group wants to have a scramble on the first day of their event.  They go in to the admin schedule, and add a scramble.  (We will eventually be able to configure that scramble to manage participants, teams, handicaps, payouts, etc.)
+
+But during that scramble, there's also a closest-to-the-pin contest on the front and the back nine.  There's a long putt contest on one green.  There's a long drive contest on one hole.  There's a skins game. Are these other contests part of the scramble?  They're based on the scores from that activity.  Or are they just separate activities?
+
+---
+
+Write it up as the Phase 2 schema plan
+
+---
+
+plan is good.  what is 2a?
+
+---
+
+start 2a by tracing the roster source
+
+---
+
+It's important to note that the only people that can participate in an event activity have to be on_roster for the event.  However, each activity needs to be able to manage its own participation list, because some of the event participants might not be able to stay for the whole trip, or have to arrive late.  For example, I had to leave Friday night this year, and had to miss the activities from Saturday.
+
+Also, we have a different kind of activity we should talk about before we get too far into this.
+
+1. BSPITW: Best Scramble Partner In the World. You can see its definition in v1, but it is based on a participant's strokes under par in all three scrambles, plus some special scoring for long putts and greens hit.
+
+2. 100 Feet!: This is a cumulative total distance of a player's distance from the pin after their first shot on hole #18 each day.  It spans all three days of the scramble.
+
+---
+
+that's it for now.
+
+---
+
+write the 2a migration
+
+---
+
+one more question, regarding the calcutta.  The Calcutta is based on the winners of many of the contests.  1st and 2nd place in each scramble, cornhole tournament, and BSPITW. How does this fit into our model, or can we accommodate that later?
+
+---
+
+not if it isn't necessary now.
+
+---
+
+246 complete
+
+---
+
+for the golfapalooza event, I've already created activities that are scrambles.  were those retroactively created?
+
+---
+
+wow great
+
+---
+
+this needs to be incredibly easy to manage from a phone.  please keep that in mind.
+
+---
+
+shouldn't we start with the contests page for the event?  just curious.
+
+---
+
+yes, build the contests page
+
+---
+
+I feel like maybe we've overengineered this.  I can create a calendar event that is a "scramble", but then I need to go to contests to configure that scramble.  It seems like maybe we should just configure the contests on the contest page, and set the date and tee times there.  It should still show on the calendar, though.
+
+---
+
+Getting an internal server error. http://localhost:3000/new/golfapalooza/admin
+
+---
+
+After I delete an item from the admin schedule, the page stops scrolling.
+
+---
+
+OK, so the + button on the contests page only allows me to add a scramble.  I assume the other contest types will be available here as well?  Like a Ryder Cup, or or 2-Man Best Ball?
+
+---
+
+This page doesn't scroll yet. http://localhost:3000/new/golfapalooza/admin/events/447ab8f9-d6dc-4536-99ec-ac6218c538b2/schedule
+
+---
+
+It actually appears to be all pages currently.
+
+---
+
+restarting the dev server fixed it
+
+---
+
+When creating a contest, we should pick a date AND time.  That start time should also inform the first tee time for that contest when we start creating tee times.
+
+---
+
+We need a way to delete a contest that was created mistakenly.
+
+---
+
+Those dangling text-based delete buttons are no good. You've done that in several places so far.  Delete gets its own button, with confirmation modal, always.
+
+---
+
+Lots of space between those buttons. [Image #22]
+
+---
+
+great.  what's next?
+
+---
+
+Picking the size is important. We could either have different contests for 2-man and 4-man scrambles, or just have a scramble contest, and allow the admin to select how many players (generally) will be on each team.  It's likely that if they choose a 4-man scramble, they will have one or two teams with only three players due to numbers.
+
+---
+
+what's next?
+
+---
+
+Generally, the scoring is going to be entered by the players live-scoring the round.  Please look at how v1 implemented this for administrators.  It's much less about entering scores, and much more about reviewing (and editing if necessary).  This should be convenient and fast for administrators.  Probably show the whole scorecard for a group (or all groups), and tapping on a hole makes all of the data editable: score, putt points, green points, etc.
+
+---
+
+When I tap a hole, does the editing happen in a modal?  Can I, from the modal, just navigate hole by hole with arrows?  (That would be useful.)
+
+You can start.
+
+---
+
+I would expect, when an admin is setting up a contest, that they are using a course that has already been entered.  They should be picking from a list of existing courses.  I'm ok offering an "add a course" button, but I don't expect that to be used.
+
+---
+
+When selecting tee boxes, we also need a custom option. (We offered this in v1.)  For example, some groups might want to play from different tee boxes on each hole.  Some red, some white, some yellow.  They would need the ability to select individual tee boxes for each hole on a course.  For the purposes of handicapping, we should make that a separate choice.
+
+---
+
+Please keep in mind, we're not trying to create a new "official" composition tee set for the course.  This is a special set of tee configuration just for the contest.
+
+---
+
+I'm ok with using the default, yes.  Let's get started!
+
+---
+
+In the Handicap Basis, we should show the rating & slope. [Image #23]
+
+---
+
+Let's add par as well.  Not sure why you removed it.
+
+---
+
+In the list of holes, the hole handicap is important here.  We should show that as a column.  There's plenty of room to shrink the teebox dropdowns a little.
+
+---
+
+This was a simple dropdown when I chose "Custom Mix..." and now it is a fancy box. [Image #24] 
+
+It's a little crowded now, but I like the fancy box over the dropdwon.
+
+---
+
+Can this page show the course and tee selection? http://localhost:3000/new/golfapalooza/admin/events/447ab8f9-d6dc-4536-99ec-ac6218c538b2/contests/66ec9156-d45a-4783-b8cf-122c1e6e6b57
+
+---
+
+I prefer "Custom Tees" over "Custom Mix"
+
+---
+
+I don't seem to be able to add players to teams.
+
+---
+
+Is there a way to allow multiple player selection?  I want to grab all 4 people and assign them to a team.
+
+---
+
+We are not going to be manually setting team handicaps generally.  We will want the ability to calculate team handicaps automatically.  (This is available in v1.)
+
+---
+
+OK. Good enough for scrambles, I guess.  But we have other kinds of contests that we need to add.  Please look at v1 for how we handled these in the past.
+
+This also reminds me: Admins need a way to classify members for contests.  For example, with cornhole events, we need to divide the field into A and B players.  This is nothing that the individual members ever need to see, but admins will us this to generate pairings for a cornhole doubles tournament, for example.
+
+---
+
+Team management and creation should not be on the exact same page as the scoring manager. Let's be better.
+
+---
+
+This looks pretty terrible. [Image #25]
+
+---
+
+This is also not good. [Image #26]
+
+---
+
+Better. It's gotta fit on the 400px wide screen.
+
+---
+
+[Image #27]
+
+---
+
+Can the modal have an optimistic close?  Right now it is slow to disappear.
+
+---
+
+On http://localhost:3000/new/golfapalooza/admin/events/447ab8f9-d6dc-4536-99ec-ac6218c538b2/contests/66ec9156-d45a-4783-b8cf-122c1e6e6b57/scoring,
+
+WE have "This GRoup" and "All GRoups" buttons.  This page should be a list of groups and their relevant information about their round.  Tapping a team should show the scorecard view.
+
+---
+
+On the right side of the team cards, I'd like to just see the net par differential.  Strokes under par minus handicap.  Larger, very readable.  No colors.
+
+---
+
+I don't like the sentence context. "Thru 1 of 18, 3 gross (-1)"
+
+On the PGA, they just show a team or player name, and how many holes they have completed.  For example, "Team 1 (1)".  We will handle the raw score a different way.
+
+At the bottom of the scorecard (when it is open), we should show the math for their score, like we did in v1. [Image #28]
+
+---
+
+OK. For things like skins, CTP, long drive, long putt, etc.  Where does an admin configure that?
+
+---
+
+The moment I add a skins game to a contest, it should be expandable to show the results from the scorecards.  When expanded, I'm ok with a "Delete Skins" button at the bottom of the accordion, with confirmation.
+
+---
+
+Shouldn't be able to add side games that already exist.  Well, at least games that can't have 2 instances.  CTP could be twice.  Long drive or long putt could be twice.  But skins?  That can only be once.
+
+---
+
+When things like CTP are created, we need a way to edit them if something was misspelled or incorrect.  Or is your plan to delete and recreate?
+
+---
+
+OK. One detail we missed so far.  Each contest probably has a buy-in.  So for each contest, there needs to be a way to indicate that buy-in.  But that leads us to the next big part of our project, financial management.
+
+Every time we create something for an event that has a cost attributed to it, like contests, side games, and many other things (look at http://localhost:3000/new/golfapalooza/admin/events/447ab8f9-d6dc-4536-99ec-ac6218c538b2/contests/66ec9156-d45a-4783-b8cf-122c1e6e6b57), we have to be able to reconcile those to either a trip cost, or an option.  This also means that we need to start building a financial management system that aggregates all of these cost items into one reviewable screen where all of the values can be edited.  I'd like to see your plan for this before you start building.
+
+---
+
+249 complete
+
+---
+
+So I think it would be very difficult to add cost items all from the financials page.  The flow from contests is imperative.
+
+---
+
+Are we duplicating the cost items?  Or is there one source of truth?
+
+---
+
+yes
+
+---
+
+250 complete.
+
+---
+
+Let's pause for a moment and work on what we've just built.
+
+1. On the contest detail page, for some reason the skins box has a dedicated Edit button rather than the edit icon after the title.  Let's be consistent.
+2. I haven't been super specific with my naming because the side games were children of a contest.  On the financials page, we're only showing the name of the side game, but it seems like they should be grouped by contest so it's clear what they are.
+
+---
+
+Can the "auto" tags link to the page where an admin can see/edit that item?
+
+---
+
+[Image #29] The hole dropdown should show the hole's par, distance, and tee box color.  I'd be OK never using a stock dropdown anywhere in the app.
+
+---
+
+On the financials page, can we put the edit icon after the titles?  This also allows the dollar amounts to be on the far right.
+
+---
+
+While it doesn't actually have any bearing on the math, I would like all of the cost items to be able to be re-ordered (with grabbers, like v1) so that the admin can have them in the order they prefer.  The items can't be dragged between groups, only within their current group.
+
+---
+
+ok.  This has been great so far.  Can you document where we left off so that you find it the next time we start on this issue?

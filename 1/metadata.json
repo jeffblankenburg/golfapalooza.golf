@@ -1,0 +1,653 @@
+{
+  "cli_version": "0.11.2",
+  "checkpoint_id": "01M3X6V42FPMCGA3HQKCNV6A5H",
+  "session_id": "6a45d054-b7fe-444e-ab9f-dda273e9ff9b",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-02T02:24:41.827926Z",
+  "branch": "main",
+  "checkpoints_count": 66,
+  "save_step_count": 66,
+  "files_touched": [
+    "docs/issues/v2-attendance-contest-enrollment.md",
+    "docs/issues/v2-attendance-integrity-alerts.md",
+    "docs/issues/v2-enrollment-balances-epic.md",
+    "docs/issues/v2-option-authoring.md",
+    "docs/issues/v2-options-and-member-ledger.md",
+    "scripts/seed-tko-attendance.mjs",
+    "scripts/seed-tko-fake-members.mjs",
+    "scripts/seed-tko-handicaps.mjs",
+    "scripts/seed-tko-nicknames.mjs",
+    "src/app/api/cron/v2-feature-open/route.ts",
+    "src/app/api/v2/admin/cost-categories/[id]/route.ts",
+    "src/app/api/v2/admin/cost-categories/route.ts",
+    "src/app/api/v2/admin/system-admins/route.ts",
+    "src/app/api/v2/events/[eventId]/balance/route.ts",
+    "src/app/api/v2/events/[eventId]/options/[optionId]/selection/route.ts",
+    "src/app/api/v2/events/[eventId]/rsvp/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/balances/[userId]/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/contests/[contestId]/participants/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/contests/[contestId]/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/contests/[contestId]/teams/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/cost-items/[itemId]/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/features/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/option-groups/[groupId]/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/option-groups/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/option-settings/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/options/[optionId]/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/options/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/transactions/route.ts",
+    "src/app/new/[slug]/(event)/HomeModules.tsx",
+    "src/app/new/[slug]/(event)/OptionsModule.tsx",
+    "src/app/new/[slug]/(event)/OptionsReminder.tsx",
+    "src/app/new/[slug]/(event)/RsvpModule.tsx",
+    "src/app/new/[slug]/(event)/balance/page.tsx",
+    "src/app/new/[slug]/(event)/optionControls.tsx",
+    "src/app/new/[slug]/(event)/options/page.tsx",
+    "src/app/new/[slug]/(event)/page.tsx",
+    "src/app/new/[slug]/EventsSection.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestPlayers.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ScoringManager.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/TeamsManager.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/players/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/teams/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/financials/FinancialsManager.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/financials/balances/BalancesManager.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/financials/balances/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/financials/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/options/OptionsManager.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/options/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/schedule/ScheduleEditor.tsx",
+    "src/app/new/[slug]/admin/page.tsx",
+    "src/app/new/[slug]/layout.tsx",
+    "src/app/new/[slug]/rounds/[id]/score/score.module.css",
+    "src/app/new/_components/ConfirmModal.tsx",
+    "src/app/new/_components/FeaturesConfig.tsx",
+    "src/app/new/_components/Modal.tsx",
+    "src/app/new/admin/PlatformAdmin.tsx",
+    "src/app/new/admin/cost-categories/CostCategoriesManager.tsx",
+    "src/app/new/admin/cost-categories/page.tsx",
+    "src/app/new/admin/page.tsx",
+    "src/app/new/new.module.css",
+    "src/app/new/page.tsx",
+    "src/lib/v2/balances.ts",
+    "src/lib/v2/contests/enrollment.ts",
+    "src/lib/v2/context.ts",
+    "src/lib/v2/cost-categories.ts",
+    "src/lib/v2/features.ts",
+    "src/lib/v2/notification-prefs.ts",
+    "src/lib/v2/option-icons.ts",
+    "src/lib/v2/options.ts",
+    "src/lib/v2/orgs.ts",
+    "src/lib/v2/schedule-feed.ts",
+    "src/lib/v2/simulator.ts",
+    "supabase/migrations/00251_v2_system_admin.sql",
+    "supabase/migrations/00252_v2_contest_enrollment_exclusions.sql",
+    "supabase/migrations/00253_v2_options_and_ledger.sql",
+    "supabase/migrations/00254_v2_cost_categories.sql",
+    "supabase/migrations/00255_v2_option_authoring.sql",
+    "supabase/migrations/00256_v2_option_open_schedule.sql",
+    "supabase/migrations/00257_v2_feature_open_notification.sql",
+    "supabase/migrations/00258_v2_dedupe_trip_cost.sql",
+    "supabase/migrations/00259_v2_team_needs_attention.sql",
+    "supabase/migrations/00260_v2_option_allow_none.sql",
+    "vercel.json"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-8[1m]",
+  "turn_id": "d7446a9c9b4b",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 75559,
+    "cache_creation_tokens": 2365296,
+    "cache_read_tokens": 473646614,
+    "output_tokens": 1156775,
+    "api_call_count": 982
+  },
+  "session_metrics": {
+    "turn_count": 66
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-10-02T02:24:41.582228Z",
+    "agent_lines": 5755,
+    "agent_removed": 0,
+    "human_added": 297,
+    "human_modified": 242,
+    "human_removed": 0,
+    "total_committed": 6294,
+    "total_lines_changed": 6294,
+    "agent_percentage": 91.43628852875754,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 5416,
+      "user_lines_removed": 30,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/issues/209-amendment-aggregate-contests.md": 55,
+        "docs/issues/phase2-activity-contests.md": 132,
+        "docs/issues/v2-financials.md": 52,
+        "src/app/api/v2/orgs/[id]/events/[eventId]/contests/[contestId]/participants/route.ts": 29,
+        "src/app/api/v2/orgs/[id]/events/[eventId]/contests/[contestId]/route.ts": 105,
+        "src/app/api/v2/orgs/[id]/events/[eventId]/contests/[contestId]/scores/route.ts": 103,
+        "src/app/api/v2/orgs/[id]/events/[eventId]/contests/[contestId]/teams/handicaps/route.ts": 95,
+        "src/app/api/v2/orgs/[id]/events/[eventId]/contests/[contestId]/teams/route.ts": 105,
+        "src/app/api/v2/orgs/[id]/events/[eventId]/contests/[contestId]/winner/route.ts": 41,
+        "src/app/api/v2/orgs/[id]/events/[eventId]/contests/route.ts": 86,
+        "src/app/api/v2/orgs/[id]/events/[eventId]/cost-items/[itemId]/route.ts": 62,
+        "src/app/api/v2/orgs/[id]/events/[eventId]/cost-items/route.ts": 64,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/AddCompetition.tsx": 80,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/AddScramble.tsx": 108,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestSettings.tsx": 328,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/CustomTeeBuilder.tsx": 98,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ScoringManager.tsx": 291,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/SideGames.tsx": 383,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/TeamsManager.tsx": 383,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/page.tsx": 183,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/scoring/page.tsx": 67,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/teams/page.tsx": 68,
+        "src/app/new/[slug]/admin/events/[eventId]/contests/page.tsx": 157,
+        "src/app/new/[slug]/admin/events/[eventId]/financials/FinancialsManager.tsx": 350,
+        "src/app/new/[slug]/admin/events/[eventId]/financials/page.tsx": 59,
+        "src/app/new/[slug]/admin/events/[eventId]/page.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/schedule/ScheduleEditor.tsx": 3,
+        "src/app/new/_components/ConfirmModal.tsx": 3,
+        "src/app/new/_components/Modal.tsx": 3,
+        "src/app/new/_components/scrollLock.ts": 25,
+        "src/app/new/new.module.css": 1265,
+        "src/lib/v2/contests.ts": 194,
+        "src/lib/v2/contests/holes.ts": 67,
+        "src/lib/v2/contests/skins.ts": 57,
+        "src/lib/v2/cost-items.ts": 12,
+        "src/lib/v2/schedule-feed.ts": 35,
+        "supabase/migrations/00246_v2_contests.sql": 179,
+        "supabase/migrations/00247_v2_contests_start_time.sql": 5,
+        "supabase/migrations/00248_v2_contests_course.sql": 9,
+        "supabase/migrations/00249_v2_cost_items.sql": 38,
+        "supabase/migrations/00250_v2_contest_buyin_single_source.sql": 35
+      },
+      "user_removed_per_file": {
+        "src/app/new/[slug]/admin/events/[eventId]/page.tsx": 2,
+        "src/app/new/[slug]/admin/events/[eventId]/schedule/ScheduleEditor.tsx": 19,
+        "src/app/new/_components/ConfirmModal.tsx": 3,
+        "src/app/new/_components/Modal.tsx": 3,
+        "src/lib/v2/schedule-feed.ts": 3
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 5416,
+      "agent_lines_removed": 30
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 5940,
+      "agent_lines_removed": 33
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 5940,
+      "agent_lines_removed": 33
+    },
+    {
+      "checkpoint_number": 5,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 5941,
+      "agent_lines_removed": 33
+    },
+    {
+      "checkpoint_number": 6,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 5952,
+      "agent_lines_removed": 35
+    },
+    {
+      "checkpoint_number": 7,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 6146,
+      "agent_lines_removed": 35
+    },
+    {
+      "checkpoint_number": 8,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 6149,
+      "agent_lines_removed": 35
+    },
+    {
+      "checkpoint_number": 9,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 6149,
+      "agent_lines_removed": 35
+    },
+    {
+      "checkpoint_number": 10,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 6154,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 11,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 6295,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 12,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 6295,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 13,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 6295,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 14,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 6295,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 15,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 6295,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 16,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 6489,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 17,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 6491,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 18,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 6492,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 19,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 6513,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 20,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 7020,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 21,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 7081,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 22,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 7053,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 23,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 7072,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 24,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 7072,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 25,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 7171,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 26,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 7188,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 27,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 7188,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 28,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 7188,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 29,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 7278,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 30,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 7313,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 31,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 7310,
+      "agent_lines_removed": 37
+    },
+    {
+      "checkpoint_number": 32,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 7904,
+      "agent_lines_removed": 38
+    },
+    {
+      "checkpoint_number": 33,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 7934,
+      "agent_lines_removed": 38
+    },
+    {
+      "checkpoint_number": 34,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 8357,
+      "agent_lines_removed": 38
+    },
+    {
+      "checkpoint_number": 35,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 8357,
+      "agent_lines_removed": 38
+    },
+    {
+      "checkpoint_number": 36,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 8629,
+      "agent_lines_removed": 39
+    },
+    {
+      "checkpoint_number": 37,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 8688,
+      "agent_lines_removed": 39
+    },
+    {
+      "checkpoint_number": 38,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 9036,
+      "agent_lines_removed": 39
+    },
+    {
+      "checkpoint_number": 39,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 9185,
+      "agent_lines_removed": 39
+    },
+    {
+      "checkpoint_number": 40,
+      "user_lines_added": 539,
+      "user_lines_removed": 212,
+      "agent_lines_added": 9279,
+      "agent_lines_removed": 39,
+      "user_added_per_file": {
+        "src/app/api/v2/events/[eventId]/options/[optionId]/selection/route.ts": 12,
+        "src/app/new/[slug]/(event)/HomeModules.tsx": 18,
+        "src/app/new/[slug]/(event)/OptionsModule.tsx": 166,
+        "src/app/new/[slug]/admin/events/[eventId]/options/OptionsManager.tsx": 261,
+        "src/app/new/[slug]/admin/events/[eventId]/options/page.tsx": 15,
+        "src/app/new/new.module.css": 67
+      },
+      "user_removed_per_file": {
+        "src/app/api/v2/events/[eventId]/options/[optionId]/selection/route.ts": 2,
+        "src/app/new/[slug]/(event)/HomeModules.tsx": 10,
+        "src/app/new/[slug]/(event)/OptionsModule.tsx": 46,
+        "src/app/new/[slug]/admin/events/[eventId]/options/OptionsManager.tsx": 150,
+        "src/app/new/[slug]/admin/events/[eventId]/options/page.tsx": 4
+      }
+    },
+    {
+      "checkpoint_number": 41,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 9918,
+      "agent_lines_removed": 39
+    },
+    {
+      "checkpoint_number": 42,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 10402,
+      "agent_lines_removed": 40
+    },
+    {
+      "checkpoint_number": 43,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 10432,
+      "agent_lines_removed": 40
+    },
+    {
+      "checkpoint_number": 44,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 10500,
+      "agent_lines_removed": 43
+    },
+    {
+      "checkpoint_number": 45,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 10582,
+      "agent_lines_removed": 43
+    },
+    {
+      "checkpoint_number": 46,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 10577,
+      "agent_lines_removed": 43
+    },
+    {
+      "checkpoint_number": 47,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 10577,
+      "agent_lines_removed": 43
+    },
+    {
+      "checkpoint_number": 48,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 10605,
+      "agent_lines_removed": 43
+    },
+    {
+      "checkpoint_number": 49,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 10608,
+      "agent_lines_removed": 43
+    },
+    {
+      "checkpoint_number": 50,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 10687,
+      "agent_lines_removed": 43
+    },
+    {
+      "checkpoint_number": 51,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 10748,
+      "agent_lines_removed": 43
+    },
+    {
+      "checkpoint_number": 52,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 10889,
+      "agent_lines_removed": 43
+    },
+    {
+      "checkpoint_number": 53,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 10889,
+      "agent_lines_removed": 43
+    },
+    {
+      "checkpoint_number": 54,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 11115,
+      "agent_lines_removed": 46
+    },
+    {
+      "checkpoint_number": 55,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 11882,
+      "agent_lines_removed": 46
+    },
+    {
+      "checkpoint_number": 56,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 11927,
+      "agent_lines_removed": 46
+    },
+    {
+      "checkpoint_number": 57,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 11911,
+      "agent_lines_removed": 101
+    },
+    {
+      "checkpoint_number": 58,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 11902,
+      "agent_lines_removed": 101
+    },
+    {
+      "checkpoint_number": 59,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 11902,
+      "agent_lines_removed": 101
+    },
+    {
+      "checkpoint_number": 60,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 11917,
+      "agent_lines_removed": 101
+    },
+    {
+      "checkpoint_number": 61,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 11922,
+      "agent_lines_removed": 101
+    },
+    {
+      "checkpoint_number": 62,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 11949,
+      "agent_lines_removed": 101
+    },
+    {
+      "checkpoint_number": 63,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 11949,
+      "agent_lines_removed": 101
+    },
+    {
+      "checkpoint_number": 64,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 11942,
+      "agent_lines_removed": 101
+    },
+    {
+      "checkpoint_number": 65,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 11942,
+      "agent_lines_removed": 101
+    },
+    {
+      "checkpoint_number": 66,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 11952,
+      "agent_lines_removed": 101
+    }
+  ]
+}

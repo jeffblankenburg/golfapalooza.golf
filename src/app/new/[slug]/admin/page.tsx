@@ -56,6 +56,15 @@ export default async function AdminHub({
           items={[{ label: "Simulator", href: `/new/${slug}/admin/simulator`, desc: "View as a member, or override the clock" }]}
         />
       </div>
+
+      {ctx.isSystemAdmin && (
+        <div className={styles.section}>
+          <p className={styles.sectionLabel}>Platform</p>
+          <AdminGrid
+            items={[{ label: "All groups", href: "/new/admin", desc: "Every group on the platform & system admins" }]}
+          />
+        </div>
+      )}
     </div>
   );
 }

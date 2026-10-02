@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/v2-articles-publish",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/v2-feature-open",
+      "schedule": "* * * * *"
     }
   ]
 }

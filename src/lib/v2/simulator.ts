@@ -37,6 +37,11 @@ export async function canSimulate(
 ): Promise<boolean> {
   if (!realUserId || !targetUserId || realUserId === targetUserId) return false;
 
+  // Platform system admins may simulate anyone (support/testing across every group),
+  // even members of groups they don't belong to.
+  const { isSystemAdmin } = await import("./orgs");
+  if (await isSystemAdmin(admin, realUserId)) return true;
+
   const { data: adminOrgs } = await admin
     .from("v2_memberships")
     .select("org_id")

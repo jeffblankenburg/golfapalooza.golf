@@ -24,7 +24,7 @@ async function loadRows(admin: ReturnType<typeof v2AdminClient>, orgId: string, 
   const { data } = await admin
     .from("v2_event_features")
     .select(
-      "feature_key, event_id, visibility, pinned, nav_order, label_override, public, availability, available_from, available_until",
+      "feature_key, event_id, visibility, pinned, nav_order, label_override, public, availability, available_from, available_until, open_notification_title, open_notification_body, open_notification_sent_at",
     )
     .eq("org_id", orgId)
     .or(`event_id.is.null,event_id.eq.${eventId}`);
@@ -60,6 +60,8 @@ interface FeatureInput {
   availability?: string;
   available_from?: string | null;
   available_until?: string | null;
+  open_notification_title?: string | null;
+  open_notification_body?: string | null;
 }
 
 export async function PUT(
@@ -82,6 +84,12 @@ export async function PUT(
   }
   const inputs = Array.isArray(body.features) ? body.features : [];
 
+  // Prior event rows: preserve the one-time open-notification tombstone across saves,
+  // re-arming it only when the open time (available_from) actually changes.
+  const { data: priorRows } = await admin
+    .from("v2_event_features").select("feature_key, available_from, open_notification_sent_at").eq("org_id", id).eq("event_id", eventId);
+  const priorByKey = new Map((priorRows || []).map((r) => [r.feature_key as string, r]));
+
   // Validate keys: must be catalogued, event-scoped, built ('available'), and not
   // an always-on utility.
   const now = new Date().toISOString();
@@ -102,6 +110,10 @@ export async function PUT(
     const pinned = on && !!inp.pinned;
     if (pinned) pinnedCount += 1;
     const availability = inp.availability === "window" ? "window" : "always";
+    const availableFrom = availability === "window" ? inp.available_from || null : null;
+    const prior = priorByKey.get(inp.feature_key);
+    // Keep the sent tombstone unless the open time moved (then re-arm).
+    const sentAt = prior && (prior.available_from as string | null) === availableFrom ? (prior.open_notification_sent_at as string | null) : null;
     rows.push({
       org_id: id,
       event_id: eventId,
@@ -113,8 +125,11 @@ export async function PUT(
       // Spectator-public only makes sense when the feature is on for everyone.
       public: visibility === "everyone" && !!inp.public,
       availability,
-      available_from: availability === "window" ? inp.available_from || null : null,
+      available_from: availableFrom,
       available_until: availability === "window" ? inp.available_until || null : null,
+      open_notification_title: inp.open_notification_title?.trim() || null,
+      open_notification_body: inp.open_notification_body?.trim() || null,
+      open_notification_sent_at: sentAt,
       updated_at: now,
       updated_by: userId,
     });

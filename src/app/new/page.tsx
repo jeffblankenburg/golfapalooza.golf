@@ -19,7 +19,8 @@ export default async function NewHome() {
 
   // Members of exactly one group skip the chooser and land in that group.
   // The picker only matters at 0 groups (create/join) or 2+ (owners/admins).
-  if (ctx.orgs.length === 1) redirect(`/new/${ctx.orgs[0].slug}`);
+  // System admins always see the chooser so the platform console stays reachable.
+  if (ctx.orgs.length === 1 && !ctx.isSystemAdmin) redirect(`/new/${ctx.orgs[0].slug}`);
 
   const supabase = await v2ServerClient();
   const orgIds = ctx.orgs.map((o) => o.id);
@@ -52,6 +53,16 @@ export default async function NewHome() {
         Every club and outing you belong to, in one place. Pick a group to see its
         events and games.
       </p>
+
+      {ctx.isSystemAdmin && (
+        <Link
+          href="/new/admin"
+          className={styles.createBtnGhost}
+          style={{ alignSelf: "flex-start", marginBottom: 18 }}
+        >
+          Platform admin, all groups
+        </Link>
+      )}
 
       <div className={styles.rule} />
 

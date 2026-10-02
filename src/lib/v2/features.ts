@@ -101,7 +101,8 @@ export const FEATURE_CATALOG: FeatureDef[] = [
   { key: "rooms", label: "Rooms", bucket: "schedule", scope: "event", icon: "bed", status: "planned", surface: "route", blurb: "Lodging & room assignments." },
   { key: "trip_info", label: "Trip Info", bucket: "schedule", scope: "event", icon: "info", status: "planned", surface: "route", blurb: "Logistics, links & the essentials." },
   { key: "shirt_guide", label: "Shirt Guide", bucket: "schedule", scope: "event", icon: "shirt", status: "planned", surface: "route", blurb: "What to wear each day." },
-  { key: "my_options", label: "My Options", bucket: "schedule", scope: "event", icon: "list", status: "planned", surface: "route", blurb: "Add-ons & extras you've chosen." },
+  { key: "options", label: "Options", bucket: "schedule", scope: "event", icon: "list", status: "available", surface: "route", blurb: "Add-ons & extras you opt into." },
+  { key: "balance", label: "My Balance", bucket: "schedule", scope: "event", icon: "coins", status: "available", surface: "route", blurb: "What you owe for the event." },
   { key: "action_items", label: "Action Items", bucket: "schedule", scope: "event", icon: "check", status: "planned", surface: "route", blurb: "What still needs your attention." },
 
   // ── Community (group-wide) ───────────────────────────────────────────────
@@ -144,6 +145,9 @@ export interface FeatureRow {
   availability: FeatureAvailability;
   available_from: string | null;
   available_until: string | null;
+  open_notification_title?: string | null;
+  open_notification_body?: string | null;
+  open_notification_sent_at?: string | null;
 }
 
 /** Where a resolved setting came from, for the config screen's inheritance hint. */
@@ -160,6 +164,8 @@ export interface ResolvedFeature {
   availability: FeatureAvailability;
   availableFrom: string | null;
   availableUntil: string | null;
+  openNotificationTitle: string | null; // authored "it's open" notification (#218 generalized)
+  openNotificationBody: string | null;
   source: FeatureSource; // strongest scope that set visibility
 }
 
@@ -176,6 +182,8 @@ function baseResolved(def: FeatureDef): ResolvedFeature {
     availability: "always",
     availableFrom: null,
     availableUntil: null,
+    openNotificationTitle: null,
+    openNotificationBody: null,
     source: "default",
   };
 }
@@ -191,6 +199,8 @@ function applyRow(acc: ResolvedFeature, row: FeatureRow, source: FeatureSource):
     availability: row.availability,
     availableFrom: row.available_from,
     availableUntil: row.available_until,
+    openNotificationTitle: row.open_notification_title ?? acc.openNotificationTitle,
+    openNotificationBody: row.open_notification_body ?? acc.openNotificationBody,
     source,
   };
 }
@@ -231,6 +241,15 @@ export function isFeatureActive(
   const t = now.getTime();
   if (f.availableFrom && t < new Date(f.availableFrom).getTime()) return false;
   if (f.availableUntil && t > new Date(f.availableUntil).getTime()) return false;
+  return true;
+}
+
+/** Has a visible feature reached its open time? (past available_from; maybe past close).
+ *  Used for "show it, but read-only once the window has ended." */
+export function featureHasOpened(f: ResolvedFeature, viewerIsAdmin: boolean, now = new Date()): boolean {
+  if (!isVisibleTo(f, viewerIsAdmin)) return false;
+  if (f.availability !== "window") return true;
+  if (f.availableFrom && now.getTime() < new Date(f.availableFrom).getTime()) return false;
   return true;
 }
 
@@ -293,6 +312,8 @@ const FEATURE_ROUTES: Record<string, (slug: string) => string> = {
   courses: (slug) => `/new/${slug}/courses`,
   loozers: (slug) => `/new/${slug}/loozers`,
   schedule: (slug) => `/new/${slug}/schedule`,
+  options: (slug) => `/new/${slug}/options`,
+  balance: (slug) => `/new/${slug}/balance`,
 };
 
 export function featureHref(slug: string, def: FeatureDef): string | null {

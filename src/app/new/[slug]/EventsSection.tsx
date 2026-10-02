@@ -192,6 +192,7 @@ export default function EventsSection({
           <div className={styles.field}>
             <label className={styles.label}>End date <span className={styles.optional}>(optional)</span></label>
             <input className={styles.input} type="date" value={form.end_date}
+              min={form.start_date || undefined}
               onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
           </div>
           <div className={styles.field}>

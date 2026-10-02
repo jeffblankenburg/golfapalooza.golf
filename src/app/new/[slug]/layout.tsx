@@ -77,8 +77,17 @@ export default async function OrgLayout({
     );
   }
 
+  // Apply THIS org's brand color across the whole /new/<slug> subtree. The root
+  // /new layout only resolves a color for custom domains; path-based routes land
+  // here, so we override --brand from the org's saved primary_color. A
+  // display:contents wrapper carries the CSS var down the cascade with no layout
+  // impact; a null color keeps the inherited default green.
+  const brandStyle = org.primary_color
+    ? ({ display: "contents", ["--brand" as string]: org.primary_color } as React.CSSProperties)
+    : ({ display: "contents" } as React.CSSProperties);
+
   return (
-    <>
+    <div style={brandStyle}>
       <PwaRegistrar />
       {(ctx?.simulating || simAt) && <SimBanner name={ctx?.simulating ? ctx.simName : null} at={simAt} />}
       <SimTimeProvider serverNowMs={serverNowMs}>
@@ -86,6 +95,6 @@ export default async function OrgLayout({
           <MusicProvider orgId={org.id}>{children}</MusicProvider>
         </NameModeProvider>
       </SimTimeProvider>
-    </>
+    </div>
   );
 }

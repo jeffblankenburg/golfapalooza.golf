@@ -42,6 +42,22 @@ export async function isAnyOrgAdmin(admin: SupabaseClient, userId: string): Prom
   return !!data;
 }
 
+/**
+ * True if the user is a PLATFORM system admin (v2_profiles.is_system_admin).
+ * Platform-level, independent of any org membership — gates the cross-org admin
+ * screen and lets the user simulate anyone. Use the service-role client; the flag
+ * is never trusted from the RLS client.
+ */
+export async function isSystemAdmin(admin: SupabaseClient, userId: string): Promise<boolean> {
+  if (!userId) return false;
+  const { data } = await admin
+    .from("v2_profiles")
+    .select("is_system_admin")
+    .eq("id", userId)
+    .maybeSingle();
+  return !!data?.is_system_admin;
+}
+
 /** True when the user is an active member (any role) of the org. */
 export async function isOrgMember(
   admin: SupabaseClient,

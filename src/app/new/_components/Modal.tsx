@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { lockScroll, unlockScroll } from "./scrollLock";
 import styles from "./Modal.module.css";
 
 /**
@@ -25,11 +26,10 @@ export default function Modal({
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    lockScroll();
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
+      unlockScroll();
     };
   }, [open, onClose]);
 

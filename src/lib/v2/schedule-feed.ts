@@ -175,9 +175,41 @@ export async function buildMemberSchedule(
     }
   }
 
-  // ── Provided: activity time items (tee times etc.) ───────────────────────────
-  // Modules aren't built yet; when they are, each active activity projects its
-  // time-sensitive rows here (source:"activity", context: event name, href: module).
+  // ── Derived: contests (scrambles etc.) authored on the Contests page ─────────
+  // A contest is the source of truth; the calendar reflects it via contest_date.
+  // Top-level, dated contests (parent NULL) become an all-day activity entry;
+  // side games (parent set) ride their scramble, aggregates have no date. Tee
+  // times will layer on as timed sub-entries once teams exist.
+  if (activeIds.length) {
+    const { data: contests } = await admin
+      .from("v2_contests")
+      .select("id, name, contest_date, start_time, event_id")
+      .in("event_id", activeIds)
+      .is("parent_contest_id", null)
+      .not("contest_date", "is", null)
+      .gte("contest_date", windowStart);
+    for (const c of contests || []) {
+      const ev = eventById.get(c.event_id as string);
+      const timed = !!c.start_time;
+      entries.push({
+        id: `contest:${c.id}`,
+        source: "activity",
+        title: c.name as string,
+        description: null,
+        location: null,
+        day: c.contest_date as string,
+        end_day: null,
+        start_time: (c.start_time as string) || null,
+        end_time: null,
+        all_day: !timed,
+        // Timed contests sort by time among the day's items; all-day ones sit up
+        // top like a banner (below the event span at -100).
+        sort_order: timed ? 0 : -80,
+        context: ev ? ev.name : null,
+        href: null, // member scramble view lands later
+      });
+    }
+  }
 
   // Sort the merged feed: by day, then all-day/banner first, then time, then order.
   entries.sort(

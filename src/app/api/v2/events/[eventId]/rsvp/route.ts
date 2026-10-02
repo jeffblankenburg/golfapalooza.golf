@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgMember, orgNameMode } from "@/lib/v2/orgs";
 import { pickName } from "@/lib/v2/profile";
 import { logActivity } from "@/lib/v2/activity";
 import { syncEventChannelMembership } from "@/lib/v2/chat/channels";
+import { syncAttendanceEnrollment, cascadeLeaveRoster, alertRosterBreaks } from "@/lib/v2/contests/enrollment";
 
 /**
  * RSVP for an event. Mirrors the legacy model: a member sets their attendance
@@ -11,9 +12,10 @@ import { syncEventChannelMembership } from "@/lib/v2/chat/channels";
  * clears the RSVP. Returns the caller's likelihood plus the attending count
  * (on_roster). Auth: bearer (native) or cookie (web). Membership-gated.
  *
- * NOTE: the legacy site also cascades contest/roster enrollment on attend/leave.
- * v2 has no contest system yet, so we only persist likelihood + on_roster here;
- * enrollment sync lands when v2 contests do.
+ * Enrollment integrity (#214/#215/#217): becoming on_roster auto-enrolls into every
+ * Included contest; dropping below "Attending" or clearing the RSVP cascades the
+ * member off those contests + their opted-in Options + any scramble team seat, and
+ * alerts admins when a seat is left empty. Never blocks the RSVP (best-effort).
  */
 
 const LIKELIHOODS = [25, 50, 75, 99];
@@ -50,6 +52,31 @@ async function attendingCount(
     .eq("event_id", eventId)
     .eq("on_roster", true);
   return count ?? 0;
+}
+
+/**
+ * A member is no longer attending: cascade them off Included contests + opted-in
+ * Options + scramble seats, then alert admins about any emptied seat (#217).
+ * Best-effort — never blocks the RSVP write.
+ */
+async function handleLeave(
+  admin: ReturnType<typeof v2AdminClient>,
+  orgId: string,
+  eventId: string,
+  userId: string,
+): Promise<void> {
+  try {
+    const { breaks } = await cascadeLeaveRoster(admin, eventId, userId);
+    if (!breaks.length) return;
+    const [{ data: org }, { data: prof }, mode] = await Promise.all([
+      admin.from("v2_organizations").select("slug").eq("id", orgId).maybeSingle(),
+      admin.from("v2_profiles").select("display_name, first_name, last_name").eq("id", userId).maybeSingle(),
+      orgNameMode(admin, orgId),
+    ]);
+    await alertRosterBreaks(admin, orgId, (org?.slug as string) || "", eventId, pickName(prof, mode), breaks);
+  } catch {
+    /* best-effort */
+  }
 }
 
 export async function GET(
@@ -135,23 +162,27 @@ export async function POST(
   );
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Managed event channel: opting in (on_roster) adds you with full history;
-  // dropping below "Attending" removes you (your past messages stay). Best-effort.
-  await syncEventChannelMembership(g.admin, eventId, g.userId, onRoster).catch(() => {});
-
-  // Activity feed: a row per genuine likelihood change. Title is the status only
-  // ("Attending 99%") — the feed renders the actor's name + avatar itself.
-  if (priorLikelihood !== likelihood) {
-    await logActivity(g.admin, {
-      orgId: g.orgId,
-      eventId,
-      kind: "rsvp",
-      actorId: g.userId,
-      title: `${LIKELIHOOD_LABEL[likelihood as number]} ${likelihood}%`,
-      refId: eventId,
-      metadata: { likelihood },
-    }).catch(() => {});
-  }
+  // Everything below is a side-effect of the RSVP, not part of it — run it AFTER the
+  // response so the member's tap feels instant. The cascade/enrollment/alerts/channel
+  // sync can take a moment (many writes + a push); none of it blocks the UI.
+  const { admin, orgId, userId } = g;
+  after(async () => {
+    // Managed event channel: opting in adds you (full history); dropping below
+    // "Attending" removes you (messages persist).
+    await syncEventChannelMembership(admin, eventId, userId, onRoster).catch(() => {});
+    // Included contests: on_roster auto-enrolls (#215); leaving cascades off + alerts
+    // admins about emptied seats (#217).
+    if (onRoster) await syncAttendanceEnrollment(admin, eventId, userId, true).catch(() => {});
+    else if (priorLikelihood === 99) await handleLeave(admin, orgId, eventId, userId);
+    // Activity feed: one row per genuine change.
+    if (priorLikelihood !== likelihood) {
+      await logActivity(admin, {
+        orgId, eventId, kind: "rsvp", actorId: userId,
+        title: `${LIKELIHOOD_LABEL[likelihood as number]} ${likelihood}%`,
+        refId: eventId, metadata: { likelihood },
+      }).catch(() => {});
+    }
+  });
 
   return NextResponse.json({
     likelihood,
@@ -167,6 +198,15 @@ export async function DELETE(
   const g = await resolve(request, eventId);
   if ("error" in g) return NextResponse.json({ error: g.error }, { status: g.status });
 
+  // Were they on the roster before clearing? Drives the leave cascade (#217).
+  const { data: prior } = await g.admin
+    .from("v2_event_participants")
+    .select("on_roster")
+    .eq("event_id", eventId)
+    .eq("user_id", g.userId)
+    .maybeSingle();
+  const wasOnRoster = prior?.on_roster === true;
+
   const { error } = await g.admin
     .from("v2_event_participants")
     .delete()
@@ -174,8 +214,12 @@ export async function DELETE(
     .eq("user_id", g.userId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Clearing an RSVP drops you from the event channel (messages persist).
-  await syncEventChannelMembership(g.admin, eventId, g.userId, false).catch(() => {});
+  // Side-effects after the response — the clear feels instant.
+  const { admin, orgId, userId } = g;
+  after(async () => {
+    await syncEventChannelMembership(admin, eventId, userId, false).catch(() => {});
+    if (wasOnRoster) await handleLeave(admin, orgId, eventId, userId);
+  });
 
   return NextResponse.json({
     likelihood: null,

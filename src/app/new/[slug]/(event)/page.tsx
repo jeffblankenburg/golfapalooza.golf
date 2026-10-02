@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
 import { loadResolvedFeatures } from "@/lib/v2/features-server";
-import { isFeatureVisible } from "@/lib/v2/features";
+import { isFeatureVisible, isFeatureActive } from "@/lib/v2/features";
+import { loadOptionSettings, selectionsStillOpen } from "@/lib/v2/options";
 import styles from "@/app/new/new.module.css";
 import { getOnboardingState } from "@/lib/v2/onboarding";
 import { v2Now } from "@/lib/v2/simulator";
@@ -63,6 +64,15 @@ export default async function EventHome({
   const isAdmin = org.role === "owner" || org.role === "admin";
   const resolved = await loadResolvedFeatures(supabase, org.id, event?.id ?? null);
   const articlesVisible = isFeatureVisible(resolved, "articles", isAdmin);
+  // Options: visibility/open come from the feature window; the read-only cutoff is
+  // the Options-specific close date. "Open" (editable) means both hold.
+  const optionsFeat = event ? resolved.find((r) => r.def.key === "options") || null : null;
+  let optionsOpen = false;
+  if (optionsFeat && event) {
+    const nowDate = await v2Now();
+    const optSettings = await loadOptionSettings(supabase, event.id);
+    optionsOpen = isFeatureActive(optionsFeat, isAdmin, nowDate) && selectionsStillOpen(optSettings, nowDate.getTime());
+  }
 
   // First-run setup checklist — admins only, hidden once done or dismissed.
   const onboarding = isAdmin ? await getOnboardingState(supabase, org, isAdmin) : null;
@@ -107,6 +117,7 @@ export default async function EventHome({
             storeEnabled={org.store_enabled}
             nameDisplay={org.name_display}
             articlesVisible={articlesVisible}
+            optionsOpen={optionsOpen}
           />
         </>
       ) : (

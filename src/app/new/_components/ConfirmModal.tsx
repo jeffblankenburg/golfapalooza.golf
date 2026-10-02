@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { lockScroll, unlockScroll } from "./scrollLock";
 import styles from "./ConfirmModal.module.css";
 
 /**
@@ -33,11 +34,10 @@ export default function ConfirmModal({
       if (e.key === "Escape") onCancel();
     };
     document.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    lockScroll();
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
+      unlockScroll();
     };
   }, [open, onCancel]);
 

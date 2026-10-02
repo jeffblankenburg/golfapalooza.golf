@@ -396,10 +396,13 @@
 /* Skins: one tile per player (name + net). */
 .sideGameGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0,1fr) lets tracks shrink below content width so tiles never overflow
+     the card (default grid tracks are min-width:auto = content-sized). */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 .sideGameTile {
+  min-width: 0; /* grid item must allow shrink for the name ellipsis to engage */
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 8px 10px;
@@ -415,6 +418,8 @@
   gap: 6px;
 }
 .sideGameTileName {
+  flex: 1;
+  min-width: 0; /* allow the flex item to shrink so ellipsis engages, not overflow */
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--ink);
@@ -423,6 +428,7 @@
   text-overflow: ellipsis;
 }
 .sideGameTileSkins {
+  flex: none; /* keep the count intact; the name truncates instead */
   font-size: 0.68rem;
   font-weight: 600;
   color: var(--ink-soft);

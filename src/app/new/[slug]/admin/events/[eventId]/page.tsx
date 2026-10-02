@@ -71,15 +71,15 @@ export default async function EventAdmin({
         <AdminGrid
           items={[
             { label: "Features", href: `/new/${slug}/admin/events/${eventId}/features`, desc: "Turn features on, pin & rename them" },
-            { label: "Contests", desc: "Scramble, Skins, Pick'em, Calcutta, Cornhole…" },
+            { label: "Contests", href: `/new/${slug}/admin/events/${eventId}/contests`, desc: "Scramble, Skins, Pick'em, Calcutta, Cornhole…" },
             { label: "Tee Times", desc: "Groups & start times" },
             { label: "Teams", desc: "Team assignments" },
             { label: "Lodging", desc: "Rooms & housing" },
             { label: "Schedule", href: `/new/${slug}/admin/events/${eventId}/schedule`, desc: "Per-day agenda & activities" },
-            { label: "Financials", desc: "Buy-ins & payouts" },
+            { label: "Financials", href: `/new/${slug}/admin/events/${eventId}/financials`, desc: "Costs, trip cost & payouts" },
             { label: "Attendance", desc: "RSVPs & roster" },
             { label: "Shirts", desc: "Sizes & orders" },
-            { label: "Options", desc: "Add-ons & extras" },
+            { label: "Options", href: `/new/${slug}/admin/events/${eventId}/options`, desc: "Opt-in add-ons & their pricing" },
             { label: "Polls", desc: "Voting" },
             { label: "Awards", desc: "Accolades & nominations" },
             { label: "Info", desc: "Event details" },

@@ -71,6 +71,15 @@ export const NOTIFICATION_SECTIONS: NotificationSection[] = [
       { type: "notify_round_completed", label: "Round finished", description: "When someone you follow finishes a round" },
     ],
   },
+  {
+    // Admin-only alerts. These only reach org owners/admins; non-admins never
+    // trigger them, so the toggle is simply dormant for everyone else.
+    key: "admin",
+    label: "Admin alerts",
+    items: [
+      { type: "contest_roster_break", label: "Roster breaks", description: "When a member's drop leaves an empty team seat" },
+    ],
+  },
 ];
 
 export const NOTIFICATION_TYPE_KEYS = NOTIFICATION_SECTIONS.flatMap((s) => s.items.map((i) => i.type));

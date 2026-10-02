@@ -6,7 +6,6 @@ import Modal from "@/app/new/_components/Modal";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import {
   SCHEDULE_KINDS as KINDS,
-  ACTIVITY_TYPES,
   ACTIVITY_LABEL,
   fmtTime,
   fmtDateShort,
@@ -39,7 +38,6 @@ const emptyForm = {
   end_time: "",
   location: "",
   description: "",
-  activity_type: "",
 };
 
 /**
@@ -115,7 +113,6 @@ export default function ScheduleEditor({
       end_time: it.end_time ? it.end_time.slice(0, 5) : "",
       location: it.location || "",
       description: it.description || "",
-      activity_type: it.activity_type || "",
     });
     setError(null);
     setEditing(it);
@@ -144,7 +141,6 @@ export default function ScheduleEditor({
       end_time: form.all_day ? null : form.end_time || null,
       location: form.location.trim() || null,
       description: form.description.trim() || null,
-      activity_type: form.kind === "activity" ? form.activity_type || null : null,
     };
     const isNew = editing === "new";
     const res = await fetch(isNew ? apiBase : `${apiBase}/${(editing as ScheduleItem).id}`, {
@@ -265,18 +261,6 @@ export default function ScheduleEditor({
             </div>
           </div>
 
-          {form.kind === "activity" && (
-            <div className={styles.field}>
-              <label className={styles.label}>Activity <span className={styles.optional}>(module, coming soon)</span></label>
-              <select className={styles.roleSelect} value={form.activity_type} onChange={(e) => setForm({ ...form, activity_type: e.target.value })}>
-                <option value="">Unspecified</option>
-                {ACTIVITY_TYPES.map((a) => (
-                  <option key={a.key} value={a.key}>{a.label}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
           <label className={styles.profileToggle}>
             <input type="checkbox" checked={form.all_day} onChange={(e) => setForm({ ...form, all_day: e.target.checked })} />
             <span>All day</span>
@@ -307,13 +291,13 @@ export default function ScheduleEditor({
 
           {error && <p className={styles.formError}>{error}</p>}
 
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <button type="submit" className={styles.createBtn} disabled={busy || !form.title.trim()} style={{ opacity: busy || !form.title.trim() ? 0.6 : 1 }}>
               {busy ? "Saving…" : editing === "new" ? "Add item" : "Save changes"}
             </button>
             {editing !== "new" && editing && (
-              <button type="button" className={styles.wizBackLink} style={{ color: "#a3341f" }} onClick={() => setConfirmDel(editing as ScheduleItem)}>
-                Delete
+              <button type="button" className={styles.deleteBtn} onClick={() => setConfirmDel(editing as ScheduleItem)}>
+                Delete item
               </button>
             )}
           </div>

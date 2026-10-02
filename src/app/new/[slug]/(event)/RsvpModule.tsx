@@ -55,7 +55,6 @@ export default function RsvpModule({
   const [participants, setParticipants] = useState<Participant[] | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [open, setOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadParticipants = useCallback(async () => {
@@ -78,42 +77,50 @@ export default function RsvpModule({
     if (next && participants === null) loadParticipants();
   }
 
-  async function choose(next: Likelihood) {
-    setSaving(true);
+  // Optimistic: reflect the choice immediately, write in the background, revert on error.
+  function choose(next: Likelihood) {
+    const prev = likelihood, prevResp = responseCount, prevAtt = attendingCount;
     setError(null);
-    try {
-      const res = await fetch(`/api/v2/events/${eventId}/rsvp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ likelihood: next }),
-      });
-      if (!res.ok) throw new Error();
-      setLikelihood(next);
-      setOpen(false);
-      setParticipants(null);
-      await loadParticipants();
-    } catch {
-      setError("Couldn't save your RSVP. Try again.");
-    } finally {
-      setSaving(false);
-    }
+    setLikelihood(next);
+    setOpen(false);
+    setParticipants(null); // breakdown reloads lazily next time it's expanded
+    if (prev === null) setResponseCount((c) => c + 1);
+    setAttendingCount((c) => c + (next === 99 ? 1 : 0) - (prev === 99 ? 1 : 0));
+    void (async () => {
+      try {
+        const res = await fetch(`/api/v2/events/${eventId}/rsvp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ likelihood: next }),
+        });
+        if (!res.ok) throw new Error();
+      } catch {
+        setLikelihood(prev); setResponseCount(prevResp); setAttendingCount(prevAtt);
+        setError("Couldn't save your RSVP. Try again.");
+        setOpen(true);
+      }
+    })();
   }
 
-  async function clear() {
-    setSaving(true);
+  function clear() {
+    const prev = likelihood, prevResp = responseCount, prevAtt = attendingCount;
     setError(null);
-    try {
-      const res = await fetch(`/api/v2/events/${eventId}/rsvp`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
-      setLikelihood(null);
-      setExpanded(false);
-      setParticipants(null);
-      setOpen(false);
-    } catch {
-      setError("Couldn't clear your RSVP. Try again.");
-    } finally {
-      setSaving(false);
-    }
+    setLikelihood(null);
+    setExpanded(false);
+    setParticipants(null);
+    setOpen(false);
+    if (prev !== null) setResponseCount((c) => Math.max(0, c - 1));
+    if (prev === 99) setAttendingCount((c) => Math.max(0, c - 1));
+    void (async () => {
+      try {
+        const res = await fetch(`/api/v2/events/${eventId}/rsvp`, { method: "DELETE" });
+        if (!res.ok) throw new Error();
+      } catch {
+        setLikelihood(prev); setResponseCount(prevResp); setAttendingCount(prevAtt);
+        setError("Couldn't clear your RSVP. Try again.");
+        setOpen(true);
+      }
+    })();
   }
 
   return (
@@ -200,7 +207,7 @@ export default function RsvpModule({
               type="button"
               className={styles.rsvpOption}
               data-selected={likelihood === o.value || undefined}
-              disabled={saving}
+             
               onClick={() => choose(o.value)}
             >
               <span className={styles.rsvpOptionDot} data-likelihood={o.value} aria-hidden />
@@ -212,7 +219,7 @@ export default function RsvpModule({
             </button>
           ))}
           {likelihood !== null && (
-            <button type="button" className={styles.rsvpClear} disabled={saving} onClick={clear}>
+            <button type="button" className={styles.rsvpClear} onClick={clear}>
               Clear my choice
             </button>
           )}

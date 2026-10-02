@@ -6,9 +6,11 @@ import { todayInTimezone, ageTurningToday } from "@/lib/v2/birthday";
 import { v2Now } from "@/lib/v2/simulator";
 import BirthdayBanner, { type BirthdayPerson } from "./BirthdayBanner";
 import RsvpModule, { type Likelihood } from "./RsvpModule";
+import OptionsReminder from "./OptionsReminder";
 import AdCarousel, { type Ad } from "./AdCarousel";
 import ActivityFeed from "./ActivityFeed";
 import type { ActivityRow } from "@/lib/v2/activity";
+import { OPTION_SELECT, loadOptionChoicePrices, tripCostCents, type Option } from "@/lib/v2/options";
 import styles from "@/app/new/new.module.css";
 /* eslint-disable @next/next/no-img-element */
 
@@ -65,6 +67,7 @@ export default async function HomeModules({
   storeEnabled,
   nameDisplay,
   articlesVisible,
+  optionsOpen,
 }: {
   orgId: string;
   eventId: string;
@@ -76,6 +79,7 @@ export default async function HomeModules({
   storeEnabled: boolean;
   nameDisplay: NameMode;
   articlesVisible: boolean;
+  optionsOpen: boolean;
 }) {
   const supabase = await v2ServerClient();
 
@@ -83,7 +87,7 @@ export default async function HomeModules({
   const nowIso = now.toISOString();
 
   // Birthdays + article + RSVP + attending count + ads + activity, in parallel.
-  const [membersRes, articleRes, myRsvpRes, goingRes, attendingRes, adsRes, activityRes, orgSysRes] =
+  const [membersRes, articleRes, myRsvpRes, goingRes, attendingRes, adsRes, activityRes, orgSysRes, optionsRes, selectionsRes] =
     await Promise.all([
     supabase
       .from("v2_memberships")
@@ -135,6 +139,9 @@ export default async function HomeModules({
       .select("system_name, system_avatar_url")
       .eq("id", orgId)
       .maybeSingle(),
+    // Opt-in options for this event + the member's current selections (for the nudge).
+    supabase.from("v2_options").select(OPTION_SELECT).eq("event_id", eventId).order("sort_order"),
+    supabase.from("v2_user_option_selections").select("option_id, value").eq("event_id", eventId).eq("user_id", userId),
   ]);
 
   const myLikelihood = (myRsvpRes.data?.likelihood as Likelihood | undefined) ?? null;
@@ -151,6 +158,30 @@ export default async function HomeModules({
   const orgSys = (orgSysRes.data as { system_name: string | null; system_avatar_url: string | null } | null) ?? null;
   const systemName = orgSys?.system_name?.trim() || "System";
   const systemAvatar = orgSys?.system_avatar_url ?? null;
+
+  // Options the member can opt into + their current picks + the derived Trip Cost.
+  const optionRows = (optionsRes.data as Option[] | null) ?? [];
+  const optionIds = optionRows.map((o) => o.id);
+  const [optionPriceInfo, tripCost] = await Promise.all([
+    loadOptionChoicePrices(supabase, optionIds),
+    tripCostCents(supabase, eventId),
+  ]);
+  // Trip Cost is a normal selectable option (v1 parity) — render it as a checkbox whose
+  // price is the derived tripCostCents; drop it only when it's $0 (nothing in it yet).
+  const memberOptions = optionRows
+    .filter((o) => o.option_type !== "trip_cost" || tripCost > 0)
+    .map((o) => {
+      const isTrip = o.option_type === "trip_cost";
+      return {
+        id: o.id, name: o.name, description: o.description,
+        option_type: (isTrip ? "checkbox" : o.option_type) as Option["option_type"],
+        choices: o.choices, is_required: o.is_required, max_total: o.max_total, icon: o.icon, group_id: o.group_id,
+        depends_on_option_id: o.depends_on_option_id,
+        price_info: isTrip ? { whole: tripCost, byChoice: {} } : (optionPriceInfo.get(o.id) || { whole: 0, byChoice: {} }),
+      };
+    });
+  const selections: Record<string, unknown> = {};
+  for (const s of ((selectionsRes.data as { option_id: string; value: unknown }[] | null) ?? [])) selections[s.option_id] = s.value;
 
   const birthdays = birthdaysToday(
     (membersRes.data as unknown as { v2_profiles: MemberProfile | null }[]) || [],
@@ -178,7 +209,7 @@ export default async function HomeModules({
   return (
     <>
       <BirthdayBanner birthdays={birthdays} slug={slug} />
-      {articlesVisible && <ArticleModule article={article} slug={slug} />}
+      {articlesVisible && article && <ArticleModule article={article} slug={slug} />}
       <RsvpModule
         eventId={eventId}
         eventName={eventName}
@@ -186,6 +217,13 @@ export default async function HomeModules({
         initialResponseCount={responseCount}
         initialAttendingCount={attendingCount}
       />
+      {optionsOpen && (
+        <OptionsReminder
+          slug={slug}
+          options={memberOptions}
+          initialSelections={selections}
+        />
+      )}
       <StoreModule storeUrl={storeEnabled ? storeUrl : null} storeLabel={storeLabel} />
       <ActivityFeed initialItems={activity} orgId={orgId} systemName={systemName} systemAvatar={systemAvatar} />
       <AdCarousel ads={ads} />

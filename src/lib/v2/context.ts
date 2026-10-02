@@ -37,6 +37,8 @@ export interface PlatformContext {
   simulating: boolean;
   /** Display name of the simulated member (only while simulating). */
   simName: string | null;
+  /** True when the effective user is a platform system admin (gates /new/admin). */
+  isSystemAdmin: boolean;
   orgs: PlatformOrg[];
 }
 
@@ -77,10 +79,24 @@ export async function getPlatformContext(): Promise<PlatformContext | null> {
     .sort((a, b) => a.name.localeCompare(b.name));
 
   let simName: string | null = null;
+  let isSystemAdmin = false;
   if (eff.simulating) {
-    const { data: prof } = await client.from("v2_profiles").select("display_name").eq("id", effUserId).maybeSingle();
+    const { data: prof } = await client
+      .from("v2_profiles")
+      .select("display_name, is_system_admin")
+      .eq("id", effUserId)
+      .maybeSingle();
     simName = prof?.display_name ?? null;
+    isSystemAdmin = !!prof?.is_system_admin;
+  } else {
+    // RLS self-select exposes the user's own profile, so the cookie client is fine.
+    const { data: prof } = await supabase
+      .from("v2_profiles")
+      .select("is_system_admin")
+      .eq("id", effUserId)
+      .maybeSingle();
+    isSystemAdmin = !!prof?.is_system_admin;
   }
 
-  return { userId: effUserId, realUserId: user.id, simulating: eff.simulating, simName, orgs };
+  return { userId: effUserId, realUserId: user.id, simulating: eff.simulating, simName, isSystemAdmin, orgs };
 }

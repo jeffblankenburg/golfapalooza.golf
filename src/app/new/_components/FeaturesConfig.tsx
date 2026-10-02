@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   FEATURE_BUCKETS,
   MAX_PINNED,
+  type FeatureAvailability,
   type FeatureScope,
   type FeatureVisibility,
   type ResolvedFeature,
@@ -13,12 +14,25 @@ import {
 import FeatureIcon from "@/app/new/_components/FeatureIcon";
 import styles from "@/app/new/new.module.css";
 
+function toLocalInput(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+const toIso = (local: string): string | null => (local ? new Date(local).toISOString() : null);
+
 /** The editable slice of a feature's config. */
 interface Draft {
   visibility: FeatureVisibility;
   pinned: boolean;
   isPublic: boolean;
   label: string; // label override; empty = use catalog label
+  availability: FeatureAvailability;
+  availableFrom: string | null;
+  availableUntil: string | null;
+  notifTitle: string;
+  notifBody: string;
 }
 
 function toDraft(f: ResolvedFeature): Draft {
@@ -27,6 +41,11 @@ function toDraft(f: ResolvedFeature): Draft {
     pinned: f.pinned,
     isPublic: f.public,
     label: f.label === f.def.label ? "" : f.label,
+    availability: f.availability,
+    availableFrom: f.availableFrom,
+    availableUntil: f.availableUntil,
+    notifTitle: f.openNotificationTitle || "",
+    notifBody: f.openNotificationBody || "",
   };
 }
 
@@ -82,6 +101,8 @@ export default function FeaturesConfig({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState(0);
+  const [schedOpen, setSchedOpen] = useState<Set<string>>(new Set());
+  const toggleSched = (key: string) => setSchedOpen((s) => { const n = new Set(s); if (n.has(key)) n.delete(key); else n.add(key); return n; });
 
   const pinnedCount = allowPin
     ? editableKeys.filter((k) => drafts[k]?.visibility !== "off" && drafts[k]?.pinned).length
@@ -120,6 +141,11 @@ export default function FeaturesConfig({
         nav_order: pinned ? order++ : 0,
         label_override: d.label.trim() || null,
         public: d.visibility === "everyone" && d.isPublic,
+        availability: d.availability,
+        available_from: d.availability === "window" ? d.availableFrom : null,
+        available_until: d.availability === "window" ? d.availableUntil : null,
+        open_notification_title: d.notifTitle.trim() || null,
+        open_notification_body: d.notifBody.trim() || null,
       };
     });
     try {
@@ -262,6 +288,39 @@ export default function FeaturesConfig({
                             placeholder={f.def.label}
                             maxLength={24}
                           />
+                        </div>
+
+                        <div className={styles.featSubText} style={{ width: "100%" }}>
+                          <button type="button" className={styles.linkAction} onClick={() => toggleSched(f.def.key)}>
+                            {schedOpen.has(f.def.key) ? "Hide scheduling" : "Scheduling & notification"}
+                            {d?.availability === "window" && <span className={styles.featChip} style={{ marginLeft: 6 }}>Scheduled</span>}
+                          </button>
+                          {schedOpen.has(f.def.key) && (
+                            <div style={{ marginTop: 8 }}>
+                              <label className={styles.profileToggle} style={{ marginTop: 0 }}>
+                                <input type="checkbox" checked={d?.availability === "window"}
+                                  onChange={(e) => patch(f.def.key, e.target.checked ? { availability: "window" } : { availability: "always", availableFrom: null, availableUntil: null })} />
+                                <span>Schedule a window (auto open &amp; close)</span>
+                              </label>
+                              {d?.availability === "window" && (
+                                <div className={styles.profileTwoCol} style={{ marginTop: 8 }}>
+                                  <div className={styles.field}>
+                                    <label className={styles.label}>Opens</label>
+                                    <input type="datetime-local" className={styles.input} value={toLocalInput(d?.availableFrom ?? null)} onChange={(e) => patch(f.def.key, { availableFrom: toIso(e.target.value) })} />
+                                  </div>
+                                  <div className={styles.field}>
+                                    <label className={styles.label}>Closes</label>
+                                    <input type="datetime-local" className={styles.input} value={toLocalInput(d?.availableUntil ?? null)} onChange={(e) => patch(f.def.key, { availableUntil: toIso(e.target.value) })} />
+                                  </div>
+                                </div>
+                              )}
+                              <div className={styles.field} style={{ marginTop: 8 }}>
+                                <label className={styles.label}>Opening notification <span className={styles.optional}>(sent when it opens)</span></label>
+                                <input className={styles.input} value={d?.notifTitle ?? ""} onChange={(e) => patch(f.def.key, { notifTitle: e.target.value })} placeholder={`e.g. ${f.def.label} is open!`} maxLength={80} />
+                                <textarea className={styles.textarea} value={d?.notifBody ?? ""} onChange={(e) => patch(f.def.key, { notifBody: e.target.value })} placeholder="Body (optional)" maxLength={300} style={{ marginTop: 6 }} />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}

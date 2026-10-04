@@ -1,0 +1,60 @@
+{
+  "cli_version": "0.11.2",
+  "checkpoint_id": "01M444Z6TQ7XC1EKPXYG2948H1",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 20,
+  "files_touched": [
+    "docs/issues/v2-customization-leaks.md",
+    "docs/issues/v2-team-members-rename-team.md",
+    "src/app/api/v2/admin/scoring-metrics/[id]/route.ts",
+    "src/app/api/v2/admin/scoring-metrics/route.ts",
+    "src/app/api/v2/events/[eventId]/pickem/pick/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/contests/[contestId]/pickem/reset/route.ts",
+    "src/app/api/v2/orgs/[id]/events/[eventId]/contests/[contestId]/pickem/route.ts",
+    "src/app/new/[slug]/(event)/pickem/PickemContent.tsx",
+    "src/app/new/[slug]/(event)/pickem/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/AddCompetition.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ContestPayouts.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/PayoutSplitsEditor.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/PickemAdmin.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/ScoringManager.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/TeamsManager.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/scoring/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/contests/page.tsx",
+    "src/app/new/[slug]/admin/events/[eventId]/options/OptionsManager.tsx",
+    "src/app/new/_components/Modal.module.css",
+    "src/app/new/_components/Modal.tsx",
+    "src/app/new/_components/SaveStatus.module.css",
+    "src/app/new/_components/SaveStatus.tsx",
+    "src/app/new/_components/useAutoSave.ts",
+    "src/app/new/admin/page.tsx",
+    "src/app/new/admin/scoring-metrics/ScoringMetricsManager.tsx",
+    "src/app/new/admin/scoring-metrics/page.tsx",
+    "src/app/new/new.module.css",
+    "src/lib/v2/contests.ts",
+    "src/lib/v2/contests/payouts.ts",
+    "src/lib/v2/contests/pickem.ts",
+    "src/lib/v2/features.ts",
+    "src/lib/v2/scoring-metrics.ts",
+    "supabase/migrations/00261_v2_pickem.sql",
+    "supabase/migrations/00262_v2_scoring_metrics.sql"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 102302,
+    "cache_creation_tokens": 4499256,
+    "cache_read_tokens": 634765781,
+    "output_tokens": 1549751,
+    "api_call_count": 1320
+  }
+}

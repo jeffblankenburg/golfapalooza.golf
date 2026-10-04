@@ -93,7 +93,7 @@ export const FEATURE_CATALOG: FeatureDef[] = [
   { key: "cornhole", label: "Cornhole", bucket: "scores", scope: "event", icon: "bracket", status: "planned", surface: "route", blurb: "Cornhole bracket & results." },
   { key: "boland_bet", label: "Boland Bet", bucket: "scores", scope: "event", icon: "coins", status: "planned", surface: "route", blurb: "The house side bet." },
   { key: "bspitw", label: "BSPITW", bucket: "scores", scope: "event", icon: "target", status: "planned", surface: "route", blurb: "Best shot player in the world." },
-  { key: "pickem", label: "Pick'em", bucket: "scores", scope: "event", icon: "check", status: "planned", surface: "route", blurb: "Pick winners before play." },
+  { key: "pickem", label: "Pick'em", bucket: "scores", scope: "event", icon: "check", status: "available", surface: "route", blurb: "Pick games vs. the spread." },
 
   // ── Schedule & Logistics (mostly per event) ──────────────────────────────
   { key: "schedule", label: "Schedule", bucket: "schedule", scope: "event", icon: "calendar", status: "available", surface: "route", blurb: "The event itinerary." },
@@ -314,6 +314,7 @@ const FEATURE_ROUTES: Record<string, (slug: string) => string> = {
   schedule: (slug) => `/new/${slug}/schedule`,
   options: (slug) => `/new/${slug}/options`,
   balance: (slug) => `/new/${slug}/balance`,
+  pickem: (slug) => `/new/${slug}/pickem`,
 };
 
 export function featureHref(slug: string, def: FeatureDef): string | null {

@@ -52,6 +52,11 @@ const TYPE_LABEL: Record<string, string> = {
   cornhole: "Cornhole", pickem: "Pick'em", other: "Contest",
 };
 
+/** Human label for a contest type (e.g. "Scramble", "Closest to the Pin"). */
+export function contestTypeLabel(type: string): string {
+  return TYPE_LABEL[type] || "Contest";
+}
+
 /** Derived contests read scores/observations; the rest are hand-adjudicated. */
 export function defaultScoringSource(type: ContestType): "derived" | "manual" {
   return type === "scramble" || type === "skins" || type === "bspitw" ? "derived" : "manual";

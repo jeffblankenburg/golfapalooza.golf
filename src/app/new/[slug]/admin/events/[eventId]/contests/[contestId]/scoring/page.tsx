@@ -19,7 +19,14 @@ export default async function ContestScoringPage({ params }: { params: Promise<{
     .from("v2_contests").select("id, name, tee_id, config").eq("id", contestId).eq("org_id", org.id).eq("event_id", eventId).maybeSingle();
   if (!contest) redirect(`/new/${slug}/admin/events/${eventId}/contests`);
 
-  const holes = await resolveContestHoles(admin, { tee_id: contest.tee_id as string | null, config: contest.config as Record<string, unknown> | null });
+  const cfg = contest.config as Record<string, unknown> | null;
+  const holes = await resolveContestHoles(admin, { tee_id: contest.tee_id as string | null, config: cfg });
+  // Per-player observations (greens/putts/etc.) belong to the CONSUMING contest
+  // (BSPITW / 100 Feet / CTP), not the scramble. Until those are built and declare
+  // which v2_scoring_metrics they collect, the scramble scorer collects none.
+  // TODO(#220): compute the union of metrics required by consuming contests here.
+  const trackGreens = false;
+  const trackPutts = false;
 
   const { data: teamRows } = await admin
     .from("v2_scramble_teams").select("id, name, team_handicap, sort_order").eq("contest_id", contestId).order("sort_order");
@@ -61,6 +68,8 @@ export default async function ContestScoringPage({ params }: { params: Promise<{
         initialScores={scoreRows || []}
         initialObs={obsRows || []}
         names={names}
+        trackGreens={trackGreens}
+        trackPutts={trackPutts}
       />
     </div>
   );

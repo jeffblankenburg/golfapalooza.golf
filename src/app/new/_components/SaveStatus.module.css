@@ -1,0 +1,70 @@
+.bar {
+  position: sticky;
+  /* Clear the whole bottom chrome: nav (--nav-h) + music mini-player (--mini-h). */
+  bottom: calc(var(--nav-h, 0px) + var(--mini-h, 0px) + 10px);
+  z-index: 5;
+  margin-top: 20px;
+  padding-top: 8px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* Bare centered chip; the Modal footer slot (.below) handles floating it beneath the card. */
+.modalBar {
+  display: flex;
+  justify-content: center;
+}
+
+.chip {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink-soft);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.chip[data-state="saving"] {
+  color: #92600a;
+  background: #fff7e6;
+  border-color: #f2d19b;
+}
+.chip[data-state="saved"] {
+  color: #137a3e;
+  background: #eafaf0;
+  border-color: #a9e2c0;
+}
+.chip[data-state="error"] {
+  color: #b42318;
+  background: #fdeceb;
+  border-color: #f3b6b2;
+}
+.chip svg {
+  flex: none;
+}
+
+.spin {
+  animation: saveStatusSpin 0.8s linear infinite;
+}
+@keyframes saveStatusSpin {
+  to { transform: rotate(360deg); }
+}
+
+.retry {
+  pointer-events: auto;
+  margin-left: 4px;
+  font-weight: 700;
+  text-decoration: underline;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: inherit;
+}

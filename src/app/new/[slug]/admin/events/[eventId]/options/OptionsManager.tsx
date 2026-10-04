@@ -640,7 +640,7 @@ export default function OptionsManager({
         )}
         <div className={styles.field}>
           <label className={styles.label}>Description <span className={styles.optional}>(optional)</span></label>
-          <textarea className={styles.textarea} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What members are opting into" maxLength={300} />
+          <textarea className={styles.textarea} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What members are opting into" maxLength={2000} rows={4} />
         </div>
         <div className={styles.field}>
           <label className={styles.label}>Section <span className={styles.optional}>(optional)</span></label>
@@ -962,7 +962,7 @@ export default function OptionsManager({
           </div>
           <div className={styles.field}>
             <label className={styles.label}>Description <span className={styles.optional}>(optional)</span></label>
-            <textarea className={styles.textarea} value={gDesc} onChange={(e) => setGDesc(e.target.value)} maxLength={300} />
+            <textarea className={styles.textarea} value={gDesc} onChange={(e) => setGDesc(e.target.value)} maxLength={2000} rows={3} />
           </div>
           <div className={styles.field}>
             <label className={styles.label}>Icon <span className={styles.optional}>(optional)</span></label>

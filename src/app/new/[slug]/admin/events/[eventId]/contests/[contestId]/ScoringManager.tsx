@@ -25,6 +25,8 @@ export default function ScoringManager({
   initialScores,
   initialObs,
   names,
+  trackGreens,
+  trackPutts,
 }: {
   orgId: string;
   eventId: string;
@@ -34,6 +36,8 @@ export default function ScoringManager({
   initialScores: ScoreRow[];
   initialObs: ObsRow[];
   names: Record<string, string>;
+  trackGreens: boolean;
+  trackPutts: boolean;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [scores, setScores] = useState<Record<string, Record<number, number>>>(() => {
@@ -274,15 +278,17 @@ export default function ScoringManager({
               {wScore !== "" && <button type="button" className={styles.cscClear} onClick={() => setWScore("")}>Clear</button>}
             </div>
 
-            <div className={styles.cscPlayers}>
-              {editTeam.members.map((uid) => (
-                <div key={uid} className={styles.cscPlayerRow}>
-                  <span className={styles.cscPlayerName}>{names[uid] || "Member"}</span>
-                  <button type="button" className={styles.cscToggle} data-on={wPlayers[uid]?.on_green || undefined} onClick={() => toggleGreen(uid)}>Green</button>
-                  <button type="button" className={styles.cscToggle} data-on={wPlayers[uid]?.holed_out || undefined} onClick={() => toggleHoled(uid)}>Putt</button>
-                </div>
-              ))}
-            </div>
+            {(trackGreens || trackPutts) && (
+              <div className={styles.cscPlayers}>
+                {editTeam.members.map((uid) => (
+                  <div key={uid} className={styles.cscPlayerRow}>
+                    <span className={styles.cscPlayerName}>{names[uid] || "Member"}</span>
+                    {trackGreens && <button type="button" className={styles.cscToggle} data-on={wPlayers[uid]?.on_green || undefined} onClick={() => toggleGreen(uid)}>Green</button>}
+                    {trackPutts && <button type="button" className={styles.cscToggle} data-on={wPlayers[uid]?.holed_out || undefined} onClick={() => toggleHoled(uid)}>Putt</button>}
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className={styles.cscNav}>
               <button type="button" className={styles.cscNavBtn} disabled={holeNums.indexOf(editHole) <= 0} onClick={() => gotoHole(holeNums[holeNums.indexOf(editHole) - 1])}>‹ Prev</button>

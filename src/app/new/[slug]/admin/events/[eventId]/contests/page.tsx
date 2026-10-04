@@ -149,12 +149,15 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
         ) : (
           <div className={styles.contestDays} style={{ marginTop: 10 }}>
             {eventWide.map((c) => (
-              <div key={c.id} className={styles.contestCard} data-setup="1">
+              <Link key={c.id} href={`${base}/${c.id}`} className={styles.contestCard} data-setup="1">
                 <span className={styles.contestCardMain}>
                   <span className={styles.contestCardTitle}>{c.name}</span>
-                  <span className={styles.contestCardMeta}>Runs all event</span>
+                  <span className={styles.contestCardMeta}>{c.contest_type === "pickem" ? "Tap to set up games" : "Runs all event"}</span>
                 </span>
-              </div>
+                <svg className={styles.contestChevron} width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
             ))}
           </div>
         )}

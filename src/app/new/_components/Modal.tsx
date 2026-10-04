@@ -14,11 +14,14 @@ export default function Modal({
   title,
   onClose,
   children,
+  footer,
 }: {
   open: boolean;
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  /** Floats centered BELOW the card, over the backdrop (e.g. a save-status chip). */
+  footer?: React.ReactNode;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -37,16 +40,19 @@ export default function Modal({
 
   return (
     <div className={styles.overlay} onClick={onClose} role="dialog" aria-modal="true">
-      <div className={styles.card} onClick={(e) => e.stopPropagation()}>
-        <div className={styles.head}>
-          <h2 className={styles.title}>{title}</h2>
-          <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
-            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+      <div className={styles.stack}>
+        <div className={styles.card} onClick={(e) => e.stopPropagation()}>
+          <div className={styles.head}>
+            <h2 className={styles.title}>{title}</h2>
+            <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
+              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className={styles.body}>{children}</div>
         </div>
-        <div className={styles.body}>{children}</div>
+        {footer && <div className={styles.below} onClick={(e) => e.stopPropagation()}>{footer}</div>}
       </div>
     </div>
   );

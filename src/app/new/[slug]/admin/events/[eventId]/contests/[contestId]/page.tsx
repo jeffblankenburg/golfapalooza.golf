@@ -2,12 +2,15 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getPlatformContext } from "@/lib/v2/context";
 import { v2AdminClient } from "@/lib/v2/supabase";
-import { CONTEST_SELECT, loadBuyInCents, type Contest } from "@/lib/v2/contests";
+import { CONTEST_SELECT, contestTypeLabel, loadBuyInCents, type Contest } from "@/lib/v2/contests";
 import { resolveContestHoles } from "@/lib/v2/contests/holes";
 import { computeSkins } from "@/lib/v2/contests/skins";
 import { fmtTime } from "@/lib/v2/schedule";
 import ContestSettings from "./ContestSettings";
 import SideGames, { type SideGame } from "./SideGames";
+import PickemAdmin from "./PickemAdmin";
+import ContestPayouts from "./ContestPayouts";
+import type { PayoutSplit } from "@/lib/v2/contests/payouts";
 import styles from "@/app/new/new.module.css";
 
 /**
@@ -33,6 +36,32 @@ export default async function ContestDetailPage({ params }: { params: Promise<{ 
     .eq("id", contestId).eq("org_id", org.id).eq("event_id", eventId).maybeSingle();
   const contest = contestRow as Contest | null;
   if (!contest) redirect(`/new/${slug}/admin/events/${eventId}/contests`);
+
+  // Pick'em has its own admin surface (game slate + results + open/close + money).
+  if (contest.contest_type === "pickem") {
+    const [feeMap, { count: enrolled }] = await Promise.all([
+      loadBuyInCents(admin, [contestId]),
+      admin.from("v2_contest_participants").select("id", { count: "exact", head: true }).eq("contest_id", contestId),
+    ]);
+    return (
+      <div className={styles.page}>
+        <Link href={`/new/${slug}/admin/events/${eventId}/contests`} className={styles.back}>
+          <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 19l-7-7 7-7" />
+          </svg>
+          Contests
+        </Link>
+        <div className={styles.titleRow}><h1 className={styles.title}>{contest.name}</h1></div>
+        <PickemAdmin
+          slug={slug} orgId={org.id} eventId={eventId} contestId={contestId}
+          initialStatus={contest.status}
+          initialFeeCents={feeMap.get(contestId) ?? 0}
+          initialSplits={(contest.payout_splits as { place: number; kind: string; amount: number }[] | null) ?? []}
+          enrolledCount={enrolled ?? 0}
+        />
+      </div>
+    );
+  }
 
   const [{ count: partCount }, { count: teamCount }, { data: courseRows }] = await Promise.all([
     admin.from("v2_contest_participants").select("id", { count: "exact", head: true }).eq("contest_id", contestId),
@@ -112,6 +141,23 @@ export default async function ContestDetailPage({ params }: { params: Promise<{ 
     return { user_id: p.id, name: p.display_name || `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Member" };
   });
 
+  // Representative team size (most common) for the type-aware payout preview.
+  let teamSize: number | null = null;
+  if (contest.contest_type === "scramble" && numTeams > 0) {
+    const { data: tms } = await admin.from("v2_scramble_teams").select("id").eq("contest_id", contestId);
+    const teamIds = (tms || []).map((t) => t.id as string);
+    if (teamIds.length) {
+      const { data: mem } = await admin.from("v2_scramble_team_members").select("team_id").in("team_id", teamIds);
+      const perTeam = new Map<string, number>();
+      for (const m of mem || []) perTeam.set(m.team_id as string, (perTeam.get(m.team_id as string) || 0) + 1);
+      const freq = new Map<number, number>();
+      for (const c of perTeam.values()) freq.set(c, (freq.get(c) || 0) + 1);
+      const top = [...freq.entries()].sort((a, b) => b[1] - a[1])[0];
+      teamSize = top ? top[0] : null;
+    }
+  }
+  const payoutSplits = ((contest.payout_splits as PayoutSplit[] | null) || []).slice().sort((a, b) => a.place - b.place);
+
   return (
     <div className={styles.page}>
       <Link href={`/new/${slug}/admin/events/${eventId}/contests`} className={styles.back}>
@@ -144,41 +190,34 @@ export default async function ContestDetailPage({ params }: { params: Promise<{ 
       ) : (
         <p className={styles.dnsHint} style={{ marginTop: 2 }}>No course set — pick one in settings to enable scoring.</p>
       )}
+      <p className={styles.lede} style={{ marginTop: 2, color: "var(--ink-soft)" }}>{contestTypeLabel(contest.contest_type)}</p>
 
-      <div className={styles.contestDays} style={{ marginTop: 20 }}>
-        <Link href={`${base}/players`} className={styles.contestCard} data-setup="1">
-          <span className={styles.contestCardMain}>
-            <span className={styles.contestCardTitle}>Players</span>
-            <span className={styles.contestCardMeta}>
-              {players === 0 ? "Add players" : `${players} player${players === 1 ? "" : "s"}`}
-            </span>
-          </span>
-          <svg className={styles.contestChevron} width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5l7 7-7 7" />
-          </svg>
-        </Link>
-        <Link href={`${base}/teams`} className={styles.contestCard} data-setup="1">
-          <span className={styles.contestCardMain}>
-            <span className={styles.contestCardTitle}>Teams</span>
-            <span className={styles.contestCardMeta}>
-              {numTeams} team{numTeams === 1 ? "" : "s"}, {players} player{players === 1 ? "" : "s"}
-            </span>
-          </span>
-          <svg className={styles.contestChevron} width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5l7 7-7 7" />
-          </svg>
-        </Link>
-        <Link href={`${base}/scoring`} className={styles.contestCard} data-setup="1">
-          <span className={styles.contestCardMain}>
-            <span className={styles.contestCardTitle}>Scoring</span>
-            <span className={styles.contestCardMeta}>
-              {!hasTee ? "Set a course + tee first" : numTeams === 0 ? "Build teams first" : "Review the scorecard"}
-            </span>
-          </span>
-          <svg className={styles.contestChevron} width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5l7 7-7 7" />
-          </svg>
-        </Link>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
+        {[
+          { href: `${base}/players`, title: "Players", meta: players === 0 ? "Add players" : `${players} player${players === 1 ? "" : "s"}` },
+          { href: `${base}/teams`, title: "Teams", meta: `${numTeams} team${numTeams === 1 ? "" : "s"}, ${players} player${players === 1 ? "" : "s"}` },
+          { href: `${base}/scoring`, title: "Scoring", meta: !hasTee ? "Set a course + tee first" : numTeams === 0 ? "Build teams first" : "Review the scorecard" },
+        ].map((card) => (
+          <Link key={card.title} href={card.href} className={styles.cscAcc} style={{ display: "block", textDecoration: "none" }}>
+            <div className={styles.cscAccHead}>
+              <span className={styles.cscAllMain}>
+                <span className={styles.cscAllName}>{card.title}</span>
+                <span className={styles.cscAllPlayers}>{card.meta}</span>
+              </span>
+              <svg className={styles.cscAccChevron} width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </Link>
+        ))}
+        <ContestPayouts
+          base={`/api/v2/orgs/${org.id}/events/${eventId}/contests/${contestId}`}
+          contestType={contest.contest_type}
+          initialSplits={payoutSplits}
+          feeCents={buyIns.get(contest.id) ?? 0}
+          participantCount={players}
+          teamSize={teamSize}
+        />
       </div>
 
       <SideGames

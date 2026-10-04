@@ -5393,12 +5393,6 @@ button.rosterChip {
 .addTeamBtn:active {
   background: color-mix(in srgb, var(--brand) 6%, transparent);
 }
-.teamsSaveBar {
-  position: sticky;
-  bottom: calc(var(--nav-h, 0px) + 10px);
-  margin-top: 20px;
-  padding-top: 4px;
-}
 
 /* ── Scramble scoring (#209) — review scorecard + per-hole editor ───────────── */
 .cscoring {
@@ -5758,6 +5752,197 @@ button.rosterChip {
 .balSummaryVal { font-size: 1.1rem; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
 .balSummaryVal[data-state="owes"] { color: var(--warn, #c2410c); }
 .balSummaryVal[data-state="credit"] { color: #15803d; }
+
+/* Pick'em team combobox (#209). */
+.comboField {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--card);
+}
+.comboField:focus-within { border-color: var(--brand); }
+.comboLogo { width: 22px; height: 22px; object-fit: contain; flex: none; }
+.comboDot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.comboInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: 10px 12px 10px 2px;
+  font: inherit;
+  color: var(--ink);
+  outline: none;
+}
+.comboList {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+.comboItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.comboItem:hover { background: color-mix(in srgb, var(--brand) 8%, var(--card)); }
+.comboItemName { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comboItemConf { font-size: 0.72rem; color: var(--ink-soft); flex: none; }
+
+/* Pick'em admin game card (#209) — a clean two-row scoreboard. */
+.pickAdminGame {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 10px 12px;
+}
+.pickAdminGame[data-tb] {
+  border-color: color-mix(in srgb, var(--brand) 40%, var(--line));
+  background: color-mix(in srgb, var(--brand) 5%, var(--card));
+}
+.pickAdminRow {
+  display: grid;
+  grid-template-columns: 26px 1fr auto 52px;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+}
+.pickAdminRow + .pickAdminRow { border-top: 1px solid var(--line); }
+.pickAdminName { font-weight: 600; font-size: 0.95rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pickAdminScore {
+  width: 52px;
+  text-align: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ink) 2%, var(--card));
+  padding: 6px 4px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.pickAdminFoot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+/* Tiebreaker toggle pill: outline when off, brand-filled when it's the tiebreaker. */
+.tbPill {
+  flex: none;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.tbPill[data-on] { background: var(--brand); border-color: var(--brand); color: #fff; }
+.tbPill:disabled { opacity: 0.5; cursor: default; }
+/* Red trash icon button. */
+.iconDelBtn {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  color: var(--warn, #c2410c);
+  cursor: pointer;
+}
+.iconDelBtn:hover { background: color-mix(in srgb, var(--warn, #c2410c) 12%, transparent); }
+.iconDelBtn:disabled { opacity: 0.5; cursor: default; }
+
+/* Pick'em (#209). */
+.pickCard {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 12px;
+}
+.pickCardMeta {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  margin-bottom: 8px;
+}
+.pickTeams {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.pickTeam {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--ink) 2%, var(--card));
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  min-width: 0;
+}
+.pickTeam[data-on] {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 10%, var(--card));
+}
+.pickTeam:disabled { cursor: default; opacity: 0.85; }
+.pickLogo { width: 26px; height: 26px; object-fit: contain; flex: none; }
+.pickTeamName { font-weight: 600; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.pickSpread { font-size: 0.8rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; flex: none; }
+.pickMark { position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 0.75rem; font-weight: 800; color: #fff; }
+.pickMark[data-ok] { background: #15803d; }
+.pickMark[data-bad] { background: var(--warn, #c2410c); }
+
+.pickLeaderRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pickLeaderRow:disabled { cursor: default; }
+.pickLeaderRow[data-me] { border-color: color-mix(in srgb, var(--brand) 40%, var(--line)); background: color-mix(in srgb, var(--brand) 7%, var(--card)); }
+.pickRank { width: 22px; text-align: center; font-weight: 800; color: var(--ink-soft); font-variant-numeric: tabular-nums; flex: none; }
+.pickAvatar, .pickAvatarFallback { width: 28px; height: 28px; border-radius: 50%; flex: none; object-fit: cover; }
+.pickAvatarFallback { display: grid; place-items: center; background: color-mix(in srgb, var(--ink) 10%, transparent); font-weight: 700; font-size: 0.8rem; color: var(--ink); }
+.pickLeaderName { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pickLeaderStat { font-size: 0.82rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; flex: none; }
+.pickReveal { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 10px 2px; }
+.pickRevealChip { font-size: 0.72rem; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
+.pickRevealChip[data-ok] { background: color-mix(in srgb, #15803d 18%, transparent); }
+.pickRevealChip[data-bad] { background: color-mix(in srgb, var(--warn, #c2410c) 18%, transparent); }
 
 /* Member option controls: switch (binary), radio (select), checkbox (multi) — v1 parity. */
 .optChoiceList { display: flex; flex-direction: column; gap: 8px; }

@@ -100,7 +100,10 @@ export default async function PlatformAdminPage() {
       <div className={styles.section} style={{ marginTop: 28 }}>
         <p className={styles.sectionLabel}>Data management</p>
         <AdminGrid
-          items={[{ label: "Cost categories", href: "/new/admin/cost-categories", desc: "Shared categories for cost items" }]}
+          items={[
+            { label: "Cost categories", href: "/new/admin/cost-categories", desc: "Shared categories for cost items" },
+            { label: "Scoring metrics", href: "/new/admin/scoring-metrics", desc: "Per-player observations contests can collect" },
+          ]}
         />
       </div>
     </div>

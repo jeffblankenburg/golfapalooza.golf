@@ -1,9 +1,23 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
+import SaveStatus from "@/app/new/_components/SaveStatus";
+import { useAutoSave } from "@/app/new/_components/useAutoSave";
 import styles from "@/app/new/new.module.css";
 /* eslint-disable @next/next/no-img-element */
+
+type DragHandle = Pick<ReturnType<typeof useSortable>, "listeners" | "attributes">;
+
+/** Sortable wrapper for a team card. Render-prop hands the card its drag handle props. */
+function SortableTeam({ id, children }: { id: string; children: (handle: DragHandle) => React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1, zIndex: isDragging ? 2 : undefined };
+  return <div ref={setNodeRef} style={style}>{children({ listeners, attributes })}</div>;
+}
 
 export interface Participant {
   user_id: string;
@@ -64,8 +78,6 @@ export default function TeamsManager({
   );
   const [teamSize, setTeamSize] = useState(4);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [dirty, setDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [calcBusy, setCalcBusy] = useState(false);
   const [missingCount, setMissingCount] = useState(0);
   const [breakdowns, setBreakdowns] = useState<Record<string, HcpBreakdown>>({});
@@ -73,6 +85,16 @@ export default function TeamsManager({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [confirmGen, setConfirmGen] = useState(false);
+
+  // Auto-save: every team change debounces a background PUT, no Save button.
+  const { state: saveState, error: saveError, retry: retrySave } = useAutoSave(teams, async (snapshot) => {
+    const res = await fetch(`/api/v2/orgs/${orgId}/events/${eventId}/contests/${contestId}/teams`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ teams: snapshot.map((t) => ({ name: t.name || null, team_handicap: t.handicap, tee_time: t.tee_time || null, members: t.members })) }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Could not save");
+  });
 
   const profileById = useMemo(() => new Map(participants.map((p) => [p.user_id, p])), [participants]);
   const name = (uid: string) => {
@@ -99,32 +121,36 @@ export default function TeamsManager({
     setTeams((prev) => fn(prev.map((t) => ({ ...t, members: [...t.members] }))));
     setBreakdowns({}); // any team edit makes a prior calculation stale
     setExpanded(new Set());
-    setDirty(true);
   }
   function toggleExpand(key: string) {
     setExpanded((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
   }
 
   function doGenerate() {
-    // A/B/C/D snake draft. Order players by handicap (unknowns treated as highest),
-    // then deal one tier at a time, reversing direction each tier. Every team ends
-    // up with one player from each quartile, and the serpentine order keeps the
-    // total strength balanced (the best A pairs with the weakest B, and so on).
+    // A/B/C/D draft. Order players by handicap (unknowns treated as highest) and
+    // split into skill tiers (A = lowest hdcp, then B, C, …), one tier per team slot.
+    // Each tier is shuffled before dealing, so every team still gets one player from
+    // each band but WHICH player lands on WHICH team is random each generation.
+    const shuffle = (arr: string[]) => {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
     const sorted = [...participants].sort(
       (a, b) => (a.handicap_index ?? Infinity) - (b.handicap_index ?? Infinity),
     );
     const numTeams = Math.max(1, Math.ceil(sorted.length / teamSize));
+    const numTiers = Math.ceil(sorted.length / numTeams);
     const buckets: string[][] = Array.from({ length: numTeams }, () => []);
-    sorted.forEach((p, rank) => {
-      const tier = Math.floor(rank / numTeams); // 0 = A (lowest hdcp), 1 = B, …
-      const pos = rank % numTeams;
-      const teamIdx = tier % 2 === 0 ? pos : numTeams - 1 - pos;
-      buckets[teamIdx].push(p.user_id);
-    });
+    for (let tier = 0; tier < numTiers; tier++) {
+      const slice = shuffle(sorted.slice(tier * numTeams, tier * numTeams + numTeams).map((p) => p.user_id));
+      slice.forEach((uid, pos) => buckets[pos].push(uid));
+    }
     keySeq.current = 0;
     setTeams(buckets.map((members, i) => ({ key: nextKey(), name: "", handicap: null, tee_time: i === 0 ? startHHMM : "", members })));
     clearSel();
-    setDirty(true);
   }
   function generate() {
     if (teams.some((t) => t.members.length > 0)) setConfirmGen(true);
@@ -146,7 +172,6 @@ export default function TeamsManager({
       const handicaps: Record<string, number> = d.handicaps || {};
       // Apply directly (not via mutate, which would wipe the breakdowns we set next).
       setTeams((prev) => prev.map((t) => (handicaps[t.key] != null ? { ...t, handicap: handicaps[t.key] } : t)));
-      setDirty(true);
       setBreakdowns(d.breakdowns || {});
       setCalcTeeName(d.tee_name || null);
       setMissingCount((d.missing || []).length);
@@ -185,26 +210,19 @@ export default function TeamsManager({
     mutate((d) => d.map((t) => (t.key === key ? { ...t, ...patch } : t)));
   }
 
-  async function save() {
-    if (saving) return;
-    setSaving(true);
-    setError(null);
-    const res = await fetch(`/api/v2/orgs/${orgId}/events/${eventId}/contests/${contestId}/teams`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        teams: teams.map((t) => ({ name: t.name || null, team_handicap: t.handicap, tee_time: t.tee_time || null, members: t.members })),
-      }),
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+  );
+  function onDragEnd(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    setTeams((prev) => {
+      const oldIdx = prev.findIndex((t) => t.key === active.id);
+      const newIdx = prev.findIndex((t) => t.key === over.id);
+      if (oldIdx < 0 || newIdx < 0) return prev;
+      return arrayMove(prev, oldIdx, newIdx);
     });
-    setSaving(false);
-    if (!res.ok) {
-      setError((await res.json().catch(() => ({}))).error || "Could not save");
-      return;
-    }
-    const { teams: saved } = (await res.json()) as { teams: TeamData[] };
-    keySeq.current = 0;
-    setTeams(saved.map((t) => ({ key: nextKey(), name: t.name || "", handicap: t.team_handicap, tee_time: t.tee_time ? t.tee_time.slice(0, 5) : "", members: [...t.members] })));
-    setDirty(false);
   }
 
   return (
@@ -266,14 +284,27 @@ export default function TeamsManager({
 
       {/* Teams */}
       <div className={styles.teamList}>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={teams.map((t) => t.key)} strategy={verticalListSortingStrategy}>
         {teams.map((t, i) => (
+          <SortableTeam key={t.key} id={t.key}>
+            {(handle) => (
           <div
-            key={t.key}
             className={styles.teamCard}
             data-target={hasSel ? "1" : undefined}
             onClick={() => hasSel && placeSelected(t.key)}
           >
             <div className={styles.teamHead}>
+              <button
+                type="button"
+                className={styles.finGrab}
+                aria-label="Drag to reorder team"
+                onClick={(e) => e.stopPropagation()}
+                {...handle.listeners}
+                {...handle.attributes}
+              >
+                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden><circle cx="9" cy="6" r="1" /><circle cx="15" cy="6" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="9" cy="18" r="1" /><circle cx="15" cy="18" r="1" /></svg>
+              </button>
               <input
                 className={styles.teamNameInput}
                 value={t.name}
@@ -365,18 +396,18 @@ export default function TeamsManager({
               </div>
             )}
           </div>
+            )}
+          </SortableTeam>
         ))}
+          </SortableContext>
+        </DndContext>
 
         <button type="button" className={styles.addTeamBtn} onClick={addTeam}>+ New team{hasSel ? ` with ${addLabel}` : ""}</button>
       </div>
 
       {error && <p className={styles.formError} style={{ marginTop: 14 }}>{error}</p>}
 
-      <div className={styles.teamsSaveBar}>
-        <button type="button" className={styles.createBtn} onClick={save} disabled={saving || !dirty} style={{ opacity: saving || !dirty ? 0.6 : 1 }}>
-          {saving ? "Saving…" : dirty ? "Save teams" : "Saved"}
-        </button>
-      </div>
+      <SaveStatus state={saveState} error={saveError} onRetry={retrySave} />
 
       <ConfirmModal
         open={confirmGen}

@@ -9,6 +9,7 @@ import styles from "@/app/new/new.module.css";
 const KINDS = [
   { key: "bspitw", label: "BSPITW", blurb: "Best scramble partner, all days" },
   { key: "hundred_feet", label: "100 Feet!", blurb: "Cumulative distance, hole 18" },
+  { key: "pickem", label: "Pick'em", blurb: "Pick games vs. the spread" },
   { key: "other", label: "Other", blurb: "A custom event-wide contest" },
 ];
 

@@ -1,0 +1,423 @@
+Before we do any more work on this application, I need to set up a new event specifically for all of my testing.  I don't like dabbling in the event I'll eventually be using, especially when we start messing with user statuses and the like.
+
+If I was a person that wanted to create a new event on this software, where would I start?
+
+---
+
+6143275066
+
+---
+
+251 complete
+
+---
+
+When creating a new event, we choose a start date, and then an end date.  If the start date is selected, I'd like the end date calendar, when opened, to show the same month.  Currently it shows the current month. [Image #1]
+
+---
+
+I have created a new group, TKO Trivia. I've selected an orange color, but I expected it to apply to the entire website.  It doesn't seem to.
+
+---
+
+Can you populate the database with 40 fake members of this new TKO Trivia group?  These are not users that will ever log in, this entire group is only for testing.
+
+---
+
+Just noticed these don't fit in their box. [Image #2]
+
+---
+
+Getting an error logging in. [TypeError: fetch failed] {
+  [cause]: Error [ConnectTimeoutError]: Connect Timeout Error (attempted addresses: 104.18.38.10:443, timeout: 10000ms)
+      at ignore-listed frames {
+    code: 'UND_ERR_CONNECT_TIMEOUT'
+  }
+}
+
+---
+
+Seems like maybe we're having an internet outage?
+
+---
+
+1. If an admin enables articles, that doesn't mean we need a placeholder on the home page.  Not until the first article is published should an article preview appear on the home page.
+2. This is still overflowing. [Image #4]
+
+---
+
+OK, I need all of the members of this TKO group to be marked as "attending"
+
+---
+
+why, on this page, does it show 0 players? http://localhost:3000/new/tko-trivia/admin/events/11414ae0-6459-4da6-909e-0a64662d2282/contests/712e52f0-3d05-4357-906a-2f97cd4c00ba
+
+---
+
+It seems very likely to me that we have some tools, notifications and challenges ahead on this.
+
+1. It's very likely that after users have started enrolling in the event, an admin will add a contest.  So they need a way to import some/all of the event participants into the event.
+2. It's very possible that most contests will have a participation/buy-in cost.  If a member is added to a new contest with a cost, that should appear in their balance owed.
+3. It's very possible that a member that is "Attending" when an event is planned and organized will have something come up, and they will have to bail on some of all of the event.  If teams have already been created (or even just tee times), this potentially blows everything up.  An administrator needs to know immediately if someone changes their status and it removes them from a contest.
+
+---
+
+How did we handle the user ledger in v1?
+
+---
+
+Items that are not part of "Trip Cost" will be grouped into "Options" eventually.  We haven't built that for v2.  Generally, you can't pick "part" of an option.  You are in for all of it, or none of it.  For example, the Closest to the Pin "option" will include all of the CTP contests from all of the days.  So users will see one item, "Closest to the Pin" that costs $15, even though it is technically 6 x $2.50.
+
+---
+
+Yes. We can think of "Trip Cost" as one big option.
+
+---
+
+Here's the catch on 215: not all contests will be auto-enroll.  For example, we're going to have a Ryder Cup event one day.  It's optional.  If the user selects that option, then they are opted in. If they don't, they're not.  Make sense?
+
+---
+
+When we talk about "included contests", we are talking about those that are part of the "trip cost".  We have a flag to designate that.  Anything not included in "trip cost" is optional, and we need options created to represent those things to a user.  There will definitely be zero-cost options.
+
+---
+
+Here's a scenario that happened this past year:
+
+I registered for the full event.  On Friday morning, I discovered that my son was accepted to perform in an event on Saturday morning.  So I had to leave Friday before an evening cornhole tournament, and missed the entire Saturday contests.  We can't be too sticky on the rules.  A participant needs to be able to be added and removed from a contest regardless of their enrollment status.  We might have someone local drive in just to play in the Saturday round, but otherwise not stay at the hotel, or participate in the other contests.  Does that make sense?
+
+---
+
+Let's do it.
+
+---
+
+It feels like Players should have a similar tab to Teams and Scoring.
+
+---
+
+The players page should just show the list.  Buttons at the top for "All Attending", "All", and "None/Clear". Checkboxes for each person.
+
+---
+
+I think players should be grouped when they are participating.  Top list is "in", and a second list below it shows the folks that aren't in.
+
+---
+
+252 complete
+
+---
+
+close 215, but I have more edits yet.
+
+1. ON http://localhost:3000/new/tko-trivia/admin/events/11414ae0-6459-4da6-909e-0a64662d2282/contests/712e52f0-3d05-4357-906a-2f97cd4c00ba/teams, "generate teams" should actually have some math behind it.  Ideally, we would order the participants from low to high in handicap, divide that list into quarters, and seed the teams with one player from each quarter, so that we effectively end up with an A/B/C/D player distribution.
+2. For our test data, it would be nice to have handicaps for all players.  Can you populate those?
+
+---
+
+It seems like maybe we should show that handicap on the individual player pills.
+
+---
+
+I noticed that when generating teams with 41 players, we end up with 3 three-player teams.  I suppose that seems correct.  We never allow 5-player teams.
+
+---
+
+If an admin doesn't like the three-man teams, they can always remove and add players.  This is meant to be a way to form teams quickly, and the admin can then manipulate and move golfers around at their pleasure.
+
+---
+
+Can you give all of the fake players in this event unique nicknames?
+
+---
+
+I thought that the scoring page showed the team's net handicap and score as a large font on the scoring cards, no?
+
+---
+
+Why do we hesitate to show this data before a hole has been completed?  These are admin tools.  We want to see what is happening.  A team that hasn't teed off yet, but has a -2 net handicap should show -2, 0 holes played, 0 gross.
+
+---
+
+Yep, let's keep going.
+
+---
+
+Two questions regarding this: [Image #5] 
+
+1. Cna we make the dropdown maybe have icons, and have a similar style to the amount box?
+2. Is there a place in the master admin that I can configure these categories?  Can a group admin make their own category names if they have specific needs?
+
+---
+
+We are likely to have more of this super-admin type data management needs, so it doesn't hurt to build a place for us to start with that now.
+
+---
+
+What do the 0s represent? [Image #6]
+
+---
+
+slice 2, I guess.
+
+---
+
+This modal still needs the groupings.  That's going to be the most familiar.  It should also respect the sort order.
+
+---
+
+I need to to take a thorough look at option creation in v1.  There's much more to this than just assigning cost items.
+
+---
+
+281 looks great.
+
+---
+
+218 looks great.
+
+---
+
+OK. You've still missed meaningful details from v1.  Each "option" was an accordion, with the details inside.  They were re-orderable.  Please please please be detail oriented on this one.
+
+---
+
+I want all of it.  Let's get there.
+
+---
+
+network connectivity back
+
+---
+
+Options definitely shouldn't be shown directly on the home page.  IF options are open, a box should appear on the home page reminding users to complete their options.  Clicking the button should bring up a modal that walks the user through each individual choice.
+
+Here's how we manage the different states of options:
+
+0. Options closed: don't show anything on the home page or "everything" menu.
+1. Options open, choices incomplete: show the button on the home page, with a pulse. Options also show up in the "Everything" menu.
+2. Options open, choices complete: show the button, no pulse.  Allows users to update their choices before the close date. Options also show up in the "Everything" menu.
+3. Options open, but expiration has passed. Home page button disappears. Options also show up in the "Everything" menu, but the options are read-only.
+
+---
+
+Opening notification should be a collapsible accordion.  For the open checkmark and open close dates, that should also be tucked away.
+
+---
+
+I don't love this paradigm.  I think we already have a place (Features) to toggle whether certain modules of the app are visible.  I think we should remove this from the Options page directly, and apply this new model (start dates) to all features.  Options can be turned on there, like everything else.  Thoughts? This feels like the same pattern.
+
+---
+
+It is possible that the same cost item could be applied to multiple option choices.  For example, we will have a question about when each person is going to arrive.  There are three different choices for each day.  Each of the Monday options should include a Monday hotel night, but only the first two include Monday dinner, for example.  This continues through other choices.
+
+---
+
+Now I want to tighten up the admin options list.  We're showing all of the choices, the option type in a pill, etc.  We just need the title, drag handle, and price shown when an option accordion is closed.
+
+---
+
+Now fix the drag handles.  [Image #7]
+
+---
+
+When adding cost items to an option selection, it's very confusing.  Items still disappear from the list after selected.  For my "when are you arriving" option, I have 10 choices!  Three on Monday, three on Tuesday, three on Wednesday, and one on Thursday. They all have some set of combinations of cost items applied to them.  Checking boxes is fine, as long as the cost items don't disappear from the list, but if there's a better way to manage this, I'm all ears.
+
+---
+
+Also, there's an options container holding all of the options.  We don't need the outer box.  As we add groups, it can just be a small header.  Trying to maximize the width I have available to manage options.
+
+---
+
+Sections should also not be boxes.  Also, options should be able to be dragged between sections (including trip cost)
+
+---
+
+Bro, there are now 257 Trip Costs. Every time I refresh the page, it adds one more.  What happened?
+
+---
+
+More UI improvements.
+
+1. Make these draggable accordions. [Image #8] When the accordion is open, show the selected cost items. Delete button only when the accordion is open. The accordion should show the range of costs that all of the options cover, like "$0-$74".
+
+---
+
+The options building is excellent now!
+
+---
+
+Let's finish things that are unfinished.
+
+---
+
+259 complete
+
+---
+
+I don't seem to be able to select the "trip cost" on http://localhost:3000/new/tko-trivia/options
+
+---
+
+Changing your attendance response is incredibly slow now.  It needs to be faster, and the UI optimistic.
+
+---
+
+We used switches for binary choices, radio buttons and checkboxes for multi.
+
+---
+
+If an option is free, you don't need to indicate that.  It just takes up space. [Image #9]
+
+---
+
+I just changed the Allergy option from yes/no to "select one", but I don't now see a way to add the options to be selected.  That should appear immediately after I make the choice. [Image #10]
+
+---
+
+The option chooser on the home page is still in the wrong order. [Image #11]
+
+---
+
+For our "beer" option in v1, we had a "I'm not having any" checkbox.  Can we do that with our current v2 setup? [Image #12]
+
+---
+
+Let's call it a "No, thank you" option.
+
+---
+
+Attempted to call selectionIsActive() from the server but selectionIsActive is on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of a Client Component.
+src/app/new/[slug]/(event)/OptionsReminder.tsx (23:33) @ visible
+
+
+  21 |     if (!o.depends_on_option_id) return true;
+  22 |     const p = byId.get(o.depends_on_option_id);
+> 23 |     return p ? selectionIsActive(p.option_type, sel[p.id]) : true;
+     |                                 ^
+  24 |   };
+  25 |   const shown = options.filter(visible);
+  26 |   if (shown.length === 0) return null;
+Call Stack
+9
+
+Show 5 ignore-listed frame(s)
+visible
+src/app/new/[slug]/(event)/OptionsReminder.tsx (23:33)
+Array.filter
+<anonymous>
+OptionsReminder
+src/app/new/[slug]/(event)/OptionsReminder.tsx (25:25)
+
+---
+
+Choosing the "no thank you" option should disable all of the quanity toggles
+
+---
+
+OK, if we are treating yes/no as a switch that can only be activated, then those questions can't be required.  Because "no" requires no action.  I think I'm going to change my current yes/no to select one so that a choice is forced.
+
+---
+
+OK. . Feeling good about building options and selecting options.
+
+---
+
+Now I would like to be able to start adding some of the other contests.
+
+---
+
+Can't say "Pick the Saturday games vs. the spread."  Everything we are building could be for any group, any games (basketball, baseball, football, hockey).  When we're writing copy, it needs to always keep that in mind.
+
+"Pick games vs. the spread" is fine.
+
+---
+
+OK. . I've created a pickem contest.  How do I configure it? [Image #13]
+
+---
+
+Can we make the team selection searchable/typable?  With logos and/or colors?
+
+---
+
+1. Let's make the "Add Game" form a modal, and keep the add game button near the top.
+2. Let's clean up the layout of these boxes. [Image #14]
+
+---
+
+Have you installed all of the pickem rules like all picks lock when the first game starts?
+
+---
+
+Yes, do Phase 2 money and add Reset
+
+---
+
+Why is our option description field so limited for characters?
+
+---
+
+whitey's pickem still needs participant management, like all contests.  a member selecting the option is auto-enrolled, but there will be several people that opt-in on-site for the event.  Every contest needs the ability to set pot percentages for winners, and it should be smart enough to divide the pot between the individuals or teammates, depending on the contest type.
+
+---
+
+The payout module should have the option to enter dollar values and a "remainder" option.  For example, the scrambles will pay 2nd place $80, and the winners whatever the rest of the pot is.
+
+---
+
+On a contest detail page, the order of the top accordions should be: players, teams, scoring, payouts.  And they should all look the same.
+
+---
+
+On this page (http://localhost:3000/new/tko-trivia/admin/events/11414ae0-6459-4da6-909e-0a64662d2282/contests/712e52f0-3d05-4357-906a-2f97cd4c00ba/teams), teams definitely need the ability to be re-ordered.  Some grab handles would make that very helpful.  Also, I just noticed that you provided the ability for a team to be renamed to something other than "Team #".  Fun. Could the members of the team also have the ability to change that name? (Let's just write an issue for that one for now.)
+
+On this page (http://localhost:3000/new/tko-trivia/admin/events/11414ae0-6459-4da6-909e-0a64662d2282/contests/712e52f0-3d05-4357-906a-2f97cd4c00ba), there's no indication as to what kind of contest it is.  Probably a line of text under the location/tees line that just says "Scramble".
+
+Finally, can we make the payouts button, instead of an accordion, launch a modal with the payouts information?
+
+---
+
+We've also gotten really inconsistent about auto-saving changes vs. requiring a "save" button to be pressed.  I would prefer to never have to click "save" anywhere in the app.
+
+Also, this modal's layout is still horribad. [Image #15]  Can we make things a little smaller?  More table-like?  Right now, things are all over the place.
+
+---
+
+1. I need the user to have a very visual indication that data is saving, has saved, and is safe.  Sticky was perfect.
+
+---
+
+If I generate teams, I need some randomization across the different pools of players.  For example, with 4-man teams, we divide the field into A/B/C/D groups, and pick one from each to assemble a team.  But this needs to be random.  As I generate teams, I'm getting the same results every time.
+
+---
+
+Perfect. We're going to need that sticky floating save indicator everywhere, now.  For example, the payouts modal.
+
+---
+
+I just edited the payout splits, and I don't see any indication of a save.
+
+---
+
+If I change a value, and my "click off" move is to click the X to close the modal, I don't think we save anything.  Can you confirm?
+
+---
+
+There are a few things that got past my plan to make this app fully customizable for group admins.  For example, when someone is live scoring a scramble for an event, we automatically included putt points and greens hit.  But those should be OPTIONS, not default capabilities.  I'm sure there are other examples of this.
+
+---
+
+I think that this is an example of content that needs to be created by a super admin.  I can imagine there being 20 different ways that people want to influence scoring for a scramble.  I'd like the ability to create each one as a super admin, write a decent description (so group admins understand).
+
+Also, I'm starting to feel like this doesn't actually have anything to do with the scramble.  These points only matter to the BSPITW contest that we haven't created yet.  I think we actually choose and configure these things there.  Thoughts?
+
+---
+
+262 complete
+
+---
+
+I have a new issue we need to research and plan:
+
+With all of the side games, and the wagering that takes place, it would be incredible to offer a Venmo integration that somehow collects the payments, and distributes the winnings.  I'm picturing this being a process where a user can set up a Venmo integration in their account, and when a side game includes them, they get a notification with an approval step that they must approve.  When the round is completed, we pull the Venmo payments from the losers, and automatically send the appropriate funds to the winners.  PLease ask clarifying questions.

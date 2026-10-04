@@ -411,3 +411,7 @@ There are a few things that got past my plan to make this app fully customizable
 I think that this is an example of content that needs to be created by a super admin.  I can imagine there being 20 different ways that people want to influence scoring for a scramble.  I'd like the ability to create each one as a super admin, write a decent description (so group admins understand).
 
 Also, I'm starting to feel like this doesn't actually have anything to do with the scramble.  These points only matter to the BSPITW contest that we haven't created yet.  I think we actually choose and configure these things there.  Thoughts?
+
+---
+
+262 complete

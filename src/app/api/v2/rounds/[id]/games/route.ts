@@ -34,7 +34,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const gameType = body.game_type;
-  if (gameType !== "skins" && gameType !== "nassau" && gameType !== "sixes" && gameType !== "vegas") {
+  if (gameType !== "skins" && gameType !== "nassau" && gameType !== "sixes" && gameType !== "vegas" && gameType !== "chairman" && gameType !== "wolf") {
     return NextResponse.json({ error: "Unknown game type" }, { status: 400 });
   }
 
@@ -48,6 +48,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   if (gameType === "vegas" && ids.length !== 4) {
     return NextResponse.json({ error: "Vegas needs exactly four players." }, { status: 400 });
+  }
+  if (gameType === "wolf" && ids.length !== 4) {
+    return NextResponse.json({ error: "Wolf needs exactly four players." }, { status: 400 });
   }
   if (ids.length < 2) {
     return NextResponse.json({ error: "A game needs at least two players." }, { status: 400 });
@@ -78,6 +81,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       participant_ids: created.participant_ids || [],
       value: typeof created.config?.value === "number" ? created.config.value : null,
       carry: created.config?.carry === true,
+      decisions: created.config?.decisions ?? {},
     },
   });
 }

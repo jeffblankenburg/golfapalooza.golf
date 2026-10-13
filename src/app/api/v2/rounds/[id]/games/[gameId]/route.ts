@@ -30,12 +30,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { data: game } = await admin
     .from("v2_round_games")
-    .select("id, round_id, game_type")
+    .select("id, round_id, game_type, config")
     .eq("id", gameId)
     .maybeSingle();
   if (!game || game.round_id !== roundId) return NextResponse.json({ error: "Game not found" }, { status: 404 });
 
-  let body: { is_net?: boolean; value?: number | null; carry?: boolean; participant_ids?: string[] };
+  let body: {
+    is_net?: boolean;
+    value?: number | null;
+    carry?: boolean;
+    participant_ids?: string[];
+    // Wolf: a partial map of hole_number → pick (null clears that hole's pick).
+    decisions?: Record<string, { partner?: string; lone?: boolean } | null>;
+  };
   try {
     body = await request.json();
   } catch {
@@ -46,11 +53,27 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (typeof body.is_net === "boolean") patch.is_net = body.is_net;
 
-  // The editor sends the complete config, so rebuild it wholesale.
-  if ("value" in body || "carry" in body) {
-    const cfg: Record<string, unknown> = {};
-    if (typeof body.value === "number" && body.value > 0) cfg.value = body.value;
-    if (game.game_type === "skins" && body.carry) cfg.carry = true;
+  // Merge into the existing config so a stake edit doesn't wipe Wolf picks, and a
+  // single Wolf pick doesn't wipe the stake. Each listed field is applied in place.
+  if ("value" in body || "carry" in body || "decisions" in body) {
+    const cfg: Record<string, unknown> = { ...(game.config ?? {}) };
+    if ("value" in body) {
+      if (typeof body.value === "number" && body.value > 0) cfg.value = body.value;
+      else delete cfg.value;
+    }
+    if ("carry" in body) {
+      if (game.game_type === "skins" && body.carry) cfg.carry = true;
+      else delete cfg.carry;
+    }
+    if (body.decisions && typeof body.decisions === "object") {
+      const decisions: Record<string, unknown> = { ...((cfg.decisions as Record<string, unknown>) ?? {}) };
+      for (const [hole, pick] of Object.entries(body.decisions)) {
+        if (pick == null) delete decisions[hole];
+        else if (pick.lone) decisions[hole] = { lone: true };
+        else if (typeof pick.partner === "string") decisions[hole] = { partner: pick.partner };
+      }
+      cfg.decisions = decisions;
+    }
     patch.config = cfg;
   }
 
@@ -59,11 +82,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (game.game_type === "nassau" && ids.length !== 2) {
       return NextResponse.json({ error: "Nassau needs exactly two players." }, { status: 400 });
     }
-    if (game.game_type === "sixes" && ids.length !== 4) {
-      return NextResponse.json({ error: "6-6-6 needs exactly four players." }, { status: 400 });
-    }
-    if (game.game_type === "vegas" && ids.length !== 4) {
-      return NextResponse.json({ error: "Vegas needs exactly four players." }, { status: 400 });
+    if ((game.game_type === "sixes" || game.game_type === "vegas" || game.game_type === "wolf") && ids.length !== 4) {
+      return NextResponse.json({ error: "This game needs exactly four players." }, { status: 400 });
     }
     if (ids.length < 2) {
       return NextResponse.json({ error: "A game needs at least two players." }, { status: 400 });
@@ -89,6 +109,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       participant_ids: updated.participant_ids || [],
       value: typeof updated.config?.value === "number" ? updated.config.value : null,
       carry: updated.config?.carry === true,
+      decisions: updated.config?.decisions ?? {},
     },
   });
 }

@@ -177,24 +177,26 @@ const STEPS = [
 
 interface GameDraft {
   key: string;
-  type: "skins" | "nassau" | "sixes" | "vegas";
+  type: "skins" | "chairman" | "nassau" | "sixes" | "vegas" | "wolf";
   isNet: boolean;
   carry: boolean; // skins only — roll tied skins forward (default off)
   value: number | null; // optional $ stake (per skin / bet / segment / point)
   participantKeys: string[]; // Player.key of those in this game
 }
 
-const GAME_LABEL: Record<GameDraft["type"], string> = { skins: "Skins", nassau: "Nassau", sixes: "6-6-6", vegas: "Vegas" };
+const GAME_LABEL: Record<GameDraft["type"], string> = { skins: "Skins", chairman: "Chairman", nassau: "Nassau", sixes: "6-6-6", vegas: "Vegas", wolf: "Wolf" };
 const GAME_DESC: Record<GameDraft["type"], string> = {
   skins: "Low score wins the hole. Ties are a push unless you turn on carryover.",
+  chairman: "King of the hill. Win a hole outright to take the chair; defend it (win again outright) to score. A tie, or being beaten, scores nothing.",
   nassau: "Match play as three bets: the front 9, the back 9, and the full 18.",
   sixes: "Foursome, best ball. Partners rotate every 6 holes so you team with everyone once.",
   vegas: "Two-player teams. Scores combine into a number, low team wins the difference. Opponents' birdies flip your number.",
+  wolf: "Rotating foursome. Each hole one player is the Wolf and picks a partner (or goes Lone Wolf for more). Make the pick on the scorer as you play.",
 };
-// Fixed roster size for team/head-to-head games (skins takes any 2+).
-const GAME_EXACT: Partial<Record<GameDraft["type"], number>> = { nassau: 2, sixes: 4, vegas: 4 };
+// Fixed roster size for team/head-to-head games (skins and chairman take any 2+).
+const GAME_EXACT: Partial<Record<GameDraft["type"], number>> = { nassau: 2, sixes: 4, vegas: 4, wolf: 4 };
 // Sensible default stakes, pre-filled and editable. Vegas is per point (small).
-const GAME_DEFAULT_VALUE: Record<GameDraft["type"], number> = { skins: 2, nassau: 5, sixes: 5, vegas: 0.1 };
+const GAME_DEFAULT_VALUE: Record<GameDraft["type"], number> = { skins: 2, chairman: 5, nassau: 5, sixes: 5, vegas: 0.1, wolf: 5 };
 
 // Nassau is 1-on-1, so a pair is identified regardless of order.
 const pairKey = (a: string, b: string) => [a, b].sort().join("|");
@@ -848,6 +850,15 @@ export default function RoundForm({
                 + Skins
               </button>
             )}
+            {!games.some((g) => g.type === "chairman") && players.length >= 2 && (
+              <button
+                type="button"
+                className={styles.createBtnGhost}
+                onClick={() => setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "chairman", isNet: true, carry: false, value: GAME_DEFAULT_VALUE.chairman, participantKeys: players.map((p) => p.key) }])}
+              >
+                + Chairman
+              </button>
+            )}
             {(() => {
               // Nassau shows only while a distinct, not-yet-matched pair remains.
               const allPairs: [string, string][] = [];
@@ -890,6 +901,15 @@ export default function RoundForm({
                 onClick={() => setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "vegas", isNet: true, carry: false, value: GAME_DEFAULT_VALUE.vegas, participantKeys: [] }])}
               >
                 + Vegas
+              </button>
+            )}
+            {!games.some((g) => g.type === "wolf") && players.length >= 4 && (
+              <button
+                type="button"
+                className={styles.createBtnGhost}
+                onClick={() => setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "wolf", isNet: true, carry: false, value: GAME_DEFAULT_VALUE.wolf, participantKeys: players.slice(0, 4).map((p) => p.key) }])}
+              >
+                + Wolf
               </button>
             )}
           </div>
@@ -935,7 +955,9 @@ export default function RoundForm({
                     ? "6-6-6 is a foursome, so pick exactly four players"
                     : g.type === "vegas"
                       ? "Vegas is two teams of two — pick four (first two vs last two)"
-                      : "Tap players to include or leave out"}
+                      : g.type === "wolf"
+                        ? "Wolf is a foursome — pick exactly four; the Wolf rotates in this order"
+                        : "Tap players to include or leave out"}
               </span>
               <div className={styles.gamePlayers}>
                 {players.map((p) => {
@@ -984,7 +1006,7 @@ export default function RoundForm({
               </div>
               <div className={styles.gameStake}>
                 <span className={styles.gameStakeLabel}>
-                  $ per {g.type === "nassau" ? "bet" : g.type === "sixes" ? "segment" : g.type === "vegas" ? "pt" : "skin"}
+                  $ per {g.type === "nassau" ? "bet" : g.type === "sixes" ? "segment" : g.type === "vegas" || g.type === "wolf" ? "pt" : g.type === "chairman" ? "point" : "skin"}
                 </span>
                 <span className={styles.gameStakeInput}>
                   <span aria-hidden>$</span>

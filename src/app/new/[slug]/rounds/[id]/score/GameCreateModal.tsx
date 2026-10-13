@@ -6,11 +6,11 @@ import styles from "./score.module.css";
 import type { RoundGame } from "./SideGameStandings";
 import { formatStake, parseStake } from "@/lib/v2/rounds/stake";
 
-type GameType = "skins" | "nassau" | "sixes" | "vegas";
-const EXACT: Record<GameType, number | null> = { skins: null, nassau: 2, sixes: 4, vegas: 4 };
-const UNIT: Record<GameType, string> = { skins: "skin", nassau: "bet", sixes: "segment", vegas: "pt" };
-const LABEL: Record<GameType, string> = { skins: "Skins", nassau: "Nassau", sixes: "6-6-6", vegas: "Vegas" };
-const DEFAULT_STAKE: Record<GameType, number> = { skins: 2, nassau: 5, sixes: 5, vegas: 0.1 };
+type GameType = "skins" | "nassau" | "sixes" | "vegas" | "chairman" | "wolf";
+const EXACT: Record<GameType, number | null> = { skins: null, nassau: 2, sixes: 4, vegas: 4, chairman: null, wolf: 4 };
+const UNIT: Record<GameType, string> = { skins: "skin", nassau: "bet", sixes: "segment", vegas: "pt", chairman: "point", wolf: "pt" };
+const LABEL: Record<GameType, string> = { skins: "Skins", nassau: "Nassau", sixes: "6-6-6", vegas: "Vegas", chairman: "Chairman", wolf: "Wolf" };
+const DEFAULT_STAKE: Record<GameType, number> = { skins: 2, nassau: 5, sixes: 5, vegas: 0.1, chairman: 5, wolf: 5 };
 
 /**
  * Add a side game to a round already in progress (#183) — the "Add game" button
@@ -40,15 +40,21 @@ export default function GameCreateModal({
   const hasSkins = games.some((g) => g.game_type === "skins");
   const hasSixes = games.some((g) => g.game_type === "sixes");
   const hasVegas = games.some((g) => g.game_type === "vegas");
+  const hasChairman = games.some((g) => g.game_type === "chairman");
+  const hasWolf = games.some((g) => g.game_type === "wolf");
   const rosterCount = rosterOrder.length;
-  const available = (["skins", "nassau", "sixes", "vegas"] as GameType[]).filter((t) =>
+  const available = (["skins", "chairman", "nassau", "sixes", "vegas", "wolf"] as GameType[]).filter((t) =>
     t === "skins"
       ? !hasSkins && rosterCount >= 2
-      : t === "nassau"
-        ? rosterCount >= 2
-        : t === "sixes"
-          ? !hasSixes && allowSixes
-          : !hasVegas && rosterCount >= 4, // vegas: 2v2, any hole count
+      : t === "chairman"
+        ? !hasChairman && rosterCount >= 2 // one chair per round; whole group plays
+        : t === "nassau"
+          ? rosterCount >= 2
+          : t === "sixes"
+            ? !hasSixes && allowSixes
+            : t === "vegas"
+              ? !hasVegas && rosterCount >= 4 // vegas: 2v2, any hole count
+              : !hasWolf && rosterCount >= 4, // wolf: rotating partners, foursome
   );
   const firstAvailable = available[0] ?? "nassau";
 

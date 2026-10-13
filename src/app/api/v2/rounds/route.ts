@@ -282,7 +282,7 @@ export async function POST(request: Request) {
       .filter((g) =>
         g.game_type === "nassau"
           ? g.participant_ids.length === 2
-          : g.game_type === "sixes" || g.game_type === "vegas"
+          : g.game_type === "sixes" || g.game_type === "vegas" || g.game_type === "wolf"
             ? g.participant_ids.length === 4
             : g.participant_ids.length >= 2,
       );

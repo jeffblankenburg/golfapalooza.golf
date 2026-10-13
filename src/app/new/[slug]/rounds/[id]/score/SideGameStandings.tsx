@@ -4,6 +4,8 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import styles from "./score.module.css";
 import { computeSkins } from "@/lib/v2/rounds/skins";
+import { computeChairman } from "@/lib/v2/rounds/chairman";
+import { computeWolf, type WolfDecision } from "@/lib/v2/rounds/wolf";
 import { computeNassau } from "@/lib/v2/rounds/nassau";
 import { computeSixSixSix, sixesNetUnits } from "@/lib/v2/rounds/sixes";
 import { computeVegas, vegasNet, type VegasHole } from "@/lib/v2/rounds/vegas";
@@ -19,6 +21,7 @@ export interface RoundGame {
   participant_ids: string[];
   value: number | null; // optional $ stake per skin / per bet
   carry?: boolean; // skins only — roll tied skins to the next hole (default off)
+  decisions?: Record<string, { partner?: string; lone?: boolean }>; // wolf only — per-hole Wolf pick
 }
 
 const money = (n: number) => `$${n % 1 === 0 ? n : n.toFixed(2)}`;
@@ -102,10 +105,23 @@ export default function SideGameStandings({
   const [editing, setEditing] = useState<RoundGame | null>(null);
   const [vegasPop, setVegasPop] = useState<{ ph: VegasHole; teamA: string[]; teamB: string[]; x: number; y: number } | null>(null);
   const skins = games.filter((g) => g.game_type === "skins");
+  const chairman = games.filter((g) => g.game_type === "chairman");
+  const wolf = games.filter((g) => g.game_type === "wolf");
   const nassau = games.filter((g) => g.game_type === "nassau");
   const sixes = games.filter((g) => g.game_type === "sixes");
   const vegas = games.filter((g) => g.game_type === "vegas");
-  if (skins.length === 0 && nassau.length === 0 && sixes.length === 0 && vegas.length === 0) return null;
+  if (skins.length === 0 && chairman.length === 0 && wolf.length === 0 && nassau.length === 0 && sixes.length === 0 && vegas.length === 0) return null;
+
+  // Normalize a game's stored per-hole Wolf picks (string-keyed JSON) into the
+  // number-keyed shape the scorer computes from.
+  const wolfDecisions = (g: RoundGame): Record<number, WolfDecision> => {
+    const out: Record<number, WolfDecision> = {};
+    for (const [k, v] of Object.entries(g.decisions ?? {})) {
+      if (v?.lone) out[Number(k)] = { lone: true };
+      else if (typeof v?.partner === "string") out[Number(k)] = { partner: v.partner };
+    }
+    return out;
+  };
 
   // Net: subtract each player's per-hole handicap strokes before scoring.
   const netScores = (): Record<string, Record<number, number>> => {
@@ -161,6 +177,116 @@ export default function SideGameStandings({
                   ) : (
                     <span className={styles.sideGameTileEven}>
                       {s.won} <span className={styles.sideGameTileSkinsInline}>{s.won === 1 ? "skin" : "skins"}</span>
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+
+      {chairman.map((g) => {
+        const scores = g.is_net ? netScores() : gross;
+        const r = computeChairman(holeNumbers, scores, g.participant_ids);
+        // Each point is worth `stake` from every OTHER player, so a player's net is
+        // stake × (theirPts × N − totalPts). Sums to zero across the table (same
+        // peer-to-peer settlement as Skins).
+        const n = g.participant_ids.length;
+        const totalPts = g.participant_ids.reduce((sum, id) => sum + (r.points[id] ?? 0), 0);
+        const standings = g.participant_ids
+          .map((id) => {
+            const pts = r.points[id] ?? 0;
+            // The holes where this player defended the chair for a point — shown in
+            // their box so you can see exactly where the points came from.
+            const pointHoles = r.perHole.filter((ph) => ph.point && ph.winner === id).map((ph) => ph.hole_number);
+            return { id, name: playerNames[id] || "Player", pts, pointHoles, net: g.value ? g.value * (pts * n - totalPts) : 0 };
+          })
+          .sort((a, b) => b.pts - a.pts);
+        return (
+          <div key={g.id} className={styles.sideGame}>
+            <div className={styles.sideGameHead}>
+              <span className={styles.sideGameTitle}>
+                Chairman{g.is_net ? " (Net)" : ""}
+                {g.value ? <span className={styles.sideGameStake}> {money(g.value)}/pt</span> : null}
+              </span>
+              {r.chairman && <span className={styles.sideGameCarry}>{firstName(playerNames[r.chairman] || "")} holds</span>}
+              <span className={styles.sideGameThru}>{r.resolved > 0 ? `thru ${r.resolved}` : "not started"}</span>
+              {!readOnly && <GearButton onClick={() => setEditing(g)} />}
+            </div>
+            <div className={styles.sideGameGrid}>
+              {standings.map((s) => (
+                <div key={s.id} className={styles.sideGameTile} data-chair={s.id === r.chairman || undefined}>
+                  <div className={styles.sideGameTileTop}>
+                    <span className={styles.sideGameTileName}>{s.name}</span>
+                    {g.value ? <span className={styles.sideGameTileSkins}>{s.pts === 1 ? "1 pt" : `${s.pts} pts`}</span> : null}
+                  </div>
+                  {g.value ? (
+                    <span className={s.net > 0 ? styles.sideGameTileUp : s.net < 0 ? styles.sideGameTileDown : styles.sideGameTileEven}>
+                      {money(Math.abs(s.net))}
+                    </span>
+                  ) : (
+                    <span className={styles.sideGameTileEven}>
+                      {s.pts} <span className={styles.sideGameTileSkinsInline}>{s.pts === 1 ? "pt" : "pts"}</span>
+                    </span>
+                  )}
+                  {s.pointHoles.length > 0 && (
+                    <div className={styles.sideGameTileHoles} aria-label={`Points won on holes ${s.pointHoles.join(", ")}`}>
+                      {s.pointHoles.map((h) => (
+                        <span key={h} className={styles.sideGameHoleChip}>{h}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+
+      {wolf.map((g) => {
+        const scores = g.is_net ? netScores() : gross;
+        const r = computeWolf(holeNumbers, scores, g.participant_ids, wolfDecisions(g), holeNumbers.length === 18);
+        // Wolf points are already zero-sum per player (winners +, losers −), so the
+        // dollar net is simply points × stake (no cross-table normalization needed).
+        const standings = g.participant_ids
+          .map((id) => {
+            const pts = r.points[id] ?? 0;
+            return { id, name: playerNames[id] || "Player", pts, net: g.value ? g.value * pts : 0 };
+          })
+          .sort((a, b) => b.pts - a.pts);
+        const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+        return (
+          <div key={g.id} className={styles.sideGame}>
+            <div className={styles.sideGameHead}>
+              <span className={styles.sideGameTitle}>
+                Wolf{g.is_net ? " (Net)" : ""}
+                {g.value ? <span className={styles.sideGameStake}> {money(g.value)}/pt</span> : null}
+              </span>
+              {r.pendingPicks.length > 0 && (
+                <span className={styles.sideGameCarry}>{r.pendingPicks.length} need a pick</span>
+              )}
+              <span className={styles.sideGameThru}>{r.decidedCount > 0 ? `thru ${r.decidedCount}` : "not started"}</span>
+              {!readOnly && <GearButton onClick={() => setEditing(g)} />}
+            </div>
+            <div className={styles.sideGameGrid}>
+              {standings.map((s) => (
+                <div key={s.id} className={styles.sideGameTile}>
+                  <div className={styles.sideGameTileTop}>
+                    <span className={styles.sideGameTileName}>{s.name}</span>
+                    {g.value ? (
+                      <span className={styles.sideGameTileSkins}>
+                        {signed(s.pts)} pt{Math.abs(s.pts) === 1 ? "" : "s"}
+                      </span>
+                    ) : null}
+                  </div>
+                  {g.value ? (
+                    <span className={s.net > 0 ? styles.sideGameTileUp : s.net < 0 ? styles.sideGameTileDown : styles.sideGameTileEven}>
+                      {s.net < 0 ? `-${money(Math.abs(s.net))}` : money(s.net)}
+                    </span>
+                  ) : (
+                    <span className={s.pts > 0 ? styles.sideGameTileUp : s.pts < 0 ? styles.sideGameTileDown : styles.sideGameTileEven}>
+                      {signed(s.pts)} <span className={styles.sideGameTileSkinsInline}>pt{Math.abs(s.pts) === 1 ? "" : "s"}</span>
                     </span>
                   )}
                 </div>

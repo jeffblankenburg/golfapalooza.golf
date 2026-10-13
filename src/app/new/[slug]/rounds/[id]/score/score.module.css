@@ -223,6 +223,13 @@
 .cardCol {
   position: relative;
 }
+/* Wolf: outline the cell of whoever is the Wolf on that hole. Inset box-shadow
+   keeps it a crisp 1px without nudging the table layout; it layers cleanly over
+   the active-column tint. */
+.cardTable td.cardCell[data-wolf="true"] {
+  box-shadow: inset 0 0 0 1px var(--brand);
+  border-radius: 3px;
+}
 /* Score cell reserves a top strip for pops (handicap-stroke dots). */
 .cardTable td.cardCell {
   position: relative;
@@ -464,6 +471,165 @@
   border-color: color-mix(in srgb, #a3341f 45%, var(--line));
   background: color-mix(in srgb, #a3341f 7%, var(--paper));
 }
+/* Chairman: the player who currently holds the chair gets a brand-tinted tile so
+   the "king of the hill" is obvious at a glance (the head badge names them too). */
+.sideGameTile[data-chair="true"] {
+  border-color: color-mix(in srgb, var(--brand) 50%, var(--line));
+  background: color-mix(in srgb, var(--brand) 8%, var(--paper));
+}
+/* The holes on which this player scored a point — one small chip per hole, so you
+   can see exactly where a Chairman's points came from. */
+.sideGameTileHoles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 2px;
+}
+.sideGameHoleChip {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  padding: 0 5px;
+  border-radius: 999px;
+  line-height: 1.55;
+}
+
+/* Wolf: the current hole's pick control, shown above the score rows. The Wolf for
+   the hole is named, then the three partner choices + a full-width Lone Wolf. */
+.wolfStrip {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.wolfStripHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wolfBadge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--brand);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.wolfWho {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.wolfPicks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.wolfPick {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wolfPick[data-on="true"] {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 14%, var(--paper));
+  color: var(--brand);
+}
+.wolfPick:disabled {
+  opacity: 0.6;
+}
+/* Lone Wolf drops to its own full-width row so it reads as the riskier choice. */
+.wolfLone {
+  flex-basis: 100%;
+  border-style: dashed;
+}
+.wolfLone[data-on="true"] {
+  border-style: solid;
+}
+/* Until the Wolf has picked, the strip wears an amber accent + "needs a pick" tag
+   so it reads as the required next action. */
+.wolfStrip[data-need="true"] {
+  border-color: color-mix(in srgb, #d97706 45%, var(--line));
+}
+.wolfNeed {
+  margin-left: auto;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #b45309;
+  background: color-mix(in srgb, #d97706 16%, transparent);
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+
+/* Soft gate: the player rows dim and stop taking taps until the Wolf pick is made
+   (or the scorer bypasses it), while the gate card OVERLAYS them (no layout shift).
+   The pick strip + bypass link stay interactive (strip is outside; the card's own
+   button sits above the inert rows). */
+.panelGateWrap {
+  position: relative;
+}
+.panelRows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.panelRows[data-locked="true"] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.wolfGateOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 10px;
+}
+.wolfGate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 320px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, #d97706 45%, var(--line));
+  background: color-mix(in srgb, #d97706 12%, var(--paper));
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+  text-align: center;
+}
+.wolfGateMsg {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.wolfGateSkip {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
 /* A little breathing room between the 6-6-6 segments and the debt boxes. */
 .sixesDebts {
   margin-top: 10px;

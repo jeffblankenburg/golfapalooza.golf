@@ -33,9 +33,11 @@ export default function GameSettingsModal({
   const isSixes = game.game_type === "sixes";
   const isVegas = game.game_type === "vegas";
   const isSkins = game.game_type === "skins";
-  const exact = isNassau ? 2 : isSixes || isVegas ? 4 : null; // fixed roster size, or any 2+
-  const gameName = isNassau ? "Nassau" : isSixes ? "6-6-6" : isVegas ? "Vegas" : "Skins";
-  const stakeUnit = isNassau ? "bet" : isSixes ? "segment" : isVegas ? "pt" : "skin";
+  const isChairman = game.game_type === "chairman";
+  const isWolf = game.game_type === "wolf";
+  const exact = isNassau ? 2 : isSixes || isVegas || isWolf ? 4 : null; // fixed roster size, or any 2+
+  const gameName = isNassau ? "Nassau" : isSixes ? "6-6-6" : isVegas ? "Vegas" : isChairman ? "Chairman" : isWolf ? "Wolf" : "Skins";
+  const stakeUnit = isNassau ? "bet" : isSixes ? "segment" : isVegas || isWolf ? "pt" : isChairman ? "point" : "skin";
   const [isNet, setIsNet] = useState(game.is_net);
   const [carry, setCarry] = useState(game.carry === true);
   const [value, setValue] = useState<number | null>(game.value);

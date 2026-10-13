@@ -8,6 +8,8 @@ import RoundComments from "./RoundComments";
 import OtherGroups from "./OtherGroups";
 import ScoringMapModal, { anyHoleMapped } from "./ScoringMapModal";
 import SideGameStandings, { type RoundGame } from "./SideGameStandings";
+import WolfHolePick from "./WolfHolePick";
+import { computeWolf, type WolfDecision } from "@/lib/v2/rounds/wolf";
 import GameCreateModal from "./GameCreateModal";
 
 export interface ScoreHole {
@@ -138,6 +140,8 @@ export default function ScoreEntry({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [completeErr, setCompleteErr] = useState<string | null>(null);
+  // Wolf soft gate: holes where the scorer chose "enter scores anyway" despite no pick.
+  const [wolfBypass, setWolfBypass] = useState<Set<number>>(new Set());
 
   const hole = holes[idx];
   const hasBothNines = holes.some((h) => h.hole_number <= 9) && holes.some((h) => h.hole_number >= 10);
@@ -406,6 +410,35 @@ export default function ScoreEntry({
     if (g.is_net) for (const id of g.participant_ids) netPlayerIds.add(id);
   }
 
+  // Who is the Wolf on each hole, so the mini scorecard can outline their cell
+  // (shows the rotation across the card + the current Wolf in the active column).
+  // One Wolf game per round; scores only matter for the 17–18 last-place rule.
+  const wolfByHole: Record<number, string> = {};
+  const wolfGame = gameList.find((g) => g.game_type === "wolf" && g.participant_ids.length === 4);
+  if (wolfGame) {
+    const wolfScores = wolfGame.is_net
+      ? Object.fromEntries(
+          Object.entries(gross).map(([pid, hs]) => [
+            pid,
+            Object.fromEntries(Object.entries(hs).map(([h, v]) => [h, v - (strokesByPlayer[pid]?.[Number(h)] ?? 0)])),
+          ]),
+        )
+      : gross;
+    const decisions: Record<number, WolfDecision> = {};
+    for (const [k, v] of Object.entries(wolfGame.decisions ?? {})) {
+      if (v?.lone) decisions[Number(k)] = { lone: true };
+      else if (typeof v?.partner === "string") decisions[Number(k)] = { partner: v.partner };
+    }
+    for (const ph of computeWolf(holeNumbers, wolfScores, wolfGame.participant_ids, decisions, holeNumbers.length === 18).perHole) {
+      wolfByHole[ph.hole_number] = ph.wolf;
+    }
+  }
+  // Soft gate: if a Wolf game is on and this hole has no pick yet, lock score entry
+  // until the pick is made (or the scorer explicitly bypasses it for this hole).
+  const wolfPick = wolfGame?.decisions?.[String(hole.hole_number)];
+  const wolfHasPick = !!(wolfPick && (wolfPick.lone || typeof wolfPick.partner === "string"));
+  const wolfLocked = !!wolfGame && !wolfHasPick && !wolfBypass.has(hole.hole_number);
+
   return (
     <div className={styles.screen}>
       {/* Header */}
@@ -523,7 +556,11 @@ export default function ScoreEntry({
                     return (
                       <Fragment key={h.hole_number}>
                         {h.hole_number === 10 && hasBothNines && <td className={styles.cardTotVal}>{anyF ? f9 : ""}</td>}
-                        <td className={styles.cardCell} data-active={h.hole_number === hole.hole_number || undefined}>
+                        <td
+                          className={styles.cardCell}
+                          data-active={h.hole_number === hole.hole_number || undefined}
+                          data-wolf={wolfByHole[h.hole_number] === p.id || undefined}
+                        >
                           {pops > 0 && (
                             <span className={styles.cardPops}>
                               {Array.from({ length: pops }).map((_, i) => (
@@ -584,7 +621,39 @@ export default function ScoreEntry({
 
       {/* Panel */}
       <div className={styles.panel}>
-        {players.map((p) => {
+        {/* Wolf: the current hole's pick sits above the score rows (one Wolf per round). */}
+        {gameList
+          .filter((g) => g.game_type === "wolf" && g.participant_ids.length === 4)
+          .map((g) => (
+            <WolfHolePick
+              key={g.id}
+              game={g}
+              holeNumber={hole.hole_number}
+              holeNumbers={holeNumbers}
+              gross={gross}
+              strokesByPlayer={strokesByPlayer}
+              playerNames={playerNames}
+              roundId={roundId}
+              onGameSaved={(ng) => setGameList((prev) => prev.map((x) => (x.id === ng.id ? ng : x)))}
+            />
+          ))}
+        <div className={styles.panelGateWrap}>
+          {wolfLocked && (
+            <div className={styles.wolfGateOverlay}>
+              <div className={styles.wolfGate}>
+                <span className={styles.wolfGateMsg}>Make the Wolf&apos;s pick above to score this hole.</span>
+                <button
+                  type="button"
+                  className={styles.wolfGateSkip}
+                  onClick={() => setWolfBypass((prev) => new Set(prev).add(hole.hole_number))}
+                >
+                  Enter scores anyway
+                </button>
+              </div>
+            </div>
+          )}
+          <div className={styles.panelRows} data-locked={wolfLocked || undefined} aria-disabled={wolfLocked || undefined}>
+            {players.map((p) => {
           const cell = scores[p.id]?.[hole.hole_number] || {};
           const strokes = cell.strokes;
           const played = holes.filter((h) => scores[p.id]?.[h.hole_number]?.strokes != null);
@@ -678,7 +747,9 @@ export default function ScoreEntry({
               )}
             </div>
           );
-        })}
+          })}
+          </div>
+        </div>
 
         {allComplete && status !== "completed" && (
           <button type="button" className={styles.completeBtn} onClick={() => setConfirmOpen(true)}>Complete round</button>
@@ -697,7 +768,7 @@ export default function ScoreEntry({
           ))}
         </div>
 
-        {/* Side-game standings (Skins, Nassau, 6-6-6) — live, just above the chatter. */}
+        {/* Side-game standings (Skins, Chairman, Wolf, Nassau, 6-6-6, Vegas) — live, just above the chatter. */}
         <SideGameStandings
           games={gameList}
           playerNames={playerNames}

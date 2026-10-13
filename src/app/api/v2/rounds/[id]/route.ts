@@ -151,6 +151,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     participant_ids: g.participant_ids || [],
     value: typeof g.config?.value === "number" ? g.config.value : null,
     carry: g.config?.carry === true,
+    decisions: g.config?.decisions ?? {},
   }));
 
   const strokesByPlayer: Record<string, Record<number, number>> = {};

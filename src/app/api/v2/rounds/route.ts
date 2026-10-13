@@ -165,7 +165,7 @@ export async function POST(request: Request) {
     format?: string;
     players?: NewPlayer[];
     silent?: boolean;
-    games?: { game_type?: string; is_net?: boolean; value?: number | null; carry?: boolean; participants?: number[] }[];
+    games?: { game_type?: string; is_net?: boolean; value?: number | null; carry?: boolean; tiebreak?: string; participants?: number[] }[];
   };
   try {
     body = await request.json();
@@ -273,6 +273,7 @@ export async function POST(request: Request) {
         config: {
           ...(typeof g.value === "number" && g.value > 0 ? { value: g.value } : {}),
           ...(g.game_type === "skins" && g.carry ? { carry: true } : {}),
+          ...(g.game_type === "wolf" && (g.tiebreak === "second" || g.tiebreak === "total") ? { tiebreak: g.tiebreak } : {}),
         },
         participant_ids: (g.participants as number[])
           .map((i) => idByPosition.get(i + 1))

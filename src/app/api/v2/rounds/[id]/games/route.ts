@@ -26,7 +26,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   const rosterIds = new Set((roster || []).map((r) => r.id));
 
-  let body: { game_type?: string; is_net?: boolean; value?: number | null; carry?: boolean; participant_ids?: string[] };
+  let body: { game_type?: string; is_net?: boolean; value?: number | null; carry?: boolean; tiebreak?: string; participant_ids?: string[] };
   try {
     body = await request.json();
   } catch {
@@ -65,6 +65,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       config: {
         ...(typeof body.value === "number" && body.value > 0 ? { value: body.value } : {}),
         ...(gameType === "skins" && body.carry ? { carry: true } : {}),
+        ...(gameType === "wolf" && (body.tiebreak === "second" || body.tiebreak === "total") ? { tiebreak: body.tiebreak } : {}),
       },
       participant_ids: ids,
       created_by: userId,
@@ -82,6 +83,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       value: typeof created.config?.value === "number" ? created.config.value : null,
       carry: created.config?.carry === true,
       decisions: created.config?.decisions ?? {},
+      tiebreak: created.config?.tiebreak ?? "push",
     },
   });
 }

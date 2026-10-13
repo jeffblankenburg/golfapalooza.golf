@@ -4,13 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import styles from "./score.module.css";
 import type { RoundGame } from "./SideGameStandings";
+import { GameRulesInfoButton } from "@/components/v2/games/GameRulesModal";
 import { formatStake, parseStake } from "@/lib/v2/rounds/stake";
 
 type GameType = "skins" | "nassau" | "sixes" | "vegas" | "chairman" | "wolf";
 const EXACT: Record<GameType, number | null> = { skins: null, nassau: 2, sixes: 4, vegas: 4, chairman: null, wolf: 4 };
 const UNIT: Record<GameType, string> = { skins: "skin", nassau: "bet", sixes: "segment", vegas: "pt", chairman: "point", wolf: "pt" };
 const LABEL: Record<GameType, string> = { skins: "Skins", nassau: "Nassau", sixes: "6-6-6", vegas: "Vegas", chairman: "Chairman", wolf: "Wolf" };
-const DEFAULT_STAKE: Record<GameType, number> = { skins: 2, nassau: 5, sixes: 5, vegas: 0.1, chairman: 5, wolf: 5 };
+const DEFAULT_STAKE: Record<GameType, number> = { skins: 2, nassau: 5, sixes: 5, vegas: 0.1, chairman: 5, wolf: 1 };
 
 /**
  * Add a side game to a round already in progress (#183) — the "Add game" button
@@ -61,6 +62,7 @@ export default function GameCreateModal({
   const [type, setType] = useState<GameType>(firstAvailable);
   const [isNet, setIsNet] = useState(true); // Net is the default scoring basis
   const [carry, setCarry] = useState(false); // skins: roll tied skins forward (default off)
+  const [tiebreak, setTiebreak] = useState<"push" | "second" | "total">("push"); // wolf: best-ball tie rule
   const [value, setValue] = useState<number | null>(DEFAULT_STAKE[firstAvailable]);
   const [valueStr, setValueStr] = useState(formatStake(DEFAULT_STAKE[firstAvailable]));
   const defaultFor = useMemo(
@@ -88,6 +90,7 @@ export default function GameCreateModal({
     setSelected(defaultFor(t)); // reset roster to a sensible default for the new type
     setValue(DEFAULT_STAKE[t]); // and its default stake
     setValueStr(formatStake(DEFAULT_STAKE[t]));
+    setTiebreak("push");
   };
 
   const exact = EXACT[type];
@@ -114,6 +117,7 @@ export default function GameCreateModal({
           is_net: isNet,
           value: value && value > 0 ? value : null,
           carry: type === "skins" ? carry : undefined,
+          tiebreak: type === "wolf" ? tiebreak : undefined,
           participant_ids: selected,
         }),
       });
@@ -140,13 +144,15 @@ export default function GameCreateModal({
           </button>
         </div>
 
-        <label className={styles.gsLabel}>Game</label>
+        <label className={styles.gsLabel}>
+          Game {available.length > 0 && <GameRulesInfoButton gameType={type} />}
+        </label>
         {available.length === 0 ? (
           <p className={styles.gsOptional}>No other games can be added to this round.</p>
         ) : (
-          <div className={styles.gsSeg} role="group" aria-label="Game type">
+          <div className={styles.gsGameGrid} role="group" aria-label="Game type">
             {available.map((t) => (
-              <button key={t} type="button" className={styles.gsSegOption} data-on={type === t || undefined} onClick={() => pickType(t)}>
+              <button key={t} type="button" className={styles.gsGameOption} data-on={type === t || undefined} onClick={() => pickType(t)}>
                 {LABEL[t]}
               </button>
             ))}
@@ -165,6 +171,17 @@ export default function GameCreateModal({
             <div className={styles.gsSeg} role="group" aria-label="Skins carryover">
               <button type="button" className={styles.gsSegOption} data-on={!carry || undefined} onClick={() => setCarry(false)}>No carry</button>
               <button type="button" className={styles.gsSegOption} data-on={carry || undefined} onClick={() => setCarry(true)}>Carry over</button>
+            </div>
+          </>
+        )}
+
+        {type === "wolf" && (
+          <>
+            <label className={styles.gsLabel}>Tied best ball</label>
+            <div className={styles.gsSeg} role="group" aria-label="Wolf tiebreak">
+              <button type="button" className={styles.gsSegOption} data-on={tiebreak === "push" || undefined} onClick={() => setTiebreak("push")}>Push</button>
+              <button type="button" className={styles.gsSegOption} data-on={tiebreak === "second" || undefined} onClick={() => setTiebreak("second")}>Other ball</button>
+              <button type="button" className={styles.gsSegOption} data-on={tiebreak === "total" || undefined} onClick={() => setTiebreak("total")}>Total</button>
             </div>
           </>
         )}

@@ -152,6 +152,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     value: typeof g.config?.value === "number" ? g.config.value : null,
     carry: g.config?.carry === true,
     decisions: g.config?.decisions ?? {},
+    tiebreak: g.config?.tiebreak ?? "push",
   }));
 
   const strokesByPlayer: Record<string, Record<number, number>> = {};

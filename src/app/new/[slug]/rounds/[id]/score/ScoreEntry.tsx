@@ -255,6 +255,30 @@ export default function ScoreEntry({
       onRoundChange: ({ row }) => {
         if (row?.status) setStatus(row.status);
       },
+      // Side games (incl. Wolf per-hole picks) propagate live across devices.
+      // Picks are non-optimistic (saved to the server first), so echoing the
+      // server row back in commit order converges without a dirty guard.
+      onGameChange: ({ kind, row, old }) => {
+        if (kind === "DELETE") {
+          const gid = old?.id ?? row?.id;
+          if (gid) setGameList((prev) => prev.filter((g) => g.id !== gid));
+          return;
+        }
+        if (!row) return;
+        const mapped: RoundGame = {
+          id: row.id,
+          game_type: row.game_type,
+          is_net: row.is_net,
+          participant_ids: row.participant_ids || [],
+          value: typeof row.config?.value === "number" ? row.config.value : null,
+          carry: row.config?.carry === true,
+          decisions: row.config?.decisions ?? {},
+          tiebreak: (row.config?.tiebreak as RoundGame["tiebreak"]) ?? "push",
+        };
+        setGameList((prev) =>
+          prev.some((g) => g.id === mapped.id) ? prev.map((g) => (g.id === mapped.id ? mapped : g)) : [...prev, mapped],
+        );
+      },
       onStatusChange: (s) => {
         setLiveStatus(s === "SUBSCRIBED" ? "live" : s === "CHANNEL_ERROR" || s === "TIMED_OUT" || s === "CLOSED" ? "offline" : "connecting");
       },
@@ -414,6 +438,7 @@ export default function ScoreEntry({
   // (shows the rotation across the card + the current Wolf in the active column).
   // One Wolf game per round; scores only matter for the 17–18 last-place rule.
   const wolfByHole: Record<number, string> = {};
+  const wolfPartnerByHole: Record<number, string> = {};
   const wolfGame = gameList.find((g) => g.game_type === "wolf" && g.participant_ids.length === 4);
   if (wolfGame) {
     const wolfScores = wolfGame.is_net
@@ -429,8 +454,11 @@ export default function ScoreEntry({
       if (v?.lone) decisions[Number(k)] = { lone: true };
       else if (typeof v?.partner === "string") decisions[Number(k)] = { partner: v.partner };
     }
-    for (const ph of computeWolf(holeNumbers, wolfScores, wolfGame.participant_ids, decisions, holeNumbers.length === 18).perHole) {
+    for (const ph of computeWolf(holeNumbers, wolfScores, wolfGame.participant_ids, decisions, holeNumbers.length === 18, wolfGame.tiebreak ?? "push").perHole) {
       wolfByHole[ph.hole_number] = ph.wolf;
+      // Once a partner is picked, their square joins the Wolf's — the two outlined
+      // cells in a column are that hole's Wolf team (Lone Wolf leaves just the one).
+      if (ph.decision && "partner" in ph.decision) wolfPartnerByHole[ph.hole_number] = ph.decision.partner;
     }
   }
   // Soft gate: if a Wolf game is on and this hole has no pick yet, lock score entry
@@ -559,7 +587,7 @@ export default function ScoreEntry({
                         <td
                           className={styles.cardCell}
                           data-active={h.hole_number === hole.hole_number || undefined}
-                          data-wolf={wolfByHole[h.hole_number] === p.id || undefined}
+                          data-wolf={wolfByHole[h.hole_number] === p.id || wolfPartnerByHole[h.hole_number] === p.id || undefined}
                         >
                           {pops > 0 && (
                             <span className={styles.cardPops}>

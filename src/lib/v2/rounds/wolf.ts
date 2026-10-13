@@ -21,6 +21,15 @@
 
 export type WolfDecision = { partner: string } | { lone: true };
 
+/**
+ * How a partner hole (2 v 2) is decided when both sides' best ball ties:
+ *   - "push"   — the hole is dead, nobody scores (standard Wolf, the default).
+ *   - "second" — the side with the lower SECOND ball wins; equal second → push.
+ *   - "total"  — the side with the lower two-ball total wins; equal total → push.
+ * Lone Wolf (1 v 3) has a single ball, so its ties always push regardless.
+ */
+export type WolfTiebreak = "push" | "second" | "total";
+
 export interface WolfHole {
   hole_number: number;
   wolf: string; // round_player_id who is the Wolf this hole (derived)
@@ -76,6 +85,7 @@ export function computeWolf(
   order: string[],
   decisions: Record<number, WolfDecision>,
   fullEighteen: boolean,
+  tiebreak: WolfTiebreak = "push",
 ): WolfResult {
   const points: Record<string, number> = {};
   for (const id of order) points[id] = 0;
@@ -119,11 +129,22 @@ export function computeWolf(
         const opps = order.filter((id) => id !== wolf && id !== partner);
         const teamBest = Math.min(scores[wolf][h], scores[partner][h]);
         const oppBest = Math.min(...opps.map((id) => scores[id][h]));
-        if (teamBest < oppBest) {
+        // Best ball decides; on a tie, apply the configured tiebreak (default push).
+        let wolfSideWins: boolean | null = teamBest < oppBest ? true : teamBest > oppBest ? false : null;
+        if (wolfSideWins === null && tiebreak !== "push") {
+          const sideVal = (ids: string[]) =>
+            tiebreak === "total"
+              ? ids.reduce((sum, id) => sum + scores[id][h], 0)
+              : Math.max(...ids.map((id) => scores[id][h])); // "second" = each side's higher ball
+          const t = sideVal(team);
+          const o = sideVal(opps);
+          wolfSideWins = t < o ? true : t > o ? false : null;
+        }
+        if (wolfSideWins === true) {
           for (const id of team) points[id] += 1;
           for (const id of opps) points[id] -= 1;
           outcome = "wolf";
-        } else if (teamBest > oppBest) {
+        } else if (wolfSideWins === false) {
           for (const id of opps) points[id] += 1;
           for (const id of team) points[id] -= 1;
           outcome = "opponents";

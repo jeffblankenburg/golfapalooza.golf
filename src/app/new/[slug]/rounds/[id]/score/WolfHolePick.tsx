@@ -4,6 +4,7 @@ import { useState } from "react";
 import styles from "./score.module.css";
 import type { RoundGame } from "./SideGameStandings";
 import { computeWolf, type WolfDecision } from "@/lib/v2/rounds/wolf";
+import { GameRulesInfoButton } from "@/components/v2/games/GameRulesModal";
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
 
@@ -64,7 +65,7 @@ export default function WolfHolePick({
   const [saving, setSaving] = useState<string | null>(null);
 
   const scores = toScores(game.is_net, gross, strokesByPlayer);
-  const r = computeWolf(holeNumbers, scores, game.participant_ids, decisionsOf(game), holeNumbers.length === 18);
+  const r = computeWolf(holeNumbers, scores, game.participant_ids, decisionsOf(game), holeNumbers.length === 18, game.tiebreak ?? "push");
   const ph = r.perHole.find((x) => x.hole_number === holeNumber);
   if (!ph) return null;
 
@@ -94,6 +95,7 @@ export default function WolfHolePick({
     <div className={styles.wolfStrip} data-need={!current || undefined}>
       <div className={styles.wolfStripHead}>
         <span className={styles.wolfBadge}>Wolf</span>
+        <GameRulesInfoButton gameType="wolf" />
         <span className={styles.wolfWho}>{firstName(playerNames[wolfId] || "Player")} picks</span>
         {!current && <span className={styles.wolfNeed}>needs a pick</span>}
       </div>

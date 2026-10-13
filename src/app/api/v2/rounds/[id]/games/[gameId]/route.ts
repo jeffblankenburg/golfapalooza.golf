@@ -39,6 +39,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     is_net?: boolean;
     value?: number | null;
     carry?: boolean;
+    tiebreak?: string;
     participant_ids?: string[];
     // Wolf: a partial map of hole_number → pick (null clears that hole's pick).
     decisions?: Record<string, { partner?: string; lone?: boolean } | null>;
@@ -55,7 +56,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   // Merge into the existing config so a stake edit doesn't wipe Wolf picks, and a
   // single Wolf pick doesn't wipe the stake. Each listed field is applied in place.
-  if ("value" in body || "carry" in body || "decisions" in body) {
+  if ("value" in body || "carry" in body || "tiebreak" in body || "decisions" in body) {
     const cfg: Record<string, unknown> = { ...(game.config ?? {}) };
     if ("value" in body) {
       if (typeof body.value === "number" && body.value > 0) cfg.value = body.value;
@@ -64,6 +65,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if ("carry" in body) {
       if (game.game_type === "skins" && body.carry) cfg.carry = true;
       else delete cfg.carry;
+    }
+    if ("tiebreak" in body) {
+      if (game.game_type === "wolf" && (body.tiebreak === "second" || body.tiebreak === "total")) cfg.tiebreak = body.tiebreak;
+      else delete cfg.tiebreak;
     }
     if (body.decisions && typeof body.decisions === "object") {
       const decisions: Record<string, unknown> = { ...((cfg.decisions as Record<string, unknown>) ?? {}) };
@@ -110,6 +115,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       value: typeof updated.config?.value === "number" ? updated.config.value : null,
       carry: updated.config?.carry === true,
       decisions: updated.config?.decisions ?? {},
+      tiebreak: updated.config?.tiebreak ?? "push",
     },
   });
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
 import CourseLookupModal from "@/components/v2/courses/CourseLookupModal";
+import { GameRulesInfoButton } from "@/components/v2/games/GameRulesModal";
 import styles from "@/app/new/new.module.css";
 import { formatCourseName } from "@/lib/v2/course-display";
 import { formatStake, parseStake } from "@/lib/v2/rounds/stake";
@@ -180,6 +181,7 @@ interface GameDraft {
   type: "skins" | "chairman" | "nassau" | "sixes" | "vegas" | "wolf";
   isNet: boolean;
   carry: boolean; // skins only — roll tied skins forward (default off)
+  tiebreak?: "push" | "second" | "total"; // wolf only — best-ball tie rule (default push)
   value: number | null; // optional $ stake (per skin / bet / segment / point)
   participantKeys: string[]; // Player.key of those in this game
 }
@@ -196,7 +198,7 @@ const GAME_DESC: Record<GameDraft["type"], string> = {
 // Fixed roster size for team/head-to-head games (skins and chairman take any 2+).
 const GAME_EXACT: Partial<Record<GameDraft["type"], number>> = { nassau: 2, sixes: 4, vegas: 4, wolf: 4 };
 // Sensible default stakes, pre-filled and editable. Vegas is per point (small).
-const GAME_DEFAULT_VALUE: Record<GameDraft["type"], number> = { skins: 2, chairman: 5, nassau: 5, sixes: 5, vegas: 0.1, wolf: 5 };
+const GAME_DEFAULT_VALUE: Record<GameDraft["type"], number> = { skins: 2, chairman: 5, nassau: 5, sixes: 5, vegas: 0.1, wolf: 1 };
 
 // Nassau is 1-on-1, so a pair is identified regardless of order.
 const pairKey = (a: string, b: string) => [a, b].sort().join("|");
@@ -430,6 +432,7 @@ export default function RoundForm({
               is_net: g.isNet,
               value: g.value && g.value > 0 ? g.value : null,
               carry: g.type === "skins" ? g.carry : undefined,
+              tiebreak: g.type === "wolf" ? g.tiebreak ?? "push" : undefined,
               participants: g.participantKeys.map((k) => players.findIndex((p) => p.key === k)).filter((i) => i >= 0),
             })),
         }),
@@ -482,6 +485,7 @@ export default function RoundForm({
               is_net: g.isNet,
               value: g.value && g.value > 0 ? g.value : null,
               carry: g.type === "skins" ? g.carry : undefined,
+              tiebreak: g.type === "wolf" ? g.tiebreak ?? "push" : undefined,
               participants: g.participantKeys.map((k) => players.findIndex((p) => p.key === k)).filter((i) => i >= 0),
             })),
         }),
@@ -907,7 +911,7 @@ export default function RoundForm({
               <button
                 type="button"
                 className={styles.createBtnGhost}
-                onClick={() => setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "wolf", isNet: true, carry: false, value: GAME_DEFAULT_VALUE.wolf, participantKeys: players.slice(0, 4).map((p) => p.key) }])}
+                onClick={() => setGames((gs) => [...gs, { key: crypto.randomUUID(), type: "wolf", isNet: true, carry: false, tiebreak: "push", value: GAME_DEFAULT_VALUE.wolf, participantKeys: players.slice(0, 4).map((p) => p.key) }])}
               >
                 + Wolf
               </button>
@@ -924,6 +928,7 @@ export default function RoundForm({
                 <span className={styles.gameCardTitle}>
                   {GAME_LABEL[g.type]}
                   {GAME_EXACT[g.type] && <span className={styles.optional}> (pick {GAME_EXACT[g.type]})</span>}
+                  <GameRulesInfoButton gameType={g.type} />
                 </span>
                 <button type="button" className={styles.wizBackLink} onClick={() => setGames((gs) => gs.filter((x) => x.key !== g.key))}>
                   Remove
@@ -945,6 +950,19 @@ export default function RoundForm({
                   </button>
                   <button type="button" className={styles.wizSegOption} data-on={g.carry || undefined} onClick={() => setGames((gs) => gs.map((x) => (x.key === g.key ? { ...x, carry: true } : x)))}>
                     Carry over
+                  </button>
+                </div>
+              )}
+              {g.type === "wolf" && (
+                <div className={styles.wizSegToggle} role="group" aria-label="Wolf tiebreak">
+                  <button type="button" className={styles.wizSegOption} data-on={(g.tiebreak ?? "push") === "push" || undefined} onClick={() => setGames((gs) => gs.map((x) => (x.key === g.key ? { ...x, tiebreak: "push" } : x)))}>
+                    Tie pushes
+                  </button>
+                  <button type="button" className={styles.wizSegOption} data-on={g.tiebreak === "second" || undefined} onClick={() => setGames((gs) => gs.map((x) => (x.key === g.key ? { ...x, tiebreak: "second" } : x)))}>
+                    Other ball
+                  </button>
+                  <button type="button" className={styles.wizSegOption} data-on={g.tiebreak === "total" || undefined} onClick={() => setGames((gs) => gs.map((x) => (x.key === g.key ? { ...x, tiebreak: "total" } : x)))}>
+                    Total
                   </button>
                 </div>
               )}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import styles from "./score.module.css";
 import type { RoundGame } from "./SideGameStandings";
+import { GameRulesInfoButton } from "@/components/v2/games/GameRulesModal";
 import { formatStake, parseStake } from "@/lib/v2/rounds/stake";
 
 /**
@@ -40,6 +41,7 @@ export default function GameSettingsModal({
   const stakeUnit = isNassau ? "bet" : isSixes ? "segment" : isVegas || isWolf ? "pt" : isChairman ? "point" : "skin";
   const [isNet, setIsNet] = useState(game.is_net);
   const [carry, setCarry] = useState(game.carry === true);
+  const [tiebreak, setTiebreak] = useState<"push" | "second" | "total">(game.tiebreak ?? "push");
   const [value, setValue] = useState<number | null>(game.value);
   const [valueStr, setValueStr] = useState(formatStake(game.value));
   const [selected, setSelected] = useState<string[]>(game.participant_ids);
@@ -76,7 +78,7 @@ export default function GameSettingsModal({
       const res = await fetch(`/api/v2/rounds/${roundId}/games/${game.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_net: isNet, value: value && value > 0 ? value : null, carry: isSkins ? carry : undefined, participant_ids: selected }),
+        body: JSON.stringify({ is_net: isNet, value: value && value > 0 ? value : null, carry: isSkins ? carry : undefined, tiebreak: isWolf ? tiebreak : undefined, participant_ids: selected }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -114,7 +116,9 @@ export default function GameSettingsModal({
     <div className={styles.gsOverlay} style={{ ["--brand" as string]: brandColor }} onClick={onClose}>
       <div className={styles.gsModal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.gsHead}>
-          <span className={styles.gsTitle}>{gameName} settings</span>
+          <span className={styles.gsTitle}>
+            {gameName} settings <GameRulesInfoButton gameType={game.game_type} />
+          </span>
           <button type="button" className={styles.gsClose} onClick={onClose} aria-label="Close">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
           </button>
@@ -132,6 +136,17 @@ export default function GameSettingsModal({
             <div className={styles.gsSeg} role="group" aria-label="Skins carryover">
               <button type="button" className={styles.gsSegOption} data-on={!carry || undefined} onClick={() => setCarry(false)}>No carry</button>
               <button type="button" className={styles.gsSegOption} data-on={carry || undefined} onClick={() => setCarry(true)}>Carry over</button>
+            </div>
+          </>
+        )}
+
+        {isWolf && (
+          <>
+            <label className={styles.gsLabel}>Tied best ball</label>
+            <div className={styles.gsSeg} role="group" aria-label="Wolf tiebreak">
+              <button type="button" className={styles.gsSegOption} data-on={tiebreak === "push" || undefined} onClick={() => setTiebreak("push")}>Push</button>
+              <button type="button" className={styles.gsSegOption} data-on={tiebreak === "second" || undefined} onClick={() => setTiebreak("second")}>Other ball</button>
+              <button type="button" className={styles.gsSegOption} data-on={tiebreak === "total" || undefined} onClick={() => setTiebreak("total")}>Total</button>
             </div>
           </>
         )}

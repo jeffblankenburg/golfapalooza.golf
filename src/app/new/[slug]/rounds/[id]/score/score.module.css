@@ -1027,6 +1027,31 @@
   background: color-mix(in srgb, var(--brand) 14%, transparent);
   color: var(--brand);
 }
+/* Game-type picker: too many games for a single segmented row, so lay them out as
+   a wrapping grid of chips (two rows of three) with breathing room. */
+.gsGameGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.gsGameOption {
+  padding: 9px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gsGameOption[data-on] {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+  color: var(--brand);
+}
 .gsStake {
   display: inline-flex;
   align-items: center;

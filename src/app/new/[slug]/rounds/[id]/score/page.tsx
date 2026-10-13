@@ -99,6 +99,7 @@ export default async function ScorePage({ params }: { params: Promise<{ slug: st
     value: typeof g.config?.value === "number" ? g.config.value : null,
     carry: g.config?.carry === true,
     decisions: g.config?.decisions ?? {},
+    tiebreak: g.config?.tiebreak ?? "push",
   }));
 
   // Each player's handicap strokes ("pops") per hole, played off the low. Computed

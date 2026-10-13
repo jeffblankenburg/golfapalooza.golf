@@ -5,11 +5,12 @@ import { createPortal } from "react-dom";
 import styles from "./score.module.css";
 import { computeSkins } from "@/lib/v2/rounds/skins";
 import { computeChairman } from "@/lib/v2/rounds/chairman";
-import { computeWolf, type WolfDecision } from "@/lib/v2/rounds/wolf";
+import { computeWolf, type WolfDecision, type WolfTiebreak } from "@/lib/v2/rounds/wolf";
 import { computeNassau } from "@/lib/v2/rounds/nassau";
 import { computeSixSixSix, sixesNetUnits } from "@/lib/v2/rounds/sixes";
 import { computeVegas, vegasNet, type VegasHole } from "@/lib/v2/rounds/vegas";
 import { settleUp } from "@/lib/v2/rounds/settle";
+import { GameRulesInfoButton } from "@/components/v2/games/GameRulesModal";
 import GameSettingsModal from "./GameSettingsModal";
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
@@ -22,6 +23,7 @@ export interface RoundGame {
   value: number | null; // optional $ stake per skin / per bet
   carry?: boolean; // skins only — roll tied skins to the next hole (default off)
   decisions?: Record<string, { partner?: string; lone?: boolean }>; // wolf only — per-hole Wolf pick
+  tiebreak?: WolfTiebreak; // wolf only — best-ball tie rule (default "push")
 }
 
 const money = (n: number) => `$${n % 1 === 0 ? n : n.toFixed(2)}`;
@@ -156,6 +158,7 @@ export default function SideGameStandings({
           <div key={g.id} className={styles.sideGame}>
             <div className={styles.sideGameHead}>
               <span className={styles.sideGameTitle}>
+                <GameRulesInfoButton gameType={g.game_type} />
                 Skins{g.is_net ? " (Net)" : ""}
                 {g.value ? <span className={styles.sideGameStake}> {money(g.value)}/skin</span> : null}
               </span>
@@ -207,6 +210,7 @@ export default function SideGameStandings({
           <div key={g.id} className={styles.sideGame}>
             <div className={styles.sideGameHead}>
               <span className={styles.sideGameTitle}>
+                <GameRulesInfoButton gameType={g.game_type} />
                 Chairman{g.is_net ? " (Net)" : ""}
                 {g.value ? <span className={styles.sideGameStake}> {money(g.value)}/pt</span> : null}
               </span>
@@ -246,7 +250,7 @@ export default function SideGameStandings({
 
       {wolf.map((g) => {
         const scores = g.is_net ? netScores() : gross;
-        const r = computeWolf(holeNumbers, scores, g.participant_ids, wolfDecisions(g), holeNumbers.length === 18);
+        const r = computeWolf(holeNumbers, scores, g.participant_ids, wolfDecisions(g), holeNumbers.length === 18, g.tiebreak ?? "push");
         // Wolf points are already zero-sum per player (winners +, losers −), so the
         // dollar net is simply points × stake (no cross-table normalization needed).
         const standings = g.participant_ids
@@ -260,6 +264,7 @@ export default function SideGameStandings({
           <div key={g.id} className={styles.sideGame}>
             <div className={styles.sideGameHead}>
               <span className={styles.sideGameTitle}>
+                <GameRulesInfoButton gameType={g.game_type} />
                 Wolf{g.is_net ? " (Net)" : ""}
                 {g.value ? <span className={styles.sideGameStake}> {money(g.value)}/pt</span> : null}
               </span>
@@ -328,6 +333,7 @@ export default function SideGameStandings({
           <div key={g.id} className={styles.sideGame}>
             <div className={styles.sideGameHead}>
               <span className={styles.sideGameTitle}>
+                <GameRulesInfoButton gameType={g.game_type} />
                 {firstName(playerNames[a] || "A")} v {firstName(playerNames[b] || "B")}
                 <span className={styles.sideGameStake}> ({g.is_net ? "Net" : "Raw"})</span>
               </span>
@@ -392,6 +398,7 @@ export default function SideGameStandings({
           <div key={g.id} className={styles.sideGame}>
             <div className={styles.sideGameHead}>
               <span className={styles.sideGameTitle}>
+                <GameRulesInfoButton gameType={g.game_type} />
                 6-6-6
                 <span className={styles.sideGameStake}> ({g.is_net ? "Net" : "Raw"})</span>
               </span>
@@ -457,6 +464,7 @@ export default function SideGameStandings({
           <div key={g.id} className={styles.sideGame}>
             <div className={styles.sideGameHead}>
               <span className={styles.sideGameTitle}>
+                <GameRulesInfoButton gameType={g.game_type} />
                 Vegas
                 <span className={styles.sideGameStake}> ({g.is_net ? "Net" : "Raw"})</span>
               </span>

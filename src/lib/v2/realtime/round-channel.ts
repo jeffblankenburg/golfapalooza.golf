@@ -32,12 +32,23 @@ export type RoundRow = {
   status: string;
 };
 
+export type GameRow = {
+  id: string;
+  round_id: string;
+  game_type: string;
+  is_net: boolean;
+  participant_ids: string[];
+  config: { value?: number; carry?: boolean; tiebreak?: string; decisions?: Record<string, { partner?: string; lone?: boolean }> } | null;
+};
+
 type ChangeKind = "INSERT" | "UPDATE" | "DELETE";
 
 export interface RoundChannelHandlers {
   onScoreChange?: (event: { kind: ChangeKind; row: ScoreRow | null; old: ScoreRow | null }) => void;
   onRosterChange?: (event: { kind: ChangeKind; row: RoundPlayerRow | null; old: RoundPlayerRow | null }) => void;
   onRoundChange?: (event: { kind: ChangeKind; row: RoundRow | null; old: RoundRow | null }) => void;
+  // Side-game create/edit/delete (incl. Wolf per-hole picks in config.decisions).
+  onGameChange?: (event: { kind: ChangeKind; row: GameRow | null; old: GameRow | null }) => void;
   onStatusChange?: (status: "SUBSCRIBED" | "CHANNEL_ERROR" | "CLOSED" | "TIMED_OUT") => void;
 }
 
@@ -89,6 +100,20 @@ export function subscribeToV2Round(
           kind: payload.eventType as ChangeKind,
           row: (payload.new as RoundRow) ?? null,
           old: (payload.old as RoundRow) ?? null,
+        });
+      },
+    );
+  }
+
+  if (handlers.onGameChange) {
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "v2_round_games", filter: `round_id=eq.${roundId}` },
+      (payload) => {
+        handlers.onGameChange!({
+          kind: payload.eventType as ChangeKind,
+          row: (payload.new as GameRow) ?? null,
+          old: (payload.old as GameRow) ?? null,
         });
       },
     );

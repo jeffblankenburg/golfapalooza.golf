@@ -1,0 +1,533 @@
+.page {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 14px 16px calc(24px + var(--mini-h, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.title {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.sub {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft, #59635b);
+}
+.add {
+  align-self: flex-start;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px dashed var(--line-strong, rgba(23, 33, 29, 0.22));
+  background: transparent;
+  color: var(--brand, #0a5c36);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+/* Edit/create happens in a modal so the list behind reads as "the pool", not a
+   duplicate. z-50 keeps it below the admin top bar (z-60), per the nav rule. */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 16px;
+}
+.modal {
+  width: 100%;
+  max-width: 440px;
+  max-height: min(90vh, 760px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--card, #fff);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+.formHead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 10px;
+}
+.modalBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* plain block flow (not flex) so children never shrink + clip; they just stack
+     and the body scrolls */
+  padding: 2px 16px 14px;
+}
+/* Sticky footer so Save is always visible no matter how long the form gets. */
+.modalFooter {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  background: var(--card, #fff);
+}
+.footerRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.footerRow .create {
+  flex: 1;
+  margin-top: 0;
+}
+.delInline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Collapsible sections to tame the form height. flex: none so they keep their
+   full content height and the modal BODY scrolls — otherwise flex-shrink lets
+   them collapse and overflow:hidden clips the content. */
+.section {
+  margin-bottom: 8px;
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  border-radius: 12px;
+  overflow: hidden;
+}
+.sectionHead {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 12px;
+  border: none;
+  background: var(--paper, #f6f6f1);
+  text-align: left;
+  cursor: pointer;
+}
+.sectionTitle {
+  flex: none;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.sectionSummary {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.76rem;
+  color: var(--ink-soft, #59635b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+.sectionSpacer {
+  flex: 1;
+}
+.chev {
+  flex: none;
+  color: var(--ink-soft, #59635b);
+  transition: transform 0.15s ease;
+}
+.chev[data-open] {
+  transform: rotate(180deg);
+}
+.sectionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+}
+.formTitle {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.cancel {
+  background: none;
+  border: none;
+  color: var(--ink-soft, #59635b);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft, #59635b);
+  margin-top: 4px;
+}
+.input {
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  border-radius: 10px;
+  background: var(--card, #fff);
+  color: var(--ink, #17211c);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.cost {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink, #17211c);
+}
+.cost input {
+  width: 80px;
+  padding: 9px 10px;
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink, #17211c);
+  background: var(--card, #fff);
+}
+.costNote {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-soft, #59635b);
+}
+.selGames {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.selEmpty {
+  font-size: 0.82rem;
+  color: var(--ink-soft, #59635b);
+}
+.selGame {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  border-radius: 10px;
+  background: var(--paper, #f6f6f1);
+}
+.selTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.selValue {
+  flex: none;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--brand, #0a5c36);
+}
+.selPays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.selPay {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-soft, #59635b);
+}
+.selPay b {
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.selMatch {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.selLeague {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--ink-soft, #59635b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.selRemove {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft, #59635b);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.addGame {
+  align-self: flex-start;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px dashed var(--line-strong, rgba(23, 33, 29, 0.22));
+  background: transparent;
+  color: var(--brand, #0a5c36);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.periodBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.caps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.capField {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.capRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.capName {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink, #17211c);
+}
+.capInput {
+  width: 70px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-align: center;
+  color: var(--ink, #17211c);
+  background: var(--card, #fff);
+}
+.capHint {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--ink-soft, #59635b);
+}
+.periodApplies {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-soft, #59635b);
+  margin-top: -2px;
+}
+.periodGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
+  gap: 8px;
+}
+.periodCell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  padding: 8px 6px;
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  border-radius: 10px;
+  background: var(--paper, #f6f6f1);
+}
+.periodName {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--ink-soft, #59635b);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.periodPct {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.periodPct input {
+  width: 38px;
+  padding: 4px 2px;
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  border-radius: 7px;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+  background: var(--card, #fff);
+}
+.periodSum {
+  align-self: flex-end;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #b45309;
+}
+.periodSum[data-ok] {
+  color: var(--brand, #0a5c36);
+}
+
+.seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  border-radius: 10px;
+  overflow: hidden;
+}
+.seg button {
+  padding: 8px 12px;
+  border: none;
+  background: var(--card, #fff);
+  color: var(--ink-soft, #59635b);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.seg button[data-on] {
+  background: color-mix(in srgb, var(--brand, #0a5c36) 14%, transparent);
+  color: var(--brand, #0a5c36);
+}
+.create {
+  margin-top: 6px;
+  padding: 11px;
+  border-radius: 10px;
+  border: none;
+  background: var(--brand, #0a5c36);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.create:disabled {
+  opacity: 0.6;
+}
+.err {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.empty {
+  font-size: 0.85rem;
+  color: var(--ink-soft, #59635b);
+}
+.rowWrap {
+  position: relative;
+}
+.row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 12px 48px 12px 14px;
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  border-radius: 12px;
+  background: var(--card, #fff);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.row:hover {
+  border-color: var(--brand, #0a5c36);
+}
+/* Gear floats over the card's top-right; the rest of the card is the detail link. */
+.rowGear {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft, #59635b);
+  cursor: pointer;
+}
+.rowGear:hover {
+  background: color-mix(in srgb, var(--ink, #17211c) 6%, transparent);
+  color: var(--ink, #17211c);
+}
+
+/* Delete gets its own destructive button + a two-step confirm (no native dialog). */
+.deleteRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+}
+.delBtn {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, #b91c1c 45%, var(--line, rgba(23, 33, 29, 0.12)));
+  background: transparent;
+  color: #b91c1c;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.delAsk {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink, #17211c);
+}
+.delConfirm {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  background: #b91c1c;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.rowName {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.rowMeta {
+  font-size: 0.78rem;
+  color: var(--ink-soft, #59635b);
+}
+.rowGames {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 4px;
+}
+.rowGame {
+  font-size: 0.78rem;
+  color: var(--ink-soft, #59635b);
+}
+.rowGame b {
+  font-weight: 800;
+  color: var(--brand, #0a5c36);
+}

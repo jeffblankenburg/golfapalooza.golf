@@ -11,7 +11,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const CONTEST_TYPES = [
   "scramble", "skins", "ctp", "long_drive", "long_putt",
-  "bspitw", "hundred_feet", "ryder_cup", "calcutta", "cornhole", "pickem", "other",
+  "bspitw", "hundred_feet", "ryder_cup", "calcutta", "cornhole", "pickem", "boxes", "other",
 ] as const;
 export type ContestType = (typeof CONTEST_TYPES)[number];
 
@@ -21,7 +21,7 @@ export const CONTEST_SELECT =
 export interface Contest {
   id: string;
   org_id: string;
-  event_id: string;
+  event_id: string | null; // NULL = group-scoped (event-independent, all members)
   parent_contest_id: string | null;
   contest_type: ContestType;
   name: string;
@@ -49,7 +49,7 @@ const TYPE_LABEL: Record<string, string> = {
   scramble: "Scramble", skins: "Skins", ctp: "Closest to the Pin",
   long_drive: "Long Drive", long_putt: "Long Putt", bspitw: "BSPITW",
   hundred_feet: "100 Feet!", ryder_cup: "Ryder Cup", calcutta: "Calcutta",
-  cornhole: "Cornhole", pickem: "Pick'em", other: "Contest",
+  cornhole: "Cornhole", pickem: "Pick'em", boxes: "Boxes", other: "Contest",
 };
 
 /** Human label for a contest type (e.g. "Scramble", "Closest to the Pin"). */

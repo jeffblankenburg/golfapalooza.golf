@@ -1,0 +1,244 @@
+.sim {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.sub {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ink-soft, #59635b);
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.league {
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  border-radius: 10px;
+  background: var(--card, #fff);
+  color: var(--ink, #17211c);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn,
+.btnGhost {
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  background: var(--card, #fff);
+  color: var(--ink, #17211c);
+}
+.btnGhost {
+  border-style: dashed;
+  color: var(--ink-soft, #59635b);
+}
+.pot,
+.lbl {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink-soft, #59635b);
+}
+.pot input,
+.lbl input {
+  width: 72px;
+  padding: 7px 8px;
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink, #17211c);
+  background: var(--card, #fff);
+}
+.lbl input {
+  width: 90px;
+}
+.hint {
+  font-size: 0.74rem;
+  color: var(--ink-soft, #59635b);
+}
+
+/* Live score board */
+.scoreBoard {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.scoreCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  border-radius: 12px;
+  background: var(--card, #fff);
+}
+.scoreLabel {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.scoreCtrl {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.scoreCtrl button {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  background: var(--paper, #f6f6f1);
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+  cursor: pointer;
+}
+.scoreNum {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+  min-width: 42px;
+  text-align: center;
+}
+.quick {
+  display: inline-flex;
+  gap: 4px;
+}
+.quick button {
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  background: var(--paper, #f6f6f1);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--ink-soft, #59635b);
+  cursor: pointer;
+}
+.live {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--ink, #17211c);
+  text-align: center;
+}
+
+/* Periods + payouts */
+.periods {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.period {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 11px;
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  border-radius: 10px;
+  background: var(--paper, #f6f6f1);
+}
+.period[data-final] {
+  border-color: var(--brand, #0a5c36);
+  background: color-mix(in srgb, var(--brand, #0a5c36) 6%, var(--paper, #f6f6f1));
+}
+.pLabel {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.pWeight {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--ink-soft, #59635b);
+}
+.pPay {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--brand, #0a5c36);
+}
+.pWin {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink, #17211c);
+  min-width: 0;
+  overflow: hidden;
+}
+.pTag,
+.pTagLive {
+  flex: none;
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.pTag {
+  color: var(--brand, #0a5c36);
+  background: color-mix(in srgb, var(--brand, #0a5c36) 14%, transparent);
+}
+.pTagLive {
+  color: var(--ink-soft, #59635b);
+  background: color-mix(in srgb, var(--ink, #17211c) 8%, transparent);
+}
+.pBtn,
+.pBtnGhost {
+  flex: none;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pBtn {
+  border: none;
+  background: var(--brand, #0a5c36);
+  color: #fff;
+}
+.pBtn:disabled {
+  opacity: 0.5;
+}
+.pBtnGhost {
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  background: transparent;
+  color: var(--ink-soft, #59635b);
+}
+.reset {
+  align-self: flex-start;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  background: transparent;
+  color: var(--ink-soft, #59635b);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}

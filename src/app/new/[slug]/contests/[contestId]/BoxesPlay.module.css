@@ -1,0 +1,78 @@
+.page {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 16px 16px calc(28px + var(--nav-h, 0px) + var(--mini-h, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.title {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft, #59635b);
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px;
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  border-radius: 12px;
+  background: var(--card, #fff);
+}
+.statNum {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.statLabel {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft, #59635b);
+}
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tab {
+  padding: 7px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  background: var(--paper, #f6f6f1);
+  color: var(--ink-soft, #59635b);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.tab[data-on] {
+  border-color: var(--brand, #0a5c36);
+  background: color-mix(in srgb, var(--brand, #0a5c36) 12%, transparent);
+  color: var(--brand, #0a5c36);
+}
+.err {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #b91c1c;
+}
+.help {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--ink-soft, #59635b);
+  text-align: center;
+}

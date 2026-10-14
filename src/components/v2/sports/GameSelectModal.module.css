@@ -1,0 +1,62 @@
+/* Stacks above the edit modal (z-50), below the admin top bar (z-60). */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 16px;
+}
+.modal {
+  width: 100%;
+  max-width: 440px;
+  max-height: min(90vh, 760px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--card, #fff);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.close {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft, #59635b);
+  cursor: pointer;
+}
+.hint {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--ink-soft, #59635b);
+}
+.done {
+  margin-top: 4px;
+  padding: 11px;
+  border-radius: 10px;
+  border: none;
+  background: var(--brand, #0a5c36);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+}

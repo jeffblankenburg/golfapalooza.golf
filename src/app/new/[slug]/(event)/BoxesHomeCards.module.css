@@ -1,0 +1,91 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.draftCard,
+.gameCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  border-radius: 14px;
+  background: var(--card, #fff);
+  text-decoration: none;
+}
+.draftTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.name {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.badge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: var(--brand, #0a5c36);
+  padding: 2px 9px;
+  border-radius: 999px;
+}
+.draftStats {
+  display: flex;
+  gap: 18px;
+  font-size: 0.85rem;
+  color: var(--ink-soft, #59635b);
+}
+.draftStats strong {
+  color: var(--ink, #17211c);
+  font-weight: 800;
+}
+.matchup {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.logo {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+.logoFallback {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+}
+.abbrev {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.at {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-soft, #59635b);
+  margin: 0 2px;
+}
+.combos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.combo {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--ink-soft, #59635b);
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--paper, #f6f6f1);
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+}
+.combo b {
+  color: var(--brand, #0a5c36);
+  font-weight: 800;
+}

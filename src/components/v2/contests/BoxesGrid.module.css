@@ -1,0 +1,120 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.colTeam {
+  margin-left: 26px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink, #17211c);
+}
+.body {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+}
+.rowTeam {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rowTeam span {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink, #17211c);
+}
+.grid {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 22px repeat(10, 1fr);
+  gap: 2px;
+}
+.corner {
+  aspect-ratio: 1;
+}
+.head {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--ink-soft, #59635b);
+}
+.cell {
+  position: relative;
+  aspect-ratio: 1;
+  min-width: 0;
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  border-radius: 4px;
+  background: var(--paper, #f6f6f1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
+  cursor: default;
+}
+.cell[data-empty] {
+  background: color-mix(in srgb, var(--ink, #17211c) 3%, var(--paper, #f6f6f1));
+}
+/* The viewer's own squares, so they can spot them at a glance while the board fills. */
+.cell[data-mine] {
+  background: color-mix(in srgb, var(--brand, #0a5c36) 18%, var(--paper, #f6f6f1));
+  border-color: var(--brand, #0a5c36);
+}
+.cell[data-mine] .owner {
+  color: var(--brand, #0a5c36);
+}
+.owner {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+  line-height: 1;
+}
+/* Locked period winner: filled + a tiny period badge in the corner. */
+.cell[data-won] {
+  background: color-mix(in srgb, var(--brand, #0a5c36) 24%, var(--paper, #f6f6f1));
+  border-color: var(--brand, #0a5c36);
+}
+.cell[data-won] .owner {
+  color: var(--brand, #0a5c36);
+}
+.badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-size: 0.45rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 1px 2px;
+  color: #fff;
+  background: var(--brand, #0a5c36);
+  border-bottom-left-radius: 3px;
+  letter-spacing: -0.02em;
+}
+/* Live currently-winning square: a moving ring that pulses. */
+.cell[data-cur] {
+  box-shadow: inset 0 0 0 2px var(--brand, #0a5c36);
+  animation: boxesPulse 1.1s ease-in-out infinite;
+}
+@keyframes boxesPulse {
+  0%, 100% { box-shadow: inset 0 0 0 2px var(--brand, #0a5c36); }
+  50% { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--brand, #0a5c36) 40%, transparent); }
+}
+/* Clickable mode (buying / assigning owners in the simulator). */
+.cell:not(:disabled) {
+  cursor: pointer;
+}
+.cell:not(:disabled):hover {
+  border-color: var(--brand, #0a5c36);
+}

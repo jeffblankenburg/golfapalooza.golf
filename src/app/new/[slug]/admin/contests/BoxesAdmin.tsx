@@ -22,6 +22,7 @@ export interface StoredGame {
   label: string | null;
   teamRow: TeamRef;
   teamCol: TeamRef;
+  startTime: string | null;
 }
 
 export interface BoxesContestRow {
@@ -73,7 +74,7 @@ function toEspnGame(g: StoredGame): EspnGame {
     espnEventId: g.espnEventId,
     league: g.league,
     shortName: g.label ?? `${g.teamRow?.abbrev ?? "?"} @ ${g.teamCol?.abbrev ?? "?"}`,
-    startTime: "",
+    startTime: g.startTime ?? "",
     state: "pre",
     statusDetail: "",
     tv: null,
@@ -222,6 +223,7 @@ export default function BoxesAdmin({ orgId, slug, contests }: { orgId: string; s
         // Board convention: HOME on top (columns), AWAY on the left (rows).
         teamRow: teamRef(g.away),
         teamCol: teamRef(g.home),
+        startTime: g.startTime || null,
       })),
     };
     try {

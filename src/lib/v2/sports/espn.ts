@@ -104,6 +104,8 @@ export interface SideScore {
   abbrev: string;
   /** Cumulative score through each period that is COMPLETE (null while in play). */
   cum: (number | null)[];
+  /** Current running score at this instant (mid-period included); null pre-game. */
+  current: number | null;
   total: number | null; // final score, set only when the game is over
 }
 export interface GameScore {
@@ -148,7 +150,8 @@ export async function fetchGameScore(leagueKey: string, eventId: string): Promis
       cum.push(complete ? run : null);
     }
     const total = state === "post" ? Number(c.score ?? run) : null;
-    return { abbrev: c.team?.abbreviation ?? "", cum, total };
+    const current = c.score != null && c.score !== "" ? Number(c.score) : state === "pre" ? null : run;
+    return { abbrev: c.team?.abbreviation ?? "", cum, current, total };
   };
 
   return { state, detail, away: side("away"), home: side("home") };

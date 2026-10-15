@@ -24,8 +24,9 @@ export default async function BoxesDetailPage({ params }: { params: Promise<{ sl
 
   const { data: gameRows } = await supabase
     .from("v2_boxes_games")
-    .select("id, espn_event_id, league, label, team_row, team_col, row_digits, col_digits, locked_at, sort_order")
+    .select("id, espn_event_id, league, label, team_row, team_col, row_digits, col_digits, locked_at, period_scores, start_time, sort_order")
     .eq("contest_id", contestId)
+    .order("start_time", { ascending: true, nullsFirst: false })
     .order("sort_order");
 
   const { data: cells } = await supabase
@@ -74,9 +75,14 @@ export default async function BoxesDetailPage({ params }: { params: Promise<{ sl
     if (!g.locked_at) continue;
     const structure = getLeague(g.league as string)?.periods;
     if (structure !== "quarters" && structure !== "halves") continue;
-    const score = g.espn_event_id ? await fetchGameScore(g.league as string, g.espn_event_id as string) : null;
-    if (!score) continue;
-    const ps = periodScoresFromGame(score, structure);
+    // Prefer the scores the cron cached; fall back to a live fetch if it hasn't
+    // run for this game yet (e.g. just locked).
+    let ps = (g.period_scores as Record<string, { away: number | null; home: number | null } | null> | null) ?? null;
+    if (!ps && g.espn_event_id) {
+      const score = await fetchGameScore(g.league as string, g.espn_event_id as string);
+      if (score) ps = periodScoresFromGame(score, structure);
+    }
+    if (!ps) continue;
     if (Object.values(ps).some((v) => v)) anyScored = true;
     const payout = computeGamePayouts(
       { owners: ownerById, rowDigits: (g.row_digits as number[]) ?? [], colDigits: (g.col_digits as number[]) ?? [] },

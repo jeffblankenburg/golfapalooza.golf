@@ -3,6 +3,7 @@
 import { Fragment } from "react";
 import styles from "./BoxesGrid.module.css";
 import { type BoxesGridState, type Cell, cellKey } from "@/lib/v2/contests/boxes";
+/* eslint-disable @next/next/no-img-element */
 
 export interface AxisTeam {
   label: string;
@@ -31,6 +32,8 @@ export default function BoxesGrid({
   currentWinner,
   periodWinners = [],
   mine,
+  avatars,
+  bare = false,
   onCellClick,
 }: {
   grid: BoxesGridState;
@@ -39,6 +42,8 @@ export default function BoxesGrid({
   currentWinner?: Cell | null;
   periodWinners?: { cell: Cell; label: string }[];
   mine?: Set<string>; // cellKeys owned by the viewer — highlighted distinctly
+  avatars?: Record<string, string | null>; // cellKey → owner avatar url
+  bare?: boolean; // team-agnostic board (drafting): no axes/digits, bigger cells
   onCellClick?: (row: number, col: number) => void;
 }) {
   const wonLabels = new Map<string, string>();
@@ -48,6 +53,41 @@ export default function BoxesGrid({
   }
   const curKey = currentWinner ? cellKey(currentWinner.row, currentWinner.col) : null;
   const drawn = grid.rowDigits.length === 10 && grid.colDigits.length === 10;
+
+  const renderCell = (r: number, c: number) => {
+    const k = cellKey(r, c);
+    const owner = grid.owners[k];
+    const won = wonLabels.get(k);
+    const avatar = avatars?.[k] ?? null;
+    return (
+      <button
+        key={k}
+        type="button"
+        className={styles.cell}
+        data-cur={curKey === k || undefined}
+        data-won={won ? true : undefined}
+        data-mine={mine?.has(k) || undefined}
+        data-empty={!owner || undefined}
+        onClick={onCellClick ? () => onCellClick(r, c) : undefined}
+        disabled={!onCellClick}
+        title={owner ?? "open"}
+      >
+        {owner && (avatar ? <img className={styles.avatar} src={avatar} alt={owner} /> : <span className={styles.owner}>{initials(owner)}</span>)}
+        {won && <span className={styles.badge}>{won}</span>}
+      </button>
+    );
+  };
+
+  // Drafting: a team-agnostic board — no axes, no digits, bigger cells.
+  if (bare) {
+    return (
+      <div className={styles.grid} data-bare>
+        {TEN.map((r) => (
+          <Fragment key={`r${r}`}>{TEN.map((c) => renderCell(r, c))}</Fragment>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className={styles.wrap}>
@@ -66,28 +106,7 @@ export default function BoxesGrid({
           {TEN.map((r) => (
             <Fragment key={`r${r}`}>
               <div className={styles.head}>{drawn ? grid.rowDigits[r] : "·"}</div>
-              {TEN.map((c) => {
-                const k = cellKey(r, c);
-                const owner = grid.owners[k];
-                const won = wonLabels.get(k);
-                return (
-                  <button
-                    key={k}
-                    type="button"
-                    className={styles.cell}
-                    data-cur={curKey === k || undefined}
-                    data-won={won ? true : undefined}
-                    data-mine={mine?.has(k) || undefined}
-                    data-empty={!owner || undefined}
-                    onClick={onCellClick ? () => onCellClick(r, c) : undefined}
-                    disabled={!onCellClick}
-                    title={owner ?? "open"}
-                  >
-                    {owner && <span className={styles.owner}>{initials(owner)}</span>}
-                    {won && <span className={styles.badge}>{won}</span>}
-                  </button>
-                );
-              })}
+              {TEN.map((c) => renderCell(r, c))}
             </Fragment>
           ))}
         </div>

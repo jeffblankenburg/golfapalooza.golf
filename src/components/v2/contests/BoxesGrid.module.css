@@ -38,6 +38,11 @@
   grid-template-columns: 22px repeat(10, 1fr);
   gap: 2px;
 }
+/* Drafting board: no header row/col, so the 10 cells spread wider + a bit larger. */
+.grid[data-bare] {
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+}
 .corner {
   aspect-ratio: 1;
 }
@@ -80,6 +85,13 @@
   font-weight: 800;
   color: var(--ink, #17211c);
   line-height: 1;
+}
+.avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 3px;
+  display: block;
 }
 /* Locked period winner: filled + a tiny period badge in the corner. */
 .cell[data-won] {

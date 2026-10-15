@@ -2,6 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  margin-top: 12px;
 }
 .draftCard,
 .gameCard {
@@ -88,4 +89,72 @@
 .combo b {
   color: var(--brand, #0a5c36);
   font-weight: 800;
+}
+
+/* Squares type marker */
+.typeTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft, #59635b);
+}
+.typeTag svg {
+  color: var(--brand, #0a5c36);
+}
+
+/* Locked pool card */
+.poolHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.featGame {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line, rgba(23, 33, 29, 0.1));
+}
+.matchupRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.score {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+  font-variant-numeric: tabular-nums;
+}
+.gState {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--ink-soft, #59635b);
+  white-space: nowrap;
+}
+.gState[data-live] {
+  color: #b91c1c;
+}
+.gState[data-final] {
+  color: var(--ink-soft, #59635b);
+}
+.combo[data-win] {
+  color: #fff;
+  background: var(--brand, #0a5c36);
+  border-color: var(--brand, #0a5c36);
+}
+.combo[data-win] b {
+  color: #fff;
+}
+.more {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--brand, #0a5c36);
 }

@@ -22,8 +22,9 @@ export default async function BoxesPlayPage({ params }: { params: Promise<{ slug
 
   const { data: gameRows } = await supabase
     .from("v2_boxes_games")
-    .select("id, label, team_row, team_col, row_digits, col_digits, locked_at, sort_order")
+    .select("id, label, team_row, team_col, row_digits, col_digits, locked_at, start_time, live_score, period_scores, status, sort_order")
     .eq("contest_id", contestId)
+    .order("start_time", { ascending: true, nullsFirst: false })
     .order("sort_order");
 
   const { data: cells } = await supabase
@@ -31,21 +32,25 @@ export default async function BoxesPlayPage({ params }: { params: Promise<{ slug
     .select("grid_row, grid_col, user_id")
     .eq("contest_id", contestId);
 
-  const ownerIds = [...new Set((cells ?? []).map((c) => c.user_id).filter((x): x is string => !!x))];
+  const ownerIds = [...new Set([...(cells ?? []).map((c) => c.user_id).filter((x): x is string => !!x), ctx.userId])];
   const { data: profiles } = ownerIds.length
-    ? await supabase.from("v2_profiles").select("id, display_name").in("id", ownerIds)
-    : { data: [] as { id: string; display_name: string | null }[] };
+    ? await supabase.from("v2_profiles").select("id, display_name, avatar_url").in("id", ownerIds)
+    : { data: [] as { id: string; display_name: string | null; avatar_url: string | null }[] };
   const nameById = new Map((profiles ?? []).map((p) => [p.id, p.display_name || "Member"]));
+  const avatarById = new Map((profiles ?? []).map((p) => [p.id, p.avatar_url ?? null]));
+  const myName = nameById.get(ctx.userId) || "You";
+  const myAvatar = avatarById.get(ctx.userId) ?? null;
 
   const owners: Record<string, string> = {};
+  const avatars: Record<string, string | null> = {};
   const mine: string[] = [];
   for (const c of cells ?? []) {
     if (!c.user_id) continue;
     const k = `${c.grid_row},${c.grid_col}`;
     owners[k] = nameById.get(c.user_id) || "Member";
+    avatars[k] = avatarById.get(c.user_id) ?? null;
     if (c.user_id === ctx.userId) mine.push(k);
   }
-  const claimed = (cells ?? []).filter((c) => c.user_id).length;
 
   const games: PlayGame[] = (gameRows ?? []).map((g) => ({
     id: g.id as string,
@@ -55,6 +60,9 @@ export default async function BoxesPlayPage({ params }: { params: Promise<{ slug
     rowDigits: (g.row_digits as number[]) ?? [],
     colDigits: (g.col_digits as number[]) ?? [],
     locked: !!g.locked_at,
+    startTime: (g.start_time as string) ?? null,
+    live: (g.live_score as PlayGame["live"]) ?? null,
+    periodScores: (g.period_scores as PlayGame["periodScores"]) ?? null,
   }));
 
   const cfg = (contest.config as Record<string, unknown>) ?? {};
@@ -71,8 +79,10 @@ export default async function BoxesPlayPage({ params }: { params: Promise<{ slug
       maxSecondary={(cfg.max_squares_secondary as number | null) ?? null}
       games={games}
       owners={owners}
+      avatars={avatars}
       mine={mine}
-      claimed={claimed}
+      myName={myName}
+      myAvatar={myAvatar}
     />
   );
 }

@@ -15,6 +15,7 @@ export interface BoxesGameInput {
   teamRow: Record<string, unknown>; // { name, abbrev, espn_id, logo, color }
   teamCol: Record<string, unknown>;
   gameWeight?: number;
+  startTime?: string | null; // ESPN kickoff (ISO); gates the scores cron
 }
 
 // Per-period payout split, keyed by game structure ("quarters" | "halves") so a
@@ -72,6 +73,7 @@ export async function createBoxesContest(admin: SupabaseClient, input: CreateBox
       team_row: g.teamRow,
       team_col: g.teamCol,
       game_weight: g.gameWeight ?? 1,
+      start_time: g.startTime || null,
     }));
     const { error: gErr } = await admin.from("v2_boxes_games").insert(gameRows);
     if (gErr) throw new Error(gErr.message);
@@ -147,6 +149,7 @@ export async function updateBoxesContest(admin: SupabaseClient, contestId: strin
         team_row: g.teamRow,
         team_col: g.teamCol,
         game_weight: g.gameWeight ?? 1,
+        start_time: g.startTime || null,
       }));
       const { error: insErr } = await admin.from("v2_boxes_games").insert(rows);
       if (insErr) throw new Error(insErr.message);

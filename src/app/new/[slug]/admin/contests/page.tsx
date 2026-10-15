@@ -28,7 +28,7 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
   const { data: games } = ids.length
     ? await supabase
         .from("v2_boxes_games")
-        .select("contest_id, espn_event_id, league, label, team_row, team_col, sort_order")
+        .select("contest_id, espn_event_id, league, label, team_row, team_col, start_time, sort_order")
         .in("contest_id", ids)
         .order("sort_order")
     : { data: [] as Record<string, unknown>[] };
@@ -63,6 +63,7 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
           label: (g.label as string) ?? null,
           teamRow: (g.team_row as BoxesContestRow["games"][number]["teamRow"]) ?? null,
           teamCol: (g.team_col as BoxesContestRow["games"][number]["teamCol"]) ?? null,
+          startTime: (g.start_time as string) ?? null,
         })),
     };
   });

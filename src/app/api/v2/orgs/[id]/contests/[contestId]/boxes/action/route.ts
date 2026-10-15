@@ -53,9 +53,13 @@ export async function POST(request: Request, { params }: { params: Params }) {
   }
   const action = body.action ?? "";
   const cfg = { ...((contest.config as Record<string, unknown>) ?? {}) };
+  const drawn = cfg.phase === "locked" || cfg.phase === "final" || !!cfg.drawn_at;
 
-  // Simple phase advances.
+  // Simple phase advances. Once numbers are drawn the board is permanent, so a
+  // draft phase (close/reopen/open) can never be re-entered — it would strand a
+  // locked, scored pool back in a pre-draw state (and hide it from the home feed).
   if (action in PHASE_MOVES) {
+    if (drawn) return NextResponse.json({ error: "Numbers are already drawn — the draft can't be reopened." }, { status: 409 });
     cfg.phase = PHASE_MOVES[action];
     const patch: Record<string, unknown> = { config: cfg };
     if (action === "open_primary") patch.status = "active";

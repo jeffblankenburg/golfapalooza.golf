@@ -6,6 +6,13 @@
   flex-direction: column;
   gap: 12px;
 }
+.back {
+  align-self: flex-start;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--ink-soft, #59635b);
+}
 .title {
   margin: 0;
   font-size: 1.4rem;
@@ -75,4 +82,85 @@
   font-size: 0.78rem;
   color: var(--ink-soft, #59635b);
   text-align: center;
+}
+.peek {
+  margin: 0;
+  align-self: center;
+  font-size: 0.82rem;
+  color: var(--ink, #17211c);
+  background: var(--paper, #f6f6f1);
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  border-radius: 999px;
+  padding: 5px 14px;
+}
+.peek strong {
+  color: var(--brand, #0a5c36);
+  font-weight: 800;
+}
+.gameList {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--card, #fff);
+}
+.gameListHead {
+  padding: 9px 13px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft, #59635b);
+  background: var(--paper, #f6f6f1);
+  border-bottom: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+}
+.gameItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 13px;
+}
+.gameItem + .gameItem {
+  border-top: 1px solid var(--line, rgba(23, 33, 29, 0.08));
+}
+.gameTeams {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.gameWhen {
+  font-size: 0.78rem;
+  color: var(--ink-soft, #59635b);
+  white-space: nowrap;
+}
+.scoreLine {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 13px;
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  border-radius: 10px;
+  background: var(--card, #fff);
+}
+.scoreTeam {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ink-soft, #59635b);
+}
+.scoreTeam b {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+  font-variant-numeric: tabular-nums;
+}
+.scoreState {
+  margin-left: auto;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--ink-soft, #59635b);
+}
+.scoreState[data-live] {
+  color: #b91c1c;
 }

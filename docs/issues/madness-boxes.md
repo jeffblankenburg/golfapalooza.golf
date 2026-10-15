@@ -92,3 +92,84 @@ Fun to watch, especially a close finish — and it reuses the pure scoring funct
 - Out of scope v1: reverse/secondary-digit variants.
 
 **Dependencies:** Phase 0b (#231, group-scoped lane) + Phase 2 (ESPN period/linescore grading); uses the group contest lane + lightweight money/ledger; tournament format can lean on Phase 3's field. Does **not** need Phase 1 (no picks/slate). **Difficulty:** Medium (grid + per-cell one-time money + multi-game per-period grading + pot allocation are the new bits; no picks, no bracket scoring, no house).
+
+---
+
+## Scale decision (Oct 2026): hand-pick small, feed for big
+
+Resolved the "17+ or 63 games" question. A pool attaches games in one of two
+modes; the draft, home card, and detail are unchanged by which:
+
+- **manual** (default, ≤ ~16) — admin hand-picks ESPN events. Numbers draw once
+  for all games at lock. This is today's behavior (Super Bowl, a full NFL Sunday).
+- **feed** (big / unknown-until-later) — admin attaches a *league + date range*
+  (e.g. NCAAM, Mar 19–Apr 7) instead of events. A cron ingests games as ESPN
+  publishes them and **auto-appends later-round matchups** as the bracket
+  resolves. Because games materialize over time, each game **draws its own
+  numbers when its matchup is known / about to start** (not one-shot at lock).
+  Pot allocation is **rule-based** (`equal` per game, or `round_weighted`), never
+  63 hand-set period grids.
+
+### Draft vs games (the key reframe)
+The draft owns **grid squares, not games** (`v2_boxes_cells` is independent of
+`v2_boxes_games`). "We don't know who's playing yet" is the *native* shape, not a
+problem — you draft a position on the 10×10, games attach later. The draft page
+shows only the grid, identical for 1 / 17 / 63 games.
+
+### Display (built Oct 2026)
+- **Home: one card per POOL, never per game.** Drafting → yours/gone + a Squares
+  type tag. Locked → features only the game that matters now (live → next →
+  most-recent-final), member's combos, live winning-square highlight from cached
+  `live_score`, and "+N more games" into the detail.
+- **Pool detail** holds volume: Live / Upcoming / Final sections, compact rows
+  (not cards). *(section split still TODO — see below.)*
+
+### Live scoring (built Oct 2026)
+- Migration `00266`: `v2_boxes_games.start_time` (gates the cron to a game's real
+  window) + `live_score` JSONB (current running score, drives the home highlight).
+- `/api/cron/v2-boxes-scores` (every minute, data-gated on phase=locked +
+  not-final + kickoff reached) caches `live_score` + `period_scores` and flips
+  `status`. `fetchGameScore` now returns each side's `current` running score.
+- Payout page prefers cached `period_scores`, falls back to a live fetch.
+
+### Feed mode — remaining build (next phase)
+1. Pool `game_source: 'manual' | 'feed'` + `feed: {league, startDate, endDate, groups?}` in config.
+2. Feed-ingest cron: pull the league+range scoreboard, upsert games, append new matchups.
+3. Per-game draw-on-materialize (feed) vs one-shot-at-lock (manual).
+4. Rule-based pot allocation for feed (`equal` / `round_weighted`), no per-game hand weights.
+5. Detail page Live/Upcoming/Final sections for large N.
+
+> A true 63-game squares pool is unusual — squares is normally one marquee game
+> or a handful (Final Four). Picking tournament *winners* across 63 games is the
+> **bracket contest** (Phase 3), not squares. Feed mode exists so one type covers
+> Super Bowl squares *and* a March Madness squares pool, but the bracket is the
+> right tool for full-tournament outcome contests.
+
+---
+
+## Session handoff (Oct 14–15, 2026) — what's left
+
+### Done this session (ALL UNCOMMITTED — not yet pushed)
+- **Live-score cron** `/api/cron/v2-boxes-scores` (every minute, data-gated on phase=locked + not-final + kickoff reached), registered in `vercel.json`. Caches `live_score` + `period_scores`, flips `status`.
+- **Migration 00266** (`start_time` + `live_score`) — RAN on DB. (00264/00265 also already run.)
+- `espn.ts`: `fetchGameScore` now returns each side's `current` running score.
+- `start_time` threaded through create/edit/admin/list; **existing games backfilled** from ESPN (`scripts/backfill-boxes-start-times.mjs`).
+- **Home card**: one card per POOL (not per game); features live→next→final; "Squares" type tag; live winning-square highlight; top margin.
+- **Payout page**: prefers cached `period_scores`, falls back to live fetch.
+- **Member buying page** (`BoxesPlay`): ← Home back button; **optimistic** claim/release (myKeys is sole authority); **bare drafting grid** (team-agnostic, bigger cells, avatars, tap-another's-square-reveals-name); **games table** below (temporal order, real dates/times).
+- **Temporal ordering** of games everywhere they're listed.
+- **Action-route guard**: draft phase can't be re-entered once drawn (`drawn_at`/locked) — prevents the "stuck in closed, hidden from home" bug. Repaired the one pool that had regressed.
+- **Detail page now shows live**: `BoxesPlay` locked view renders a score line + current-winner highlight + completed-period winners.
+
+### Left to do (next session)
+1. **COMMIT & PUSH this batch** — the cron only runs on Vercel; until deployed, live scores never update on their own. (In local dev: `curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/v2-boxes-scores`.)
+2. **Realtime board** — home card + detail page update only on refresh/`router.refresh()`. Subscribe to `v2_boxes_games` changes so live scores/highlights move without a reload.
+3. **Feed mode** (the big one, "both" decision): pool `game_source: manual|feed`, feed = league+date-range ingest cron, auto-append later-round matchups, per-game draw-on-materialize, rule-based pot allocation. See the "Scale decision" section above.
+4. **Detail Live/Upcoming/Final sections** for large N (currently per-game tabs).
+5. **"Set payouts" round-dollar finalize** (suggest + hand-edit) — decided, not built.
+6. **Manual score override + on-pool simulator / test mode** (#232).
+7. **Axis convention cleanup** (optional): a few old test games stored away-on-top instead of home-on-top; only matters cosmetically now that numbers are drawn.
+
+### Gotchas to remember
+- Vercel crons DO NOT run against localhost — `live_score` stays null in dev unless you curl the cron (or deploy).
+- Once `drawn_at` is set the board is permanent; the draft phase is intentionally one-way.

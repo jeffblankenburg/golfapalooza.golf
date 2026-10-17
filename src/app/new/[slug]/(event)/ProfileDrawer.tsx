@@ -31,6 +31,9 @@ interface Profile {
   fun_fact: string | null;
   best_shot: string | null;
   show_on_map: boolean;
+  venmo_username: string | null;
+  paypal_username: string | null;
+  mailing_address: string | null;
 }
 
 const SWINGS = ["right", "left", "both"];
@@ -100,6 +103,9 @@ export default function ProfileDrawer({ active, orgId, canSim }: { active: boole
           fun_fact: p.fun_fact,
           best_shot: p.best_shot,
           show_on_map: p.show_on_map,
+          venmo_username: p.venmo_username,
+          paypal_username: p.paypal_username,
+          mailing_address: p.mailing_address,
         }),
       });
       if (!res.ok) throw new Error();
@@ -239,6 +245,20 @@ export default function ProfileDrawer({ active, orgId, canSim }: { active: boole
       </Field>
       <Field label="Best shot">
         <textarea className={styles.textarea} value={p.best_shot || ""} onChange={(e) => set("best_shot", e.target.value)} rows={2} />
+      </Field>
+
+      <p className={styles.profileSubhead}>Payment info</p>
+      <p className={styles.profileHint}>Private — only you and your group&apos;s admins see this. Used to pay you quickly when you win.</p>
+      <div className={styles.profileTwoCol}>
+        <Field label="Venmo">
+          <input className={styles.input} value={p.venmo_username || ""} onChange={(e) => set("venmo_username", e.target.value)} placeholder="username" />
+        </Field>
+        <Field label="PayPal">
+          <input className={styles.input} value={p.paypal_username || ""} onChange={(e) => set("paypal_username", e.target.value)} placeholder="paypal.me name" />
+        </Field>
+      </div>
+      <Field label="Mailing address">
+        <textarea className={styles.textarea} value={p.mailing_address || ""} onChange={(e) => set("mailing_address", e.target.value)} rows={2} placeholder="For a mailed check, if you don't use Venmo or PayPal" />
       </Field>
 
       <label className={styles.profileToggle}>

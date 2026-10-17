@@ -112,6 +112,128 @@ export function gamePotShares(gameCount: number, potCents: number, allocation: "
   return shares;
 }
 
+/**
+ * Flexible payout allocation (#230). Every slot — a game's share of the pot, or a
+ * period's share of a game — is entered as ONE of:
+ *   - `amount`    an exact dollar figure (cents), independent of pot size,
+ *   - `percent`   a share (0-100) of the parent pool, scales with the pot,
+ *   - `remainder` "whatever's left" after the fixed + percent siblings.
+ * This lets an admin say "each MNF game pays $80, the Super Bowl gets the rest."
+ */
+export type AllocKind = "amount" | "percent" | "remainder";
+export interface Alloc {
+  kind: AllocKind;
+  value: number; // amount → cents; percent → 0-100; remainder → ignored
+}
+
+export interface ResolvedAllocations {
+  amounts: number[]; // resolved cents per alloc (input order)
+  committedCents: number; // fixed ($) + percent, before the remainder pool
+  remainderCents: number; // total handed to the remainder bucket(s)
+  unallocatedCents: number; // left over with NO remainder bucket to catch it (money on the table)
+  shortfallCents: number; // committed beyond the parent pool (over-promised)
+}
+
+/**
+ * Split a parent pool across sibling allocations. Fixed `amount`s take their cents;
+ * `percent`s take their share of the parent; any `remainder` buckets evenly divide
+ * what's left (clamped at ≥ 0). Diagnostics flag money left unallocated (percents +
+ * fixed < parent, no remainder) or over-promised (fixed + percent > parent).
+ *
+ * When there's no remainder bucket, tiny ROUNDING dust (a few cents from rounding
+ * percents, ≤ the number of percent entries) is distributed across the percent
+ * entries so the parts sum EXACTLY to the parent — e.g. 15/25/15/45% of $640 lands
+ * on $640, never $639.99. Genuine under/over-allocation (a real gap, bigger than
+ * dust) is left alone and surfaced in the diagnostics.
+ */
+export function resolveAllocations(parentCents: number, allocs: Alloc[]): ResolvedAllocations {
+  const amounts = new Array(allocs.length).fill(0);
+  const remIdx: number[] = [];
+  const pctIdx: number[] = [];
+  let fixed = 0;
+  let pct = 0;
+  allocs.forEach((a, i) => {
+    if (a.kind === "amount") {
+      amounts[i] = Math.max(0, Math.round(a.value));
+      fixed += amounts[i];
+    } else if (a.kind === "percent") {
+      amounts[i] = Math.max(0, Math.round((parentCents * a.value) / 100));
+      pct += amounts[i];
+      pctIdx.push(i);
+    } else {
+      remIdx.push(i);
+    }
+  });
+  let committedCents = fixed + pct;
+  const remainderPool = Math.max(0, parentCents - committedCents);
+  if (remIdx.length) {
+    const each = Math.floor(remainderPool / remIdx.length);
+    let rem = remainderPool - each * remIdx.length;
+    for (const i of remIdx) {
+      amounts[i] = each + (rem > 0 ? 1 : 0);
+      if (rem > 0) rem--;
+    }
+  } else if (pctIdx.length) {
+    // Absorb rounding dust into the percent entries (largest first) so they sum exactly.
+    let dust = parentCents - committedCents;
+    if (dust !== 0 && Math.abs(dust) <= pctIdx.length) {
+      const order = [...pctIdx].sort((a, b) => amounts[b] - amounts[a]);
+      let k = 0;
+      while (dust !== 0 && order.length) {
+        const i = order[k % order.length];
+        if (dust > 0) { amounts[i] += 1; dust--; } else if (amounts[i] > 0) { amounts[i] -= 1; dust++; }
+        k++;
+        if (k > order.length * 2) break;
+      }
+      committedCents = fixed + pctIdx.reduce((a, i) => a + amounts[i], 0);
+    }
+  }
+  return {
+    amounts,
+    committedCents,
+    remainderCents: remIdx.length ? remainderPool : 0,
+    unallocatedCents: remIdx.length ? 0 : Math.max(0, parentCents - committedCents),
+    shortfallCents: Math.max(0, committedCents - parentCents),
+  };
+}
+
+export interface GameAllocation {
+  key: string; // game id
+  game: Alloc; // how this game draws from the pot
+  periods: { key: string; label: string; alloc: Alloc }[]; // how the game's share splits across its periods
+}
+export interface ResolvedGamePayout {
+  key: string;
+  cents: number; // this game's total share of the pot
+  periods: { key: string; label: string; cents: number }[];
+}
+export interface ResolvedPayouts {
+  games: ResolvedGamePayout[];
+  committedCents: number; // sum of fixed + percent game shares (pre-remainder)
+  unallocatedCents: number; // pot money no game claims (no remainder game)
+  shortfallCents: number; // game shares promised beyond the pot
+}
+
+/**
+ * Two-level resolve: split the pot across games, then each game's share across its
+ * periods — the single source of truth for what every square is worth. Consumers
+ * (editor preview, member board, payout sheet) all run this so they never disagree.
+ */
+export function resolvePayouts(potCents: number, games: GameAllocation[]): ResolvedPayouts {
+  const gameRes = resolveAllocations(potCents, games.map((g) => g.game));
+  const resolved = games.map((g, i) => {
+    const share = gameRes.amounts[i];
+    const pr = resolveAllocations(share, g.periods.map((p) => p.alloc));
+    return { key: g.key, cents: share, periods: g.periods.map((p, j) => ({ key: p.key, label: p.label, cents: pr.amounts[j] })) };
+  });
+  return {
+    games: resolved,
+    committedCents: gameRes.committedCents,
+    unallocatedCents: gameRes.unallocatedCents,
+    shortfallCents: gameRes.shortfallCents,
+  };
+}
+
 /** A single game's pot split into its periods (dollars per period). */
 export function periodPayouts(
   gamePotCents: number,
@@ -141,6 +263,9 @@ export interface GamePayout {
  * takes their slice + any carry; an unowned (orphan) winner's slice carries to the
  * next owned period. If the final is orphaned with carry left, it splits evenly
  * among the game's winners (or, if nobody won, refunds pro-rata by squares).
+ *
+ * Percentage-weighted convenience wrapper. The flexible $/%/remainder engine
+ * (resolvePayouts) feeds `computeGamePayoutsFromSlices` directly with resolved cents.
  */
 export function computeGamePayouts(
   compute: BoxesGridState,
@@ -149,15 +274,29 @@ export function computeGamePayouts(
   weights: Record<string, number> | undefined,
   scores: Record<string, { away: number | null; home: number | null } | null>,
 ): GamePayout {
+  const slices = periods.map((p) => ({
+    key: p.key,
+    label: p.label,
+    cents: Math.round((gamePotCents * (weights?.[p.key] ?? p.weightPct)) / 100),
+  }));
+  return computeGamePayoutsFromSlices(compute, slices, scores);
+}
+
+/** Carry-orphan payout for ONE game from already-resolved per-period dollar slices. */
+export function computeGamePayoutsFromSlices(
+  compute: BoxesGridState,
+  periodSlices: { key: string; label: string; cents: number }[],
+  scores: Record<string, { away: number | null; home: number | null } | null>,
+): GamePayout {
   const byOwner: Record<string, number> = {};
   const perPeriod: GamePeriodResult[] = [];
   const winners = new Set<string>();
   let carry = 0;
 
-  for (const p of periods) {
+  for (const p of periodSlices) {
     const s = scores[p.key];
     const scored = !!s && s.away != null && s.home != null;
-    const slice = Math.round((gamePotCents * (weights?.[p.key] ?? p.weightPct)) / 100);
+    const slice = p.cents;
     let cell: Cell | null = null;
     let ownerId: string | null = null;
     let amount = 0;
@@ -176,7 +315,7 @@ export function computeGamePayouts(
     perPeriod.push({ key: p.key, label: p.label, cell, ownerId, amountCents: amount, scored });
   }
 
-  const allScored = periods.every((p) => {
+  const allScored = periodSlices.every((p) => {
     const s = scores[p.key];
     return s && s.away != null && s.home != null;
   });

@@ -8,11 +8,59 @@ import styles from "./BoxesAdmin.module.css";
 import GameSelectModal from "@/components/v2/sports/GameSelectModal";
 import { parseStake, formatStake } from "@/lib/v2/rounds/stake";
 import { getLeague, type EspnGame } from "@/lib/v2/sports/espn";
-import { PERIOD_PRESETS, gamePotShares, periodPayouts } from "@/lib/v2/contests/boxes";
+import { PERIOD_PRESETS, resolvePayouts, type Alloc, type GameAllocation } from "@/lib/v2/contests/boxes";
+import { buildGameAllocations } from "@/lib/v2/contests/boxes-alloc";
 
 type Structure = "quarters" | "halves";
 const defaultWeights = (s: Structure): Record<string, number> =>
   Object.fromEntries(PERIOD_PRESETS[s].map((p) => [p.key, p.weightPct]));
+
+// Editor allocation — like the engine's Alloc, but `amount` is held in DOLLARS for
+// the input (converted to cents at the storage/engine boundary).
+type EditorAlloc = { kind: "amount" | "percent" | "remainder"; value: number };
+const defaultGameAlloc = (): EditorAlloc => ({ kind: "remainder", value: 0 }); // all-remainder → equal split
+const defaultPeriodAlloc = (s: Structure): Record<string, EditorAlloc> =>
+  Object.fromEntries(PERIOD_PRESETS[s].map((p) => [p.key, { kind: "percent", value: p.weightPct } as EditorAlloc]));
+const editorToEngine = (a: EditorAlloc): Alloc =>
+  a.kind === "amount" ? { kind: "amount", value: Math.round(a.value * 100) } : a.kind === "percent" ? { kind: "percent", value: a.value } : { kind: "remainder", value: 0 };
+const editorToStored = (a: EditorAlloc) =>
+  a.kind === "amount" ? { kind: "amount", value: Math.round(a.value * 100) } : a.kind === "percent" ? { kind: "percent", value: a.value } : { kind: "remainder", value: 0 };
+const storedToEditor = (a: { kind?: unknown; value?: unknown } | null | undefined): EditorAlloc | null => {
+  if (!a || typeof a !== "object") return null;
+  if (a.kind === "remainder") return { kind: "remainder", value: 0 };
+  if ((a.kind === "amount" || a.kind === "percent") && typeof a.value === "number") {
+    return { kind: a.kind, value: a.kind === "amount" ? a.value / 100 : a.value };
+  }
+  return null;
+};
+
+/** A dollar/percent/remainder input: a number field + a $ | % | Rest toggle. */
+function AllocInput({ alloc, onChange, allowRemainder, restLabel, compact, styles }: { alloc: EditorAlloc; onChange: (a: EditorAlloc) => void; allowRemainder?: boolean; restLabel?: string; compact?: boolean; styles: Record<string, string> }) {
+  return (
+    <span className={styles.alloc} data-compact={compact || undefined}>
+      {alloc.kind === "remainder" ? (
+        <span className={styles.allocRest}>{restLabel ?? "the rest"}</span>
+      ) : (
+        <input
+          className={styles.allocNum}
+          type="number"
+          inputMode="decimal"
+          min="0"
+          value={alloc.value || ""}
+          placeholder="0"
+          onChange={(e) => onChange({ kind: alloc.kind, value: Math.max(0, Number(e.target.value) || 0) })}
+        />
+      )}
+      <span className={styles.allocToggle} role="group">
+        <button type="button" data-on={alloc.kind === "amount" || undefined} onClick={() => onChange({ kind: "amount", value: alloc.value })}>$</button>
+        <button type="button" data-on={alloc.kind === "percent" || undefined} onClick={() => onChange({ kind: "percent", value: alloc.value })}>%</button>
+        {allowRemainder && (
+          <button type="button" data-on={alloc.kind === "remainder" || undefined} title="Gets whatever's left" onClick={() => onChange({ kind: "remainder", value: 0 })}>Rest</button>
+        )}
+      </span>
+    </span>
+  );
+}
 
 type TeamRef = { name?: string; abbrev?: string; espn_id?: string; logo?: string; color?: string } | null;
 
@@ -23,7 +71,10 @@ export interface StoredGame {
   teamRow: TeamRef;
   teamCol: TeamRef;
   startTime: string | null;
+  gameAlloc: StoredAlloc | null; // { kind, value } — value in CENTS for amount
+  periodAlloc: Record<string, StoredAlloc> | null;
 }
+export type StoredAlloc = { kind: "amount" | "percent" | "remainder"; value: number };
 
 export interface BoxesContestRow {
   id: string;
@@ -94,6 +145,10 @@ export default function BoxesAdmin({ orgId, slug, contests }: { orgId: string; s
   const [games, setGames] = useState<EspnGame[]>([]);
   const [potAllocation, setPotAllocation] = useState<"equal" | "round_weighted" | "custom">("equal");
   const [periodWeights, setPeriodWeights] = useState<Record<string, Record<string, number>>>({});
+  // Flexible per-game payout allocation, keyed by espnEventId ($ / % / remainder).
+  const [galloc, setGalloc] = useState<Record<string, EditorAlloc>>({});
+  const [palloc, setPalloc] = useState<Record<string, Record<string, EditorAlloc>>>({});
+  const [openGameId, setOpenGameId] = useState<string | null>(null);
   const [maxPrimaryStr, setMaxPrimaryStr] = useState("10");
   const [secondaryUnlimited, setSecondaryUnlimited] = useState(true);
   const [maxSecondaryStr, setMaxSecondaryStr] = useState("20");
@@ -110,9 +165,20 @@ export default function BoxesAdmin({ orgId, slug, contests }: { orgId: string; s
   const structures = Array.from(
     new Set(games.map((g) => getLeague(g.league)?.periods).filter((x): x is Structure => x === "quarters" || x === "halves")),
   );
-  // Projected pot (all 100 squares sold) and each game's share, for the live values.
+  // Projected pot (all 100 squares sold), resolved through the flexible engine so
+  // the editor previews exactly what each game + period will pay.
   const potCents = Math.round((cost ?? 0) * 100) * 100;
-  const gameShares = gamePotShares(games.length, potCents, potAllocation);
+  const allocGames: GameAllocation[] = games.map((g) => {
+    const s = getLeague(g.league)?.periods;
+    const periods =
+      s === "quarters" || s === "halves"
+        ? PERIOD_PRESETS[s].map((p) => ({ key: p.key, label: p.label, alloc: editorToEngine(palloc[g.espnEventId]?.[p.key] ?? { kind: "percent", value: p.weightPct }) }))
+        : [];
+    return { key: g.espnEventId, game: editorToEngine(galloc[g.espnEventId] ?? defaultGameAlloc()), periods };
+  });
+  const resolved = resolvePayouts(potCents, allocGames);
+  const resolvedByGame = new Map(resolved.games.map((rg) => [rg.key, rg]));
+  const hasRemainderGame = allocGames.some((g) => g.game.kind === "remainder");
 
   // Seed default period weights whenever a new structure appears (keeps edits).
   useEffect(() => {
@@ -126,6 +192,28 @@ export default function BoxesAdmin({ orgId, slug, contests }: { orgId: string; s
           changed = true;
         }
       }
+      return changed ? next : prev;
+    });
+  }, [games]);
+
+  // Seed + prune per-game payout allocations as games are added/removed.
+  useEffect(() => {
+    const ids = new Set(games.map((g) => g.espnEventId));
+    setGalloc((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const g of games) if (!next[g.espnEventId]) { next[g.espnEventId] = defaultGameAlloc(); changed = true; }
+      for (const id of Object.keys(next)) if (!ids.has(id)) { delete next[id]; changed = true; }
+      return changed ? next : prev;
+    });
+    setPalloc((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const g of games) {
+        const s = getLeague(g.league)?.periods;
+        if ((s === "quarters" || s === "halves") && !next[g.espnEventId]) { next[g.espnEventId] = defaultPeriodAlloc(s); changed = true; }
+      }
+      for (const id of Object.keys(next)) if (!ids.has(id)) { delete next[id]; changed = true; }
       return changed ? next : prev;
     });
   }, [games]);
@@ -161,6 +249,9 @@ export default function BoxesAdmin({ orgId, slug, contests }: { orgId: string; s
     setGames([]);
     setPotAllocation("equal");
     setPeriodWeights({});
+    setGalloc({});
+    setPalloc({});
+    setOpenGameId(null);
     setMaxPrimaryStr("10");
     setSecondaryUnlimited(true);
     setMaxSecondaryStr("20");
@@ -178,6 +269,21 @@ export default function BoxesAdmin({ orgId, slug, contests }: { orgId: string; s
     setGames(c.games.map(toEspnGame));
     setPotAllocation(c.potAllocation);
     setPeriodWeights(c.periodWeights && Object.keys(c.periodWeights).length ? c.periodWeights : {});
+    // Seed per-game allocations from storage (cents→dollars), default where unset.
+    const ga: Record<string, EditorAlloc> = {};
+    const pa: Record<string, Record<string, EditorAlloc>> = {};
+    for (const sg of c.games) {
+      ga[sg.espnEventId] = storedToEditor(sg.gameAlloc) ?? defaultGameAlloc();
+      const s = getLeague(sg.league)?.periods;
+      if (s === "quarters" || s === "halves") {
+        pa[sg.espnEventId] = Object.fromEntries(
+          PERIOD_PRESETS[s].map((p) => [p.key, storedToEditor(sg.periodAlloc?.[p.key]) ?? ({ kind: "percent", value: p.weightPct } as EditorAlloc)]),
+        );
+      }
+    }
+    setGalloc(ga);
+    setPalloc(pa);
+    setOpenGameId(null);
     setMaxPrimaryStr(String(c.maxSquaresPrimary));
     setSecondaryUnlimited(c.maxSquaresSecondary == null);
     setMaxSecondaryStr(String(c.maxSquaresSecondary ?? 20));
@@ -199,10 +305,21 @@ export default function BoxesAdmin({ orgId, slug, contests }: { orgId: string; s
     if (saving) return;
     if (!name.trim()) return setErr("Give it a name.");
     if (games.length === 0) return setErr("Pick at least one game.");
-    for (const s of structures) {
-      const w = periodWeights[s] ?? defaultWeights(s);
-      const sum = PERIOD_PRESETS[s].reduce((t, p) => t + (Number(w[p.key]) || 0), 0);
-      if (sum !== 100) return setErr(`${s === "quarters" ? "Quarter" : "Half"} payouts must total 100% (now ${sum}%).`);
+    // Block when payouts exceed the full-board pot (over-promised)…
+    if (potCents > 0 && resolved.shortfallCents > 0) {
+      return setErr(`Payouts exceed the pot by ${money(resolved.shortfallCents)}. Lower some amounts or use "the rest".`);
+    }
+    // …and when any game's periods don't add up to what that game pays (money
+    // assigned to the game that reaches no square).
+    if (potCents > 0) {
+      for (const rg of resolved.games) {
+        if (rg.periods.length === 0) continue;
+        const psum = rg.periods.reduce((t, p) => t + p.cents, 0);
+        if (psum !== rg.cents) {
+          const gm = games.find((x) => x.espnEventId === rg.key);
+          return setErr(`${gm?.shortName ?? "A game"}: periods add up to ${money(psum)}, but the game pays ${money(rg.cents)}. Make them match.`);
+        }
+      }
     }
     setSaving(true);
     setErr(null);
@@ -216,15 +333,21 @@ export default function BoxesAdmin({ orgId, slug, contests }: { orgId: string; s
       max_squares_secondary: secondaryUnlimited ? null : Math.max(1, parseInt(maxSecondaryStr, 10) || 1),
       primary_ends_at: localToISO(primaryEndsStr),
       secondary_ends_at: localToISO(secondaryEndsStr),
-      games: games.map((g) => ({
-        espnEventId: g.espnEventId,
-        league: g.league,
-        label: g.shortName,
-        // Board convention: HOME on top (columns), AWAY on the left (rows).
-        teamRow: teamRef(g.away),
-        teamCol: teamRef(g.home),
-        startTime: g.startTime || null,
-      })),
+      games: games.map((g) => {
+        const s = getLeague(g.league)?.periods;
+        const pa = s === "quarters" || s === "halves" ? palloc[g.espnEventId] : null;
+        return {
+          espnEventId: g.espnEventId,
+          league: g.league,
+          label: g.shortName,
+          // Board convention: HOME on top (columns), AWAY on the left (rows).
+          teamRow: teamRef(g.away),
+          teamCol: teamRef(g.home),
+          startTime: g.startTime || null,
+          gameAlloc: editorToStored(galloc[g.espnEventId] ?? defaultGameAlloc()),
+          periodAlloc: pa ? Object.fromEntries(Object.entries(pa).map(([k, v]) => [k, editorToStored(v)])) : null,
+        };
+      }),
     };
     try {
       const res = await fetch(
@@ -333,91 +456,155 @@ export default function BoxesAdmin({ orgId, slug, contests }: { orgId: string; s
             </Section>
 
             <Section
-              title="Games"
+              title="Games & payouts"
               open={openSec.games}
               onToggle={() => setOpenSec((o) => ({ ...o, games: !o.games }))}
-              summary={games.length === 0 ? "No games yet" : `${games.length} game${games.length === 1 ? "" : "s"}`}
+              summary={games.length === 0 ? "No games yet" : potCents > 0 ? `${games.length} game${games.length === 1 ? "" : "s"}, pot ${money(potCents)}` : `${games.length} game${games.length === 1 ? "" : "s"}`}
             >
-              <div className={styles.selGames}>
-                {games.length === 0 && <span className={styles.selEmpty}>No games picked yet.</span>}
-                {games.map((g, i) => {
-                  const struct = getLeague(g.league)?.periods;
-                  const gCents = gameShares[i] ?? 0;
-                  const pays = struct === "quarters" || struct === "halves" ? periodPayouts(gCents, PERIOD_PRESETS[struct], periodWeights[struct]) : [];
-                  return (
-                    <div key={g.espnEventId} className={styles.selGame}>
-                      <div className={styles.selTop}>
-                        <span className={styles.selMatch}>{g.shortName}</span>
-                        <span className={styles.selLeague}>{getLeague(g.league)?.label ?? g.league}</span>
-                        {potCents > 0 && <span className={styles.selValue}>{money(gCents)}</span>}
-                        <button type="button" className={styles.selRemove} onClick={() => setGames(games.filter((x) => x.espnEventId !== g.espnEventId))} aria-label="Remove game">×</button>
-                      </div>
-                      {potCents > 0 && pays.length > 0 && (
-                        <div className={styles.selPays}>
-                          {pays.map((p) => (
-                            <span key={p.key} className={styles.selPay}>{p.label} <b>{money(p.cents)}</b></span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <button type="button" className={styles.addGame} onClick={() => setPickerOpen(true)}>+ Add game{games.length ? "s" : ""}</button>
-            </Section>
-
-            <Section
-              title="Payouts"
-              open={openSec.payouts}
-              onToggle={() => setOpenSec((o) => ({ ...o, payouts: !o.payouts }))}
-              summary={games.length === 0 ? "Pick games first" : games.length > 1 ? (potAllocation === "equal" ? "Equal split" : "Weighted split") : "By period"}
-            >
-              {games.length === 0 && <p className={styles.capHint}>Pick a game to set its payouts.</p>}
-              {games.length > 1 && (
+              {games.length === 0 ? (
                 <>
-                  <label className={styles.label}>Each game&apos;s share of the pot</label>
-                  <div className={styles.seg} role="group" aria-label="Pot allocation">
-                    <button type="button" data-on={potAllocation === "equal" || undefined} onClick={() => setPotAllocation("equal")}>Equal</button>
-                    <button type="button" data-on={potAllocation === "round_weighted" || undefined} onClick={() => setPotAllocation("round_weighted")}>Later rounds more</button>
-                  </div>
+                  <p className={styles.capHint}>Add the games this pool covers, then set what each one pays.</p>
+                  <button type="button" className={styles.addGame} onClick={() => setPickerOpen(true)}>+ Add games</button>
+                </>
+              ) : (
+                <>
+                  <p className={styles.payHint}>Tap a game to set its cut of the pot and how that cut splits across periods. Every field is a dollar amount or a percent; set one game (e.g. the final) to <b>Rest</b> to soak up the leftover.</p>
+                  {games.map((g) => {
+                    const s = getLeague(g.league)?.periods;
+                    const struct = s === "quarters" || s === "halves" ? s : null;
+                    const ga = galloc[g.espnEventId] ?? defaultGameAlloc();
+                    const rg = resolvedByGame.get(g.espnEventId);
+                    const isOpen = openGameId === g.espnEventId;
+                    const sameStruct = struct ? games.filter((x) => getLeague(x.league)?.periods === struct) : [];
+                    return (
+                      <div key={g.espnEventId} className={styles.payGame} data-open={isOpen || undefined}>
+                        <button type="button" className={styles.payGameHead} onClick={() => setOpenGameId(isOpen ? null : g.espnEventId)}>
+                          <span className={styles.payGameName}>
+                            {g.shortName}
+                            <span className={styles.payGameLeague}>{getLeague(g.league)?.label ?? g.league}</span>
+                          </span>
+                          <span className={styles.payGameTotal}>
+                            {potCents > 0 ? money(rg?.cents ?? 0) : ga.kind === "remainder" ? "the rest" : money(0)}
+                            {ga.kind === "remainder" && <span className={styles.payRestTag}>rest</span>}
+                          </span>
+                          <svg className={styles.chev} data-open={isOpen || undefined} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+                        </button>
+                        {isOpen && (
+                          <div className={styles.payGameBody}>
+                            <div className={styles.payRow}>
+                              <span className={styles.payRowLabel}>Game pays</span>
+                              <AllocInput
+                                alloc={ga}
+                                allowRemainder
+                                restLabel={potCents > 0 ? money(rg?.cents ?? 0) : "the rest"}
+                                styles={styles}
+                                onChange={(a) =>
+                                  setGalloc((prev) => {
+                                    const next = { ...prev, [g.espnEventId]: a };
+                                    // Only ONE game may be "the rest": picking it here clears any other.
+                                    if (a.kind === "remainder") {
+                                      for (const id of Object.keys(next)) {
+                                        if (id !== g.espnEventId && next[id]?.kind === "remainder") next[id] = { kind: "amount", value: 0 };
+                                      }
+                                    }
+                                    return next;
+                                  })
+                                }
+                              />
+                            </div>
+                            {struct && (
+                              <div className={styles.payPeriodList}>
+                                {PERIOD_PRESETS[struct].map((p) => {
+                                  const pa = palloc[g.espnEventId]?.[p.key] ?? { kind: "percent", value: p.weightPct };
+                                  const cents = rg?.periods.find((x) => x.key === p.key)?.cents ?? 0;
+                                  return (
+                                    <div key={p.key} className={styles.payPeriodRow}>
+                                      <span className={styles.payPeriodName}>{p.label}</span>
+                                      <AllocInput alloc={pa} compact styles={styles} onChange={(a) => setPalloc((prev) => ({ ...prev, [g.espnEventId]: { ...(prev[g.espnEventId] ?? defaultPeriodAlloc(struct)), [p.key]: a } }))} />
+                                      <span className={styles.payPeriodCents}>{potCents > 0 ? money(cents) : ""}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            <div className={styles.payActions}>
+                              {struct && potCents > 0 && (() => {
+                                const periodSum = rg?.periods.reduce((t, p) => t + p.cents, 0) ?? 0;
+                                const gameCents = rg?.cents ?? 0;
+                                const ok = periodSum === gameCents;
+                                return (
+                                  <span className={styles.payReconcile} data-ok={ok || undefined} data-bad={!ok || undefined}>
+                                    {ok ? `Adds up to ${money(gameCents)} ✓` : `${money(periodSum)} of ${money(gameCents)} — must match`}
+                                  </span>
+                                );
+                              })()}
+                              <span className={styles.payActionBtns}>
+                                {struct && sameStruct.length > 1 && ga.kind !== "remainder" && (
+                                  <button
+                                    type="button"
+                                    className={styles.payApplyAll}
+                                    onClick={() => {
+                                      const srcGame = galloc[g.espnEventId] ?? defaultGameAlloc();
+                                      const srcPer = palloc[g.espnEventId] ?? defaultPeriodAlloc(struct);
+                                      // Don't propagate "the rest" to every game (only one may hold it).
+                                      if (srcGame.kind !== "remainder") {
+                                        setGalloc((prev) => { const n = { ...prev }; for (const x of sameStruct) n[x.espnEventId] = { ...srcGame }; return n; });
+                                      }
+                                      setPalloc((prev) => { const n = { ...prev }; for (const x of sameStruct) n[x.espnEventId] = { ...srcPer }; return n; });
+                                    }}
+                                  >
+                                    Apply to all {sameStruct.length}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  className={styles.payRemove}
+                                  onClick={() => {
+                                    setGames(games.filter((x) => x.espnEventId !== g.espnEventId));
+                                    if (openGameId === g.espnEventId) setOpenGameId(null);
+                                  }}
+                                >
+                                  Remove
+                                </button>
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <button type="button" className={styles.addGame} onClick={() => setPickerOpen(true)}>+ Add games</button>
+                  {potCents > 0 && (() => {
+                    const restGame = games.find((x) => (galloc[x.espnEventId] ?? defaultGameAlloc()).kind === "remainder");
+                    const periodsBalanced = resolved.games.every((rg) => rg.periods.length === 0 || rg.periods.reduce((t, p) => t + p.cents, 0) === rg.cents);
+                    const allGood = resolved.unallocatedCents === 0 && resolved.shortfallCents === 0 && periodsBalanced;
+                    return (
+                      <div className={styles.payFooter}>
+                        <div className={styles.payFootRow}><span>Pot (full board)</span><b>{money(potCents)}</b></div>
+                        <div className={styles.payFootRow}><span>{hasRemainderGame ? "Set amounts" : "Assigned"}</span><b>{money(resolved.committedCents)}</b></div>
+                        {hasRemainderGame && (
+                          <div className={styles.payFootRow}><span>The rest → {restGame?.shortName ?? "a game"}</span><b>{money(Math.max(0, potCents - resolved.committedCents))}</b></div>
+                        )}
+                        {resolved.unallocatedCents > 0 && (
+                          <div className={styles.payFootRow} data-warn><span>Unassigned (add a &ldquo;rest&rdquo; game)</span><b>{money(resolved.unallocatedCents)}</b></div>
+                        )}
+                        {resolved.shortfallCents > 0 && (
+                          <div className={styles.payFootRow} data-bad><span>Over the pot by</span><b>{money(resolved.shortfallCents)}</b></div>
+                        )}
+                        {allGood ? (
+                          <div className={styles.payFootStatus} data-ok>Fully allocated, $0 remaining ✓</div>
+                        ) : !periodsBalanced ? (
+                          <div className={styles.payFootStatus} data-bad>A game&apos;s periods don&apos;t add up to what it pays</div>
+                        ) : (
+                          <div className={styles.payFootStatus} data-bad={resolved.shortfallCents > 0 || undefined}>
+                            {money(resolved.shortfallCents > 0 ? resolved.shortfallCents : resolved.unallocatedCents)} {resolved.shortfallCents > 0 ? "over" : "unassigned"}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </>
               )}
-              {structures.map((s) => {
-                const defs = PERIOD_PRESETS[s];
-                const w = periodWeights[s] ?? defaultWeights(s);
-                const sum = defs.reduce((t, p) => t + (Number(w[p.key]) || 0), 0);
-                return (
-                  <div key={s} className={styles.periodBlock}>
-                    <label className={styles.label}>
-                      Payout by period{structures.length > 1 ? ` — ${s === "quarters" ? "Quarters" : "Halves"}` : ""}
-                    </label>
-                    {structures.length > 1 && (
-                      <span className={styles.periodApplies}>
-                        {games.filter((g) => getLeague(g.league)?.periods === s).map((g) => g.shortName).join(", ")}
-                      </span>
-                    )}
-                    <div className={styles.periodGrid}>
-                      {defs.map((p) => (
-                        <label key={p.key} className={styles.periodCell}>
-                          <span className={styles.periodName}>{p.label}</span>
-                          <span className={styles.periodPct}>
-                            <input
-                              value={w[p.key] ?? 0}
-                              inputMode="numeric"
-                              onChange={(e) => {
-                                const n = Math.max(0, Math.min(100, parseInt(e.target.value.replace(/\D/g, ""), 10) || 0));
-                                setPeriodWeights((prev) => ({ ...prev, [s]: { ...(prev[s] ?? defaultWeights(s)), [p.key]: n } }));
-                              }}
-                            />
-                            %
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                    <span className={styles.periodSum} data-ok={sum === 100 || undefined}>Total {sum}%</span>
-                  </div>
-                );
-              })}
             </Section>
           </div>
 
@@ -450,7 +637,15 @@ export default function BoxesAdmin({ orgId, slug, contests }: { orgId: string; s
       <div className={styles.list}>
         {contests.length === 0 && !open && <p className={styles.empty}>No pools yet. Add one above.</p>}
         {contests.map((c) => {
-          const shares = gamePotShares(c.games.length, c.cellCostCents * 100, c.potAllocation);
+          // Full-board value of each game via the flexible $/%/remainder engine.
+          const cPot = c.cellCostCents * 100;
+          const cAlloc = buildGameAllocations(
+            c.games.map((g) => ({ id: g.espnEventId, league: g.league, game_alloc: g.gameAlloc, period_alloc: g.periodAlloc })),
+            cPot,
+            { potAllocation: c.potAllocation, periodWeights: c.periodWeights },
+          );
+          const centsByGame = new Map(resolvePayouts(cPot, cAlloc).games.map((rg) => [rg.key, rg.cents]));
+          const restId = c.games.find((g) => g.gameAlloc?.kind === "remainder")?.espnEventId;
           return (
             <div key={c.id} className={styles.rowWrap}>
               <Link href={`/new/${slug}/admin/contests/${c.id}`} className={styles.row}>
@@ -459,9 +654,10 @@ export default function BoxesAdmin({ orgId, slug, contests }: { orgId: string; s
                   {money(c.cellCostCents)}/square, {money(c.cellCostCents * 100)} pot, {c.status}
                 </span>
                 <span className={styles.rowGames}>
-                  {c.games.map((g, i) => (
+                  {c.games.map((g) => (
                     <span key={g.espnEventId} className={styles.rowGame}>
-                      {g.label || "Game"} <b>{money(shares[i] ?? 0)}</b>
+                      {g.label || "Game"} <b>{money(centsByGame.get(g.espnEventId) ?? 0)}</b>
+                      {g.espnEventId === restId && <span className={styles.rowRest}>rest</span>}
                     </span>
                   ))}
                 </span>

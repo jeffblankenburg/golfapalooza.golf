@@ -1,6 +1,8 @@
 import { redirect, notFound } from "next/navigation";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
+import { resolvePayouts } from "@/lib/v2/contests/boxes";
+import { buildGameAllocations } from "@/lib/v2/contests/boxes-alloc";
 import BoxesPlay, { type PlayGame } from "./BoxesPlay";
 
 /** Member-facing Boxes pool — see the board, claim open squares, watch it fill. */
@@ -22,7 +24,7 @@ export default async function BoxesPlayPage({ params }: { params: Promise<{ slug
 
   const { data: gameRows } = await supabase
     .from("v2_boxes_games")
-    .select("id, label, team_row, team_col, row_digits, col_digits, locked_at, start_time, live_score, period_scores, status, sort_order")
+    .select("id, label, league, team_row, team_col, row_digits, col_digits, locked_at, start_time, live_score, period_scores, game_alloc, period_alloc, status, sort_order")
     .eq("contest_id", contestId)
     .order("start_time", { ascending: true, nullsFirst: false })
     .order("sort_order");
@@ -52,9 +54,23 @@ export default async function BoxesPlayPage({ params }: { params: Promise<{ slug
     if (c.user_id === ctx.userId) mine.push(k);
   }
 
+  const cfg = (contest.config as Record<string, unknown>) ?? {};
+
+  // Resolve the flexible $/%/remainder payouts into per-period dollar slices (over
+  // the actual sold pot) so the board can show what each square is worth.
+  const claimedCount = (cells ?? []).filter((c) => c.user_id).length;
+  const potCents = claimedCount * ((cfg.cell_cost_cents as number) ?? 0);
+  const allocGames = buildGameAllocations(
+    (gameRows ?? []).map((g) => ({ id: g.id as string, league: g.league as string, game_alloc: g.game_alloc, period_alloc: g.period_alloc })),
+    potCents,
+    { potAllocation: (cfg.pot_allocation as "equal" | "round_weighted" | "custom") ?? "equal", periodWeights: (cfg.period_weights as Record<string, Record<string, number>>) ?? {} },
+  );
+  const sliceCentsFor = new Map(resolvePayouts(potCents, allocGames).games.map((rg) => [rg.key, Object.fromEntries(rg.periods.map((p) => [p.key, p.cents]))]));
+
   const games: PlayGame[] = (gameRows ?? []).map((g) => ({
     id: g.id as string,
     label: (g.label as string) ?? "Game",
+    league: (g.league as string) ?? "",
     teamRow: (g.team_row as PlayGame["teamRow"]) ?? null,
     teamCol: (g.team_col as PlayGame["teamCol"]) ?? null,
     rowDigits: (g.row_digits as number[]) ?? [],
@@ -63,9 +79,8 @@ export default async function BoxesPlayPage({ params }: { params: Promise<{ slug
     startTime: (g.start_time as string) ?? null,
     live: (g.live_score as PlayGame["live"]) ?? null,
     periodScores: (g.period_scores as PlayGame["periodScores"]) ?? null,
+    periodCents: sliceCentsFor.get(g.id as string) ?? {},
   }));
-
-  const cfg = (contest.config as Record<string, unknown>) ?? {};
 
   return (
     <BoxesPlay

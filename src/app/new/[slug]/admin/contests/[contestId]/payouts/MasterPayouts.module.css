@@ -1,0 +1,211 @@
+.page {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 14px 16px calc(28px + var(--mini-h, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.topRow {
+  display: flex;
+  align-items: center;
+}
+.back {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--ink-soft, #59635b);
+}
+.title {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.summary {
+  display: flex;
+  gap: 18px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--paper, #f6f6f1);
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  font-size: 0.85rem;
+  color: var(--ink-soft, #59635b);
+}
+.summary b {
+  color: var(--ink, #17211c);
+  font-weight: 800;
+}
+.summary b[data-owed] {
+  color: #b45309;
+}
+.empty {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--ink-soft, #59635b);
+}
+.row {
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  border-radius: 12px;
+  background: var(--card, #fff);
+  overflow: hidden;
+}
+.row[data-paid] {
+  background: color-mix(in srgb, var(--brand, #0a5c36) 5%, var(--card, #fff));
+  border-color: color-mix(in srgb, var(--brand, #0a5c36) 30%, var(--line, rgba(23, 33, 29, 0.12)));
+}
+.head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+.name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.headNote {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-soft, #59635b);
+}
+.noteField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.noteLabel {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft, #59635b);
+}
+.noteInput {
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  border-radius: 9px;
+  font-size: 0.88rem;
+  color: var(--ink, #17211c);
+  background: var(--card, #fff);
+}
+.actions {
+  display: flex;
+  gap: 8px;
+}
+.wonTag {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--brand, #0a5c36);
+}
+.paidTag {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--brand, #0a5c36);
+}
+.owedTag {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #b45309;
+}
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 14px 14px;
+}
+.lines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.line {
+  font-size: 0.74rem;
+  color: var(--ink-soft, #59635b);
+}
+.line b {
+  color: var(--ink, #17211c);
+  font-weight: 800;
+}
+.breakdown {
+  display: flex;
+  gap: 14px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink-soft, #59635b);
+}
+.owedLine {
+  color: #b45309;
+}
+.payLinks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.venmo,
+.paypal {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 14px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+.venmo {
+  background: #3d95ce;
+  color: #fff;
+}
+.paypal {
+  background: #003087;
+  color: #fff;
+}
+.address {
+  font-size: 0.8rem;
+  color: var(--ink, #17211c);
+}
+.noPay {
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--ink-soft, #59635b);
+}
+.markPaid {
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: none;
+  background: var(--brand, #0a5c36);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.markPaid:disabled {
+  opacity: 0.6;
+}
+.unmark {
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  background: transparent;
+  color: var(--ink-soft, #59635b);
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.err {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #b91c1c;
+}

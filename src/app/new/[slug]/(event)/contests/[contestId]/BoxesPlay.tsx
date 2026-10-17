@@ -7,17 +7,20 @@ import styles from "./BoxesPlay.module.css";
 import BoxesGrid from "@/components/v2/contests/BoxesGrid";
 import { cellKey, winningCell, type BoxesGridState, type Cell } from "@/lib/v2/contests/boxes";
 
+type TeamRef = { name?: string; abbrev?: string; color?: string; logo?: string } | null;
 export interface PlayGame {
   id: string;
   label: string;
-  teamRow: { abbrev?: string } | null;
-  teamCol: { abbrev?: string } | null;
+  league: string;
+  teamRow: TeamRef; // away (left axis)
+  teamCol: TeamRef; // home (top axis)
   rowDigits: number[];
   colDigits: number[];
   locked: boolean;
   startTime: string | null;
   live: { away: number | null; home: number | null; state: string; detail: string } | null;
   periodScores: Record<string, { away: number | null; home: number | null } | null> | null;
+  periodCents: Record<string, number>; // resolved dollars per period (server-computed)
 }
 
 const money = (c: number) => `$${c / 100 % 1 === 0 ? (c / 100).toFixed(0) : (c / 100).toFixed(2)}`;
@@ -29,6 +32,32 @@ const gameTime = (iso: string | null): string => {
     return "";
   }
 };
+
+/**
+ * Which game the picker lands on by default: the live game that started earliest,
+ * else the next upcoming game, else the most recent final. `games` arrives sorted
+ * by start time ascending, so the first match in order is always the earliest.
+ */
+function defaultGameIndex(games: PlayGame[]): number {
+  const live = games.findIndex((g) => g.live?.state === "in");
+  if (live >= 0) return live;
+  const upcoming = games.findIndex((g) => g.live?.state !== "post");
+  if (upcoming >= 0) return upcoming;
+  return Math.max(0, games.length - 1);
+}
+
+const mdy = (iso: string | null): string =>
+  iso ? new Date(iso).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" }) : "";
+
+/** Dropdown label for a game — kickoff first, then matchup + score/state. */
+function gameOptionLabel(x: PlayGame): string {
+  const m = `${x.teamRow?.abbrev ?? "Away"} @ ${x.teamCol?.abbrev ?? "Home"}`;
+  const when = mdy(x.startTime) || "TBD";
+  const live = x.live;
+  if (live && live.away != null && live.home != null && live.state === "post") return `${when} - ${m}, ${live.away}-${live.home} Final`;
+  if (live && live.away != null && live.home != null && live.state === "in") return `${when} - ${m}, ${live.away}-${live.home}, ${live.detail || "Live"}`;
+  return `${when} - ${m}`;
+}
 
 const PHASE_NOTE: Record<string, string> = {
   setup: "The draft hasn't opened yet.",
@@ -71,7 +100,7 @@ export default function BoxesPlay({
   myAvatar: string | null;
 }) {
   const router = useRouter();
-  const [sel, setSel] = useState(0);
+  const [sel, setSel] = useState(() => defaultGameIndex(games));
   const [err, setErr] = useState<string | null>(null);
   const [peek, setPeek] = useState<string | null>(null); // whose square you just tapped
   // Optimistic local ownership: tapping flips a square instantly; the API
@@ -211,28 +240,31 @@ export default function BoxesPlay({
       ) : (
         <>
           {games.length > 1 && (
-            <div className={styles.tabs}>
+            <select className={styles.gamePick} value={sel} onChange={(e) => setSel(Number(e.target.value))} aria-label="Pick a game">
               {games.map((x, i) => (
-                <button key={x.id} type="button" className={styles.tab} data-on={i === sel || undefined} onClick={() => setSel(i)}>
-                  {x.label}
-                </button>
+                <option key={x.id} value={i}>{gameOptionLabel(x)}</option>
               ))}
-            </div>
+            </select>
           )}
           {g && (() => {
             const live = g.live;
             const currentWinner: Cell | null =
               live && live.away != null && live.home != null ? winningCell(grid, live.away, live.home) : null;
-            const periodWinners: { cell: Cell; label: string }[] = [];
+
+            // Per-period winnings come pre-resolved from the server (flexible
+            // $/%/remainder allocation over the sold pot).
+            const periodWinners: { cell: Cell; label: string; amountCents: number }[] = [];
             for (const [k, v] of Object.entries(g.periodScores ?? {})) {
               if (v && v.away != null && v.home != null) {
                 const cell = winningCell(grid, v.away, v.home);
-                if (cell) periodWinners.push({ cell, label: k });
+                if (cell) periodWinners.push({ cell, label: k, amountCents: g.periodCents[k] ?? 0 });
               }
             }
             return (
               <>
-                {live && live.state !== "pre" && (
+                {/* Single-game pools have no dropdown, so keep a score bar here.
+                    Multi-game pools carry the score in the dropdown label instead. */}
+                {games.length === 1 && live && live.state !== "pre" && (
                   <div className={styles.scoreLine}>
                     <span className={styles.scoreTeam}>{g.teamRow?.abbrev ?? "Away"} <b>{live.away ?? "-"}</b></span>
                     <span className={styles.scoreTeam}>{g.teamCol?.abbrev ?? "Home"} <b>{live.home ?? "-"}</b></span>
@@ -243,8 +275,8 @@ export default function BoxesPlay({
                 )}
                 <BoxesGrid
                   grid={grid}
-                  teamRow={{ label: g.teamRow?.abbrev ?? "Away" }}
-                  teamCol={{ label: g.teamCol?.abbrev ?? "Home" }}
+                  teamRow={{ label: g.teamRow?.name ?? g.teamRow?.abbrev ?? "Away", sub: "away", color: g.teamRow?.color ?? null, logo: g.teamRow?.logo ?? null }}
+                  teamCol={{ label: g.teamCol?.name ?? g.teamCol?.abbrev ?? "Home", sub: "home", color: g.teamCol?.color ?? null, logo: g.teamCol?.logo ?? null }}
                   mine={mineSet}
                   currentWinner={currentWinner}
                   periodWinners={periodWinners}

@@ -43,6 +43,10 @@
     {
       "path": "/api/cron/v2-boxes-scores",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/v2-boxes-reveal",
+      "schedule": "* * * * *"
     }
   ]
 }

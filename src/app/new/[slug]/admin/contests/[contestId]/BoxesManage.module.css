@@ -122,25 +122,16 @@
   font-weight: 600;
   color: #b91c1c;
 }
-.tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.tab {
-  padding: 7px 11px;
-  border-radius: 999px;
-  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
-  background: var(--paper, #f6f6f1);
-  color: var(--ink-soft, #59635b);
-  font-size: 0.8rem;
+.gamePick {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  background: var(--card, #fff);
+  color: var(--ink, #17211c);
+  font-size: 0.92rem;
   font-weight: 700;
   cursor: pointer;
-}
-.tab[data-on] {
-  border-color: var(--brand, #0a5c36);
-  background: color-mix(in srgb, var(--brand, #0a5c36) 12%, transparent);
-  color: var(--brand, #0a5c36);
 }
 .gridNote {
   margin: 0;
@@ -152,19 +143,52 @@
   flex-direction: column;
   gap: 6px;
 }
+.selGame {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.selGame .gameTop,
+.selGame .gameRevRow {
+  padding: 0 2px;
+}
 .gameRow {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 9px 12px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
   border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
   border-radius: 10px;
   background: var(--card, #fff);
+}
+.gameTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
 }
 .gameName {
   font-size: 0.88rem;
   font-weight: 800;
   color: var(--ink, #17211c);
+}
+.gameKick {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--ink-soft, #59635b);
+  white-space: nowrap;
+}
+.gameRevRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.revLabel {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--ink-soft, #59635b);
 }
 .gameState {
   font-size: 0.74rem;
@@ -173,6 +197,83 @@
 }
 .gameState[data-locked] {
   color: var(--brand, #0a5c36);
+}
+.gameRow[data-revealed] {
+  border-color: color-mix(in srgb, var(--brand, #0a5c36) 35%, var(--line, rgba(23, 33, 29, 0.12)));
+  background: color-mix(in srgb, var(--brand, #0a5c36) 5%, var(--card, #fff));
+}
+.revealHead {
+  font-size: 0.76rem;
+  color: var(--ink-soft, #59635b);
+  padding: 0 2px 2px;
+}
+.revealControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.revealInput {
+  padding: 5px 7px;
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  border-radius: 8px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--ink, #17211c);
+  background: var(--paper, #f6f6f1);
+}
+.revealNow {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: none;
+  background: var(--brand, #0a5c36);
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.revealNow:disabled {
+  opacity: 0.6;
+}
+.lockedControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.revealCount {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.lockedBtns {
+  display: inline-flex;
+  gap: 8px;
+}
+.archiveRow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line, rgba(23, 33, 29, 0.1));
+}
+.archiveLink {
+  background: none;
+  border: none;
+  padding: 4px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink-soft, #59635b);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.archiveNote {
+  font-size: 0.72rem;
+  color: var(--ink-soft, #59635b);
+  text-align: center;
 }
 .payouts {
   display: flex;

@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { v2ServerClient } from "@/lib/v2/supabase";
-import { winningCell } from "@/lib/v2/contests/boxes";
+import { winningCell, resolvePayouts } from "@/lib/v2/contests/boxes";
+import { buildGameAllocations } from "@/lib/v2/contests/boxes-alloc";
+import { getLeague } from "@/lib/v2/sports/espn";
 import styles from "./BoxesHomeCards.module.css";
 /* eslint-disable @next/next/no-img-element */
 
 type TeamRef = { abbrev?: string; logo?: string; color?: string } | null;
 type Live = { away: number | null; home: number | null; state: string; detail: string } | null;
+type PeriodScores = Record<string, { away: number | null; home: number | null } | null> | null;
 interface Game {
   id: string;
   label: string;
+  league: string;
   teamRow: TeamRef; // away
   teamCol: TeamRef; // home
   rowDigits: number[];
@@ -16,12 +20,32 @@ interface Game {
   locked: boolean;
   startTime: string | null;
   live: Live;
+  periodScores: PeriodScores;
   final: boolean;
 }
+
+const money = (c: number) => `$${c / 100 % 1 === 0 ? (c / 100).toFixed(0) : (c / 100).toFixed(2)}`;
 
 function Logo({ t }: { t: TeamRef }) {
   if (t?.logo) return <img className={styles.logo} src={t.logo} alt="" width={26} height={26} />;
   return <span className={styles.logoFallback} style={{ background: t?.color ?? "var(--line)" }} />;
+}
+
+/** A score with its LAST digit emphasized — that digit is what picks the square. */
+function Score({ n }: { n: number }) {
+  const s = String(n);
+  return (
+    <span className={styles.score}>
+      {s.length > 1 && <span className={styles.scoreHead}>{s.slice(0, -1)}</span>}
+      <span className={styles.scoreDigit}>{s.slice(-1)}</span>
+    </span>
+  );
+}
+
+/** The period in play right now = the first one not yet complete in period_scores. */
+function currentPeriodKey(structure: "quarters" | "halves", ps: PeriodScores): string {
+  const order = structure === "quarters" ? ["Q1", "Half", "Q3", "Final"] : ["Half", "Final"];
+  return order.find((k) => !ps?.[k]) ?? order[order.length - 1];
 }
 
 /** A small "this is a squares pool" marker (10x10 grid glyph + label). */
@@ -74,7 +98,7 @@ export default async function BoxesHomeCards({ orgId, userId, slug }: { orgId: s
   const { data: cells } = await supabase.from("v2_boxes_cells").select("contest_id, grid_row, grid_col, user_id").in("contest_id", ids);
   const { data: gameRows } = await supabase
     .from("v2_boxes_games")
-    .select("contest_id, id, label, team_row, team_col, row_digits, col_digits, locked_at, start_time, live_score, status, sort_order")
+    .select("contest_id, id, label, league, team_row, team_col, row_digits, col_digits, locked_at, start_time, live_score, period_scores, game_alloc, period_alloc, status, sort_order")
     .in("contest_id", ids)
     .order("start_time", { ascending: true, nullsFirst: false })
     .order("sort_order");
@@ -111,6 +135,7 @@ export default async function BoxesHomeCards({ orgId, userId, slug }: { orgId: s
       .map((g) => ({
         id: g.id as string,
         label: (g.label as string) ?? "Game",
+        league: g.league as string,
         teamRow: (g.team_row as TeamRef) ?? null,
         teamCol: (g.team_col as TeamRef) ?? null,
         rowDigits: (g.row_digits as number[]) ?? [],
@@ -118,9 +143,25 @@ export default async function BoxesHomeCards({ orgId, userId, slug }: { orgId: s
         locked: !!g.locked_at,
         startTime: (g.start_time as string) ?? null,
         live: (g.live_score as Live) ?? null,
+        periodScores: (g.period_scores as PeriodScores) ?? null,
         final: (g.status as string) === "final",
       }));
     if (games.length === 0) continue;
+
+    // Win-amount math: resolve the flexible $/%/remainder allocations across ALL
+    // the pool's games (remainder depends on the full series), then look up each
+    // featured game's per-period dollar slice.
+    const cfg = (c.config as { cell_cost_cents?: number; pot_allocation?: "equal" | "round_weighted" | "custom"; period_weights?: Record<string, Record<string, number>> }) ?? {};
+    const potCents = claimed * (cfg.cell_cost_cents ?? 0);
+    const allGames = (gameRows ?? []).filter((g) => g.contest_id === c.id);
+    const allocGames = buildGameAllocations(
+      allGames.map((g) => ({ id: g.id as string, league: g.league as string, game_alloc: g.game_alloc, period_alloc: g.period_alloc })),
+      potCents,
+      { potAllocation: cfg.pot_allocation ?? "equal", periodWeights: cfg.period_weights ?? {} },
+    );
+    const sliceCentsFor = new Map(
+      resolvePayouts(potCents, allocGames).games.map((rg) => [rg.key, new Map(rg.periods.map((p) => [p.key, p.cents]))]),
+    );
 
     const liveGames = games.filter((g) => g.live?.state === "in");
     const upcoming = games.filter((g) => !g.final && g.live?.state !== "in").sort((a, b) => (a.startTime ?? "").localeCompare(b.startTime ?? ""));
@@ -138,15 +179,22 @@ export default async function BoxesHomeCards({ orgId, userId, slug }: { orgId: s
           const win = g.live ? winningCell({ owners: {}, rowDigits: g.rowDigits, colDigits: g.colDigits }, g.live.away, g.live.home) : null;
           const isLive = g.live?.state === "in";
           const isFinal = g.final;
+          // Dollar value of the square winning right now = the in-play period's slice.
+          const structure = getLeague(g.league)?.periods;
+          let winCents = 0;
+          if ((isLive || isFinal) && (structure === "quarters" || structure === "halves")) {
+            const key = currentPeriodKey(structure, g.periodScores);
+            winCents = sliceCentsFor.get(g.id)?.get(key) ?? 0;
+          }
           return (
             <div key={g.id} className={styles.featGame}>
               <div className={styles.matchupRow}>
                 <span className={styles.matchup}>
                   <Logo t={g.teamRow} />
                   <span className={styles.abbrev}>{g.teamRow?.abbrev ?? "AWY"}</span>
-                  {g.live && g.live.away != null ? <span className={styles.score}>{g.live.away}</span> : null}
+                  {g.live && g.live.away != null ? <Score n={g.live.away} /> : null}
                   <span className={styles.at}>@</span>
-                  {g.live && g.live.home != null ? <span className={styles.score}>{g.live.home}</span> : null}
+                  {g.live && g.live.home != null ? <Score n={g.live.home} /> : null}
                   <span className={styles.abbrev}>{g.teamCol?.abbrev ?? "HOM"}</span>
                   <Logo t={g.teamCol} />
                 </span>
@@ -159,7 +207,8 @@ export default async function BoxesHomeCards({ orgId, userId, slug }: { orgId: s
                   const winning = !!win && win.row === cell.grid_row && win.col === cell.grid_col;
                   return (
                     <span key={`${g.id}:${cell.grid_row},${cell.grid_col}`} className={styles.combo} data-win={winning || undefined}>
-                      {g.teamRow?.abbrev ?? "A"} <b>{g.rowDigits[cell.grid_row] ?? "?"}</b>, {g.teamCol?.abbrev ?? "H"} <b>{g.colDigits[cell.grid_col] ?? "?"}</b>
+                      <b>{g.rowDigits[cell.grid_row] ?? "?"}</b>-<b>{g.colDigits[cell.grid_col] ?? "?"}</b>
+                      {winning && winCents > 0 && <span className={styles.winAmt}>{money(winCents)}</span>}
                     </span>
                   );
                 })}

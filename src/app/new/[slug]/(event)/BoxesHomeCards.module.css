@@ -130,8 +130,16 @@
 .score {
   font-size: 1rem;
   font-weight: 800;
-  color: var(--ink, #17211c);
   font-variant-numeric: tabular-nums;
+}
+.scoreHead {
+  color: var(--ink-soft, #59635b);
+  font-weight: 700;
+}
+/* Emphasize the last digit by COLOR only — no padding/box, so the number stays
+   tight and still reads as one figure (e.g. 107, with the 7 in brand green). */
+.scoreDigit {
+  color: var(--brand, #0a5c36);
 }
 .gState {
   font-size: 0.72rem;
@@ -145,12 +153,28 @@
 .gState[data-final] {
   color: var(--ink-soft, #59635b);
 }
+/* Win = money = green, matching the board grid (independent of the org brand). */
 .combo[data-win] {
   color: #fff;
-  background: var(--brand, #0a5c36);
-  border-color: var(--brand, #0a5c36);
+  background: #16a34a;
+  border-color: #16a34a;
+  animation: boxesComboWin 1.8s ease-in-out infinite;
+}
+@keyframes boxesComboWin {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.45); }
+  50% { box-shadow: 0 0 7px 1px rgba(22, 163, 74, 0.55); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .combo[data-win] { animation: none; }
 }
 .combo[data-win] b {
+  color: #fff;
+}
+.winAmt {
+  margin-left: 7px;
+  padding-left: 7px;
+  border-left: 1px solid color-mix(in srgb, #fff 45%, transparent);
+  font-weight: 800;
   color: #fff;
 }
 .more {

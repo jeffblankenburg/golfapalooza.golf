@@ -16,6 +16,8 @@ export interface BoxesGameInput {
   teamCol: Record<string, unknown>;
   gameWeight?: number;
   startTime?: string | null; // ESPN kickoff (ISO); gates the scores cron
+  gameAlloc?: unknown; // { kind: 'amount'|'percent'|'remainder', value } — this game's cut of the pot
+  periodAlloc?: unknown; // { periodKey: {kind,value} } — that cut, split across periods
 }
 
 // Per-period payout split, keyed by game structure ("quarters" | "halves") so a
@@ -74,6 +76,8 @@ export async function createBoxesContest(admin: SupabaseClient, input: CreateBox
       team_col: g.teamCol,
       game_weight: g.gameWeight ?? 1,
       start_time: g.startTime || null,
+      game_alloc: g.gameAlloc ?? null,
+      period_alloc: g.periodAlloc ?? null,
     }));
     const { error: gErr } = await admin.from("v2_boxes_games").insert(gameRows);
     if (gErr) throw new Error(gErr.message);
@@ -150,6 +154,8 @@ export async function updateBoxesContest(admin: SupabaseClient, contestId: strin
         team_col: g.teamCol,
         game_weight: g.gameWeight ?? 1,
         start_time: g.startTime || null,
+        game_alloc: g.gameAlloc ?? null,
+        period_alloc: g.periodAlloc ?? null,
       }));
       const { error: insErr } = await admin.from("v2_boxes_games").insert(rows);
       if (insErr) throw new Error(insErr.message);

@@ -383,6 +383,275 @@
   color: var(--brand, #0a5c36);
 }
 
+/* Flexible per-game payout editor */
+.payHint {
+  margin: 0 0 4px;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: var(--ink-soft, #59635b);
+}
+.payHint b {
+  color: var(--ink, #17211c);
+  font-weight: 800;
+}
+.payGame {
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  border-radius: 10px;
+  background: var(--card, #fff);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.payGame[data-open] {
+  border-color: var(--brand, #0a5c36);
+}
+.payGameHead {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+.payGameName {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.payGameLeague {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--ink-soft, #59635b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.payGameTotal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--brand, #0a5c36);
+}
+.payRestTag {
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft, #59635b);
+  background: color-mix(in srgb, var(--ink, #17211c) 8%, transparent);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.payReconcile {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #b45309;
+}
+.payReconcile[data-ok] {
+  color: var(--brand, #0a5c36);
+}
+.payReconcile[data-bad] {
+  color: #b91c1c;
+}
+.payGameBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 2px 12px 12px;
+}
+.payRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line, rgba(23, 33, 29, 0.1));
+}
+.payRowLabel {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+/* Compact period rows: label | input+toggle | resolved $ */
+.payPeriodList {
+  display: flex;
+  flex-direction: column;
+}
+.payPeriodRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+}
+.payPeriodName {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.payPeriodCents {
+  min-width: 52px;
+  text-align: right;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--ink-soft, #59635b);
+  font-variant-numeric: tabular-nums;
+}
+.payActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+.payActionBtns {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.payRemove {
+  padding: 6px 10px;
+  background: none;
+  border: none;
+  color: #b91c1c;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.payApplyAll {
+  padding: 6px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--brand, #0a5c36);
+  background: color-mix(in srgb, var(--brand, #0a5c36) 10%, transparent);
+  color: var(--brand, #0a5c36);
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.payFooter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--paper, #f6f6f1);
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+}
+.payFootRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--ink-soft, #59635b);
+}
+.payFootRow b {
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.payFootRow[data-warn] b {
+  color: #b45309;
+}
+.payFootRow[data-bad] {
+  color: #b91c1c;
+}
+.payFootRow[data-bad] b {
+  color: #b91c1c;
+}
+.payFootStatus {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  text-align: right;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--brand, #0a5c36);
+}
+.payFootStatus[data-bad] {
+  color: #b91c1c;
+}
+/* $ / % / Rest allocation input */
+.alloc {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.allocNum {
+  width: 72px;
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  border-radius: 8px;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+  background: var(--card, #fff);
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.allocNum::-webkit-outer-spin-button,
+.allocNum::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.allocRest {
+  font-size: 0.8rem;
+  font-weight: 800;
+  font-style: italic;
+  color: var(--brand, #0a5c36);
+}
+.allocToggle {
+  display: inline-flex;
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  border-radius: 8px;
+  overflow: hidden;
+}
+.allocToggle button {
+  padding: 6px 9px;
+  border: none;
+  background: var(--card, #fff);
+  color: var(--ink-soft, #59635b);
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.allocToggle button + button {
+  border-left: 1px solid var(--line, rgba(23, 33, 29, 0.14));
+}
+.allocToggle button[data-on] {
+  background: var(--brand, #0a5c36);
+  color: #fff;
+}
+/* Compact variant for the per-period rows */
+.alloc[data-compact] {
+  gap: 5px;
+}
+.alloc[data-compact] .allocNum {
+  width: 72px;
+  padding: 5px 8px;
+  font-size: 0.85rem;
+}
+.alloc[data-compact] .allocToggle button {
+  padding: 4px 7px;
+  font-size: 0.74rem;
+}
+
 .seg {
   display: inline-flex;
   flex-wrap: wrap;
@@ -530,4 +799,15 @@
 .rowGame b {
   font-weight: 800;
   color: var(--brand, #0a5c36);
+}
+.rowRest {
+  margin-left: 4px;
+  font-size: 0.58rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft, #59635b);
+  background: color-mix(in srgb, var(--ink, #17211c) 8%, transparent);
+  padding: 1px 5px;
+  border-radius: 999px;
 }

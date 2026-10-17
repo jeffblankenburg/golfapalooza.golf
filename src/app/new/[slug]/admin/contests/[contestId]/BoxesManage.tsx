@@ -11,11 +11,36 @@ export interface ManageGame {
   id: string;
   label: string;
   league: string;
-  teamRow: { name?: string; abbrev?: string } | null;
-  teamCol: { name?: string; abbrev?: string } | null;
+  teamRow: { name?: string; abbrev?: string; color?: string; logo?: string } | null;
+  teamCol: { name?: string; abbrev?: string; color?: string; logo?: string } | null;
   rowDigits: number[];
   colDigits: number[];
   locked: boolean;
+  revealAt: string | null;
+  startTime: string | null;
+  final: boolean;
+}
+
+const isoToLocal = (iso: string | null): string => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+const localToISO = (s: string): string | null => (s ? new Date(s).toISOString() : null);
+const whenLabel = (iso: string | null): string =>
+  iso ? new Date(iso).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+const shortDate = (iso: string | null): string =>
+  iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
+const mdy = (iso: string | null): string =>
+  iso ? new Date(iso).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" }) : "";
+
+/** Dropdown label for the admin game selector — kickoff first, then matchup + status. */
+function gameOptionLabel(x: ManageGame): string {
+  const m = `${x.teamRow?.abbrev ?? "Away"} @ ${x.teamCol?.abbrev ?? "Home"}`;
+  const when = x.startTime ? mdy(x.startTime) : "TBD";
+  const status = x.locked ? "" : x.revealAt ? ` (reveals ${shortDate(x.revealAt)})` : " (hidden)";
+  return `${when} - ${m}${status}`;
 }
 
 export interface PayoutRow {
@@ -31,7 +56,7 @@ const PHASE_LABEL: Record<string, string> = {
   primary: "Primary draft open",
   secondary: "Secondary draft open",
   closed: "Picks closed",
-  locked: "Numbers locked",
+  locked: "Board locked",
   final: "Final",
 };
 
@@ -45,8 +70,8 @@ export default function BoxesManage({
   games,
   owners,
   claimed,
-  payouts,
-  anyScored,
+  payoutsByGame,
+  scoredGameIds,
 }: {
   orgId: string;
   slug: string;
@@ -57,8 +82,8 @@ export default function BoxesManage({
   games: ManageGame[];
   owners: Record<string, string>;
   claimed: number;
-  payouts: PayoutRow[];
-  anyScored: boolean;
+  payoutsByGame: Record<string, PayoutRow[]>;
+  scoredGameIds: string[];
 }) {
   const router = useRouter();
   const [sel, setSel] = useState(0);
@@ -69,17 +94,19 @@ export default function BoxesManage({
   const g = games[sel];
   const grid: BoxesGridState = { owners, rowDigits: g?.rowDigits ?? [], colDigits: g?.colDigits ?? [] };
   const drawn = games.length > 0 && games.every((x) => x.locked);
+  const revealedCount = games.filter((x) => x.locked).length;
+  const allConcluded = games.length > 0 && games.every((x) => x.final);
   const full = claimed >= 100;
 
-  async function doAction(action: string) {
+  async function doAction(action: string, extra?: Record<string, unknown>) {
     if (busy) return;
-    setBusy(action);
+    setBusy(action + (extra?.gameId ? `:${extra.gameId}` : ""));
     setErr(null);
     try {
       const res = await fetch(`/api/v2/orgs/${orgId}/contests/${contestId}/boxes/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, ...extra }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) setErr(d.error || "Action failed.");
@@ -99,6 +126,7 @@ export default function BoxesManage({
       <div className={styles.topRow}>
         <Link href={`/new/${slug}/admin/contests`} className={styles.back}>← Contests</Link>
         <span className={styles.topActions}>
+          <Link href={`/new/${slug}/admin/contests/${contestId}/payouts`} className={styles.edit}>Payouts</Link>
           <Link href={`/new/${slug}/contests/${contestId}`} className={styles.edit}>Player view</Link>
           <Link href={`/new/${slug}/admin/contests?edit=${contestId}`} className={styles.edit}>Edit settings</Link>
         </span>
@@ -126,81 +154,118 @@ export default function BoxesManage({
           <>
             {confirmDraw ? (
               <div className={styles.confirm}>
-                <span className={styles.confirmText}>Numbers are assigned randomly and <strong>permanently</strong> — this can&apos;t be redone. Draw now?</span>
+                <span className={styles.confirmText}>This locks the board (ownership frozen). Numbers then reveal <strong>per game</strong> — a week before each kickoff by default, or whenever you hit &ldquo;Reveal now.&rdquo; Lock it in?</span>
                 <div className={styles.confirmBtns}>
-                  <button type="button" className={styles.action} disabled={!!busy} onClick={() => doAction("draw")}>Yes, draw numbers</button>
+                  <button type="button" className={styles.action} disabled={!!busy} onClick={() => doAction("lock_board")}>Yes, lock the board</button>
                   <button type="button" className={styles.actionGhost} onClick={() => setConfirmDraw(false)}>Cancel</button>
                 </div>
               </div>
             ) : (
               <>
-                <button type="button" className={styles.action} disabled={!!busy} onClick={() => setConfirmDraw(true)}>Draw numbers</button>
+                <button type="button" className={styles.action} disabled={!!busy} onClick={() => setConfirmDraw(true)}>Lock board &amp; schedule reveals</button>
                 <button type="button" className={styles.actionGhost} disabled={!!busy} onClick={() => doAction("reopen_secondary")}>Reopen picks</button>
               </>
             )}
             {!full && !confirmDraw && <p className={styles.warn}>Only {claimed}/100 squares are claimed — unclaimed winning squares pay no one.</p>}
           </>
         )}
-        {phase === "locked" && <button type="button" className={styles.actionGhost} disabled={!!busy} onClick={() => doAction("finalize")}>Mark final</button>}
+        {phase === "locked" && (
+          <div className={styles.lockedControls}>
+            <span className={styles.revealCount}>{revealedCount}/{games.length} games revealed</span>
+            {!drawn && (
+              <span className={styles.lockedBtns}>
+                <button type="button" className={styles.actionGhost} disabled={!!busy} onClick={() => doAction("reveal_all")}>Reveal all now</button>
+              </span>
+            )}
+          </div>
+        )}
+        {phase === "final" && (
+          <button type="button" className={styles.archiveLink} disabled={!!busy} onClick={() => doAction("unarchive")}>Unarchive this pool</button>
+        )}
         {err && <p className={styles.err}>{err}</p>}
       </div>
 
       {/* Game selector (which game's numbers to view) */}
       {games.length > 1 && (
-        <div className={styles.tabs}>
+        <select className={styles.gamePick} value={sel} onChange={(e) => setSel(Number(e.target.value))} aria-label="Pick a game">
           {games.map((x, i) => (
-            <button key={x.id} type="button" className={styles.tab} data-on={i === sel || undefined} onClick={() => setSel(i)}>
-              {x.label}
-            </button>
+            <option key={x.id} value={i}>{gameOptionLabel(x)}</option>
           ))}
+        </select>
+      )}
+
+      {/* Selected game: kickoff + its reveal status/controls + the board */}
+      {g && (
+        <div className={styles.selGame}>
+          <div className={styles.gameTop}>
+            <span className={styles.gameName}>{g.label}</span>
+            <span className={styles.gameKick}>{g.startTime ? `Kickoff ${whenLabel(g.startTime)}` : "Kickoff TBD"}</span>
+          </div>
+          {g.locked ? (
+            <div className={styles.gameRevRow}><span className={styles.gameState} data-locked>Numbers revealed ✓</span></div>
+          ) : phase === "locked" ? (
+            <div className={styles.gameRevRow}>
+              <span className={styles.revLabel}>Reveal numbers</span>
+              <span className={styles.revealControls}>
+                <input
+                  className={styles.revealInput}
+                  type="datetime-local"
+                  value={isoToLocal(g.revealAt)}
+                  onChange={(e) => doAction("schedule_reveal", { gameId: g.id, revealAt: localToISO(e.target.value) })}
+                />
+                <button type="button" className={styles.revealNow} disabled={!!busy} onClick={() => doAction("reveal_game", { gameId: g.id })}>Reveal now</button>
+              </span>
+            </div>
+          ) : (
+            <div className={styles.gameRevRow}><span className={styles.gameState}>{g.revealAt ? `Reveals ${whenLabel(g.revealAt)}` : "Awaiting board lock"}</span></div>
+          )}
+          <BoxesGrid
+            grid={grid}
+            teamRow={{ label: g.teamRow?.name ?? g.teamRow?.abbrev ?? "Away", sub: "away", color: g.teamRow?.color ?? null, logo: g.teamRow?.logo ?? null }}
+            teamCol={{ label: g.teamCol?.name ?? g.teamCol?.abbrev ?? "Home", sub: "home", color: g.teamCol?.color ?? null, logo: g.teamCol?.logo ?? null }}
+          />
         </div>
       )}
 
-      {g && (
-        <>
-          <p className={styles.gridNote}>
-            {drawn ? "Numbers locked." : "Numbers hidden until the board is full and you draw."}
-            {g.teamRow?.abbrev && g.teamCol?.abbrev ? ` Rows: ${g.teamRow.abbrev}, Cols: ${g.teamCol.abbrev}.` : ""}
-          </p>
-          <BoxesGrid grid={grid} teamRow={{ label: g.teamRow?.abbrev ?? "Rows" }} teamCol={{ label: g.teamCol?.abbrev ?? "Cols" }} />
-        </>
-      )}
-
-      {/* Games status */}
-      <div className={styles.gamesStatus}>
-        {games.map((x) => (
-          <div key={x.id} className={styles.gameRow}>
-            <span className={styles.gameName}>{x.label}</span>
-            <span className={styles.gameState} data-locked={x.locked || undefined}>{x.locked ? "numbers set" : "awaiting draw"}</span>
-          </div>
-        ))}
-      </div>
-
-      {(phase === "locked" || phase === "final") && (
-        <div className={styles.payouts}>
-          <div className={styles.payHeadRow}>
-            <h2 className={styles.payTitle}>Pay out</h2>
-            <span className={styles.paySub}>auto-scored from ESPN, paid by you</span>
-          </div>
-          {payouts.length === 0 ? (
-            <p className={styles.payEmpty}>{anyScored ? "No winners yet." : "No scores in yet — check back once the games are underway."}</p>
-          ) : (
-            payouts.map((p) => (
-              <div key={p.name} className={styles.payRow}>
-                <div className={styles.payTop}>
-                  <span className={styles.payName}>{p.name}</span>
-                  <span className={styles.payTotal}>{money(p.totalCents)}</span>
-                </div>
-                {p.lines.length > 0 && (
-                  <div className={styles.payLines}>
-                    {p.lines.map((l, i) => (
-                      <span key={i} className={styles.payLine}>{l.label} <b>{money(l.amountCents)}</b></span>
-                    ))}
+      {g && (phase === "locked" || phase === "final") && (() => {
+        const gp = payoutsByGame[g.id] ?? [];
+        const scored = scoredGameIds.includes(g.id);
+        return (
+          <div className={styles.payouts}>
+            <div className={styles.payHeadRow}>
+              <h2 className={styles.payTitle}>Pay out, {g.label}</h2>
+              <span className={styles.paySub}>auto-scored from ESPN, paid by you</span>
+            </div>
+            {gp.length === 0 ? (
+              <p className={styles.payEmpty}>
+                {!g.locked ? "Numbers aren't revealed for this game yet." : scored ? "No winners yet." : "No scores in yet — check back once this game is underway."}
+              </p>
+            ) : (
+              gp.map((p) => (
+                <div key={p.name} className={styles.payRow}>
+                  <div className={styles.payTop}>
+                    <span className={styles.payName}>{p.name}</span>
+                    <span className={styles.payTotal}>{money(p.totalCents)}</span>
                   </div>
-                )}
-              </div>
-            ))
-          )}
+                  {p.lines.length > 0 && (
+                    <div className={styles.payLines}>
+                      {p.lines.map((l, i) => (
+                        <span key={i} className={styles.payLine}>{l.label} <b>{money(l.amountCents)}</b></span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Quiet archive: only once every game has concluded. */}
+      {phase === "locked" && allConcluded && (
+        <div className={styles.archiveRow}>
+          <button type="button" className={styles.archiveLink} disabled={!!busy} onClick={() => doAction("finalize")}>Archive this pool</button>
+          <span className={styles.archiveNote}>Takes it off the home screen and stops auto-updates. Everyone paid? Archive it.</span>
         </div>
       )}
     </div>

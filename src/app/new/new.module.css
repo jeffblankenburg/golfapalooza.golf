@@ -2266,6 +2266,17 @@ button.feedRow:active {
   color: var(--ink-soft);
   font-size: 1rem;
 }
+.profileSubhead {
+  margin: 10px 0 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+.profileHint {
+  margin: 2px 0 2px;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
 .profileToggle {
   display: flex;
   align-items: center;

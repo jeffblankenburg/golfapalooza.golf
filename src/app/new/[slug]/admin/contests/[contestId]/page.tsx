@@ -1,7 +1,8 @@
 import { redirect, notFound } from "next/navigation";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
-import { PERIOD_PRESETS, gamePotShares, computeGamePayouts } from "@/lib/v2/contests/boxes";
+import { resolvePayouts, computeGamePayoutsFromSlices } from "@/lib/v2/contests/boxes";
+import { buildGameAllocations } from "@/lib/v2/contests/boxes-alloc";
 import { getLeague, fetchGameScore, periodScoresFromGame } from "@/lib/v2/sports/espn";
 import BoxesManage, { type ManageGame, type PayoutRow } from "./BoxesManage";
 
@@ -24,7 +25,7 @@ export default async function BoxesDetailPage({ params }: { params: Promise<{ sl
 
   const { data: gameRows } = await supabase
     .from("v2_boxes_games")
-    .select("id, espn_event_id, league, label, team_row, team_col, row_digits, col_digits, locked_at, period_scores, start_time, sort_order")
+    .select("id, espn_event_id, league, label, team_row, team_col, row_digits, col_digits, locked_at, reveal_at, status, period_scores, game_alloc, period_alloc, start_time, sort_order")
     .eq("contest_id", contestId)
     .order("start_time", { ascending: true, nullsFirst: false })
     .order("sort_order");
@@ -54,6 +55,9 @@ export default async function BoxesDetailPage({ params }: { params: Promise<{ sl
     rowDigits: (g.row_digits as number[]) ?? [],
     colDigits: (g.col_digits as number[]) ?? [],
     locked: !!g.locked_at,
+    revealAt: (g.reveal_at as string) ?? null,
+    startTime: (g.start_time as string) ?? null,
+    final: (g.status as string) === "final",
   }));
 
   const cfg = (contest.config as Record<string, unknown>) ?? {};
@@ -65,11 +69,19 @@ export default async function BoxesDetailPage({ params }: { params: Promise<{ sl
   for (const c of cells ?? []) if (c.user_id) ownerById[`${c.grid_row},${c.grid_col}`] = c.user_id;
 
   const potCents = claimed * ((cfg.cell_cost_cents as number) ?? 0);
-  const shares = gamePotShares(gameRows?.length ?? 0, potCents, (cfg.pot_allocation as "equal" | "round_weighted" | "custom") ?? "equal");
-  const periodWeights = (cfg.period_weights as Record<string, Record<string, number>>) ?? {};
+  // Resolve the flexible $/%/remainder allocations once for the whole pool, then
+  // feed each game its per-period dollar slices.
+  const allocGames = buildGameAllocations(
+    (gameRows ?? []).map((g) => ({ id: g.id as string, league: g.league as string, game_alloc: g.game_alloc, period_alloc: g.period_alloc })),
+    potCents,
+    { potAllocation: (cfg.pot_allocation as "equal" | "round_weighted" | "custom") ?? "equal", periodWeights: (cfg.period_weights as Record<string, Record<string, number>>) ?? {} },
+  );
+  const slicesByGame = new Map(resolvePayouts(potCents, allocGames).games.map((rg) => [rg.key, rg.periods]));
 
-  const perUser: Record<string, { total: number; lines: { label: string; amountCents: number }[] }> = {};
-  let anyScored = false;
+  // Payouts PER GAME (the manage page shows the selected game's). Each row is a
+  // person's take for that one game, lines broken out by period.
+  const payoutsByGame: Record<string, PayoutRow[]> = {};
+  const scoredGameIds: string[] = [];
   for (let i = 0; i < (gameRows ?? []).length; i++) {
     const g = gameRows![i];
     if (!g.locked_at) continue;
@@ -83,25 +95,21 @@ export default async function BoxesDetailPage({ params }: { params: Promise<{ sl
       if (score) ps = periodScoresFromGame(score, structure);
     }
     if (!ps) continue;
-    if (Object.values(ps).some((v) => v)) anyScored = true;
-    const payout = computeGamePayouts(
+    if (Object.values(ps).some((v) => v)) scoredGameIds.push(g.id as string);
+    const payout = computeGamePayoutsFromSlices(
       { owners: ownerById, rowDigits: (g.row_digits as number[]) ?? [], colDigits: (g.col_digits as number[]) ?? [] },
-      shares[i] ?? 0,
-      PERIOD_PRESETS[structure],
-      periodWeights[structure],
+      slicesByGame.get(g.id as string) ?? [],
       ps,
     );
-    for (const [uid, cents] of Object.entries(payout.byOwner)) {
-      perUser[uid] ??= { total: 0, lines: [] };
-      perUser[uid].total += cents;
-    }
+    const per: Record<string, { total: number; lines: { label: string; amountCents: number }[] }> = {};
+    for (const [uid, cents] of Object.entries(payout.byOwner)) per[uid] = { total: cents, lines: [] };
     for (const pr of payout.perPeriod) {
-      if (pr.ownerId && pr.amountCents > 0) perUser[pr.ownerId].lines.push({ label: `${g.label} ${pr.label}`, amountCents: pr.amountCents });
+      if (pr.ownerId && pr.amountCents > 0) (per[pr.ownerId] ??= { total: 0, lines: [] }).lines.push({ label: pr.label, amountCents: pr.amountCents });
     }
+    payoutsByGame[g.id as string] = Object.entries(per)
+      .map(([uid, v]) => ({ name: nameById.get(uid) || "Member", totalCents: v.total, lines: v.lines }))
+      .sort((a, b) => b.totalCents - a.totalCents);
   }
-  const payouts: PayoutRow[] = Object.entries(perUser)
-    .map(([uid, v]) => ({ name: nameById.get(uid) || "Member", totalCents: v.total, lines: v.lines }))
-    .sort((a, b) => b.totalCents - a.totalCents);
 
   return (
     <BoxesManage
@@ -114,8 +122,8 @@ export default async function BoxesDetailPage({ params }: { params: Promise<{ sl
       games={games}
       owners={owners}
       claimed={claimed}
-      payouts={payouts}
-      anyScored={anyScored}
+      payoutsByGame={payoutsByGame}
+      scoredGameIds={scoredGameIds}
     />
   );
 }

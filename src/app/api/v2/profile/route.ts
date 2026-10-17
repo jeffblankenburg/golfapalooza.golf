@@ -10,7 +10,7 @@ import { displayNameFrom } from "@/lib/v2/profile";
  */
 
 const PROFILE_COLUMNS =
-  "id, display_name, avatar_url, phone, first_name, last_name, nickname, birthdate, zip, occupation, city, state, playing_since, swings, typical_shot, shirt_size, fun_fact, best_shot, show_on_map";
+  "id, display_name, avatar_url, phone, first_name, last_name, nickname, birthdate, zip, occupation, city, state, playing_since, swings, typical_shot, shirt_size, fun_fact, best_shot, show_on_map, venmo_username, paypal_username, mailing_address";
 
 const SWINGS = ["right", "left", "both"];
 const SHOTS = ["straight", "slice", "hook", "draw", "fade"];
@@ -88,6 +88,11 @@ export async function PATCH(request: Request) {
   if ("fun_fact" in body) patch.fun_fact = str(body.fun_fact);
   if ("best_shot" in body) patch.best_shot = str(body.best_shot);
   if ("show_on_map" in body) patch.show_on_map = !!body.show_on_map;
+  // Payment info — store the handle only (strip a leading @ / full URL).
+  const handle = (v: unknown) => str(v)?.replace(/^@/, "").replace(/^https?:\/\/(www\.)?(venmo\.com|paypal\.me)\//i, "").replace(/\/$/, "") ?? null;
+  if ("venmo_username" in body) patch.venmo_username = handle(body.venmo_username);
+  if ("paypal_username" in body) patch.paypal_username = handle(body.paypal_username);
+  if ("mailing_address" in body) patch.mailing_address = str(body.mailing_address);
   if ("tracked_stats" in body) {
     const allowed = ["putts", "fairways", "gir", "penalties"];
     const arr = Array.isArray(body.tracked_stats) ? body.tracked_stats : [];

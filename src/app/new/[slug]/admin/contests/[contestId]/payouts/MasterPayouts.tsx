@@ -16,6 +16,7 @@ export interface PayoutPerson {
   paypal: string | null;
   address: string | null;
   lines: { label: string; amountCents: number }[];
+  games: { gameId: string; wonCents: number }[];
 }
 
 const money = (c: number) => `$${c / 100 % 1 === 0 ? (c / 100).toFixed(0) : (c / 100).toFixed(2)}`;
@@ -48,7 +49,7 @@ export default function MasterPayouts({
   const totalWon = people.reduce((t, p) => t + p.wonCents, 0);
   const totalOwed = people.reduce((t, p) => t + Math.max(0, p.wonCents - p.paidCents), 0);
 
-  async function act(action: string, person: PayoutPerson, paidCents?: number, note?: string | null) {
+  async function act(action: string, person: PayoutPerson, extra?: Record<string, unknown>) {
     if (busy) return;
     setBusy(person.userId);
     setErr(null);
@@ -56,7 +57,7 @@ export default function MasterPayouts({
       const res = await fetch(`/api/v2/orgs/${orgId}/contests/${contestId}/boxes/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, userId: person.userId, paidCents, note }),
+        body: JSON.stringify({ action, userId: person.userId, ...extra }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) setErr(d.error || "Couldn't update.");
@@ -147,9 +148,9 @@ export default function MasterPayouts({
                     {paid ? (
                       <button type="button" className={styles.unmark} disabled={busy === p.userId} onClick={() => act("unmark_paid", p)}>Mark unpaid</button>
                     ) : (
-                      <button type="button" className={styles.markPaid} disabled={busy === p.userId} onClick={() => act("mark_paid", p, p.wonCents, noteDraft)}>Mark {money(owed)} paid</button>
+                      <button type="button" className={styles.markPaid} disabled={busy === p.userId} onClick={() => act("mark_paid", p, { items: p.games.map((g) => ({ gameId: g.gameId, paidCents: g.wonCents })), note: noteDraft })}>Mark {money(owed)} paid</button>
                     )}
-                    {paid && <button type="button" className={styles.unmark} disabled={busy === p.userId} onClick={() => act("mark_paid", p, p.paidCents, noteDraft)}>Update note</button>}
+                    {paid && <button type="button" className={styles.unmark} disabled={busy === p.userId} onClick={() => act("mark_paid", p, { items: p.games.map((g) => ({ gameId: g.gameId, paidCents: g.wonCents })), note: noteDraft })}>Update note</button>}
                   </div>
                 </div>
               )}

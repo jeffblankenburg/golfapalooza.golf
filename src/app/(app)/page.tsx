@@ -628,8 +628,16 @@ export default async function HomePage() {
     visibility_overrides: (trip.visibility_overrides as Record<string, boolean>) || {},
   };
 
+  // Event-over gate: once today is past the last scheduled event day the
+  // trip is complete, so retire the during/pre-event cards (tee time,
+  // Calcutta roster, options prompt). The scoring, KGB Cup, and Up Next
+  // cards already self-hide once their day passes; Winnings and Balance
+  // intentionally stay so people can still settle up afterward.
+  const maxEventDay = eventDaysData.reduce((max, ed) => Math.max(max, ed.day_number), 0);
+  const eventIsOver = maxEventDay > 0 && todayDayNumber > maxEventDay;
+
   // Gate tee time card
-  const teeTimesVisible = isFeatureVisible("tee_times", visCtx, effectiveDate);
+  const teeTimesVisible = isFeatureVisible("tee_times", visCtx, effectiveDate) && !eventIsOver;
 
   // Gate scoring cards — per-player tee time window
   const scoringVisible = (teeTime: string | null, dayNumber: number | null) =>
@@ -692,7 +700,7 @@ export default async function HomePage() {
       nextScheduleItem={nextScheduleItem}
       timezone={trip?.timezone}
       courseName={courseVenue}
-      myCalcuttaRoster={myCalcuttaRoster}
+      myCalcuttaRoster={eventIsOver ? null : myCalcuttaRoster}
       calcuttaBuyerOwes={calcuttaBuyerOwes}
       contestTypes={contestTypes}
       activeRounds={visibleActiveRounds}
@@ -701,7 +709,7 @@ export default async function HomePage() {
       pickemUrgent={pickemUrgent}
       myWinnings={myWinnings}
       myBalance={myBalance}
-      optionsDeadline={optionsDeadline}
+      optionsDeadline={eventIsOver ? null : optionsDeadline}
       hasCompletedOptions={hasCompletedOptions}
       showOptionsCompletion={optionSettings?.is_open === true && requiredOptionsForCompletion.length > 0}
       latestArticle={latestArticleResult.data ? (() => {

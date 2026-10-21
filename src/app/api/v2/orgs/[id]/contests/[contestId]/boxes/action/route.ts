@@ -45,7 +45,15 @@ export async function POST(request: Request, { params }: { params: Params }) {
     .maybeSingle();
   if (!contest || contest.contest_type !== "boxes") return NextResponse.json({ error: "Boxes pool not found" }, { status: 404 });
 
-  let body: { action?: string; gameId?: string; revealAt?: string | null; userId?: string; paidCents?: number; note?: string | null };
+  let body: {
+    action?: string;
+    gameId?: string;
+    revealAt?: string | null;
+    userId?: string;
+    paidCents?: number;
+    note?: string | null;
+    items?: { gameId: string; paidCents: number }[];
+  };
   try {
     body = await request.json();
   } catch {
@@ -139,20 +147,43 @@ export async function POST(request: Request, { params }: { params: Params }) {
     return NextResponse.json({ ok: true, phase: "locked" });
   }
 
-  // Mark a member paid (records the amount, so later winnings show a balance) / unmark.
+  // Mark a member paid for one game, or settle many games at once. Paid state is
+  // per (member, game) so an admin can pay a single game now (each week of a slate)
+  // or clear a member's whole-pool take in one shot (the master-payouts "pay it
+  // all", which sends every unpaid game as `items`). A member's balance is the sum
+  // across their game rows, so both paths reconcile.
   if (action === "mark_paid") {
     if (!body.userId) return NextResponse.json({ error: "Missing member." }, { status: 400 });
-    const paidCents = Math.max(0, Math.round(body.paidCents ?? 0));
     const note = typeof body.note === "string" && body.note.trim() ? body.note.trim().slice(0, 200) : null;
-    const { error } = await admin
-      .from("v2_boxes_payouts")
-      .upsert({ contest_id: contestId, user_id: body.userId, paid_cents: paidCents, paid_at: new Date().toISOString(), paid_by: userId, note }, { onConflict: "contest_id,user_id" });
+    const now = new Date().toISOString();
+    // Bulk: one row per game in `items`. Single: `gameId` + `paidCents`.
+    const rows = (body.items?.length
+      ? body.items
+      : body.gameId
+        ? [{ gameId: body.gameId, paidCents: body.paidCents ?? 0 }]
+        : []
+    )
+      .filter((r) => r.gameId)
+      .map((r) => ({
+        contest_id: contestId,
+        user_id: body.userId!,
+        game_id: r.gameId,
+        paid_cents: Math.max(0, Math.round(r.paidCents ?? 0)),
+        paid_at: now,
+        paid_by: userId,
+        note,
+      }));
+    if (rows.length === 0) return NextResponse.json({ error: "Missing game." }, { status: 400 });
+    const { error } = await admin.from("v2_boxes_payouts").upsert(rows, { onConflict: "contest_id,user_id,game_id" });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
+  // Unmark one game (gameId given) or every game for a member (no gameId).
   if (action === "unmark_paid") {
     if (!body.userId) return NextResponse.json({ error: "Missing member." }, { status: 400 });
-    const { error } = await admin.from("v2_boxes_payouts").delete().eq("contest_id", contestId).eq("user_id", body.userId);
+    let q = admin.from("v2_boxes_payouts").delete().eq("contest_id", contestId).eq("user_id", body.userId);
+    if (body.gameId) q = q.eq("game_id", body.gameId);
+    const { error } = await q;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }

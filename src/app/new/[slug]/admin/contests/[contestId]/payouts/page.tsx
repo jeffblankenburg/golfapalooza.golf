@@ -27,7 +27,7 @@ export default async function MasterPayoutsPage({ params }: { params: Promise<{ 
   const [{ data: gameRows }, { data: cells }, { data: paidRows }] = await Promise.all([
     supabase.from("v2_boxes_games").select("id, espn_event_id, league, label, row_digits, col_digits, locked_at, period_scores, game_alloc, period_alloc").eq("contest_id", contestId).order("start_time", { ascending: true, nullsFirst: false }).order("sort_order"),
     supabase.from("v2_boxes_cells").select("grid_row, grid_col, user_id").eq("contest_id", contestId),
-    supabase.from("v2_boxes_payouts").select("user_id, paid_cents, note").eq("contest_id", contestId),
+    supabase.from("v2_boxes_payouts").select("user_id, game_id, paid_cents, note").eq("contest_id", contestId),
   ]);
 
   const ownerById: Record<string, string> = {};
@@ -43,8 +43,10 @@ export default async function MasterPayoutsPage({ params }: { params: Promise<{ 
   );
   const slicesByGame = new Map(resolvePayouts(potCents, allocGames).games.map((rg) => [rg.key, rg.periods]));
 
-  // Aggregate winnings per person across every scored game.
+  // Aggregate winnings per person across every scored game. `wonByGame` keeps the
+  // per-game breakdown so "pay it all" can settle each game row in one shot.
   const won: Record<string, { total: number; lines: { label: string; amountCents: number }[] }> = {};
+  const wonByGame: Record<string, Record<string, number>> = {};
   for (const g of gameRows ?? []) {
     if (!g.locked_at) continue;
     const structure = getLeague(g.league as string)?.periods;
@@ -64,6 +66,8 @@ export default async function MasterPayoutsPage({ params }: { params: Promise<{ 
       if (pr.ownerId && pr.amountCents > 0) {
         (won[pr.ownerId] ??= { total: 0, lines: [] }).total += pr.amountCents;
         won[pr.ownerId].lines.push({ label: `${g.label} ${pr.label}`, amountCents: pr.amountCents });
+        const gw = (wonByGame[pr.ownerId] ??= {});
+        gw[g.id as string] = (gw[g.id as string] ?? 0) + pr.amountCents;
       }
     }
   }
@@ -74,7 +78,14 @@ export default async function MasterPayoutsPage({ params }: { params: Promise<{ 
     ? await supabase.from("v2_profiles").select("id, display_name, venmo_username, paypal_username, mailing_address").in("id", winnerIds)
     : { data: [] as { id: string; display_name: string | null; venmo_username: string | null; paypal_username: string | null; mailing_address: string | null }[] };
   const profById = new Map((profiles ?? []).map((p) => [p.id, p]));
-  const paidById = new Map((paidRows ?? []).map((r) => [r.user_id, { cents: r.paid_cents as number, note: (r.note as string) ?? null }]));
+  // Paid is now one row per (member, game); roll it up to a per-member total.
+  const paidById = new Map<string, { cents: number; note: string | null }>();
+  for (const r of paidRows ?? []) {
+    const cur = paidById.get(r.user_id as string) ?? { cents: 0, note: null };
+    cur.cents += (r.paid_cents as number) ?? 0;
+    if (!cur.note && r.note) cur.note = r.note as string;
+    paidById.set(r.user_id as string, cur);
+  }
 
   const people: PayoutPerson[] = winnerIds
     .map((uid) => {
@@ -90,6 +101,7 @@ export default async function MasterPayoutsPage({ params }: { params: Promise<{ 
         paypal: p?.paypal_username ?? null,
         address: p?.mailing_address ?? null,
         lines: won[uid].lines,
+        games: Object.entries(wonByGame[uid] ?? {}).map(([gameId, wonCents]) => ({ gameId, wonCents })),
       };
     })
     .sort((a, b) => b.wonCents - a.wonCents);

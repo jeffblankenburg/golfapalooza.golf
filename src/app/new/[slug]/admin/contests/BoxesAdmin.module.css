@@ -701,38 +701,58 @@
   font-size: 0.85rem;
   color: var(--ink-soft, #59635b);
 }
+/* Each pool is a collapse-by-default card: a header (expand) + a gear (edit),
+   and an expandable body listing its games in kickoff order. */
 .rowWrap {
   position: relative;
-}
-.row {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  width: 100%;
-  padding: 12px 48px 12px 14px;
   border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
   border-radius: 12px;
   background: var(--card, #fff);
-  text-align: left;
-  text-decoration: none;
-  cursor: pointer;
+  overflow: hidden;
 }
-.row:hover {
+.rowWrap[data-open],
+.rowWrap:hover {
   border-color: var(--brand, #0a5c36);
 }
-/* Gear floats over the card's top-right; the rest of the card is the detail link. */
+.rowHead {
+  display: flex;
+  align-items: stretch;
+}
+.rowMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 8px 12px 14px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.rowHeadText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rowChev {
+  flex: none;
+  color: var(--ink-soft, #59635b);
+  transition: transform 0.15s ease;
+}
+.rowChev[data-open] {
+  transform: rotate(180deg);
+}
 .rowGear {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 34px;
-  height: 34px;
+  flex: none;
+  width: 46px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 9px;
   border: none;
+  border-left: 1px solid var(--line, rgba(23, 33, 29, 0.12));
   background: transparent;
   color: var(--ink-soft, #59635b);
   cursor: pointer;
@@ -786,19 +806,74 @@
   font-size: 0.78rem;
   color: var(--ink-soft, #59635b);
 }
-.rowGames {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  margin-top: 4px;
-}
-.rowGame {
-  font-size: 0.78rem;
+.rowCount {
+  font-size: 0.72rem;
+  font-weight: 700;
   color: var(--ink-soft, #59635b);
 }
-.rowGame b {
+/* Expanded body: games in kickoff order + a link into the full manage page. */
+.rowBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 14px 14px;
+  border-top: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+}
+.rowEmpty {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ink-soft, #59635b);
+}
+.gameTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+.gameTable td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line, rgba(23, 33, 29, 0.1));
+  font-size: 0.8rem;
+  vertical-align: middle;
+}
+.gameTable td:first-child {
+  padding-left: 0;
+}
+.gameTable td:last-child {
+  padding-right: 0;
+}
+.gameTable tr:last-child td {
+  border-bottom: none;
+}
+/* Three fixed columns, each with its own boundary: date shrinks to content,
+   matchup takes the rest, pays shrinks to content. Light vertical rules keep
+   them visually separate instead of running together. */
+.gtWhen {
+  width: 1px;
+  white-space: nowrap;
+  color: var(--ink-soft, #59635b);
+  font-variant-numeric: tabular-nums;
+}
+.gtGame {
+  font-weight: 700;
+  color: var(--ink, #17211c);
+  border-left: 1px solid var(--line, rgba(23, 33, 29, 0.1));
+}
+.gtPay {
+  width: 1px;
+  white-space: nowrap;
+  text-align: right;
   font-weight: 800;
   color: var(--brand, #0a5c36);
+  border-left: 1px solid var(--line, rgba(23, 33, 29, 0.1));
+}
+.manageLink {
+  align-self: flex-start;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--brand, #0a5c36);
+  text-decoration: none;
+}
+.manageLink:hover {
+  text-decoration: underline;
 }
 .rowRest {
   margin-left: 4px;

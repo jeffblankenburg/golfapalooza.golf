@@ -122,63 +122,114 @@
   font-weight: 600;
   color: #b91c1c;
 }
-.gamePick {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
-  background: var(--card, #fff);
-  color: var(--ink, #17211c);
-  font-size: 0.92rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-.gridNote {
+/* Game accordions — one per game, in kickoff order. */
+.noGames {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   color: var(--ink-soft, #59635b);
 }
-.gamesStatus {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.selGame {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.selGame .gameTop,
-.selGame .gameRevRow {
-  padding: 0 2px;
-}
-.gameRow {
+.gameList {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
-  border-radius: 10px;
-  background: var(--card, #fff);
 }
-.gameTop {
+.game {
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  border-radius: 12px;
+  background: var(--card, #fff);
+  overflow: hidden;
+}
+.game[data-open] {
+  border-color: var(--brand, #0a5c36);
+}
+.gameHead {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: stretch;
+}
+.gameHeadMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
   gap: 10px;
+  padding: 11px 10px 11px 13px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.gameHeadText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .gameName {
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   font-weight: 800;
   color: var(--ink, #17211c);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.gameKick {
-  font-size: 0.76rem;
+.gameWhen {
+  font-size: 0.74rem;
   font-weight: 700;
   color: var(--ink-soft, #59635b);
-  white-space: nowrap;
 }
-.gameRevRow {
+.gameStatus {
+  flex: none;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  color: var(--ink-soft, #59635b);
+  background: color-mix(in srgb, var(--ink, #17211c) 8%, transparent);
+}
+.gameStatus[data-tone="revealed"],
+.gameStatus[data-tone="final"] {
+  color: var(--brand, #0a5c36);
+  background: color-mix(in srgb, var(--brand, #0a5c36) 12%, transparent);
+}
+.gameStatus[data-tone="scheduled"] {
+  color: #b45309;
+  background: color-mix(in srgb, #d97706 12%, transparent);
+}
+.chev {
+  flex: none;
+  color: var(--ink-soft, #59635b);
+  transition: transform 0.15s ease;
+}
+.chev[data-open] {
+  transform: rotate(180deg);
+}
+.revealIcon {
+  flex: none;
+  width: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-left: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  background: transparent;
+  color: var(--brand, #0a5c36);
+  cursor: pointer;
+}
+.revealIcon:hover {
+  background: color-mix(in srgb, var(--brand, #0a5c36) 10%, transparent);
+}
+.gameBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 12px 14px;
+  border-top: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+}
+.revRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -190,29 +241,12 @@
   font-weight: 700;
   color: var(--ink-soft, #59635b);
 }
-.gameState {
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: var(--ink-soft, #59635b);
-}
-.gameState[data-locked] {
-  color: var(--brand, #0a5c36);
-}
-.gameRow[data-revealed] {
-  border-color: color-mix(in srgb, var(--brand, #0a5c36) 35%, var(--line, rgba(23, 33, 29, 0.12)));
-  background: color-mix(in srgb, var(--brand, #0a5c36) 5%, var(--card, #fff));
-}
-.revealHead {
-  font-size: 0.76rem;
-  color: var(--ink-soft, #59635b);
-  padding: 0 2px 2px;
-}
-.revealControls {
+.revControls {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
-.revealInput {
+.revInput {
   padding: 5px 7px;
   border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
   border-radius: 8px;
@@ -221,7 +255,7 @@
   color: var(--ink, #17211c);
   background: var(--paper, #f6f6f1);
 }
-.revealNow {
+.revNow {
   padding: 6px 10px;
   border-radius: 8px;
   border: none;
@@ -232,25 +266,25 @@
   cursor: pointer;
   white-space: nowrap;
 }
-.revealNow:disabled {
+.revNow:disabled {
   opacity: 0.6;
 }
-.lockedControls {
+
+/* Completed games, grouped at the bottom. */
+.completedSection {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
 }
-.revealCount {
-  font-size: 0.82rem;
+.completedTitle {
+  margin: 4px 0 0;
+  font-size: 0.74rem;
   font-weight: 800;
-  color: var(--ink, #17211c);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft, #59635b);
 }
-.lockedBtns {
-  display: inline-flex;
-  gap: 8px;
-}
+
 .archiveRow {
   display: flex;
   flex-direction: column;
@@ -275,6 +309,8 @@
   color: var(--ink-soft, #59635b);
   text-align: center;
 }
+
+/* Payouts under a revealed game */
 .payouts {
   display: flex;
   flex-direction: column;
@@ -287,42 +323,79 @@
 }
 .payTitle {
   margin: 0;
-  font-size: 1.05rem;
-  font-weight: 800;
-  color: var(--ink, #17211c);
-}
-.paySub {
-  font-size: 0.74rem;
-  color: var(--ink-soft, #59635b);
-}
-.payEmpty {
-  margin: 0;
-  font-size: 0.85rem;
-  color: var(--ink-soft, #59635b);
-}
-.payRow {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 11px 13px;
-  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
-  border-radius: 12px;
-  background: var(--card, #fff);
-}
-.payTop {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.payName {
   font-size: 0.95rem;
   font-weight: 800;
   color: var(--ink, #17211c);
 }
-.payTotal {
-  font-size: 1.05rem;
+.paySub {
+  font-size: 0.72rem;
+  color: var(--ink-soft, #59635b);
+}
+.payEmpty {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ink-soft, #59635b);
+}
+/* One expandable row per winner: name + amount, tap for note + mark-paid. */
+.payRow {
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  border-radius: 10px;
+  background: var(--paper, #f6f6f1);
+  overflow: hidden;
+}
+.payRow[data-paid] {
+  border-color: color-mix(in srgb, var(--brand, #0a5c36) 30%, var(--line, rgba(23, 33, 29, 0.12)));
+  background: color-mix(in srgb, var(--brand, #0a5c36) 5%, var(--paper, #f6f6f1));
+}
+.payRowHead {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.payName {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.payNoteTag {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--ink-soft, #59635b);
+}
+.payAmt {
+  flex: none;
+}
+.paidTag {
+  font-size: 0.74rem;
   font-weight: 800;
   color: var(--brand, #0a5c36);
+}
+.owedTag {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #b45309;
+}
+.wonTag {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--brand, #0a5c36);
+}
+.payBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 12px;
 }
 .payLines {
   display: flex;
@@ -336,4 +409,110 @@
 .payLine b {
   color: var(--ink, #17211c);
   font-weight: 800;
+}
+.noteField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.noteLabel {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft, #59635b);
+}
+.noteInput {
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: var(--ink, #17211c);
+  background: var(--card, #fff);
+}
+.payActions {
+  display: flex;
+}
+.markPaid {
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: none;
+  background: var(--brand, #0a5c36);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.markPaid:disabled {
+  opacity: 0.6;
+}
+.unmark {
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
+  background: transparent;
+  color: var(--ink-soft, #59635b);
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* Box score under a game's grid: per-period points, then running totals. The
+   grid column count is set inline (varies by sport); cells flow row by row. */
+.score {
+  display: grid;
+  column-gap: 6px;
+  row-gap: 3px;
+  align-items: center;
+  margin-top: 2px;
+  padding: 9px 11px;
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  border-radius: 10px;
+  background: var(--paper, #f6f6f1);
+  font-variant-numeric: tabular-nums;
+}
+.scoreCorner {
+  min-height: 1px;
+}
+.scoreCol {
+  text-align: right;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft, #59635b);
+}
+.scoreTeam {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+}
+.scoreTeam[data-cum] {
+  font-weight: 700;
+  color: var(--ink-soft, #59635b);
+}
+.scoreVal {
+  text-align: right;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink, #17211c);
+}
+.scoreVal[data-cum] {
+  font-weight: 600;
+  color: var(--ink-soft, #59635b);
+}
+.scoreTot {
+  font-weight: 800;
+  color: var(--brand, #0a5c36);
+}
+.scoreSub {
+  grid-column: 1 / -1;
+  margin-top: 3px;
+  padding-top: 5px;
+  border-top: 1px solid var(--line, rgba(23, 33, 29, 0.1));
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft, #59635b);
 }

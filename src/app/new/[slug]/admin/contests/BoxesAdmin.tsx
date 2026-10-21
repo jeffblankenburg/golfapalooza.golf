@@ -159,6 +159,14 @@ export default function BoxesAdmin({ orgId, slug, contests }: { orgId: string; s
   const [saving, setSaving] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Which pools are expanded in the list (collapsed by default).
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleRow = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
 
   const cost = parseStake(costStr);
   // Distinct game structures among the picked games (NCAA = halves, NBA/NFL = quarters).
@@ -646,28 +654,54 @@ export default function BoxesAdmin({ orgId, slug, contests }: { orgId: string; s
           );
           const centsByGame = new Map(resolvePayouts(cPot, cAlloc).games.map((rg) => [rg.key, rg.cents]));
           const restId = c.games.find((g) => g.gameAlloc?.kind === "remainder")?.espnEventId;
+          const isOpen = expanded.has(c.id);
+          // Games listed in kickoff order; undated (TBD) games sort to the end.
+          const orderedGames = [...c.games].sort((a, b) => {
+            if (!a.startTime) return 1;
+            if (!b.startTime) return -1;
+            return a.startTime.localeCompare(b.startTime);
+          });
           return (
-            <div key={c.id} className={styles.rowWrap}>
-              <Link href={`/new/${slug}/admin/contests/${c.id}`} className={styles.row}>
-                <span className={styles.rowName}>{c.name}</span>
-                <span className={styles.rowMeta}>
-                  {money(c.cellCostCents)}/square, {money(c.cellCostCents * 100)} pot, {c.status}
-                </span>
-                <span className={styles.rowGames}>
-                  {c.games.map((g) => (
-                    <span key={g.espnEventId} className={styles.rowGame}>
-                      {g.label || "Game"} <b>{money(centsByGame.get(g.espnEventId) ?? 0)}</b>
-                      {g.espnEventId === restId && <span className={styles.rowRest}>rest</span>}
-                    </span>
-                  ))}
-                </span>
-              </Link>
-              <button type="button" className={styles.rowGear} onClick={() => openEdit(c)} aria-label="Edit settings" title="Edit settings">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                </svg>
-              </button>
+            <div key={c.id} className={styles.rowWrap} data-open={isOpen || undefined}>
+              <div className={styles.rowHead}>
+                <button type="button" className={styles.rowMain} onClick={() => toggleRow(c.id)} aria-expanded={isOpen}>
+                  <span className={styles.rowHeadText}>
+                    <span className={styles.rowName}>{c.name}</span>
+                    <span className={styles.rowMeta}>{money(c.cellCostCents)}/square, {money(cPot)} pot, {c.status}</span>
+                    <span className={styles.rowCount}>{c.games.length} game{c.games.length === 1 ? "" : "s"}</span>
+                  </span>
+                  <svg className={styles.rowChev} data-open={isOpen || undefined} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+                </button>
+                <button type="button" className={styles.rowGear} onClick={() => openEdit(c)} aria-label="Edit settings" title="Edit settings">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                  </svg>
+                </button>
+              </div>
+              {isOpen && (
+                <div className={styles.rowBody}>
+                  {orderedGames.length === 0 ? (
+                    <p className={styles.rowEmpty}>No games yet. Tap the gear to add some.</p>
+                  ) : (
+                    <table className={styles.gameTable}>
+                      <tbody>
+                        {orderedGames.map((g) => (
+                          <tr key={g.espnEventId}>
+                            <td className={styles.gtWhen}>{g.startTime ? dateLabel(g.startTime) : "TBD"}</td>
+                            <td className={styles.gtGame}>{g.label || "Game"}</td>
+                            <td className={styles.gtPay}>
+                              {money(centsByGame.get(g.espnEventId) ?? 0)}
+                              {g.espnEventId === restId && <span className={styles.rowRest}>rest</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  <Link href={`/new/${slug}/admin/contests/${c.id}`} className={styles.manageLink}>Manage pool →</Link>
+                </div>
+              )}
             </div>
           );
         })}

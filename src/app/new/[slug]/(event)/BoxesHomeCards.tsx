@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { v2ServerClient } from "@/lib/v2/supabase";
-import { winningCell, resolvePayouts } from "@/lib/v2/contests/boxes";
+import { winningCell, resolvePayouts, computeGamePayoutsFromSlices } from "@/lib/v2/contests/boxes";
 import { buildGameAllocations } from "@/lib/v2/contests/boxes-alloc";
 import { getLeague } from "@/lib/v2/sports/espn";
 import styles from "./BoxesHomeCards.module.css";
@@ -159,15 +159,25 @@ export default async function BoxesHomeCards({ orgId, userId, slug }: { orgId: s
       potCents,
       { potAllocation: cfg.pot_allocation ?? "equal", periodWeights: cfg.period_weights ?? {} },
     );
-    const sliceCentsFor = new Map(
-      resolvePayouts(potCents, allocGames).games.map((rg) => [rg.key, new Map(rg.periods.map((p) => [p.key, p.cents]))]),
-    );
+    const resolved = resolvePayouts(potCents, allocGames);
+    const sliceCentsFor = new Map(resolved.games.map((rg) => [rg.key, new Map(rg.periods.map((p) => [p.key, p.cents]))]));
+
+    // This member's running winnings across every scored game in the pool, and how
+    // many games are still to be decided.
+    const poolOwners: Record<string, string> = {};
+    for (const x of cells ?? []) if (x.contest_id === c.id && x.user_id) poolOwners[`${x.grid_row},${x.grid_col}`] = x.user_id;
+    const periodsByGame = new Map(resolved.games.map((rg) => [rg.key, rg.periods]));
+    let myWinnings = 0;
+    for (const g of games) {
+      const payout = computeGamePayoutsFromSlices({ owners: poolOwners, rowDigits: g.rowDigits, colDigits: g.colDigits }, periodsByGame.get(g.id) ?? [], g.periodScores ?? {});
+      myWinnings += payout.byOwner[userId] ?? 0;
+    }
+    const remaining = allGames.filter((g) => (g.status as string) !== "final").length;
 
     const liveGames = games.filter((g) => g.live?.state === "in");
     const upcoming = games.filter((g) => !g.final && g.live?.state !== "in").sort((a, b) => (a.startTime ?? "").localeCompare(b.startTime ?? ""));
     const finals = games.filter((g) => g.final).sort((a, b) => (b.startTime ?? "").localeCompare(a.startTime ?? ""));
     const featured = liveGames.length ? liveGames : upcoming.length ? [upcoming[0]] : finals.length ? [finals[0]] : [games[0]];
-    const moreCount = games.length - featured.length;
 
     cards.push(
       <Link key={c.id} href={href} className={styles.gameCard}>
@@ -216,7 +226,15 @@ export default async function BoxesHomeCards({ orgId, userId, slug }: { orgId: s
             </div>
           );
         })}
-        {moreCount > 0 && <span className={styles.more}>+{moreCount} more {moreCount === 1 ? "game" : "games"}</span>}
+        <div className={styles.poolFoot}>
+          <span className={styles.remaining}>
+            {remaining > 0 ? `${remaining} game${remaining === 1 ? "" : "s"} left` : "All games final"}
+          </span>
+          <span className={styles.winnings}>
+            <span className={styles.winLabel}>Winnings</span>
+            <span className={styles.winValue} data-zero={myWinnings === 0 || undefined}>{money(myWinnings)}</span>
+          </span>
+        </div>
       </Link>,
     );
   }

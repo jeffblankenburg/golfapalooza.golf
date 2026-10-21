@@ -57,14 +57,21 @@
 /* Game picker: a dropdown (handles long slates far better than pills). */
 .gamePick {
   width: 100%;
-  padding: 10px 12px;
+  padding: 10px 38px 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--line-strong, rgba(23, 33, 29, 0.22));
-  background: var(--card, #fff);
   color: var(--ink, #17211c);
   font-size: 0.92rem;
   font-weight: 700;
   cursor: pointer;
+  /* Custom chevron so it isn't jammed against the edge (matches .selectInput). */
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--card, #fff);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2359635b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px;
 }
 .err {
   margin: 0;

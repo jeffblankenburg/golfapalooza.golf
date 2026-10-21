@@ -1,10 +1,10 @@
 import { redirect, notFound } from "next/navigation";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
-import { resolvePayouts, computeGamePayoutsFromSlices } from "@/lib/v2/contests/boxes";
+import { resolvePayouts, computeGamePayoutsFromSlices, winningCell } from "@/lib/v2/contests/boxes";
 import { buildGameAllocations } from "@/lib/v2/contests/boxes-alloc";
 import { getLeague, fetchGameScore, periodScoresFromGame } from "@/lib/v2/sports/espn";
-import BoxesManage, { type ManageGame, type PayoutRow } from "./BoxesManage";
+import BoxesManage, { type ManageGame, type PayoutRow, type GameWinner, type GameBox } from "./BoxesManage";
 
 export default async function BoxesDetailPage({ params }: { params: Promise<{ slug: string; contestId: string }> }) {
   const { slug, contestId } = await params;
@@ -34,6 +34,14 @@ export default async function BoxesDetailPage({ params }: { params: Promise<{ sl
     .from("v2_boxes_cells")
     .select("grid_row, grid_col, user_id")
     .eq("contest_id", contestId);
+
+  // Per-game paid state (one row per pool, member, game).
+  const { data: paidRows } = await supabase
+    .from("v2_boxes_payouts")
+    .select("user_id, game_id, paid_cents, note")
+    .eq("contest_id", contestId);
+  const paidByGameUser = new Map<string, { cents: number; note: string | null }>();
+  for (const r of paidRows ?? []) paidByGameUser.set(`${r.game_id}:${r.user_id}`, { cents: (r.paid_cents as number) ?? 0, note: (r.note as string) ?? null });
 
   // Owner names for any claimed squares.
   const ownerIds = [...new Set((cells ?? []).map((c) => c.user_id).filter((x): x is string => !!x))];
@@ -78,9 +86,12 @@ export default async function BoxesDetailPage({ params }: { params: Promise<{ sl
   );
   const slicesByGame = new Map(resolvePayouts(potCents, allocGames).games.map((rg) => [rg.key, rg.periods]));
 
-  // Payouts PER GAME (the manage page shows the selected game's). Each row is a
-  // person's take for that one game, lines broken out by period.
+  // Payouts PER GAME — each row is a person's take for that one game (lines broken
+  // out by period), plus how much of it is already paid. `winnersByGame` carries
+  // the squares to highlight on each game's board.
   const payoutsByGame: Record<string, PayoutRow[]> = {};
+  const winnersByGame: Record<string, GameWinner[]> = {};
+  const scoresByGame: Record<string, GameBox> = {};
   const scoredGameIds: string[] = [];
   for (let i = 0; i < (gameRows ?? []).length; i++) {
     const g = gameRows![i];
@@ -96,18 +107,48 @@ export default async function BoxesDetailPage({ params }: { params: Promise<{ sl
     }
     if (!ps) continue;
     if (Object.values(ps).some((v) => v)) scoredGameIds.push(g.id as string);
-    const payout = computeGamePayoutsFromSlices(
-      { owners: ownerById, rowDigits: (g.row_digits as number[]) ?? [], colDigits: (g.col_digits as number[]) ?? [] },
-      slicesByGame.get(g.id as string) ?? [],
-      ps,
-    );
+    const gridState = { owners: ownerById, rowDigits: (g.row_digits as number[]) ?? [], colDigits: (g.col_digits as number[]) ?? [] };
+    const slices = slicesByGame.get(g.id as string) ?? [];
+
+    // Winning squares for the board highlight: any scored period with a drawn
+    // cell, badged with that period's slice value (matches the player board).
+    const winners: GameWinner[] = [];
+    for (const slice of slices) {
+      const sc = ps[slice.key];
+      if (sc && sc.away != null && sc.home != null) {
+        const cell = winningCell(gridState, sc.away, sc.home);
+        if (cell) winners.push({ cell, label: slice.label, amountCents: slice.cents });
+      }
+    }
+    winnersByGame[g.id as string] = winners;
+
+    // Box score under the grid: our checkpoints are CUMULATIVE scores, so each
+    // period's points = this checkpoint minus the last, and the running total is
+    // the checkpoint itself (its last digit is what picks the winning square).
+    const periodKeys = structure === "quarters" ? ["Q1", "Half", "Q3", "Final"] : ["Half", "Final"];
+    const cols = structure === "quarters" ? ["Q1", "Q2", "Q3", "Q4"] : ["1H", "2H"];
+    const awayCum = periodKeys.map((k) => ps![k]?.away ?? null);
+    const homeCum = periodKeys.map((k) => ps![k]?.home ?? null);
+    const toPts = (cum: (number | null)[]) => cum.map((v, j) => (v == null ? null : v - (j === 0 ? 0 : cum[j - 1] ?? 0)));
+    if (awayCum.some((v) => v != null) || homeCum.some((v) => v != null)) {
+      scoresByGame[g.id as string] = {
+        cols,
+        away: { abbrev: (g.team_row as { abbrev?: string } | null)?.abbrev ?? "AWY", pts: toPts(awayCum), cum: awayCum, total: ps.Final?.away ?? null },
+        home: { abbrev: (g.team_col as { abbrev?: string } | null)?.abbrev ?? "HOM", pts: toPts(homeCum), cum: homeCum, total: ps.Final?.home ?? null },
+      };
+    }
+
+    const payout = computeGamePayoutsFromSlices(gridState, slices, ps);
     const per: Record<string, { total: number; lines: { label: string; amountCents: number }[] }> = {};
     for (const [uid, cents] of Object.entries(payout.byOwner)) per[uid] = { total: cents, lines: [] };
     for (const pr of payout.perPeriod) {
       if (pr.ownerId && pr.amountCents > 0) (per[pr.ownerId] ??= { total: 0, lines: [] }).lines.push({ label: pr.label, amountCents: pr.amountCents });
     }
     payoutsByGame[g.id as string] = Object.entries(per)
-      .map(([uid, v]) => ({ name: nameById.get(uid) || "Member", totalCents: v.total, lines: v.lines }))
+      .map(([uid, v]) => {
+        const paid = paidByGameUser.get(`${g.id}:${uid}`);
+        return { userId: uid, name: nameById.get(uid) || "Member", totalCents: v.total, paidCents: paid?.cents ?? 0, note: paid?.note ?? null, lines: v.lines };
+      })
       .sort((a, b) => b.totalCents - a.totalCents);
   }
 
@@ -123,6 +164,8 @@ export default async function BoxesDetailPage({ params }: { params: Promise<{ sl
       owners={owners}
       claimed={claimed}
       payoutsByGame={payoutsByGame}
+      winnersByGame={winnersByGame}
+      scoresByGame={scoresByGame}
       scoredGameIds={scoredGameIds}
     />
   );

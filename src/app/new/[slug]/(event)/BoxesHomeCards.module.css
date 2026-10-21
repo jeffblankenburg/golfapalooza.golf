@@ -177,8 +177,39 @@
   font-weight: 800;
   color: #fff;
 }
-.more {
+/* Footer: games-left on the left, the member's running winnings bottom-right. */
+.poolFoot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line, rgba(23, 33, 29, 0.1));
+}
+.remaining {
   font-size: 0.74rem;
   font-weight: 700;
+  color: var(--ink-soft, #59635b);
+}
+.winnings {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.05;
+}
+.winLabel {
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft, #59635b);
+}
+.winValue {
+  font-size: 1.35rem;
+  font-weight: 800;
   color: var(--brand, #0a5c36);
+}
+.winValue[data-zero] {
+  color: var(--ink-soft, #59635b);
 }

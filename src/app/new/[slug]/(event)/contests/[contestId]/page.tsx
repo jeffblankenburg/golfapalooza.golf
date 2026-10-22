@@ -1,12 +1,17 @@
 import { redirect, notFound } from "next/navigation";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
+import { v2Now } from "@/lib/v2/simulator";
 import { resolvePayouts } from "@/lib/v2/contests/boxes";
 import { buildGameAllocations } from "@/lib/v2/contests/boxes-alloc";
+import { loadPickemBoard } from "@/lib/v2/contests/pickem-server";
 import BoxesPlay, { type PlayGame } from "./BoxesPlay";
+// Same member component the event lane uses — mounted here with the group pick URL.
+import PickemContent from "../../pickem/PickemContent";
+import styles from "@/app/new/new.module.css";
 
-/** Member-facing Boxes pool — see the board, claim open squares, watch it fill. */
-export default async function BoxesPlayPage({ params }: { params: Promise<{ slug: string; contestId: string }> }) {
+/** Member-facing contest detail — branches by contest_type (Boxes board, Pick'em slate). */
+export default async function ContestDetailPage({ params }: { params: Promise<{ slug: string; contestId: string }> }) {
   const { slug, contestId } = await params;
   const ctx = await getPlatformContext();
   if (!ctx) redirect("/new/signup");
@@ -16,11 +21,33 @@ export default async function BoxesPlayPage({ params }: { params: Promise<{ slug
   const supabase = await v2ServerClient();
   const { data: contest } = await supabase
     .from("v2_contests")
-    .select("id, name, config, contest_type, org_id")
+    .select("id, name, status, config, contest_type, org_id")
     .eq("id", contestId)
     .eq("org_id", org.id)
     .maybeSingle();
-  if (!contest || contest.contest_type !== "boxes") notFound();
+  if (!contest) notFound();
+
+  // Pick'em detail — same member UI as the event lane, group pick endpoint.
+  if (contest.contest_type === "pickem") {
+    if (contest.status !== "active") notFound(); // not open to members yet
+    const board = await loadPickemBoard(supabase, { contestId, orgId: org.id, viewerId: ctx.userId, now: await v2Now() });
+    return (
+      <div className={`${styles.page} ${styles.orgPage}`}>
+        <h1 className={styles.title}>{contest.name || "Pick'em"}</h1>
+        <PickemContent
+          pickUrl={`/api/v2/orgs/${org.id}/contests/${contestId}/pickem/pick`}
+          games={board.games}
+          initialPicks={board.myPicks}
+          leaderboard={board.leaderboard}
+          locked={board.locked}
+          meId={ctx.userId}
+          totalGames={board.totalGames}
+        />
+      </div>
+    );
+  }
+
+  if (contest.contest_type !== "boxes") notFound();
 
   const { data: gameRows } = await supabase
     .from("v2_boxes_games")
@@ -84,9 +111,8 @@ export default async function BoxesPlayPage({ params }: { params: Promise<{ slug
 
   return (
     <BoxesPlay
-      orgId={org.id}
-      slug={slug}
-      contestId={contest.id}
+      base={`/api/v2/orgs/${org.id}/contests/${contest.id}`}
+      homeHref={`/new/${slug}`}
       name={contest.name}
       phase={(cfg.phase as string) ?? "setup"}
       cellCostCents={(cfg.cell_cost_cents as number) ?? 0}

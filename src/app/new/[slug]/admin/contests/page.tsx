@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
-import BoxesAdmin, { type BoxesContestRow } from "./BoxesAdmin";
+import GroupContestsAdmin, { type GroupContestItem } from "./GroupContestsAdmin";
+import { type BoxesContestRow } from "./BoxesEditor";
 
 /**
  * Group-level contests — pools that belong to the whole group (event_id NULL),
- * available to all members, independent of the single active event. Today: Boxes.
+ * available to all members, independent of the single active event. All types
+ * (Boxes, Pick'em, …) live in one list, created from one "Add contest" control.
  */
 export default async function GroupContestsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -16,24 +18,28 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
   if (org.role !== "owner" && org.role !== "admin") redirect(`/new/${slug}`);
 
   const supabase = await v2ServerClient();
+  // Every group-scoped contest, any type, newest first — one unified list.
   const { data: contests } = await supabase
     .from("v2_contests")
-    .select("id, name, status, config, created_at")
+    .select("id, name, status, config, contest_type, created_at")
     .eq("org_id", org.id)
     .is("event_id", null)
-    .eq("contest_type", "boxes")
+    .in("contest_type", ["boxes", "pickem"])
     .order("created_at", { ascending: false });
 
-  const ids = (contests ?? []).map((c) => c.id);
-  const { data: games } = ids.length
+  const boxesIds = (contests ?? []).filter((c) => c.contest_type === "boxes").map((c) => c.id);
+  const { data: games } = boxesIds.length
     ? await supabase
         .from("v2_boxes_games")
         .select("contest_id, espn_event_id, league, label, team_row, team_col, start_time, game_alloc, period_alloc, sort_order")
-        .in("contest_id", ids)
+        .in("contest_id", boxesIds)
         .order("sort_order")
     : { data: [] as Record<string, unknown>[] };
 
-  const rows: BoxesContestRow[] = (contests ?? []).map((c) => {
+  const items: GroupContestItem[] = (contests ?? []).map((c) => {
+    if (c.contest_type === "pickem") {
+      return { kind: "pickem", id: c.id as string, createdAt: c.created_at as string, name: c.name as string, status: c.status as string };
+    }
     const cfg =
       (c.config as {
         cell_cost_cents?: number;
@@ -44,7 +50,7 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
         primary_ends_at?: string | null;
         secondary_ends_at?: string | null;
       } | null) ?? {};
-    return {
+    const box: BoxesContestRow = {
       id: c.id,
       name: c.name,
       status: c.status,
@@ -68,7 +74,8 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
           periodAlloc: (g.period_alloc as BoxesContestRow["games"][number]["periodAlloc"]) ?? null,
         })),
     };
+    return { kind: "boxes", id: c.id as string, createdAt: c.created_at as string, box };
   });
 
-  return <BoxesAdmin orgId={org.id} slug={slug} contests={rows} />;
+  return <GroupContestsAdmin orgId={org.id} slug={slug} items={items} />;
 }

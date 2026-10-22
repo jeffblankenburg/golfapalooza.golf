@@ -762,6 +762,34 @@
   color: var(--ink, #17211c);
 }
 
+/* Stacked action column on the right of a row — gear (settings) over a detail
+   link, each half-height, so detail is reachable without expanding the row. */
+.rowActions {
+  flex: none;
+  width: 46px;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+}
+.rowActions > * {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft, #59635b);
+  cursor: pointer;
+  text-decoration: none;
+}
+.rowActions > * + * {
+  border-top: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+}
+.rowActions > *:hover {
+  background: color-mix(in srgb, var(--ink, #17211c) 6%, transparent);
+  color: var(--ink, #17211c);
+}
+
 /* Delete gets its own destructive button + a two-step confirm (no native dialog). */
 .deleteRow {
   display: flex;
@@ -805,6 +833,22 @@
 .rowMeta {
   font-size: 0.78rem;
   color: var(--ink-soft, #59635b);
+}
+/* Contest-type badge (glyph + label) — mirrors the home-page SquaresTag. */
+.typeTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  margin-bottom: 2px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft, #59635b);
+}
+.typeTag svg {
+  color: var(--brand, #0a5c36);
 }
 .rowCount {
   font-size: 0.72rem;

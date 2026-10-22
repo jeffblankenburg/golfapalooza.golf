@@ -53,18 +53,52 @@ export interface EspnGame {
   tv: string | null;
   home: EspnCompetitor | null;
   away: EspnCompetitor | null;
+  spread?: number | null; // points the favorite is favored by (ESPN odds), if offered
+  favorite?: "home" | "away" | null;
 }
 
 type RawTeam = { id?: string | number; displayName?: string; name?: string; abbreviation?: string; logo?: string; color?: string };
 type RawCompetitor = { homeAway?: string; score?: string | number; team?: RawTeam };
 type RawStatus = { type?: { state?: string; shortDetail?: string } };
+type RawOdds = {
+  details?: string; // e.g. "DEN -3.5" or "EVEN"
+  spread?: number;
+  homeTeamOdds?: { favorite?: boolean };
+  awayTeamOdds?: { favorite?: boolean };
+};
 type RawEvent = {
   id?: string | number;
   date?: string;
   shortName?: string;
   status?: RawStatus;
-  competitions?: { competitors?: RawCompetitor[]; status?: RawStatus; broadcasts?: { names?: string[] }[] }[];
+  competitions?: { competitors?: RawCompetitor[]; status?: RawStatus; broadcasts?: { names?: string[] }[]; odds?: RawOdds[] }[];
 };
+
+/** Pull the spread (magnitude) + which side is favored from ESPN's odds block.
+ *  Prefers the explicit favorite flags, then the details abbrev, then spread sign. */
+function parseOdds(odds: RawOdds | undefined, home: { abbrev?: string } | null, away: { abbrev?: string } | null): { spread: number | null; favorite: "home" | "away" | null } {
+  if (!odds) return { spread: null, favorite: null };
+  const details = (odds.details ?? "").trim();
+  if (details.toUpperCase() === "EVEN" || odds.spread === 0) return { spread: 0, favorite: null };
+
+  let favorite: "home" | "away" | null =
+    odds.homeTeamOdds?.favorite ? "home" : odds.awayTeamOdds?.favorite ? "away" : null;
+  if (!favorite && details) {
+    const favAbbr = details.split(/\s+/)[0]?.toUpperCase();
+    if (favAbbr && home?.abbrev && home.abbrev.toUpperCase() === favAbbr) favorite = "home";
+    else if (favAbbr && away?.abbrev && away.abbrev.toUpperCase() === favAbbr) favorite = "away";
+  }
+  if (!favorite && typeof odds.spread === "number" && odds.spread !== 0) {
+    favorite = odds.spread < 0 ? "home" : "away"; // ESPN spread is home-relative
+  }
+
+  let spread: number | null = typeof odds.spread === "number" ? Math.abs(odds.spread) : null;
+  if (spread == null && details) {
+    const m = details.match(/-?\d+(\.\d+)?/);
+    if (m) spread = Math.abs(parseFloat(m[0]));
+  }
+  return { spread, favorite };
+}
 
 function competitor(c: RawCompetitor): EspnCompetitor {
   const t = c.team ?? {};
@@ -87,6 +121,7 @@ function normalize(league: string, ev: RawEvent): EspnGame | null {
   const away = competitors.find((c) => c.homeAway === "away") ?? null;
   const status = comp.status ?? ev.status;
   const state = status?.type?.state;
+  const { spread, favorite } = parseOdds(comp.odds?.[0], home, away);
   return {
     espnEventId: String(ev.id ?? ""),
     league,
@@ -97,6 +132,8 @@ function normalize(league: string, ev: RawEvent): EspnGame | null {
     tv: comp.broadcasts?.[0]?.names?.[0] ?? null,
     home,
     away,
+    spread,
+    favorite,
   };
 }
 
@@ -113,10 +150,13 @@ export interface GameScore {
   detail: string;
   away: SideScore | null;
   home: SideScore | null;
+  spread: number | null; // the line, from the summary's pickcenter (survives after final)
+  favorite: "home" | "away" | null;
 }
 
 type RawSummary = {
   header?: { competitions?: { status?: RawStatus; competitors?: (RawCompetitor & { linescores?: { value?: number; displayValue?: string }[] })[] }[] };
+  pickcenter?: RawOdds[]; // betting lines; persists for past games (scoreboard drops them)
 };
 
 /**
@@ -154,7 +194,10 @@ export async function fetchGameScore(leagueKey: string, eventId: string): Promis
     return { abbrev: c.team?.abbreviation ?? "", cum, current, total };
   };
 
-  return { state, detail, away: side("away"), home: side("home") };
+  const away = side("away");
+  const home = side("home");
+  const { spread, favorite } = parseOdds(data.pickcenter?.[0], home, away);
+  return { state, detail, away, home, spread, favorite };
 }
 
 /** Map an ESPN game score onto our period keys for a structure (quarters/halves). */

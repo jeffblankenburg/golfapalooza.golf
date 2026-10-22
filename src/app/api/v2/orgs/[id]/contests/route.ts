@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
 import { createBoxesContest, type BoxesGameInput } from "@/lib/v2/contests/boxes-server";
+import { createPickem } from "@/lib/v2/contests/pickem-server";
 
 type Params = Promise<{ id: string }>;
 
@@ -20,6 +21,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
 
   let body: {
     contest_type?: string;
+    event_id?: string | null; // set → event-scoped Boxes pool; omitted → group-scoped
     name?: string;
     cell_cost_cents?: number;
     pot_allocation?: string;
@@ -36,8 +38,21 @@ export async function POST(request: Request, { params }: { params: Params }) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
+  // Pick'em: group-scoped (event_id NULL). Starts as an empty draft; the admin
+  // builds the slate on the manage page afterward, so create needs only a name.
+  if (body.contest_type === "pickem") {
+    const pickemName = (body.name || "").trim();
+    if (!pickemName) return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    try {
+      const { id } = await createPickem(admin, { orgId, eventId: null, name: pickemName, createdBy: userId });
+      return NextResponse.json({ id });
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "Create failed" }, { status: 500 });
+    }
+  }
+
   if (body.contest_type !== "boxes") {
-    return NextResponse.json({ error: "Only boxes contests are supported here for now" }, { status: 400 });
+    return NextResponse.json({ error: "Only boxes and pickem contests are supported here for now" }, { status: 400 });
   }
   const name = (body.name || "").trim();
   if (!name) return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -59,6 +74,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
   try {
     const { id } = await createBoxesContest(admin, {
       orgId,
+      eventId: typeof body.event_id === "string" ? body.event_id : null,
       name,
       cellCostCents,
       potAllocation,

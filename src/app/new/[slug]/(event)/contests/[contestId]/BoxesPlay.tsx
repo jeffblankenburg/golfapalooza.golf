@@ -69,9 +69,8 @@ const PHASE_NOTE: Record<string, string> = {
 };
 
 export default function BoxesPlay({
-  orgId,
-  slug,
-  contestId,
+  base,
+  homeHref,
   name,
   phase,
   cellCostCents,
@@ -84,9 +83,9 @@ export default function BoxesPlay({
   myName,
   myAvatar,
 }: {
-  orgId: string;
-  slug: string;
-  contestId: string;
+  // Scope-agnostic: `base` is this contest's API root, `homeHref` the back link.
+  base: string;
+  homeHref: string;
   name: string;
   phase: string;
   cellCostCents: number;
@@ -159,7 +158,7 @@ export default function BoxesPlay({
     setInflight((s) => new Set(s).add(k));
 
     try {
-      const res = await fetch(`/api/v2/orgs/${orgId}/contests/${contestId}/boxes/claim`, {
+      const res = await fetch(`${base}/boxes/claim`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: isMine ? "release" : "claim", row, col }),
@@ -196,7 +195,7 @@ export default function BoxesPlay({
 
   return (
     <div className={styles.page}>
-      <Link href={`/new/${slug}`} className={styles.back}>← Home</Link>
+      <Link href={homeHref} className={styles.back}>← Home</Link>
       <h1 className={styles.title}>{name}</h1>
       <p className={styles.note}>{PHASE_NOTE[phase] ?? ""}</p>
 

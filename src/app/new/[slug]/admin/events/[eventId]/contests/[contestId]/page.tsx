@@ -10,6 +10,9 @@ import ContestSettings from "./ContestSettings";
 import SideGames, { type SideGame } from "./SideGames";
 import PickemAdmin from "./PickemAdmin";
 import ContestPayouts from "./ContestPayouts";
+import BoxesManageView, { loadBoxesContestRow } from "../../../../contests/[contestId]/BoxesManageView";
+import BoxesEditLauncher from "../../../../contests/[contestId]/BoxesEditLauncher";
+import ContestParticipants from "@/components/v2/contests/ContestParticipants";
 import type { PayoutSplit } from "@/lib/v2/contests/payouts";
 import styles from "@/app/new/new.module.css";
 
@@ -23,7 +26,7 @@ function fmtDate(ymd: string | null): string | null {
   return new Date(ymd + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 }
 
-export default async function ContestDetailPage({ params }: { params: Promise<{ slug: string; eventId: string; contestId: string }> }) {
+export default async function ContestDetailPage({ params, searchParams }: { params: Promise<{ slug: string; eventId: string; contestId: string }>; searchParams: Promise<{ edit?: string }> }) {
   const { slug, eventId, contestId } = await params;
   const ctx = await getPlatformContext();
   if (!ctx) redirect("/new/signup");
@@ -53,13 +56,42 @@ export default async function ContestDetailPage({ params }: { params: Promise<{ 
         </Link>
         <div className={styles.titleRow}><h1 className={styles.title}>{contest.name}</h1></div>
         <PickemAdmin
-          slug={slug} orgId={org.id} eventId={eventId} contestId={contestId}
+          base={`/api/v2/orgs/${org.id}/events/${eventId}/contests/${contestId}`}
+          playersHref={`/new/${slug}/admin/events/${eventId}/contests/${contestId}/players`}
           initialStatus={contest.status}
           initialFeeCents={feeMap.get(contestId) ?? 0}
           initialSplits={(contest.payout_splits as { place: number; kind: string; amount: number }[] | null) ?? []}
           enrolledCount={enrolled ?? 0}
         />
+        <ContestParticipants apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`} />
       </div>
+    );
+  }
+
+  // Boxes has its own manage surface (grid lifecycle + ESPN payout sheet), shared
+  // with the group lane. Reuses the scope-agnostic boxes routes; `?edit` opens the
+  // same full editor (games included) as the group hub.
+  if (contest.contest_type === "boxes") {
+    const manageUrl = `/new/${slug}/admin/events/${eventId}/contests/${contestId}`;
+    if ((await searchParams)?.edit) {
+      const row = await loadBoxesContestRow(admin, contest);
+      return <BoxesEditLauncher row={row} collectionBase={`/api/v2/orgs/${org.id}/contests`} returnHref={manageUrl} />;
+    }
+    return (
+      <>
+        <BoxesManageView
+          supabase={admin}
+          contest={contest}
+          base={`/api/v2/orgs/${org.id}/contests/${contestId}`}
+          backHref={`/new/${slug}/admin/events/${eventId}/contests`}
+          payoutsHref={`/new/${slug}/admin/contests/${contestId}/payouts`}
+          playerHref={`/new/${slug}/contests/${contestId}`}
+          editHref={`${manageUrl}?edit=1`}
+        />
+        <div className={styles.page} style={{ paddingTop: 0 }}>
+          <ContestParticipants apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`} />
+        </div>
+      </>
     );
   }
 

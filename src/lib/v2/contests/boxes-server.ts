@@ -26,6 +26,7 @@ export type PeriodWeights = Record<string, Record<string, number>>;
 
 export interface CreateBoxesInput {
   orgId: string;
+  eventId?: string | null; // NULL/omitted = group-scoped; set = event-scoped
   name: string;
   cellCostCents: number;
   potAllocation: "equal" | "round_weighted" | "custom";
@@ -43,7 +44,7 @@ export async function createBoxesContest(admin: SupabaseClient, input: CreateBox
     .from("v2_contests")
     .insert({
       org_id: input.orgId,
-      event_id: null, // group-scoped
+      event_id: input.eventId ?? null, // NULL = group-scoped, set = event-scoped
       contest_type: "boxes",
       name: input.name,
       scoring_source: "derived", // graded from ESPN period scores

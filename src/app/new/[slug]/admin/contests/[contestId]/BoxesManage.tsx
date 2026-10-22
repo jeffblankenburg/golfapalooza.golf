@@ -77,9 +77,11 @@ function gameStatus(g: ManageGame): { label: string; tone: string } {
 }
 
 export default function BoxesManage({
-  orgId,
-  slug,
-  contestId,
+  base,
+  backHref,
+  payoutsHref,
+  playerHref,
+  editHref,
   name,
   phase,
   games,
@@ -90,9 +92,13 @@ export default function BoxesManage({
   scoresByGame,
   scoredGameIds,
 }: {
-  orgId: string;
-  slug: string;
-  contestId: string;
+  // Scope-agnostic: `base` is this contest's API root; the hrefs are the admin
+  // links (back / payouts / player view / edit) for whichever scope mounted it.
+  base: string;
+  backHref: string;
+  payoutsHref: string;
+  playerHref: string;
+  editHref: string;
   name: string;
   phase: string;
   cellCostCents: number;
@@ -139,7 +145,7 @@ export default function BoxesManage({
     setBusy(busyKey ?? action);
     setErr(null);
     try {
-      const res = await fetch(`/api/v2/orgs/${orgId}/contests/${contestId}/boxes/action`, {
+      const res = await fetch(`${base}/boxes/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, ...extra }),
@@ -316,11 +322,11 @@ export default function BoxesManage({
   return (
     <div className={styles.page}>
       <div className={styles.topRow}>
-        <Link href={`/new/${slug}/admin/contests`} className={styles.back}>← Contests</Link>
+        <Link href={backHref} className={styles.back}>← Contests</Link>
         <span className={styles.topActions}>
-          <Link href={`/new/${slug}/admin/contests/${contestId}/payouts`} className={styles.edit}>Payouts</Link>
-          <Link href={`/new/${slug}/contests/${contestId}`} className={styles.edit}>Player view</Link>
-          <Link href={`/new/${slug}/admin/contests?edit=${contestId}`} className={styles.edit}>Edit settings</Link>
+          <Link href={payoutsHref} className={styles.edit}>Payouts</Link>
+          <Link href={playerHref} className={styles.edit}>Player view</Link>
+          <Link href={editHref} className={styles.edit}>Edit settings</Link>
         </span>
       </div>
 

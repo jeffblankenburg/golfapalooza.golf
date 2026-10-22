@@ -18,14 +18,33 @@ function gameTimeLabel(g: EspnGame): string {
   }
 }
 
-function TeamRow({ c }: { c: EspnGame["home"] }) {
+function TeamRow({ c, line }: { c: EspnGame["home"]; line?: string | null }) {
   if (!c) return <span className={styles.team}>TBD</span>;
   return (
     <span className={styles.team}>
       {c.logo ? <img className={styles.logo} src={c.logo} alt="" width={20} height={20} /> : <span className={styles.logoFallback} style={{ background: c.color ?? "var(--line)" }} />}
       <span className={styles.abbrev}>{c.abbrev || c.name}</span>
+      {line && <span className={styles.teamLine}>{line}</span>}
     </span>
   );
+}
+
+/** The favored team's spread as " (-3.5)", else "" — for the side that's favored. */
+function spreadFor(g: EspnGame, side: "home" | "away"): string | null {
+  if (g.spread == null || g.spread === 0 || g.favorite !== side) return null;
+  return `(-${g.spread})`;
+}
+
+/** No posted line → the game is a straight-up pick ("PK"). */
+function noLine(g: EspnGame): boolean {
+  return g.spread == null || g.spread === 0 || g.favorite == null;
+}
+
+/** Plain-text matchup with the line beside the favored team (for the selected pills). */
+function matchupLabel(g: EspnGame): string {
+  const away = (g.away?.abbrev || g.away?.name || "AWY") + (spreadFor(g, "away") ? ` ${spreadFor(g, "away")}` : "");
+  const home = (g.home?.abbrev || g.home?.name || "HOM") + (spreadFor(g, "home") ? ` ${spreadFor(g, "home")}` : "");
+  return `${away} @ ${home}${noLine(g) ? " (PK)" : ""}`;
 }
 
 /**
@@ -136,7 +155,7 @@ export default function GamePicker({
         <div className={styles.chips}>
           {value.map((g) => (
             <button key={g.espnEventId} type="button" className={styles.chip} onClick={() => toggle(g)} title="Remove">
-              {g.shortName} <span className={styles.chipX}>×</span>
+              {matchupLabel(g)} <span className={styles.chipX}>×</span>
             </button>
           ))}
         </div>
@@ -156,15 +175,15 @@ export default function GamePicker({
               <li key={g.espnEventId}>
                 <button type="button" className={styles.game} data-on={on || undefined} onClick={() => toggle(g)}>
                   <span className={styles.matchup}>
-                    <TeamRow c={g.away} />
+                    <TeamRow c={g.away} line={spreadFor(g, "away")} />
                     <span className={styles.at}>@</span>
-                    <TeamRow c={g.home} />
+                    <TeamRow c={g.home} line={spreadFor(g, "home")} />
+                    {noLine(g) && <span className={styles.pk} title="No line — straight-up pick">PK</span>}
                   </span>
                   <span className={styles.meta}>
                     {g.tv && <span className={styles.tv}>{g.tv}</span>}
                     <span className={styles.time} data-state={g.state}>{gameTimeLabel(g)}</span>
                   </span>
-                  <span className={styles.check} data-on={on || undefined} aria-hidden>{on ? "✓" : ""}</span>
                 </button>
               </li>
             );

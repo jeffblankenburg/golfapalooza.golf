@@ -47,6 +47,10 @@
     {
       "path": "/api/cron/v2-boxes-reveal",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/v2-pickem-scores",
+      "schedule": "* * * * *"
     }
   ]
 }

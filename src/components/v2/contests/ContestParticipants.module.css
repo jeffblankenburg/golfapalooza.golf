@@ -1,0 +1,118 @@
+.wrap {
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+  border-radius: 14px;
+  background: var(--surface, #fff);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+.title {
+  font-weight: 700;
+  color: var(--ink, #17211c);
+}
+.count {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--ink-soft, #59635b);
+}
+.chev {
+  color: var(--ink-soft, #59635b);
+  transition: transform 0.15s ease;
+}
+.chev[data-open] {
+  transform: rotate(180deg);
+}
+.body {
+  padding: 0 16px 14px;
+}
+.muted {
+  color: var(--ink-soft, #59635b);
+  font-size: 0.85rem;
+  margin: 6px 0;
+}
+.err {
+  color: var(--danger, #b42318);
+  font-size: 0.85rem;
+  margin: 6px 0;
+}
+.bulk {
+  display: flex;
+  gap: 8px;
+  margin: 2px 0 10px;
+}
+.bulk button {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line, rgba(23, 33, 29, 0.14));
+  background: none;
+  color: var(--ink, #17211c);
+  cursor: pointer;
+}
+.bulk button:hover {
+  background: color-mix(in srgb, var(--ink, #17211c) 6%, transparent);
+}
+.list {
+  display: flex;
+  flex-direction: column;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line, rgba(23, 33, 29, 0.08));
+  cursor: pointer;
+}
+.row[data-off] .name {
+  color: var(--ink-soft, #59635b);
+}
+.who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+.avatar,
+.avatarFallback {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex: none;
+  object-fit: cover;
+}
+.avatarFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--brand, #0a5c36) 14%, transparent);
+  color: var(--brand, #0a5c36);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink, #17211c);
+}
+.toggle {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  accent-color: var(--brand, #0a5c36);
+  cursor: pointer;
+}

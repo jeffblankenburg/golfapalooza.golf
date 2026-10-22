@@ -5824,18 +5824,45 @@ button.rosterChip {
   background: var(--card);
   padding: 10px 12px;
 }
+/* Read-only final-score cell (replaces the old always-on inputs). */
+.pickScoreVal {
+  min-width: 22px;
+  text-align: right;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
 .pickAdminGame[data-tb] {
   border-color: color-mix(in srgb, var(--brand) 40%, var(--line));
   background: color-mix(in srgb, var(--brand) 5%, var(--card));
 }
+/* Small header on the starred (tiebreaker) game card. */
+.tbHeader {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #e0a000;
+  margin-bottom: 6px;
+}
 .pickAdminRow {
   display: grid;
-  grid-template-columns: 26px 1fr auto 52px;
+  grid-template-columns: 26px 1fr auto;
   align-items: center;
   gap: 10px;
   padding: 5px 0;
 }
+/* Team name + line share a cell; the line sits right after the name. */
+.pickNameWrap {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
 .pickAdminRow + .pickAdminRow { border-top: 1px solid var(--line); }
+/* The team that covered once final (ATS, or straight-up with no line). */
+.pickAdminRow[data-win] .pickAdminName { color: var(--brand); font-weight: 800; }
+.pickAdminRow[data-win] .pickScoreVal { color: var(--brand); }
 .pickAdminName { font-weight: 600; font-size: 0.95rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pickAdminScore {
   width: 52px;
@@ -5870,6 +5897,26 @@ button.rosterChip {
 }
 .tbPill[data-on] { background: var(--brand); border-color: var(--brand); color: #fff; }
 .tbPill:disabled { opacity: 0.5; cursor: default; }
+/* Small square icon button for per-game footer actions (update / edit / delete). */
+.pickIconBtn {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.pickIconBtn:hover { background: color-mix(in srgb, var(--ink, #17211c) 6%, transparent); color: var(--ink); }
+/* Tiebreaker star "on": gold, filled. */
+.pickIconBtn[data-on] { color: #e0a000; border-color: color-mix(in srgb, #e0a000 45%, var(--line-strong)); }
+.pickIconBtn[data-on] svg { fill: currentColor; }
+.pickIconBtn[data-danger] { color: var(--warn, #c2410c); }
+.pickIconBtn[data-danger]:hover { background: color-mix(in srgb, var(--warn, #c2410c) 12%, transparent); color: var(--warn, #c2410c); }
+.pickIconBtn:disabled { opacity: 0.5; cursor: default; }
 /* Red trash icon button. */
 .iconDelBtn {
   flex: none;

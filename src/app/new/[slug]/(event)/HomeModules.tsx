@@ -6,6 +6,7 @@ import { todayInTimezone, ageTurningToday } from "@/lib/v2/birthday";
 import { v2Now } from "@/lib/v2/simulator";
 import BirthdayBanner, { type BirthdayPerson } from "./BirthdayBanner";
 import BoxesHomeCards from "./BoxesHomeCards";
+import PickemHomeCards from "./PickemHomeCards";
 import RsvpModule, { type Likelihood } from "./RsvpModule";
 import OptionsReminder from "./OptionsReminder";
 import AdCarousel, { type Ad } from "./AdCarousel";
@@ -211,6 +212,7 @@ export default async function HomeModules({
     <>
       <BirthdayBanner birthdays={birthdays} slug={slug} />
       <BoxesHomeCards orgId={orgId} userId={userId} slug={slug} />
+      <PickemHomeCards orgId={orgId} userId={userId} slug={slug} eventId={eventId} />
       {articlesVisible && article && <ArticleModule article={article} slug={slug} />}
       <RsvpModule
         eventId={eventId}

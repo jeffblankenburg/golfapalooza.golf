@@ -152,7 +152,7 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
               <Link key={c.id} href={`${base}/${c.id}`} className={styles.contestCard} data-setup="1">
                 <span className={styles.contestCardMain}>
                   <span className={styles.contestCardTitle}>{c.name}</span>
-                  <span className={styles.contestCardMeta}>{c.contest_type === "pickem" ? "Tap to set up games" : "Runs all event"}</span>
+                  <span className={styles.contestCardMeta}>{c.contest_type === "pickem" ? "Tap to set up games" : c.contest_type === "boxes" ? "Squares pool" : "Runs all event"}</span>
                 </span>
                 <svg className={styles.contestChevron} width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5l7 7-7 7" />

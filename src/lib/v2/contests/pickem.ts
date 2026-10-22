@@ -58,14 +58,19 @@ export function isSlateLocked(games: PickemGame[], now: Date): boolean {
   return lock != null && now.getTime() >= new Date(lock).getTime();
 }
 
-/** Did a pick cover the spread? null until the game is scored. */
+/**
+ * Did a pick cover the spread? null until the game is scored. A no-line game
+ * (`spread`/`favorite` null) grades straight-up. A PUSH — the margin lands exactly
+ * on the line, including a no-line tie — returns null: nobody is credited or dinged.
+ */
 export function pickIsCorrect(g: PickemGame, picked: "away" | "home" | null): boolean | null {
   if (!gameIsScored(g) || !picked) return null;
   const margin = (g.home_score as number) - (g.away_score as number); // + = home won by
   const spread = Math.abs(Number(g.spread ?? 0));
   const homeSpread = g.favorite === "home" ? -spread : spread; // home favored → must win by > spread
-  const homeCovers = margin + homeSpread > 0;
-  return picked === "home" ? homeCovers : !homeCovers;
+  const adjusted = margin + homeSpread;
+  if (adjusted === 0) return null; // push
+  return picked === "home" ? adjusted > 0 : adjusted < 0;
 }
 
 /** Build the leaderboard: correct DESC, then closest tiebreaker (a filled tiebreaker beats none). */
@@ -86,8 +91,11 @@ export function rankPickem(games: PickemGame[], picks: PickemPick[]): PickemLead
       if (p.picked_team) pickedCount += 1;
       if (g.is_tiebreaker && p.tiebreaker_total != null) tiebreakerTotal = p.tiebreaker_total;
       if (gameIsScored(g) && p.picked_team) {
-        decided += 1;
-        if (pickIsCorrect(g, p.picked_team)) correct += 1;
+        const result = pickIsCorrect(g, p.picked_team);
+        if (result !== null) { // null = push: a wash, not a decided game
+          decided += 1;
+          if (result) correct += 1;
+        }
       }
     }
     const tiebreakerDiff = tiebreakerTotal != null && tbActual != null ? Math.abs(tiebreakerTotal - tbActual) : null;

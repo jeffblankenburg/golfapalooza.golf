@@ -19,6 +19,16 @@
 .filter {
   width: 100%;
 }
+/* Native select caret crowds the border; draw our own, inset, with room for it. */
+.league {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2359635b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+}
 .dateNav {
   display: flex;
   align-items: center;
@@ -149,6 +159,21 @@
 }
 .time[data-state="post"] {
   color: var(--ink, #17211c);
+}
+.teamLine {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink-soft, #59635b);
+  white-space: nowrap;
+}
+.pk {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft, #59635b);
+  background: color-mix(in srgb, var(--ink, #17211c) 8%, transparent);
+  border-radius: 5px;
+  padding: 1px 5px;
 }
 .check {
   flex: none;

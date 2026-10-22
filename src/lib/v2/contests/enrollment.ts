@@ -15,6 +15,62 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendV2Notifications } from "@/lib/v2/notifications";
+import { orgNameMode } from "@/lib/v2/orgs";
+import { pickName } from "@/lib/v2/profile";
+
+export interface ContestRosterEntry {
+  userId: string;
+  name: string;
+  avatarUrl: string | null;
+  participating: boolean;
+}
+
+/**
+ * The participant picker for a contest — a LIVE projection of the eligible
+ * population (never a stored copy) overlaid with this contest's own in/out state:
+ *   - event-scoped (`event_id` set) → the event's current on-roster members
+ *   - group-scoped (`event_id` NULL) → the org's current active members
+ * `participating` reflects `v2_contest_participants`. Because the source is queried
+ * live each time, roster/membership changes show up automatically.
+ */
+export async function loadContestRoster(
+  admin: SupabaseClient,
+  contest: { id: string; org_id: string; event_id: string | null },
+): Promise<ContestRosterEntry[]> {
+  let eligibleIds: string[];
+  if (contest.event_id) {
+    const { data } = await admin
+      .from("v2_event_participants")
+      .select("user_id")
+      .eq("event_id", contest.event_id)
+      .eq("on_roster", true);
+    eligibleIds = (data || []).map((r) => r.user_id as string);
+  } else {
+    const { data } = await admin
+      .from("v2_memberships")
+      .select("user_id")
+      .eq("org_id", contest.org_id)
+      .eq("status", "active")
+      .is("archived_at", null);
+    eligibleIds = (data || []).map((r) => r.user_id as string);
+  }
+  if (eligibleIds.length === 0) return [];
+
+  const [{ data: profs }, { data: parts }, mode] = await Promise.all([
+    admin.from("v2_profiles").select("id, display_name, first_name, last_name, avatar_url").in("id", eligibleIds),
+    admin.from("v2_contest_participants").select("user_id").eq("contest_id", contest.id),
+    orgNameMode(admin, contest.org_id),
+  ]);
+  const participating = new Set((parts || []).map((p) => p.user_id as string));
+  const entries = (profs || []).map((p) => ({
+    userId: p.id as string,
+    name: pickName(p, mode),
+    avatarUrl: (p.avatar_url as string | null) ?? null,
+    participating: participating.has(p.id as string),
+  }));
+  entries.sort((a, b) => a.name.localeCompare(b.name));
+  return entries;
+}
 
 /** Contest ids in an event that auto-enroll on-roster members ("Included" contests). */
 export async function autoEnrollContestIds(admin: SupabaseClient, eventId: string): Promise<string[]> {

@@ -28,9 +28,11 @@ function spreadFor(g: PickemGame, side: "away" | "home"): string {
 }
 
 export default function PickemContent({
-  eventId, games, initialPicks, leaderboard, locked, meId, totalGames,
+  pickUrl, games, initialPicks, leaderboard, locked, meId, totalGames,
 }: {
-  eventId: string;
+  // Scope-agnostic: the mount supplies the endpoint to POST a pick to (event-
+  // scoped or group-scoped). The pick UI is identical in either case.
+  pickUrl: string;
   games: PickemGame[];
   initialPicks: Record<string, MyPick>;
   leaderboard: LeaderEntry[];
@@ -46,7 +48,7 @@ export default function PickemContent({
     const prev = picks[gameId];
     setPicks((s) => ({ ...s, [gameId]: next }));
     try {
-      const res = await fetch(`/api/v2/events/${eventId}/pickem/pick`, {
+      const res = await fetch(pickUrl, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ gameId, pickedTeam: next.picked, tiebreakerTotal: next.tiebreaker }),
       });

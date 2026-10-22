@@ -64,15 +64,18 @@ export default function PickemContent({
     const name = side === "away" ? g.away_team : g.home_team;
     const logo = side === "away" ? g.away_logo_url : g.home_logo_url;
     const scored = gameIsScored(g);
-    const correct = on && scored ? pickIsCorrect(g, side) : null;
+    const covered = scored && pickIsCorrect(g, side) === true; // this side covered
+    const myResult = on && scored ? pickIsCorrect(g, side) : null; // my pick right/wrong
+    const score = side === "away" ? g.away_score : g.home_score;
     return (
-      <button type="button" className={styles.pickTeam} data-on={on || undefined} disabled={locked}
+      <button type="button" className={styles.pickTeam} data-on={on || undefined} data-win={covered || undefined} disabled={locked}
         onClick={() => save(g.id, { picked: on ? null : side, tiebreaker: picks[g.id]?.tiebreaker ?? null })}>
         {logo && <img src={logo} alt="" className={styles.pickLogo} />}
         <span className={styles.pickTeamName}>{name}</span>
         <span className={styles.pickSpread}>{spreadFor(g, side)}</span>
-        {correct === true && <span className={styles.pickMark} data-ok>✓</span>}
-        {correct === false && <span className={styles.pickMark} data-bad>✗</span>}
+        {scored && <span className={styles.pickTeamScore}>{score}</span>}
+        {myResult === true && <span className={styles.pickMark} data-ok>✓</span>}
+        {myResult === false && <span className={styles.pickMark} data-bad>✗</span>}
       </button>
     );
   };
@@ -94,9 +97,8 @@ export default function PickemContent({
               <div key={g.id} className={styles.pickCard}>
                 <div className={styles.pickCardMeta}>
                   {g.game_time ? new Date(g.game_time).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" }) : ""}
-                  {g.tv_channel ? ` · ${g.tv_channel}` : ""}
+                  {g.tv_channel ? `, ${g.tv_channel}` : ""}
                   {g.is_tiebreaker ? "  ★ Tiebreaker" : ""}
-                  {gameIsScored(g) ? `  (${g.away_score}-${g.home_score})` : ""}
                 </div>
                 <div className={styles.pickTeams}>
                   {teamBtn(g, "away")}
@@ -135,7 +137,7 @@ export default function PickemContent({
                     <span className={styles.pickLeaderName}>{e.name}</span>
                     <span className={styles.pickLeaderStat}>
                       {e.decided > 0 ? `${e.correct}/${e.decided}` : `${e.pickedCount}/${totalGames} picked`}
-                      {e.tiebreakerDiff != null ? ` · off ${e.tiebreakerDiff}` : ""}
+                      {e.tiebreakerDiff != null ? ` (off ${e.tiebreakerDiff})` : ""}
                     </span>
                   </button>
                   {canExpand && expanded === e.userId && (

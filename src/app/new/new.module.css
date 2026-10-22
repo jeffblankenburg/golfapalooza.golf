@@ -5946,8 +5946,8 @@ button.rosterChip {
   margin-bottom: 8px;
 }
 .pickTeams {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 .pickTeam {
@@ -5968,6 +5968,13 @@ button.rosterChip {
   border-color: var(--brand);
   background: color-mix(in srgb, var(--brand) 10%, var(--card));
 }
+/* The team that covered once final — green, independent of the member's pick. */
+.pickTeam[data-win] {
+  border-color: #15803d;
+  background: color-mix(in srgb, #15803d 8%, var(--card));
+}
+.pickTeam[data-win] .pickTeamName { color: #15803d; font-weight: 800; }
+.pickTeamScore { font-weight: 800; font-variant-numeric: tabular-nums; flex: none; color: var(--ink); }
 .pickTeam:disabled { cursor: default; opacity: 0.85; }
 .pickLogo { width: 26px; height: 26px; object-fit: contain; flex: none; }
 .pickTeamName { font-weight: 600; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }

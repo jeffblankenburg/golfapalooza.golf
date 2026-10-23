@@ -115,6 +115,29 @@ export async function loadMyMoney(
     }
   }
 
+  // 2b) Boxes (Squares) buy-ins (event-less) → the pool's collector. Ownership is
+  // cells in v2_boxes_cells (NOT contest_participants), and the fee is per-square
+  // (config.cell_cost_cents) × squares owned.
+  const { data: myCells } = await admin.from("v2_boxes_cells").select("contest_id").eq("user_id", userId);
+  const cellsByContest = new Map<string, number>();
+  for (const c of myCells || []) cellsByContest.set(c.contest_id as string, (cellsByContest.get(c.contest_id as string) || 0) + 1);
+  if (cellsByContest.size) {
+    const { data: boxes } = await admin
+      .from("v2_contests")
+      .select("id, name, config, collected_by, created_by")
+      .in("id", [...cellsByContest.keys()])
+      .eq("org_id", orgId)
+      .is("event_id", null)
+      .eq("contest_type", "boxes");
+    for (const b of boxes || []) {
+      const cost = Number((b.config as { cell_cost_cents?: number } | null)?.cell_cost_cents) || 0;
+      const n = cellsByContest.get(b.id as string) || 0;
+      const amt = cost * n;
+      if (amt <= 0) continue;
+      obligations.push({ amountCents: amt, label: (b.name as string) || "Squares", sublabel: `${n} square${n === 1 ? "" : "s"}`, payeeId: resolveContestPayeeId(b, null) });
+    }
+  }
+
   // 3) Ledger charges + payments for this member, org-wide, attributed by payee.
   const { data: txs } = await admin
     .from("v2_financial_transactions")

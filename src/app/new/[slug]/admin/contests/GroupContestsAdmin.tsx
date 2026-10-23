@@ -342,7 +342,7 @@ function PickemQuickSettings({ orgId, item, currentUserId, nameMode, onClose, on
         </label>
         <label>
           <span style={{ display: "block", fontSize: "0.8125rem", fontWeight: 600, marginBottom: 4 }}>Status</span>
-          <select className={styles.selectInput} style={{ borderWidth: 1, borderStyle: "solid" }} value={status} onChange={(e) => setStatus(e.target.value)}>
+          <select className={styles.input} style={{ width: "100%" }} value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="draft">Draft (hidden from members)</option>
             <option value="active">Open (members can pick)</option>
             <option value="final">Final (closed)</option>
@@ -357,7 +357,7 @@ function PickemQuickSettings({ orgId, item, currentUserId, nameMode, onClose, on
         </label>
         <label>
           <span style={{ display: "block", fontSize: "0.8125rem", fontWeight: 600, marginBottom: 4 }}>Who&apos;s collecting? (needs Venmo)</span>
-          <select className={styles.selectInput} style={{ borderWidth: 1, borderStyle: "solid" }} value={collectedBy} onChange={(e) => setCollectedBy(e.target.value)}>
+          <select className={styles.input} style={{ width: "100%" }} value={collectedBy} onChange={(e) => setCollectedBy(e.target.value)}>
             {members.map((m) => <option key={m.user_id} value={m.user_id} disabled={!m.venmo && m.user_id !== collectedBy}>{m.name}{m.venmo ? "" : " (needs Venmo)"}</option>)}
           </select>
         </label>

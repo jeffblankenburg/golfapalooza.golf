@@ -20,17 +20,21 @@ function money(cents: number): string {
 export default function GroupContestMoney({
   orgId,
   contestId,
+  currentUserId,
   initialEntryCents,
   initialCollectedBy,
 }: {
   orgId: string;
   contestId: string;
+  currentUserId: string;
   initialEntryCents: number;
   initialCollectedBy: string | null;
 }) {
   const base = `/api/v2/orgs/${orgId}/contests/${contestId}`;
   const [fee, setFee] = useState(initialEntryCents ? String(initialEntryCents / 100) : "");
-  const [collectedBy, setCollectedBy] = useState(initialCollectedBy || "");
+  // Default the collector to whoever's setting it up (the active admin) rather than
+  // an abstract "creator" choice — they can reassign it.
+  const [collectedBy, setCollectedBy] = useState(initialCollectedBy || currentUserId);
   const [members, setMembers] = useState<MemberOpt[]>([]);
   const [roster, setRoster] = useState<RosterRow[]>([]);
   const [entryCents, setEntryCents] = useState(initialEntryCents);
@@ -59,7 +63,9 @@ export default function GroupContestMoney({
 
   async function saveFee() {
     const cents = Math.round((Number(fee) || 0) * 100);
-    await patch({ entry_cents: cents });
+    // Persist the collector alongside the fee so the implicit default (active user)
+    // becomes explicit the moment a fee is set.
+    await patch({ entry_cents: cents, collected_by: collectedBy || null });
     await loadRoster();
   }
 
@@ -75,7 +81,7 @@ export default function GroupContestMoney({
   }
 
   const pot = entryCents * roster.length;
-  const collectorVenmo = members.find((m) => m.user_id === (collectedBy || initialCollectedBy))?.venmo;
+  const collectorVenmo = members.find((m) => m.user_id === collectedBy)?.venmo;
 
   return (
     <div style={{ marginTop: 20 }}>
@@ -94,8 +100,7 @@ export default function GroupContestMoney({
         <label className={styles.label}>Who&apos;s collecting? <span className={styles.optional}>(needs Venmo)</span></label>
         <select className={styles.roleSelect} value={collectedBy}
           onChange={(e) => { setCollectedBy(e.target.value); patch({ collected_by: e.target.value || null }).then(loadRoster); }}>
-          <option value="">Contest creator (default)</option>
-          {members.map((m) => <option key={m.user_id} value={m.user_id} disabled={!m.venmo}>{m.name}{m.venmo ? "" : " (needs Venmo)"}</option>)}
+          {members.map((m) => <option key={m.user_id} value={m.user_id} disabled={!m.venmo && m.user_id !== collectedBy}>{m.name}{m.venmo ? "" : " (needs Venmo)"}</option>)}
         </select>
         {entryCents > 0 && collectedBy && !collectorVenmo && (
           <p className={styles.formError} style={{ marginTop: 4 }}>This collector has no Venmo on file — members won&apos;t get a pay button.</p>

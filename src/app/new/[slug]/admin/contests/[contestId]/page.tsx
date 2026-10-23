@@ -46,6 +46,7 @@ export default async function BoxesDetailPage({ params }: { params: Promise<{ sl
         <GroupContestMoney
           orgId={org.id}
           contestId={contestId}
+          currentUserId={ctx.userId}
           initialEntryCents={Number((contest.config as { entry_cents?: number } | null)?.entry_cents) || 0}
           initialCollectedBy={(contest.collected_by as string | null) ?? null}
         />

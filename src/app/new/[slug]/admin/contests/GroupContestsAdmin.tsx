@@ -11,9 +11,27 @@ import BoxesEditor, { money, dateLabel, type BoxesContestRow } from "./BoxesEdit
 
 // One unified list for the group Contests hub — every created pool, any type,
 // in one place (no per-type sections), with a single "Add contest" control.
+export interface PickemGamePreview {
+  awayTeam: string;
+  homeTeam: string;
+  spread: number | null;
+  favorite: "away" | "home" | null;
+  gameTime: string | null;
+  isTiebreaker: boolean;
+}
 export type GroupContestItem =
   | { kind: "boxes"; id: string; createdAt: string; box: BoxesContestRow }
-  | { kind: "pickem"; id: string; createdAt: string; name: string; status: string };
+  | {
+      kind: "pickem";
+      id: string;
+      createdAt: string;
+      name: string;
+      status: string;
+      entryCents: number;
+      collectedBy: string | null;
+      participantCount: number;
+      games: PickemGamePreview[];
+    };
 
 // Contest types an admin can create at the group level today.
 const ADDABLE = [
@@ -21,7 +39,24 @@ const ADDABLE = [
   { key: "pickem", label: "Pick'em", blurb: "Pick games vs. the spread" },
 ] as const;
 
+type PickemItem = Extract<GroupContestItem, { kind: "pickem" }>;
+
 const statusLabel = (s: string) => (s === "active" ? "Open" : s === "draft" ? "Draft" : s);
+const centsToStr = (c: number) => (c ? String(c / 100) : "");
+function fmtMoney(cents: number): string {
+  const whole = cents % 100 === 0;
+  return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 })}`;
+}
+function gameWhen(iso: string | null): string {
+  if (!iso) return "TBD";
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+function spreadLabel(g: PickemGamePreview): string {
+  if (g.isTiebreaker) return "Tiebreaker";
+  if (g.spread == null || !g.favorite) return "";
+  const fav = g.favorite === "home" ? g.homeTeam : g.awayTeam;
+  return `${fav} -${g.spread}`;
+}
 
 /** The glyph for a contest type — shared by the list badge and the add menu. */
 function ContestTypeIcon({ kind, size = 13 }: { kind: "boxes" | "pickem"; size?: number }) {
@@ -48,7 +83,7 @@ function ContestTypeTag({ kind }: { kind: "boxes" | "pickem" }) {
   );
 }
 
-export default function GroupContestsAdmin({ orgId, slug, items }: { orgId: string; slug: string; items: GroupContestItem[] }) {
+export default function GroupContestsAdmin({ orgId, slug, items, currentUserId }: { orgId: string; slug: string; items: GroupContestItem[]; currentUserId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const collectionBase = `/api/v2/orgs/${orgId}/contests`;
@@ -59,6 +94,7 @@ export default function GroupContestsAdmin({ orgId, slug, items }: { orgId: stri
   const [editing, setEditing] = useState<BoxesContestRow | null | undefined>(undefined);
   const [pickemOpen, setPickemOpen] = useState(false);
   const [pickemName, setPickemName] = useState("");
+  const [settingsFor, setSettingsFor] = useState<PickemItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -172,23 +208,151 @@ export default function GroupContestsAdmin({ orgId, slug, items }: { orgId: stri
       <div className={styles.list}>
         {items.length === 0 && editing === undefined && <p className={styles.empty}>No contests yet. Add one above.</p>}
         {items.map((it) =>
-          it.kind === "boxes" ? <BoxesRow key={it.id} c={it.box} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onEdit={() => setEditing(it.box)} /> : (
-            <Link key={it.id} href={`${adminBase}/${it.id}`} className={styles.rowWrap} style={{ display: "block", textDecoration: "none" }}>
-              <div className={styles.rowHead}>
-                <span className={styles.rowMain} style={{ cursor: "pointer" }}>
-                  <span className={styles.rowHeadText}>
-                    <ContestTypeTag kind="pickem" />
-                    <span className={styles.rowName}>{it.name}</span>
-                    <span className={styles.rowMeta}>{statusLabel(it.status)}</span>
-                  </span>
-                  <svg className={styles.rowChev} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7" /></svg>
-                </span>
-              </div>
-            </Link>
+          it.kind === "boxes" ? (
+            <BoxesRow key={it.id} c={it.box} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onEdit={() => setEditing(it.box)} />
+          ) : (
+            <PickemRow key={it.id} it={it} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onSettings={() => setSettingsFor(it)} />
           ),
         )}
       </div>
+
+      {settingsFor && (
+        <PickemQuickSettings
+          orgId={orgId}
+          item={settingsFor}
+          currentUserId={currentUserId}
+          onClose={() => setSettingsFor(null)}
+          onSaved={() => { setSettingsFor(null); router.refresh(); }}
+        />
+      )}
     </div>
+  );
+}
+
+/** One Pick'em in the list — mirrors BoxesRow: expandable (matchups preview) with
+ *  a gear (quick settings) + an arrow to the full manage page. */
+function PickemRow({ it, adminBase, isOpen, onToggle, onSettings }: { it: PickemItem; adminBase: string; isOpen: boolean; onToggle: () => void; onSettings: () => void }) {
+  const pot = it.entryCents * it.participantCount;
+  const realGames = it.games.filter((g) => !g.isTiebreaker);
+  const meta = [
+    it.entryCents > 0 ? `${fmtMoney(it.entryCents)} buy-in` : "no buy-in",
+    it.entryCents > 0 && it.participantCount > 0 ? `${fmtMoney(pot)} pot` : null,
+    statusLabel(it.status),
+  ].filter(Boolean).join(", ");
+  return (
+    <div className={styles.rowWrap} data-open={isOpen || undefined}>
+      <div className={styles.rowHead}>
+        <button type="button" className={styles.rowMain} onClick={onToggle} aria-expanded={isOpen}>
+          <span className={styles.rowHeadText}>
+            <ContestTypeTag kind="pickem" />
+            <span className={styles.rowName}>{it.name}</span>
+            <span className={styles.rowMeta}>{meta}</span>
+            <span className={styles.rowCount}>{realGames.length} game{realGames.length === 1 ? "" : "s"}</span>
+          </span>
+          <svg className={styles.rowChev} data-open={isOpen || undefined} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+        </button>
+        <div className={styles.rowActions}>
+          <button type="button" onClick={onSettings} aria-label="Quick settings" title="Quick settings">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </button>
+          <Link href={`${adminBase}/${it.id}`} aria-label="Open Pick'em details" title="Open Pick'em details">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7" /></svg>
+          </Link>
+        </div>
+      </div>
+      {isOpen && (
+        <div className={styles.rowBody}>
+          {realGames.length === 0 ? (
+            <p className={styles.rowEmpty}>No games yet. Open the Pick&apos;em to build the slate.</p>
+          ) : (
+            <table className={styles.gameTable}>
+              <tbody>
+                {realGames.map((g, i) => (
+                  <tr key={i}>
+                    <td className={styles.gtWhen}>{gameWhen(g.gameTime)}</td>
+                    <td className={styles.gtGame}>{g.awayTeam} @ {g.homeTeam}</td>
+                    <td className={styles.gtPay}>{spreadLabel(g)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Quick settings for a Pick'em (name / status / buy-in / collector) — the parity
+ *  with Squares' gear-editor. Deep management (games, payouts) stays on detail. */
+function PickemQuickSettings({ orgId, item, currentUserId, onClose, onSaved }: { orgId: string; item: PickemItem; currentUserId: string; onClose: () => void; onSaved: () => void }) {
+  const base = `/api/v2/orgs/${orgId}/contests/${item.id}`;
+  const [name, setName] = useState(item.name);
+  const [status, setStatus] = useState(item.status);
+  const [fee, setFee] = useState(centsToStr(item.entryCents));
+  const [collectedBy, setCollectedBy] = useState(item.collectedBy || currentUserId);
+  const [members, setMembers] = useState<{ user_id: string; name: string; venmo: string | null }[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const r = await fetch(`/api/v2/orgs/${orgId}/members`);
+      if (r.ok) {
+        const list = ((await r.json()).members || []) as { user_id: string; display_name: string; venmo_username: string | null; archived?: boolean }[];
+        setMembers(list.filter((m) => !m.archived).map((m) => ({ user_id: m.user_id, name: m.display_name, venmo: m.venmo_username })).sort((a, b) => a.name.localeCompare(b.name)));
+      }
+    })();
+  }, [orgId]);
+
+  async function save() {
+    const n = name.trim();
+    if (!n || saving) return;
+    setSaving(true);
+    setErr(null);
+    const res = await fetch(base, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: n, status, entry_cents: Math.round((Number(fee) || 0) * 100), collected_by: collectedBy || null }),
+    });
+    if (!res.ok) { setErr((await res.json().catch(() => ({}))).error || "Could not save"); setSaving(false); return; }
+    onSaved();
+  }
+
+  return (
+    <Modal open title="Pick'em settings" onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <label>
+          <span style={{ display: "block", fontSize: "0.8125rem", fontWeight: 600, marginBottom: 4 }}>Name</span>
+          <input className={styles.input} style={{ width: "100%" }} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+        </label>
+        <label>
+          <span style={{ display: "block", fontSize: "0.8125rem", fontWeight: 600, marginBottom: 4 }}>Status</span>
+          <select className={styles.input} style={{ width: "100%" }} value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="draft">Draft (hidden from members)</option>
+            <option value="active">Open (members can pick)</option>
+            <option value="final">Final (closed)</option>
+          </select>
+        </label>
+        <label>
+          <span style={{ display: "block", fontSize: "0.8125rem", fontWeight: 600, marginBottom: 4 }}>Entry fee</span>
+          <input className={styles.input} style={{ width: "100%" }} inputMode="decimal" value={fee} placeholder="0" onChange={(e) => setFee(e.target.value.replace(/[^0-9.]/g, ""))} />
+        </label>
+        <label>
+          <span style={{ display: "block", fontSize: "0.8125rem", fontWeight: 600, marginBottom: 4 }}>Who&apos;s collecting? (needs Venmo)</span>
+          <select className={styles.input} style={{ width: "100%" }} value={collectedBy} onChange={(e) => setCollectedBy(e.target.value)}>
+            {members.map((m) => <option key={m.user_id} value={m.user_id} disabled={!m.venmo && m.user_id !== collectedBy}>{m.name}{m.venmo ? "" : " (needs Venmo)"}</option>)}
+          </select>
+        </label>
+        {err && <p className={styles.err} style={{ margin: 0 }}>{err}</p>}
+        <button type="button" className={styles.create} onClick={() => void save()} disabled={saving || !name.trim()}>
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
+    </Modal>
   );
 }
 

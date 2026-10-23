@@ -194,44 +194,63 @@ export async function loadMyMoney(
   return { balanceCents, chargesCents, paidCents, charges, settle, owedToYouCents, incoming };
 }
 
-/** What others owe this member for GROUP contests they collect (derived entry fee
- *  per participant, minus payments recorded to this member for that contest). */
+/** What others owe this member for GROUP contests they collect — Pick'em (flat
+ *  entry per participant) + Boxes (per-square cost × squares owned), minus any
+ *  payments recorded to this member for that contest. */
 async function loadGroupContestIncoming(
   admin: SupabaseClient,
   orgId: string,
   userId: string,
   mode: NameMode,
 ): Promise<IncomingGroup[]> {
-  // Group contests where this member is the resolved collector (explicit, or the
-  // creator with no explicit collector). Fee lives in config.entry_cents.
+  // Group contests this member is the resolved collector of (explicit, or creator).
   const { data: contests } = await admin
     .from("v2_contests")
-    .select("id, config, collected_by, created_by")
+    .select("id, contest_type, config, collected_by, created_by")
     .eq("org_id", orgId)
     .is("event_id", null);
-  const mine = (contests || []).filter((c) => {
-    const entry = Number((c.config as { entry_cents?: number } | null)?.entry_cents) || 0;
-    return entry > 0 && resolveContestPayeeId(c, null) === userId;
-  });
+  const mine = (contests || []).filter((c) => resolveContestPayeeId(c, null) === userId);
   if (!mine.length) return [];
-  const feeById = new Map(mine.map((c) => [c.id as string, Number((c.config as { entry_cents?: number }).entry_cents) || 0]));
-  const ids = [...feeById.keys()];
 
-  const [{ data: participants }, { data: pays }] = await Promise.all([
-    admin.from("v2_contest_participants").select("contest_id, user_id").in("contest_id", ids),
-    admin.from("v2_financial_transactions").select("user_id, amount_cents, contest_id").eq("type", "payment").eq("payee_user_id", userId).in("contest_id", ids),
-  ]);
+  const owedByUser = new Map<string, number>(); // debtor → what they owe me
+  const allIds: string[] = [];
+  const add = (u: string, cents: number) => {
+    if (u === userId || cents <= 0) return;
+    owedByUser.set(u, (owedByUser.get(u) || 0) + cents);
+  };
 
-  const owedByUser = new Map<string, number>();
-  for (const p of participants || []) {
-    const u = p.user_id as string;
-    if (u === userId) continue;
-    owedByUser.set(u, (owedByUser.get(u) || 0) + (feeById.get(p.contest_id as string) || 0));
+  // Pick'em: flat entry per enrolled participant.
+  const pickemFee = new Map<string, number>();
+  for (const c of mine) {
+    if (c.contest_type !== "pickem") continue;
+    const fee = Number((c.config as { entry_cents?: number } | null)?.entry_cents) || 0;
+    if (fee > 0) { pickemFee.set(c.id as string, fee); allIds.push(c.id as string); }
   }
-  for (const pay of pays || []) {
-    const u = pay.user_id as string;
-    if (!owedByUser.has(u)) continue;
-    owedByUser.set(u, (owedByUser.get(u) || 0) - ((pay.amount_cents as number) || 0));
+  if (pickemFee.size) {
+    const { data: parts } = await admin.from("v2_contest_participants").select("contest_id, user_id").in("contest_id", [...pickemFee.keys()]);
+    for (const p of parts || []) add(p.user_id as string, pickemFee.get(p.contest_id as string) || 0);
+  }
+
+  // Boxes: per-square cost × squares each member owns.
+  const boxesCost = new Map<string, number>();
+  for (const c of mine) {
+    if (c.contest_type !== "boxes") continue;
+    const cost = Number((c.config as { cell_cost_cents?: number } | null)?.cell_cost_cents) || 0;
+    if (cost > 0) { boxesCost.set(c.id as string, cost); allIds.push(c.id as string); }
+  }
+  if (boxesCost.size) {
+    const { data: cells } = await admin.from("v2_boxes_cells").select("contest_id, user_id").in("contest_id", [...boxesCost.keys()]).not("user_id", "is", null);
+    for (const x of cells || []) add(x.user_id as string, boxesCost.get(x.contest_id as string) || 0);
+  }
+
+  // Subtract payments recorded to me for these contests.
+  if (allIds.length) {
+    const { data: pays } = await admin.from("v2_financial_transactions").select("user_id, amount_cents, contest_id").eq("type", "payment").eq("payee_user_id", userId).in("contest_id", allIds);
+    for (const pay of pays || []) {
+      const u = pay.user_id as string;
+      if (!owedByUser.has(u)) continue;
+      owedByUser.set(u, (owedByUser.get(u) || 0) - ((pay.amount_cents as number) || 0));
+    }
   }
 
   const debtors = [...owedByUser.entries()].filter(([, net]) => net > 0);

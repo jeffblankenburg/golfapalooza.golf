@@ -85,6 +85,7 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
       maxSquaresSecondary: cfg.max_squares_secondary === undefined ? null : cfg.max_squares_secondary,
       primaryEndsAt: cfg.primary_ends_at ?? null,
       secondaryEndsAt: cfg.secondary_ends_at ?? null,
+      collectedBy: (c as { collected_by?: string | null }).collected_by ?? null,
       games: (games ?? [])
         .filter((g) => g.contest_id === c.id)
         .map((g) => ({

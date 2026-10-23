@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import SquaresEditor, { type SquaresContestRow } from "../SquaresEditor";
+import { type NameMode } from "@/lib/v2/profile";
 
 /**
  * Opens the shared Squares editor for an existing pool, then returns to the manage
@@ -13,16 +14,19 @@ export default function SquaresEditLauncher({
   row,
   collectionBase,
   returnHref,
+  nameMode = "nickname",
 }: {
   row: SquaresContestRow;
   collectionBase: string;
   returnHref: string;
+  nameMode?: NameMode;
 }) {
   const router = useRouter();
   return (
     <SquaresEditor
       collectionBase={collectionBase}
       editing={row}
+      nameMode={nameMode}
       onClose={() => router.push(returnHref)}
       onSaved={() => router.refresh()}
     />

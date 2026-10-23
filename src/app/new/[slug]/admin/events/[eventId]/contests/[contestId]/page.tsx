@@ -83,7 +83,7 @@ export default async function ContestDetailPage({ params, searchParams }: { para
     const manageUrl = `/new/${slug}/admin/events/${eventId}/contests/${contestId}`;
     if ((await searchParams)?.edit) {
       const row = await loadSquaresContestRow(admin, contest);
-      return <SquaresEditLauncher row={row} collectionBase={`/api/v2/orgs/${org.id}/contests`} returnHref={manageUrl} />;
+      return <SquaresEditLauncher row={row} collectionBase={`/api/v2/orgs/${org.id}/contests`} returnHref={manageUrl} nameMode={org.name_display} />;
     }
     return (
       <>

@@ -12,7 +12,7 @@ import type { SquaresContestRow } from "../SquaresEditor";
  */
 export async function loadSquaresContestRow(
   supabase: SupabaseClient,
-  contest: { id: string; name: string; status: string; config: unknown },
+  contest: { id: string; name: string; status: string; config: unknown; collected_by?: string | null },
 ): Promise<SquaresContestRow> {
   const cfg = (contest.config as Record<string, unknown>) ?? {};
   const { data: gameRows } = await supabase
@@ -31,6 +31,7 @@ export async function loadSquaresContestRow(
     maxSquaresSecondary: cfg.max_squares_secondary === undefined ? null : (cfg.max_squares_secondary as number | null),
     primaryEndsAt: (cfg.primary_ends_at as string | null) ?? null,
     secondaryEndsAt: (cfg.secondary_ends_at as string | null) ?? null,
+    collectedBy: contest.collected_by ?? null,
     games: (gameRows ?? []).map((g) => ({
       espnEventId: g.espn_event_id as string,
       league: g.league as string,

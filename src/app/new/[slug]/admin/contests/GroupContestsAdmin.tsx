@@ -76,9 +76,9 @@ function ContestTypeIcon({ kind, size = 13 }: { kind: "squares" | "pickem"; size
       <path d="M9 3v18M15 3v18M3 9h18M3 15h18" />
     </svg>
   ) : (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <path d="M8 12l2.5 2.5L16 9" />
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
+      <rect x="3" y="3" width="18" height="18" rx="2" fill="currentColor" stroke="currentColor" strokeWidth={2} />
+      <path d="M8 12l2.5 2.5L16 9" fill="none" stroke="#fff" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -194,7 +194,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
       </div>
 
       {editing !== undefined && (
-        <SquaresEditor collectionBase={collectionBase} editing={editing} onClose={() => setEditing(undefined)} />
+        <SquaresEditor collectionBase={collectionBase} editing={editing} nameMode={nameMode} onClose={() => setEditing(undefined)} />
       )}
 
       <Modal open={pickemOpen} title="New Pick'em" onClose={() => setPickemOpen(false)}>

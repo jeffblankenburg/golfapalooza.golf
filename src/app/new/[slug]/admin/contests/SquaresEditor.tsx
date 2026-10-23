@@ -8,6 +8,8 @@ import GameSelectModal from "@/components/v2/sports/GameSelectModal";
 import { parseStake, formatStake } from "@/lib/v2/rounds/stake";
 import { getLeague, type EspnGame } from "@/lib/v2/sports/espn";
 import { PERIOD_PRESETS, resolvePayouts, type Alloc, type GameAllocation } from "@/lib/v2/contests/squares";
+import ContestCollector from "@/components/v2/contests/ContestCollector";
+import { type NameMode } from "@/lib/v2/profile";
 
 type Structure = "quarters" | "halves";
 const defaultWeights = (s: Structure): Record<string, number> =>
@@ -57,6 +59,7 @@ export interface SquaresContestRow {
   maxSquaresSecondary: number | null;
   primaryEndsAt: string | null;
   secondaryEndsAt: string | null;
+  collectedBy: string | null;
   games: StoredGame[];
 }
 
@@ -161,6 +164,7 @@ export default function SquaresEditor({
   collectionBase,
   editing,
   eventId = null,
+  nameMode = "nickname",
   onClose,
   onSaved,
 }: {
@@ -169,11 +173,14 @@ export default function SquaresEditor({
   // When set, a newly-created pool is EVENT-scoped (event_id). Omitted/null =
   // group-scoped. Editing an existing pool never changes its scope.
   eventId?: string | null;
+  nameMode?: NameMode; // for the collector picker's member names (edit mode only)
   onClose: () => void;
   onSaved?: () => void;
 }) {
   const router = useRouter();
   const editingId = editing?.id ?? null;
+  // Org id lives in the collection base: /api/v2/orgs/<orgId>/contests
+  const orgId = collectionBase.split("/")[4] ?? "";
   const seeded = seedAllocs(editing);
 
   const [name, setName] = useState(editing?.name ?? "");
@@ -387,6 +394,15 @@ export default function SquaresEditor({
                   <input value={costStr} inputMode="decimal" onChange={(e) => setCostStr(e.target.value)} onBlur={() => setCostStr(formatStake(cost))} />
                   <span className={styles.costNote}>pot fills to {money(Math.round((cost ?? 0) * 100) * 100)} if all 100 sell</span>
                 </div>
+                {editingId && (
+                  <ContestCollector
+                    base={`${collectionBase}/${editingId}`}
+                    orgId={orgId}
+                    nameMode={nameMode}
+                    initialCollectedBy={editing?.collectedBy ?? null}
+                    defaultLabel="Contest creator (default)"
+                  />
+                )}
               </Section>
 
               <Section

@@ -541,24 +541,6 @@
   color: rgba(89, 99, 91, 0.55);
 }
 
-/* A money input: a leading "$" inside the textbox. Wrap an .input and prefix. */
-.moneyField {
-  position: relative;
-  display: block;
-}
-.moneyField > .moneyPrefix {
-  position: absolute;
-  left: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--ink-soft);
-  font-size: 1rem;
-  pointer-events: none;
-}
-.moneyField > .input {
-  padding-left: 26px;
-}
-
 /* A <select> styled to match .input exactly, with a custom chevron. */
 .selectInput {
   width: 100%;

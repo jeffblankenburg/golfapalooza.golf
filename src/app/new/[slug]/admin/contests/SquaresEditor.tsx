@@ -186,6 +186,7 @@ export default function SquaresEditor({
   const seeded = seedAllocs(editing);
 
   const [name, setName] = useState(editing?.name ?? "");
+  const [collectedBy, setCollectedBy] = useState(editing?.collectedBy ?? currentUserId);
   const [costStr, setCostStr] = useState(editing ? formatStake(editing.cellCostCents / 100) : "10");
   const [games, setGames] = useState<EspnGame[]>(editing ? editing.games.map(toEspnGame) : []);
   // No UI control today — the pot-allocation mode is seeded and left as-is (edits
@@ -305,7 +306,7 @@ export default function SquaresEditor({
     setSaving(true);
     setErr(null);
     const payload = {
-      ...(editingId ? {} : { contest_type: "squares", event_id: eventId ?? null }),
+      ...(editingId ? { collected_by: collectedBy || null } : { contest_type: "squares", event_id: eventId ?? null }),
       name: name.trim(),
       cell_cost_cents: Math.round((cost ?? 0) * 100),
       pot_allocation: potAllocation,
@@ -403,6 +404,8 @@ export default function SquaresEditor({
                     nameMode={nameMode}
                     currentUserId={currentUserId}
                     initialCollectedBy={editing?.collectedBy ?? null}
+                    value={collectedBy}
+                    onChange={setCollectedBy}
                     labelClassName={styles.label}
                     selectClassName={styles.selectInput}
                   />

@@ -9,10 +9,15 @@ import styles from "@/app/new/new.module.css";
  * settle this contest's buy-in with. Defaults the selection to the active user (the
  * admin setting it up), never an abstract "creator/treasurer" option. The collector
  * needs a Venmo handle or members won't get a pay button in My Money, so the picker
- * gates on it. Auto-saves on change (no Save button).
+ * gates on it.
  *
- * Style-agnostic: pass `labelClassName`/`selectClassName` to match the host form
- * (e.g. the Squares editor's classes); defaults match the shared `.input` look.
+ * Two modes:
+ *  - Uncontrolled (default): auto-saves on change — for pages with no Save button.
+ *  - Controlled (`value` + `onChange`): reports the pick up and does NOT save — for
+ *    a host form (e.g. the Squares editor) that persists it with its own Save button.
+ *
+ * Style-agnostic: pass `labelClassName`/`selectClassName` to match the host form;
+ * defaults match the shared `.input` look.
  */
 interface MemberOpt { user_id: string; name: string; venmo: string | null }
 
@@ -22,6 +27,8 @@ export default function ContestCollector({
   nameMode,
   currentUserId,
   initialCollectedBy,
+  value,
+  onChange,
   labelClassName,
   selectClassName,
 }: {
@@ -30,11 +37,15 @@ export default function ContestCollector({
   nameMode: NameMode;
   currentUserId: string;
   initialCollectedBy: string | null;
+  value?: string;                       // controlled value (with onChange)
+  onChange?: (next: string) => void;    // controlled: report pick, host saves it
   labelClassName?: string;
   selectClassName?: string;
 }) {
+  const controlled = onChange !== undefined;
   // Pre-select the active user when nobody's set yet (parity with GroupContestMoney).
-  const [collectedBy, setCollectedBy] = useState(initialCollectedBy || currentUserId);
+  const [internal, setInternal] = useState(initialCollectedBy || currentUserId);
+  const collectedBy = controlled ? (value ?? "") : internal;
   const [members, setMembers] = useState<MemberOpt[]>([]);
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
 
@@ -55,7 +66,9 @@ export default function ContestCollector({
   }, [orgId, nameMode]);
 
   async function save(next: string) {
-    setCollectedBy(next);
+    // Controlled: hand the pick to the host form; it persists on its own Save.
+    if (controlled) { onChange!(next); return; }
+    setInternal(next);
     setStatus("saving");
     await fetch(base, {
       method: "PATCH",
@@ -73,7 +86,7 @@ export default function ContestCollector({
         <label className={labelClassName ?? styles.label}>
           Who&apos;s collecting? <span className={styles.optional}>(needs Venmo)</span>
         </label>
-        {status !== "idle" && (
+        {!controlled && status !== "idle" && (
           <span className={styles.optional} style={{ whiteSpace: "nowrap" }}>
             {status === "saving" ? "Saving…" : "Saved"}
           </span>

@@ -111,6 +111,12 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
       secondaryEndsAt: "secondary_ends_at" in b ? b.secondary_ends_at ?? null : undefined,
       games,
     });
+    // The collector is a top-level column, not part of the Squares config.
+    if ("collected_by" in body) {
+      await g.admin.from("v2_contests")
+        .update({ collected_by: (body.collected_by as string | null) || null })
+        .eq("id", contestId).eq("org_id", orgId);
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Update failed" }, { status: 500 });

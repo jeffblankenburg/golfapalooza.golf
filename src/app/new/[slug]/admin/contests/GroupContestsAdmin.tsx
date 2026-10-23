@@ -15,10 +15,19 @@ import { pickName, type NameMode } from "@/lib/v2/profile";
 export interface PickemGamePreview {
   awayTeam: string;
   homeTeam: string;
+  awayAbbrev: string | null;
+  homeAbbrev: string | null;
   spread: number | null;
   favorite: "away" | "home" | null;
   gameTime: string | null;
   isTiebreaker: boolean;
+}
+
+/** Short team label for the compact admin preview: ESPN abbreviation, else full name. */
+function teamShort(g: PickemGamePreview, side: "away" | "home"): string {
+  const abbrev = side === "away" ? g.awayAbbrev : g.homeAbbrev;
+  const full = side === "away" ? g.awayTeam : g.homeTeam;
+  return (abbrev || "").trim() || full;
 }
 export type GroupContestItem =
   | { kind: "squares"; id: string; createdAt: string; box: SquaresContestRow }
@@ -55,7 +64,7 @@ function gameWhen(iso: string | null): string {
 function spreadLabel(g: PickemGamePreview): string {
   if (g.isTiebreaker) return "Tiebreaker";
   if (g.spread == null || !g.favorite) return "";
-  const fav = g.favorite === "home" ? g.homeTeam : g.awayTeam;
+  const fav = teamShort(g, g.favorite);
   return `${fav} -${g.spread}`;
 }
 
@@ -275,7 +284,7 @@ function PickemRow({ it, adminBase, isOpen, onToggle, onSettings }: { it: Pickem
                 {realGames.map((g, i) => (
                   <tr key={i}>
                     <td className={styles.gtWhen}>{gameWhen(g.gameTime)}</td>
-                    <td className={styles.gtGame}>{g.awayTeam} @ {g.homeTeam}</td>
+                    <td className={styles.gtGame}>{teamShort(g, "away")} @ {teamShort(g, "home")}</td>
                     <td className={styles.gtPay}>{spreadLabel(g)}</td>
                   </tr>
                 ))}

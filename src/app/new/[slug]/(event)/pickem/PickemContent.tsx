@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import styles from "@/app/new/new.module.css";
-import { pickIsCorrect, gameIsScored, type PickemGame } from "@/lib/v2/contests/pickem";
+import { pickIsCorrect, gameIsScored, pickemTeamLabel, type PickemGame } from "@/lib/v2/contests/pickem";
 /* eslint-disable @next/next/no-img-element */
 
 export interface LeaderEntry {
@@ -146,7 +146,7 @@ export default function PickemContent({
                         const pk = e.picks!.find((x) => x.gameId === g.id)?.pickedTeam ?? null;
                         if (!pk) return null;
                         const ok = gameIsScored(g) ? pickIsCorrect(g, pk) : null;
-                        return <span key={g.id} className={styles.pickRevealChip} data-ok={ok === true || undefined} data-bad={ok === false || undefined}>{pk === "away" ? g.away_team : g.home_team}</span>;
+                        return <span key={g.id} className={styles.pickRevealChip} data-ok={ok === true || undefined} data-bad={ok === false || undefined}>{pickemTeamLabel(g, pk)}</span>;
                       })}
                     </div>
                   )}

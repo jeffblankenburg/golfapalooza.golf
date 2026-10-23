@@ -11,6 +11,8 @@ export interface PickemGame {
   id: string;
   away_team: string;
   home_team: string;
+  away_abbrev: string | null; // ESPN short code (e.g. "UVA"); null for manual games
+  home_abbrev: string | null;
   away_logo_url: string | null;
   home_logo_url: string | null;
   away_color: string | null;
@@ -24,6 +26,17 @@ export interface PickemGame {
   away_score: number | null;
   home_score: number | null;
   sort_order: number;
+}
+
+/** A side's short label: the ESPN abbreviation when we have it, else the full
+ *  name (manually-added games carry no abbreviation). */
+export function pickemTeamLabel(
+  g: { away_team: string; home_team: string; away_abbrev?: string | null; home_abbrev?: string | null },
+  side: "away" | "home",
+): string {
+  const abbrev = side === "away" ? g.away_abbrev : g.home_abbrev;
+  const full = side === "away" ? g.away_team : g.home_team;
+  return (abbrev || "").trim() || full;
 }
 
 export interface PickemPick {

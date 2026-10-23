@@ -39,7 +39,7 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
   // Pick'em enrichment: matchups (preview), participant count + buy-in (meta).
   const pickemIds = (contests ?? []).filter((c) => c.contest_type === "pickem").map((c) => c.id);
   const { data: pickemGames } = pickemIds.length
-    ? await supabase.from("v2_pickem_games").select("contest_id, away_team, home_team, spread, favorite, game_time, is_tiebreaker, sort_order").in("contest_id", pickemIds).order("sort_order")
+    ? await supabase.from("v2_pickem_games").select("contest_id, away_team, home_team, away_abbrev, home_abbrev, spread, favorite, game_time, is_tiebreaker, sort_order").in("contest_id", pickemIds).order("sort_order")
     : { data: [] as Record<string, unknown>[] };
   const { data: pickemParts } = pickemIds.length
     ? await supabase.from("v2_contest_participants").select("contest_id").in("contest_id", pickemIds)
@@ -58,6 +58,7 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
           .filter((g) => g.contest_id === c.id)
           .map((g) => ({
             awayTeam: g.away_team as string, homeTeam: g.home_team as string,
+            awayAbbrev: (g.away_abbrev as string | null) ?? null, homeAbbrev: (g.home_abbrev as string | null) ?? null,
             spread: g.spread as number | null, favorite: (g.favorite as "away" | "home" | null) ?? null,
             gameTime: (g.game_time as string) ?? null, isTiebreaker: !!g.is_tiebreaker,
           })),

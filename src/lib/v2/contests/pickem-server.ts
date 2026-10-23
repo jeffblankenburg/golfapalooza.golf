@@ -15,7 +15,7 @@ import { pickName } from "@/lib/v2/profile";
  */
 
 export const GAME_SELECT =
-  "id, contest_id, away_team, home_team, away_logo_url, home_logo_url, away_color, home_color, spread, favorite, game_time, tv_channel, is_tiebreaker, winning_team, away_score, home_score, sort_order, espn_event_id, league";
+  "id, contest_id, away_team, home_team, away_abbrev, home_abbrev, away_logo_url, home_logo_url, away_color, home_color, spread, favorite, game_time, tv_channel, is_tiebreaker, winning_team, away_score, home_score, sort_order, espn_event_id, league";
 
 /** Uniform result so shells can translate to the exact HTTP status without the
  *  engine importing NextResponse. */
@@ -146,6 +146,8 @@ export async function addEspnGames(admin: SupabaseClient, contestId: string, gam
       league: g.league,
       away_team: g.away?.name || g.away?.abbrev || "Away",
       home_team: g.home?.name || g.home?.abbrev || "Home",
+      away_abbrev: g.away?.abbrev || null,
+      home_abbrev: g.home?.abbrev || null,
       away_logo_url: g.away?.logo ?? null,
       home_logo_url: g.home?.logo ?? null,
       away_color: g.away?.color ?? null,

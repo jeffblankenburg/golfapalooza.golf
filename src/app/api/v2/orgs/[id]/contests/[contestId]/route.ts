@@ -46,6 +46,17 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
       if (!name) return NextResponse.json({ error: "Name can't be empty" }, { status: 400 });
       patch.name = name;
     }
+    if ("collected_by" in patch) patch.collected_by = (patch.collected_by as string | null) || null;
+    // Group-contest buy-in lives in config.entry_cents (no entry_amount_cents column;
+    // event contests fund via cost_items instead). Merge it into the existing config.
+    if ("entry_cents" in body) {
+      const { data: cur } = await g.admin.from("v2_contests").select("config").eq("id", contestId).maybeSingle();
+      const cfg = { ...((cur?.config as Record<string, unknown>) ?? {}) };
+      const cents = Math.max(0, Math.round(Number(body.entry_cents) || 0));
+      if (cents > 0) cfg.entry_cents = cents;
+      else delete cfg.entry_cents;
+      patch.config = cfg;
+    }
     if (Object.keys(patch).length === 0) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
     patch.updated_at = new Date().toISOString();
     const { error } = await g.admin.from("v2_contests").update(patch).eq("id", contestId).eq("org_id", orgId);

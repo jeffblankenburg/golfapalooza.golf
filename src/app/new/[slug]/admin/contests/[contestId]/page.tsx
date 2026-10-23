@@ -6,6 +6,7 @@ import BoxesManageView from "./BoxesManageView";
 // Same admin component the event lane uses — mounted here with the group API base.
 import PickemAdmin from "../../events/[eventId]/contests/[contestId]/PickemAdmin";
 import ContestParticipants from "@/components/v2/contests/ContestParticipants";
+import GroupContestMoney from "./GroupContestMoney";
 import styles from "@/app/new/new.module.css";
 
 export default async function BoxesDetailPage({ params }: { params: Promise<{ slug: string; contestId: string }> }) {
@@ -19,7 +20,7 @@ export default async function BoxesDetailPage({ params }: { params: Promise<{ sl
   const supabase = await v2ServerClient();
   const { data: contest } = await supabase
     .from("v2_contests")
-    .select("id, name, status, config, contest_type, org_id, payout_splits")
+    .select("id, name, status, config, contest_type, org_id, payout_splits, collected_by")
     .eq("id", contestId)
     .eq("org_id", org.id)
     .maybeSingle();
@@ -41,6 +42,12 @@ export default async function BoxesDetailPage({ params }: { params: Promise<{ sl
           initialFeeCents={0}
           initialSplits={(contest.payout_splits as { place: number; kind: string; amount: number }[] | null) ?? []}
           enrolledCount={enrolled ?? 0}
+        />
+        <GroupContestMoney
+          orgId={org.id}
+          contestId={contestId}
+          initialEntryCents={Number((contest.config as { entry_cents?: number } | null)?.entry_cents) || 0}
+          initialCollectedBy={(contest.collected_by as string | null) ?? null}
         />
         <ContestParticipants apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`} />
       </div>

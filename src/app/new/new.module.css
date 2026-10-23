@@ -5879,6 +5879,29 @@ button.rosterChip {
   font-size: 0.78rem;
   color: var(--ink-soft);
 }
+/* Mark-paid toggle on a group-contest roster. */
+.paidToggle,
+.paidToggleOn {
+  flex: none;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.paidToggle {
+  border: 1px solid var(--line-strong, var(--line));
+  background: var(--card);
+  color: var(--ink);
+}
+.paidToggleOn {
+  border: 1px solid color-mix(in srgb, #15803d 40%, transparent);
+  background: color-mix(in srgb, #15803d 12%, var(--card));
+  color: #15803d;
+}
+.paidToggle:disabled,
+.paidToggleOn:disabled { opacity: 0.5; cursor: default; }
 
 /* Options participant grid (#239). Horizontal scroll with a sticky member column. */
 .optGridWrap {

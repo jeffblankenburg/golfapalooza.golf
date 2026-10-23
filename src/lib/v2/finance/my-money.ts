@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { pickName, type NameMode } from "@/lib/v2/profile";
 import { loadMemberBalance } from "@/lib/v2/balances";
-import { resolveEventPayeeId } from "./payees";
+import { resolveEventPayeeId, resolveContestPayeeId } from "./payees";
 import { venmoLink } from "@/lib/v2/payments";
 
 /**
@@ -94,11 +94,26 @@ export async function loadMyMoney(
     }
   }
 
-  // (Event contest buy-ins are funded through Options — a contest's buy-in cost_item
-  // is bundled into an option the member selects — so they're already counted in the
-  // derived charges above, attributed to the event treasurer. There is no separate
-  // entry_amount_cents on v2_contests (removed in migration 00250). Group-contest
-  // buy-ins have no money mechanism yet — tracked in the #237 group-finance work.)
+  // 2) GROUP contest buy-ins (event_id null) → the contest's collector. EVENT
+  // contest buy-ins flow through Options (cost_items) and are already in the derived
+  // charges above (there's no entry_amount_cents column — removed in 00250). Group
+  // contests have no Options, so their fee lives in config.entry_cents and is
+  // DERIVED here; only the payments against it are stored in the ledger.
+  const { data: parts } = await admin.from("v2_contest_participants").select("contest_id").eq("user_id", userId);
+  const contestIds = [...new Set((parts || []).map((p) => p.contest_id as string))];
+  if (contestIds.length) {
+    const { data: contests } = await admin
+      .from("v2_contests")
+      .select("id, name, config, collected_by, created_by")
+      .in("id", contestIds)
+      .eq("org_id", orgId)
+      .is("event_id", null);
+    for (const c of contests || []) {
+      const entry = Number((c.config as { entry_cents?: number } | null)?.entry_cents) || 0;
+      if (entry <= 0) continue;
+      obligations.push({ amountCents: entry, label: (c.name as string) || "Contest", sublabel: "Entry fee", payeeId: resolveContestPayeeId(c, null) });
+    }
+  }
 
   // 3) Ledger charges + payments for this member, org-wide, attributed by payee.
   const { data: txs } = await admin
@@ -150,10 +165,55 @@ export async function loadMyMoney(
     .filter((g) => g.netCents !== 0)
     .sort((a, b) => b.netCents - a.netCents);
 
-  // "Owed to you" (collector incoming) needs the real buy-in model (cost_items +
-  // per-contest payee) — deferred with the #237 group-finance work.
-  const incoming: IncomingGroup[] = [];
-  const owedToYouCents = 0;
+  const incoming = await loadGroupContestIncoming(admin, orgId, userId, mode);
+  const owedToYouCents = incoming.reduce((s, g) => s + g.netCents, 0);
 
   return { balanceCents, chargesCents, paidCents, charges, settle, owedToYouCents, incoming };
+}
+
+/** What others owe this member for GROUP contests they collect (derived entry fee
+ *  per participant, minus payments recorded to this member for that contest). */
+async function loadGroupContestIncoming(
+  admin: SupabaseClient,
+  orgId: string,
+  userId: string,
+  mode: NameMode,
+): Promise<IncomingGroup[]> {
+  // Group contests where this member is the resolved collector (explicit, or the
+  // creator with no explicit collector). Fee lives in config.entry_cents.
+  const { data: contests } = await admin
+    .from("v2_contests")
+    .select("id, config, collected_by, created_by")
+    .eq("org_id", orgId)
+    .is("event_id", null);
+  const mine = (contests || []).filter((c) => {
+    const entry = Number((c.config as { entry_cents?: number } | null)?.entry_cents) || 0;
+    return entry > 0 && resolveContestPayeeId(c, null) === userId;
+  });
+  if (!mine.length) return [];
+  const feeById = new Map(mine.map((c) => [c.id as string, Number((c.config as { entry_cents?: number }).entry_cents) || 0]));
+  const ids = [...feeById.keys()];
+
+  const [{ data: participants }, { data: pays }] = await Promise.all([
+    admin.from("v2_contest_participants").select("contest_id, user_id").in("contest_id", ids),
+    admin.from("v2_financial_transactions").select("user_id, amount_cents, contest_id").eq("type", "payment").eq("payee_user_id", userId).in("contest_id", ids),
+  ]);
+
+  const owedByUser = new Map<string, number>();
+  for (const p of participants || []) {
+    const u = p.user_id as string;
+    if (u === userId) continue;
+    owedByUser.set(u, (owedByUser.get(u) || 0) + (feeById.get(p.contest_id as string) || 0));
+  }
+  for (const pay of pays || []) {
+    const u = pay.user_id as string;
+    if (!owedByUser.has(u)) continue;
+    owedByUser.set(u, (owedByUser.get(u) || 0) - ((pay.amount_cents as number) || 0));
+  }
+
+  const debtors = [...owedByUser.entries()].filter(([, net]) => net > 0);
+  const nameMap = await names(admin, debtors.map(([u]) => u), mode);
+  return debtors
+    .map(([fromUserId, netCents]) => ({ fromUserId, fromName: nameMap.get(fromUserId) || "Someone", netCents }))
+    .sort((a, b) => b.netCents - a.netCents);
 }

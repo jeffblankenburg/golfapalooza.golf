@@ -350,7 +350,10 @@ function PickemQuickSettings({ orgId, item, currentUserId, nameMode, onClose, on
         </label>
         <label>
           <span style={{ display: "block", fontSize: "0.8125rem", fontWeight: 600, marginBottom: 4 }}>Entry fee</span>
-          <input className={styles.input} style={{ width: "100%" }} inputMode="decimal" value={fee} placeholder="0" onChange={(e) => setFee(e.target.value.replace(/[^0-9.]/g, ""))} />
+          <span className={styles.moneyField}>
+            <span className={styles.moneyPrefix}>$</span>
+            <input className={styles.input} inputMode="decimal" value={fee} placeholder="0" onChange={(e) => setFee(e.target.value.replace(/[^0-9.]/g, ""))} />
+          </span>
         </label>
         <label>
           <span style={{ display: "block", fontSize: "0.8125rem", fontWeight: 600, marginBottom: 4 }}>Who&apos;s collecting? (needs Venmo)</span>

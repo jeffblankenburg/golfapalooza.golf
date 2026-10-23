@@ -92,8 +92,11 @@ export default function GroupContestMoney({
 
       <div className={styles.field}>
         <label className={styles.label}>Entry fee <span className={styles.optional}>(per member)</span></label>
-        <input className={styles.input} inputMode="decimal" value={fee} placeholder="0"
-          onChange={(e) => setFee(e.target.value.replace(/[^0-9.]/g, ""))} onBlur={saveFee} />
+        <span className={styles.moneyField}>
+          <span className={styles.moneyPrefix}>$</span>
+          <input className={styles.input} inputMode="decimal" value={fee} placeholder="0"
+            onChange={(e) => setFee(e.target.value.replace(/[^0-9.]/g, ""))} onBlur={saveFee} />
+        </span>
         {entryCents > 0 && roster.length > 0 && (
           <p className={styles.roundFormHint} style={{ marginTop: 4 }}>Pot: {money(entryCents)} × {roster.length} in = <strong style={{ color: "var(--brand)" }}>{money(pot)}</strong></p>
         )}

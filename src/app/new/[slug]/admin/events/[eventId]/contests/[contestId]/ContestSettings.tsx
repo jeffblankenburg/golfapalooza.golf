@@ -207,8 +207,11 @@ export default function ContestSettings({
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label}>Buy-in <span className={styles.optional}>($ per player, shows on Financials)</span></label>
-            <input className={styles.input} inputMode="decimal" value={buyin} onChange={(e) => setBuyin(e.target.value)} placeholder="0" />
+            <label className={styles.label}>Buy-in <span className={styles.optional}>(per player, shows on Financials)</span></label>
+            <span className={styles.moneyField}>
+              <span className={styles.moneyPrefix}>$</span>
+              <input className={styles.input} inputMode="decimal" value={buyin} onChange={(e) => setBuyin(e.target.value)} placeholder="0" />
+            </span>
           </div>
 
           <div className={styles.field}>

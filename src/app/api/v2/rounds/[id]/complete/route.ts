@@ -3,6 +3,7 @@ import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { recalcAffectedPlayers } from "@/lib/v2/golf/recalc";
 import { formatCourseName } from "@/lib/v2/course-display";
 import { orgSlug, clearRoundActivity, logRoundScores } from "@/lib/v2/rounds/round-activity";
+import { notifyFavoritesRoundCompleted } from "@/lib/v2/rounds/favorites-fanout";
 
 /**
  * POST — finalize an in-progress round: flip status → completed, stamp
@@ -26,6 +27,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .eq("id", roundId)
     .maybeSingle();
   if (!round) return NextResponse.json({ error: "Round not found" }, { status: 404 });
+
+  // Only a genuine in_progress/abandoned → completed transition should buzz
+  // followers; re-running complete on an already-completed round must not.
+  const wasInProgress = round.status !== "completed";
 
   const { data: roster } = await admin
     .from("v2_round_players")
@@ -78,6 +83,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
       await clearRoundActivity(admin, roundId);
       await logRoundScores(admin, { orgId: round.org_id, slug, roundId, courseName, entries });
+
+      // Spectator push to followers — one per player, with their final line.
+      if (wasInProgress) {
+        await notifyFavoritesRoundCompleted(admin, {
+          roundId,
+          players: (finals || [])
+            .filter((r) => r.user_id)
+            .map((r) => ({ userId: r.user_id as string, score: r.final_gross_score, par })),
+        });
+      }
     }
   }
 

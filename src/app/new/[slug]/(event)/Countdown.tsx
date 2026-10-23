@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import styles from "@/app/new/new.module.css";
+import { wallTimeToUtcMs, calendarDaysUntil, DEFAULT_TIMEZONE } from "@/lib/v2/timezone";
 
 /**
  * Live countdown to an event's start. Shows days when far out, and drops to
@@ -14,12 +15,18 @@ import styles from "@/app/new/new.module.css";
  */
 export default function Countdown({
   start,
+  startTime,
   end,
   nowMs,
+  timeZone,
 }: {
   start: string;
+  /** Optional start-of-day time ("HH:MM"/"HH:MM:SS"). Falls back to midnight. */
+  startTime?: string | null;
   end?: string | null;
   nowMs: number;
+  /** The event's IANA timezone — the wall-clock start is resolved in it. */
+  timeZone?: string | null;
 }) {
   const [now, setNow] = useState<number | null>(null);
 
@@ -36,8 +43,12 @@ export default function Countdown({
 
   if (now === null) return null;
 
-  const startMs = new Date(start + "T00:00:00").getTime();
-  const endMs = end ? new Date(end + "T23:59:59").getTime() : startMs;
+  // Resolve the absolute start instant from the event's wall-clock time in ITS
+  // timezone, so the countdown is the same for every viewer. A set start time
+  // targets the real kickoff (e.g. first tee); otherwise midnight of the day.
+  const tz = timeZone || DEFAULT_TIMEZONE;
+  const startMs = wallTimeToUtcMs(start, startTime, tz);
+  const endMs = wallTimeToUtcMs(end || start, "23:59:59", tz);
   const diff = startMs - now;
 
   if (diff <= 0) {
@@ -46,16 +57,20 @@ export default function Countdown({
     );
   }
 
-  const s = Math.floor(diff / 1000);
-  const days = Math.floor(s / 86400);
-  const hours = Math.floor((s % 86400) / 3600);
-  const mins = Math.floor((s % 3600) / 60);
-  const secs = s % 60;
-
   let text: string;
-  if (days >= 1) text = `${days} day${days === 1 ? "" : "s"}`; // >1 day: days only
-  else if (hours >= 1) text = `${hours}h ${mins}m`; // <24h: hours + minutes
-  else text = `${mins}m ${secs}s`; // <1h: minutes + seconds
+  if (diff < 86_400_000) {
+    // Final 24h before the start — drop to a live hours/minutes/seconds readout.
+    const s = Math.floor(diff / 1000);
+    const hours = Math.floor(s / 3600);
+    const mins = Math.floor((s % 3600) / 60);
+    const secs = s % 60;
+    text = hours >= 1 ? `${hours}h ${mins}m` : `${mins}m ${secs}s`;
+  } else {
+    // Further out: whole CALENDAR days counted in the event's zone, so the figure
+    // matches the date on the calendar and doesn't shed a day as time passes.
+    const days = calendarDaysUntil(now, start, tz);
+    text = `${days} day${days === 1 ? "" : "s"}`;
+  }
 
   return <span className={styles.countdown}>{text}</span>;
 }

@@ -90,8 +90,28 @@ export default function RoundDetail({
   const [d, setD] = useState<Detail | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [resuming, setResuming] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(defaultCommentsOpen);
   const mode = useNameMode();
+
+  // Resume: a paused (abandoned) round must be flipped back to in_progress before
+  // we jump to the scorer; a live round just navigates straight there.
+  async function handleResume() {
+    if (d?.status === "abandoned") {
+      setResuming(true);
+      try {
+        const res = await fetch(`/api/v2/rounds/${id}/resume`, { method: "POST" });
+        if (!res.ok) {
+          setResuming(false);
+          return;
+        }
+      } catch {
+        setResuming(false);
+        return;
+      }
+    }
+    onResume?.();
+  }
 
   async function handleDelete() {
     setDeleting(true);
@@ -131,7 +151,7 @@ export default function RoundDetail({
   // in-progress or solo round deletes wholesale. Mirror the server rule so the
   // confirm text is honest about what will happen.
   const otherLoozers = d.players.filter((p) => !p.is_viewer && !p.is_guest);
-  const wholeDelete = d.status === "in_progress" || otherLoozers.length === 0;
+  const wholeDelete = d.status === "in_progress" || d.status === "abandoned" || otherLoozers.length === 0;
   const deleteMessage = wholeDelete
     ? "This permanently removes the round and all its scores for everyone. If it counted toward handicaps, they'll be recalculated. This can't be undone."
     : "This removes only your score from this round. The other players keep theirs, and your handicap will be recalculated. This can't be undone.";
@@ -170,9 +190,9 @@ export default function RoundDetail({
 
   return (
     <div className={styles.roundBody}>
-      {d.status === "in_progress" && d.can_manage && (
-        <button type="button" className={styles.roundResumeBtn} onClick={onResume} style={{ marginBottom: 12 }}>
-          Resume scoring
+      {(d.status === "in_progress" || d.status === "abandoned") && d.can_manage && (
+        <button type="button" className={styles.roundResumeBtn} onClick={handleResume} disabled={resuming} style={{ marginBottom: 12 }}>
+          {resuming ? "Resuming…" : "Resume scoring"}
         </button>
       )}
       <RoundScorecard
@@ -204,6 +224,14 @@ export default function RoundDetail({
       {d.is_incomplete && (
         <p className={styles.scIncomplete}>
           Incomplete round — {d.holes_played} of {d.expected_holes} holes. Excluded from your stats and handicap.
+        </p>
+      )}
+
+      {d.status === "abandoned" && (
+        <p className={styles.scIncomplete}>
+          Paused round, set aside after sitting idle for a while. Resume to pick up
+          where you left off, or delete it. It won&apos;t count toward your stats or
+          handicap until it&apos;s completed.
         </p>
       )}
 

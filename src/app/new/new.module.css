@@ -448,6 +448,18 @@
   transform: translateY(1px);
 }
 
+/* Pins a form's primary action to the bottom of a scrolling Modal body, so it
+   stays reachable on long content. bottom:-20px cancels the Modal .body bottom
+   padding; the padding here restores breathing room beneath the button. */
+.stickyModalAction {
+  position: sticky;
+  bottom: -20px;
+  margin-top: 8px;
+  padding: 12px 0 20px;
+  background: var(--card);
+  border-top: 1px solid var(--line);
+}
+
 .createBtn {
   display: inline-flex;
   align-items: center;
@@ -3153,6 +3165,14 @@ button.feedRow:active {
   flex-direction: column;
   gap: 8px;
 }
+.roundGroupLabel {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  padding: 0 2px 2px;
+}
 .roundItem {
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -5745,6 +5765,320 @@ button.rosterChip {
   font-weight: 800;
   background: color-mix(in srgb, var(--ink) 3%, var(--card));
   border-top: 1px solid var(--line);
+}
+
+/* Home "My Money" card — compact balance link (#237). */
+.balanceModuleCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  text-decoration: none;
+}
+.balanceModuleCard[data-state="owes"] {
+  border-color: color-mix(in srgb, var(--warn, #c2410c) 35%, transparent);
+  background: color-mix(in srgb, var(--warn, #c2410c) 5%, var(--card));
+}
+.balanceModuleCard[data-state="credit"] {
+  border-color: color-mix(in srgb, #15803d 35%, transparent);
+  background: color-mix(in srgb, #15803d 5%, var(--card));
+}
+.balanceModuleIcon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--brand) 12%, var(--paper));
+  color: var(--brand);
+}
+.balanceModuleText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.balanceModuleLabel {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.balanceModuleAmount {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.balanceModuleCard[data-state="owes"] .balanceModuleAmount { color: var(--warn, #c2410c); }
+.balanceModuleCard[data-state="credit"] .balanceModuleAmount { color: #15803d; }
+
+/* Unified "My Money" (#237) — per-payee settle-up cards. */
+.balanceSub {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+.payeeList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+.payeeCard {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  padding: 14px 16px;
+}
+.payeeCard[data-credit] {
+  border-color: color-mix(in srgb, #15803d 35%, transparent);
+  background: color-mix(in srgb, #15803d 5%, var(--card));
+}
+.payeeHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.payeeName {
+  font-weight: 700;
+  color: var(--ink);
+}
+.payeeNet {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  color: var(--warn, #c2410c);
+  white-space: nowrap;
+}
+.payeeNet[data-credit] {
+  color: #15803d;
+  font-weight: 700;
+}
+.venmoBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 11px;
+  background: #3d95ce; /* Venmo blue */
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.venmoBtn:active { opacity: 0.9; }
+.venmoMissing {
+  display: block;
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+/* Options participant grid (#239). Horizontal scroll with a sticky member column. */
+.optGridWrap {
+  margin-top: 18px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  -webkit-overflow-scrolling: touch;
+}
+.optGrid {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.82rem;
+}
+.optGrid th,
+.optGrid td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+  vertical-align: top;
+}
+.optGrid thead th {
+  background: color-mix(in srgb, var(--ink) 4%, var(--card));
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft);
+  position: sticky;
+  top: 0;
+}
+.optGrid tfoot td {
+  background: color-mix(in srgb, var(--ink) 4%, var(--card));
+  border-bottom: none;
+}
+.optGridSticky {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--card);
+  font-weight: 600;
+  color: var(--ink);
+}
+.optGrid thead .optGridSticky {
+  z-index: 3;
+  background: color-mix(in srgb, var(--ink) 4%, var(--card));
+}
+.optGrid tfoot .optGridSticky {
+  background: color-mix(in srgb, var(--ink) 4%, var(--card));
+}
+.optGridTotal {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--ink);
+}
+.optCellVal {
+  display: block;
+  color: var(--ink);
+}
+.optGrid td[data-empty] .optCellVal {
+  color: color-mix(in srgb, var(--ink-soft) 70%, transparent);
+}
+/* Inline price next to a checkbox / quantity / number cell (no second line). */
+.optCheckWrap,
+.optInlineWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.optInlineCost {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* Editable cells in the selections grid. */
+.optCheck {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+.optCellInput {
+  width: 100%;
+  min-width: 90px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--ink);
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 0.8rem;
+}
+.optCellInput:focus {
+  outline: none;
+  border-color: var(--brand);
+}
+/* Selects get the app's custom chevron (the native arrow crowds the edge). */
+select.optCellInput {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 24px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2359635b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 7px center;
+  background-size: 13px;
+}
+.optMulti {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.optMultiItem {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.optMultiItem input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--brand);
+}
+.optQtyBtn {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--ink);
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.optQtyEmpty { color: var(--ink-soft); }
+.optQtyMax { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.optQtyList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.optQtyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+}
+.optQtyRow[data-on] {
+  border-color: color-mix(in srgb, var(--brand) 40%, transparent);
+  background: color-mix(in srgb, var(--brand) 5%, var(--card));
+}
+.optQtyStep {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.optQtyStep span {
+  min-width: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.optQtyStep button {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong, var(--line));
+  background: var(--card);
+  color: var(--ink);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.optQtyStep button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.optColSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.optColSummary b { color: var(--ink); }
+.optColMoney {
+  margin-top: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 .balSummary {
   display: grid;

@@ -6,6 +6,7 @@ import { calculateDifferential } from "@/lib/v2/golf/calculator";
 import { recalculateHandicap } from "@/lib/v2/golf/handicap";
 import { orgSlug, logLiveRound, logRoundScores } from "@/lib/v2/rounds/round-activity";
 import { notifyRoundInvite } from "@/lib/v2/rounds/notify";
+import { notifyFavoritesRoundStarted, notifyFavoritesRoundCompleted } from "@/lib/v2/rounds/favorites-fanout";
 import { v2Now } from "@/lib/v2/simulator";
 
 /**
@@ -320,12 +321,22 @@ export async function POST(request: Request) {
         const nameById = new Map((profs || []).map((p) => [p.id, p.display_name]));
         const names = players.map((p) => (p.user_id ? nameById.get(p.user_id) || "Player" : p.guest_name || "Guest"));
         await logLiveRound(admin, { orgId: org_id, slug, roundId: round.id, creatorId: userId, courseName, subtitle: names.join(", ") });
+        // Spectator push to anyone following a player who just teed off (#187).
+        await notifyFavoritesRoundStarted(admin, { roundId: round.id, playerUserIds: loozerIds });
       } else {
         const toPar = (g: number | null) => (g != null ? g - par : null);
         const entries = isScramble
           ? [{ actorId: userId, score: rows[0]?.final_gross_score ?? null, toPar: toPar(rows[0]?.final_gross_score ?? null) }]
           : rows.filter((r) => r.user_id).map((r) => ({ actorId: r.user_id!, score: r.final_gross_score, toPar: toPar(r.final_gross_score) }));
         await logRoundScores(admin, { orgId: org_id, slug, roundId: round.id, courseName, entries });
+        // Quick-entry already-complete round: "finished" push to followers (the
+        // fanout no-ops for silent rounds, so a quiet backfill won't notify).
+        if (status === "completed") {
+          await notifyFavoritesRoundCompleted(admin, {
+            roundId: round.id,
+            players: rows.filter((r) => r.user_id).map((r) => ({ userId: r.user_id, score: r.final_gross_score, par })),
+          });
+        }
       }
     }
   }

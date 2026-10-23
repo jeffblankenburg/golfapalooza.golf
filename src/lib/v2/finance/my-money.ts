@@ -1,0 +1,159 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { pickName, type NameMode } from "@/lib/v2/profile";
+import { loadMemberBalance } from "@/lib/v2/balances";
+import { resolveEventPayeeId } from "./payees";
+import { venmoLink } from "@/lib/v2/payments";
+
+/**
+ * Unified "My Money" (finance epic #235 / #237). A member's complete money picture
+ * across EVERY event + group contest in the org: their balance + every charge
+ * (always shown, like the admin view), PLUS a settle-up layer that nets what they
+ * owe each OTHER person and offers a Venmo link. Charges you'd "owe yourself" (you
+ * are the treasurer/collector) or that have no assigned payee still show as charges
+ * — they just have nobody to Venmo.
+ *
+ * Obligation sources:
+ *   - event trip cost + priced options  → the event's treasurer (default: creator)
+ *   - contest buy-ins (event OR group)   → the contest's collector (default: creator)
+ *   - ledger charges                     → the row's payee (or event treasurer)
+ * Payments are ledger rows; "paid" is whatever's been recorded — never automatic.
+ */
+
+const NOTE = "Settle up";
+
+export interface MoneyLine {
+  label: string;
+  sublabel: string | null;
+  amountCents: number;
+}
+export interface SettleGroup {
+  payeeId: string;
+  payeeName: string;
+  venmoUsername: string | null;
+  netCents: number; // > 0 = you owe them; < 0 = they owe you (overpaid)
+  venmoUrl: string | null; // prefilled for the outstanding net, if they have Venmo
+}
+export interface IncomingGroup {
+  fromUserId: string;
+  fromName: string;
+  netCents: number; // what they owe YOU
+}
+export interface MyMoney {
+  balanceCents: number; // total charges − payments (matches the admin balance)
+  chargesCents: number;
+  paidCents: number;
+  charges: MoneyLine[];
+  settle: SettleGroup[]; // other people you owe / who owe you
+  owedToYouCents: number;
+  incoming: IncomingGroup[];
+}
+
+interface Prof {
+  id: string;
+  display_name: string;
+  first_name: string | null;
+  last_name: string | null;
+  nickname: string | null;
+}
+
+async function names(admin: SupabaseClient, ids: string[], mode: NameMode): Promise<Map<string, string>> {
+  const uniq = [...new Set(ids)].filter(Boolean);
+  if (!uniq.length) return new Map();
+  const { data } = await admin
+    .from("v2_profiles")
+    .select("id, display_name, first_name, last_name, nickname, venmo_username")
+    .in("id", uniq);
+  return new Map((data || []).map((p) => [p.id as string, pickName(p as Prof, mode, "Someone")]));
+}
+
+interface Obligation { amountCents: number; label: string; sublabel: string | null; payeeId: string | null; }
+
+export async function loadMyMoney(
+  admin: SupabaseClient,
+  orgId: string,
+  userId: string,
+  mode: NameMode,
+): Promise<MyMoney> {
+  const { data: events } = await admin
+    .from("v2_events")
+    .select("id, name, created_by, treasurer_user_id")
+    .eq("org_id", orgId);
+  const evList = events || [];
+  const eventPayee = new Map<string, string | null>(evList.map((e) => [e.id as string, resolveEventPayeeId(e)]));
+  const eventName = new Map<string, string>(evList.map((e) => [e.id as string, (e.name as string) || "Event"]));
+
+  const obligations: Obligation[] = [];
+  const paidByPayee = new Map<string, number>();
+
+  // 1) Event derived charges (trip cost + priced options) → event treasurer.
+  for (const e of evList) {
+    const bal = await loadMemberBalance(admin, e.id as string, userId);
+    const payeeId = eventPayee.get(e.id as string) ?? null;
+    for (const c of bal.charges) {
+      if (c.derived) obligations.push({ amountCents: c.amountCents, label: c.label, sublabel: eventName.get(e.id as string) || null, payeeId });
+    }
+  }
+
+  // (Event contest buy-ins are funded through Options — a contest's buy-in cost_item
+  // is bundled into an option the member selects — so they're already counted in the
+  // derived charges above, attributed to the event treasurer. There is no separate
+  // entry_amount_cents on v2_contests (removed in migration 00250). Group-contest
+  // buy-ins have no money mechanism yet — tracked in the #237 group-finance work.)
+
+  // 3) Ledger charges + payments for this member, org-wide, attributed by payee.
+  const { data: txs } = await admin
+    .from("v2_financial_transactions")
+    .select("type, amount_cents, description, payee_user_id, event_id")
+    .eq("org_id", orgId)
+    .eq("user_id", userId);
+  for (const t of txs || []) {
+    const payeeId = (t.payee_user_id as string | null) ?? (t.event_id ? eventPayee.get(t.event_id as string) ?? null : null);
+    const amt = (t.amount_cents as number) || 0;
+    if (t.type === "charge") obligations.push({ amountCents: amt, label: (t.description as string) || "Charge", sublabel: null, payeeId });
+    else if (payeeId) paidByPayee.set(payeeId, (paidByPayee.get(payeeId) || 0) + amt);
+  }
+
+  // Charges list (always shown) + totals.
+  const charges: MoneyLine[] = obligations.map((o) => ({ label: o.label, sublabel: o.sublabel, amountCents: o.amountCents }));
+  const chargesCents = obligations.reduce((s, o) => s + o.amountCents, 0);
+  const paidCents = [...paidByPayee.values()].reduce((s, v) => s + v, 0);
+  const balanceCents = chargesCents - paidCents;
+
+  // Settle-up: net per OTHER payee (skip yourself + unassigned).
+  const owedByPayee = new Map<string, number>();
+  for (const o of obligations) {
+    if (!o.payeeId || o.payeeId === userId) continue;
+    owedByPayee.set(o.payeeId, (owedByPayee.get(o.payeeId) || 0) + o.amountCents);
+  }
+  const settlePayeeIds = new Set<string>([...owedByPayee.keys()]);
+  for (const pid of paidByPayee.keys()) if (pid !== userId) settlePayeeIds.add(pid);
+
+  const nameMap = await names(admin, [...settlePayeeIds], mode);
+  const venmoById = new Map<string, string | null>();
+  if (settlePayeeIds.size) {
+    const { data: vrows } = await admin.from("v2_profiles").select("id, venmo_username").in("id", [...settlePayeeIds]);
+    for (const v of vrows || []) venmoById.set(v.id as string, (v.venmo_username as string | null) || null);
+  }
+
+  const settle: SettleGroup[] = [...settlePayeeIds]
+    .map((pid) => {
+      const net = (owedByPayee.get(pid) || 0) - (paidByPayee.get(pid) || 0);
+      const venmo = venmoById.get(pid) ?? null;
+      return {
+        payeeId: pid,
+        payeeName: nameMap.get(pid) || "Someone",
+        venmoUsername: venmo,
+        netCents: net,
+        venmoUrl: net > 0 ? venmoLink(venmo, net, NOTE) : null,
+      };
+    })
+    .filter((g) => g.netCents !== 0)
+    .sort((a, b) => b.netCents - a.netCents);
+
+  // "Owed to you" (collector incoming) needs the real buy-in model (cost_items +
+  // per-contest payee) — deferred with the #237 group-finance work.
+  const incoming: IncomingGroup[] = [];
+  const owedToYouCents = 0;
+
+  return { balanceCents, chargesCents, paidCents, charges, settle, owedToYouCents, incoming };
+}

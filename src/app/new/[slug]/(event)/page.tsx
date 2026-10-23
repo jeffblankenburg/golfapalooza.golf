@@ -18,7 +18,9 @@ interface EventRow {
   name: string;
   year: number | null;
   start_date: string | null;
+  start_time: string | null;
   end_date: string | null;
+  timezone: string | null;
   status: string;
   location: string | null;
 }
@@ -51,7 +53,7 @@ export default async function EventHome({
   const supabase = await v2ServerClient();
   const { data } = await supabase
     .from("v2_events")
-    .select("id, name, year, start_date, end_date, status, location")
+    .select("id, name, year, start_date, start_time, end_date, timezone, status, location")
     .eq("org_id", org.id)
     .eq("status", "active")
     .order("start_date", { ascending: false })
@@ -64,6 +66,7 @@ export default async function EventHome({
   const isAdmin = org.role === "owner" || org.role === "admin";
   const resolved = await loadResolvedFeatures(supabase, org.id, event?.id ?? null);
   const articlesVisible = isFeatureVisible(resolved, "articles", isAdmin);
+  const moneyVisible = isFeatureVisible(resolved, "my_money", isAdmin);
   // Options: visibility/open come from the feature window; the read-only cutoff is
   // the Options-specific close date. "Open" (editable) means both hold.
   const optionsFeat = event ? resolved.find((r) => r.def.key === "options") || null : null;
@@ -96,7 +99,7 @@ export default async function EventHome({
           {(range || event.start_date) && (
             <div className={styles.dateBand}>
               {range && <span className={styles.dateText}>{range}</span>}
-              {event.start_date && <Countdown start={event.start_date} end={event.end_date} nowMs={(await v2Now()).getTime()} />}
+              {event.start_date && <Countdown start={event.start_date} startTime={event.start_time} end={event.end_date} timeZone={event.timezone} nowMs={(await v2Now()).getTime()} />}
             </div>
           )}
 
@@ -118,6 +121,7 @@ export default async function EventHome({
             nameDisplay={org.name_display}
             articlesVisible={articlesVisible}
             optionsOpen={optionsOpen}
+            moneyVisible={moneyVisible}
           />
         </>
       ) : (

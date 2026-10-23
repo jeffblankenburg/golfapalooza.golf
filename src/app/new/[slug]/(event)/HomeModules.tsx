@@ -13,6 +13,7 @@ import AdCarousel, { type Ad } from "./AdCarousel";
 import ActivityFeed from "./ActivityFeed";
 import type { ActivityRow } from "@/lib/v2/activity";
 import { OPTION_SELECT, loadOptionChoicePrices, tripCostCents, type Option } from "@/lib/v2/options";
+import { loadMyMoney } from "@/lib/v2/finance/my-money";
 import styles from "@/app/new/new.module.css";
 /* eslint-disable @next/next/no-img-element */
 
@@ -70,6 +71,7 @@ export default async function HomeModules({
   nameDisplay,
   articlesVisible,
   optionsOpen,
+  moneyVisible,
 }: {
   orgId: string;
   eventId: string;
@@ -82,8 +84,13 @@ export default async function HomeModules({
   nameDisplay: NameMode;
   articlesVisible: boolean;
   optionsOpen: boolean;
+  moneyVisible: boolean;
 }) {
   const supabase = await v2ServerClient();
+
+  // Member's overall balance, for the home "My Money" card — only when the feature
+  // is on (skips the aggregate otherwise). The card hides itself when it's $0.
+  const balanceCents = moneyVisible ? (await loadMyMoney(supabase, orgId, userId, nameDisplay)).balanceCents : 0;
 
   const now = await v2Now();
   const nowIso = now.toISOString();
@@ -228,6 +235,7 @@ export default async function HomeModules({
           initialSelections={selections}
         />
       )}
+      {moneyVisible && <BalanceModule slug={slug} balanceCents={balanceCents} />}
       <StoreModule storeUrl={storeEnabled ? storeUrl : null} storeLabel={storeLabel} />
       <ActivityFeed initialItems={activity} orgId={orgId} systemName={systemName} systemAvatar={systemAvatar} />
       <AdCarousel ads={ads} />
@@ -343,6 +351,37 @@ function ArticleModule({ article, slug }: { article: FeaturedArticle | null; slu
 }
 
 /* ── 3 · Registration lives in RsvpModule.tsx (client: picker + write) ─────── */
+
+/* ── My Money — the member's balance. Hidden at $0 (nothing to settle). ─────── */
+function money(cents: number): string {
+  const whole = cents % 100 === 0;
+  return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 })}`;
+}
+
+function BalanceModule({ slug, balanceCents }: { slug: string; balanceCents: number }) {
+  if (balanceCents === 0) return null;
+  const owes = balanceCents > 0;
+  return (
+    <section className={styles.module}>
+      <Link href={`/new/${slug}/money`} className={styles.balanceModuleCard} data-state={owes ? "owes" : "credit"}>
+        <span className={styles.balanceModuleIcon} aria-hidden>
+          <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <line x1="12" y1="1.5" x2="12" y2="22.5" /><path d="M17 5.5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+          </svg>
+        </span>
+        <span className={styles.balanceModuleText}>
+          <span className={styles.balanceModuleLabel}>{owes ? "Balance due" : "You have a credit"}</span>
+          <span className={styles.balanceModuleAmount}>{money(Math.abs(balanceCents))}</span>
+        </span>
+        <span className={styles.storeArrow} aria-hidden>
+          <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        </span>
+      </Link>
+    </section>
+  );
+}
 
 /* ── 4 · Store — external merch link, admin-configured. Hidden when unset. ──── */
 function StoreModule({

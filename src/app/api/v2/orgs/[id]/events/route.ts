@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
 import { ensureEventRoom } from "@/lib/v2/chat/channels";
+import { isValidTimeZone, DEFAULT_TIMEZONE } from "@/lib/v2/timezone";
 
 /**
  * Events for an org. GET lists (members); POST creates (admins).
@@ -31,7 +32,7 @@ export async function GET(
   if ("error" in g) return NextResponse.json({ error: g.error }, { status: g.status });
   const { data } = await g.admin
     .from("v2_events")
-    .select("id, name, year, start_date, end_date, status, location")
+    .select("id, name, year, start_date, start_time, end_date, timezone, status, location, treasurer_user_id")
     .eq("org_id", id)
     .order("year", { ascending: false })
     .order("start_date", { ascending: false });
@@ -50,9 +51,12 @@ export async function POST(
     name?: string;
     year?: number | null;
     start_date?: string | null;
+    start_time?: string | null;
     end_date?: string | null;
+    timezone?: string | null;
     status?: string;
     location?: string | null;
+    treasurer_user_id?: string | null;
   };
   try {
     body = await request.json();
@@ -61,6 +65,9 @@ export async function POST(
   }
   const name = (body.name || "").trim();
   if (!name) return NextResponse.json({ error: "Event name is required" }, { status: 400 });
+  if (body.timezone != null && !isValidTimeZone(body.timezone)) {
+    return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
+  }
   const status = STATUSES.includes(body.status || "") ? body.status! : "draft";
 
   if (status === "active") {
@@ -78,12 +85,15 @@ export async function POST(
       name,
       year: body.year ?? null,
       start_date: body.start_date || null,
+      start_time: body.start_time || null,
       end_date: body.end_date || null,
+      timezone: body.timezone || DEFAULT_TIMEZONE,
       status,
       location: body.location?.trim() || null,
+      treasurer_user_id: body.treasurer_user_id || null,
       created_by: g.userId,
     })
-    .select("id, name, year, start_date, end_date, status, location")
+    .select("id, name, year, start_date, start_time, end_date, timezone, status, location, treasurer_user_id")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

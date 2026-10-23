@@ -33,7 +33,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const g = await gate(request, orgId);
   if ("error" in g) return g.error;
 
-  let body: { userId?: string; kind?: string; amountCents?: number; method?: string | null; description?: string | null; notes?: string | null };
+  let body: { userId?: string; kind?: string; amountCents?: number; method?: string | null; description?: string | null; notes?: string | null; payeeUserId?: string | null; contestId?: string | null };
   try {
     body = await request.json();
   } catch {
@@ -56,6 +56,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     description: (body.description || "").trim() || null,
     method: (body.method || "").trim() || null,
     notes: (body.notes || "").trim() || null,
+    // Who received this money + what it settled — drives the per-payee "My Money"
+    // netting (#237). Null payee falls back to the event treasurer at read time.
+    payee_user_id: body.payeeUserId || null,
+    contest_id: body.contestId || null,
     created_by: g.actorId,
   }).select("id").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

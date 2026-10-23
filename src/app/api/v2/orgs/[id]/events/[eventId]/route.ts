@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
+import { isValidTimeZone } from "@/lib/v2/timezone";
 
 /**
  * Update (PATCH) or delete (DELETE) a single event. Admins only.
@@ -31,14 +32,21 @@ export async function PATCH(
     name?: string;
     year?: number | null;
     start_date?: string | null;
+    start_time?: string | null;
     end_date?: string | null;
+    timezone?: string | null;
     status?: string;
     location?: string | null;
+    treasurer_user_id?: string | null;
   };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
+
+  if (body.timezone != null && !isValidTimeZone(body.timezone)) {
+    return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
   }
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -49,7 +57,10 @@ export async function PATCH(
   }
   if ("year" in body) patch.year = body.year ?? null;
   if ("start_date" in body) patch.start_date = body.start_date || null;
+  if ("start_time" in body) patch.start_time = body.start_time || null;
   if ("end_date" in body) patch.end_date = body.end_date || null;
+  if ("treasurer_user_id" in body) patch.treasurer_user_id = body.treasurer_user_id || null;
+  if (body.timezone) patch.timezone = body.timezone; // NOT NULL — only set when provided
   if ("location" in body) patch.location = body.location?.trim() || null;
   if (typeof body.status === "string") {
     if (!STATUSES.includes(body.status)) {

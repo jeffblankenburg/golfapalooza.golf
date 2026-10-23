@@ -27,6 +27,8 @@ const PATHS: Record<string, React.ReactNode> = {
   book: <><path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z" /><path d="M4 19a2 2 0 012-2h13" /></>,
   userPlus: <><circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0112 0" /><path d="M17 8v6M14 11h6" /></>,
   news: <><path d="M4 5h13v14H4z" /><path d="M17 8h3v9a2 2 0 01-2 2h-1" /><path d="M7 9h7M7 13h7M7 17h4" /></>,
+  megaphone: <><path d="M4 10v4h3l9 5V5L7 10H4z" /><path d="M18 9a3 3 0 010 6" /><path d="M8 14v4a1 1 0 001 1h1" /></>,
+  cake: <><path d="M4 20h16M5 20v-7a2 2 0 012-2h10a2 2 0 012 2v7" /><path d="M4 15c1.3 1 2.7 1 4 0s2.7-1 4 0 2.7 1 4 0 2.7-1 4 0" /><path d="M12 8V5m0 0l-1-1m1 1l1-1" /></>,
   poll: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>,
   medal: <><circle cx="12" cy="14" r="5" /><path d="M12 12v2l1.5 1M9 4l2 5M15 4l-2 5" /></>,
   quote: <><path d="M7 7h4v4c0 3-2 5-4 5V7zM15 7h4v4c0 3-2 5-4 5V7z" /></>,

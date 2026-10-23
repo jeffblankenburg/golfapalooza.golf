@@ -6,7 +6,7 @@ import { updateBoxesContest, type BoxesGameInput } from "@/lib/v2/contests/boxes
 type Params = Promise<{ id: string; contestId: string }>;
 
 // Generic contest-level fields editable on non-Boxes group contests (e.g. Pick'em).
-const EDITABLE = new Set(["status", "payout_splits", "name"]);
+const EDITABLE = new Set(["status", "payout_splits", "name", "collected_by"]);
 
 async function gate(request: Request, orgId: string, contestId: string) {
   const { userId } = await v2GetUser(request);

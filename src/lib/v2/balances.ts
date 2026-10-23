@@ -95,7 +95,11 @@ export async function loadMemberBalance(
     }
     const value = selByOption.get(o.id);
     const info = priceInfo.get(o.id) || { whole: 0, byChoice: {} };
-    charges.push({ label: o.name, sublabel: choiceSublabel(o, value), amountCents: priceForValue(o.option_type, value, info), derived: true });
+    const amountCents = priceForValue(o.option_type, value, info);
+    // A free selection (shirt size, "no thanks", allergies) isn't money — don't
+    // clutter the financial breakdown with $0 lines. Trip Cost always shows.
+    if (amountCents === 0) continue;
+    charges.push({ label: o.name, sublabel: choiceSublabel(o, value), amountCents, derived: true });
   }
 
   const payments: LedgerTx[] = [];

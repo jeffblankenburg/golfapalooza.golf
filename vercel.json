@@ -25,6 +25,10 @@
       "schedule": "0 6 * * *"
     },
     {
+      "path": "/api/cron/v2-close-stale-rounds",
+      "schedule": "0 7 * * *"
+    },
+    {
       "path": "/api/cron/v2-verify-domains",
       "schedule": "*/10 * * * *"
     },

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
-import { cleanProfileFields, displayNameFrom } from "@/lib/v2/profile";
+import { applyProfileUpdate } from "@/lib/v2/profile-write";
 import { toE164 } from "@/lib/v2/phone";
 import { cleanPermissions, type PermissionMap } from "@/lib/v2/permissions";
 import { addToAllMembers, removeFromManagedChannels } from "@/lib/v2/chat/channels";
@@ -48,7 +48,7 @@ export async function GET(
   const { data } = await g.admin
     .from("v2_memberships")
     .select(
-      "user_id, role, status, archived_at, profile:v2_profiles(display_name, first_name, last_name, nickname, birthdate, avatar_url, is_system, phone)",
+      "user_id, role, status, archived_at, profile:v2_profiles(display_name, first_name, last_name, nickname, birthdate, avatar_url, is_system, phone, zip, occupation, city, state, playing_since, swings, typical_shot, shirt_size, fun_fact, best_shot, show_on_map, venmo_username, paypal_username, mailing_address)",
     )
     .eq("org_id", id)
     .order("role");
@@ -73,6 +73,20 @@ export async function GET(
         avatar_url?: string | null;
         is_system?: boolean | null;
         phone?: string | null;
+        zip?: string | null;
+        occupation?: string | null;
+        city?: string | null;
+        state?: string | null;
+        playing_since?: number | null;
+        swings?: string | null;
+        typical_shot?: string | null;
+        shirt_size?: string | null;
+        fun_fact?: string | null;
+        best_shot?: string | null;
+        show_on_map?: boolean | null;
+        venmo_username?: string | null;
+        paypal_username?: string | null;
+        mailing_address?: string | null;
       } | null;
       return {
         user_id: m.user_id,
@@ -87,6 +101,20 @@ export async function GET(
         avatar_url: p?.avatar_url || null,
         is_system: !!p?.is_system,
         phone: p?.phone ?? null,
+        zip: p?.zip ?? null,
+        occupation: p?.occupation ?? null,
+        city: p?.city ?? null,
+        state: p?.state ?? null,
+        playing_since: p?.playing_since ?? null,
+        swings: p?.swings ?? null,
+        typical_shot: p?.typical_shot ?? null,
+        shirt_size: p?.shirt_size ?? null,
+        fun_fact: p?.fun_fact ?? null,
+        best_shot: p?.best_shot ?? null,
+        show_on_map: p?.show_on_map ?? true,
+        venmo_username: p?.venmo_username ?? null,
+        paypal_username: p?.paypal_username ?? null,
+        mailing_address: p?.mailing_address ?? null,
         permissions: permsByUser.get(m.user_id) ?? {},
       };
     })
@@ -106,12 +134,9 @@ export async function PATCH(
   let body: {
     user_id?: string;
     role?: string;
-    profile?: {
-      first_name?: string | null;
-      last_name?: string | null;
-      nickname?: string | null;
-      birthdate?: string | null;
-    };
+    // Admins can edit any profile field a member can edit themselves (name, bio,
+    // address, Venmo/PayPal, golf info, …) — the full set, sanitized identically.
+    profile?: Record<string, unknown>;
     permissions?: PermissionMap;
     archived?: boolean;
     phone?: string;
@@ -178,27 +203,11 @@ export async function PATCH(
     else await addToAllMembers(g.admin, id, user_id).catch(() => {});
   }
 
-  // Profile edit (admins can edit any member's identity) — optional. Recompute
-  // display_name (nickname-preferred) from the new parts.
+  // Profile edit (admins can edit any member's full profile) — optional. Shares
+  // the exact sanitization + display_name recompute as the member's own editor.
   if (profile) {
-    const fields = cleanProfileFields({
-      first_name: profile.first_name,
-      last_name: profile.last_name,
-      nickname: profile.nickname,
-      birthdate: profile.birthdate,
-    });
-    const { error } = await g.admin
-      .from("v2_profiles")
-      .update({
-        first_name: fields.first_name,
-        last_name: fields.last_name,
-        nickname: fields.nickname,
-        birthdate: fields.birthdate,
-        display_name: displayNameFrom(fields),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", user_id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const r = await applyProfileUpdate(g.admin, user_id, profile);
+    if (r.error) return NextResponse.json({ error: r.error }, { status: r.status });
   }
 
   // Phone change (admin override, no OTP). Sets the member's SMS-login credential

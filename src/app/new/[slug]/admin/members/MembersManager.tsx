@@ -21,6 +21,20 @@ interface Member {
   birthdate: string | null;
   avatar_url: string | null;
   phone: string | null;
+  zip: string | null;
+  occupation: string | null;
+  city: string | null;
+  state: string | null;
+  playing_since: number | null;
+  swings: string | null;
+  typical_shot: string | null;
+  shirt_size: string | null;
+  fun_fact: string | null;
+  best_shot: string | null;
+  show_on_map: boolean;
+  venmo_username: string | null;
+  paypal_username: string | null;
+  mailing_address: string | null;
   permissions: PermissionMap;
 }
 interface Invite {
@@ -38,6 +52,17 @@ type Confirm =
 
 const fullName = (m: { first_name: string | null; last_name: string | null }) =>
   [m.first_name, m.last_name].filter(Boolean).join(" ").trim();
+
+// Extended profile fields an admin can edit (everything a member can set on their
+// own profile beyond name/birthday/phone). Strings for inputs; sanitized server-side.
+const EMPTY_EXT = {
+  city: "", state: "", zip: "", occupation: "", playing_since: "",
+  swings: "", typical_shot: "", shirt_size: "", fun_fact: "", best_shot: "",
+  venmo_username: "", paypal_username: "", mailing_address: "", show_on_map: true,
+};
+const SWING_OPTS = ["right", "left", "both"];
+const SHOT_OPTS = ["straight", "slice", "hook", "draw", "fade"];
+const SHIRT_OPTS = ["S", "M", "L", "XL", "2XL", "3XL", "4XL"];
 
 /** Primary / secondary name lines per the org's name-display mode. */
 function displayLines(m: Member, mode: NameMode): { primary: string; secondary: string | null } {
@@ -99,6 +124,7 @@ export default function MembersManager({
   const [eRole, setERole] = useState<"owner" | "admin" | "member">("member");
   const [eArchived, setEArchived] = useState(false);
   const [ePerms, setEPerms] = useState<PermissionMap>({});
+  const [eExt, setEExt] = useState({ ...EMPTY_EXT });
   const [eBusy, setEBusy] = useState(false);
   const [eError, setEError] = useState<string | null>(null);
 
@@ -159,6 +185,14 @@ export default function MembersManager({
     setERole(m.role);
     setEArchived(m.archived);
     setEPerms(m.permissions || {});
+    setEExt({
+      city: m.city || "", state: m.state || "", zip: m.zip || "",
+      occupation: m.occupation || "", playing_since: m.playing_since != null ? String(m.playing_since) : "",
+      swings: m.swings || "", typical_shot: m.typical_shot || "", shirt_size: m.shirt_size || "",
+      fun_fact: m.fun_fact || "", best_shot: m.best_shot || "",
+      venmo_username: m.venmo_username || "", paypal_username: m.paypal_username || "",
+      mailing_address: m.mailing_address || "", show_on_map: m.show_on_map ?? true,
+    });
     setEError(null);
   }
 
@@ -172,7 +206,7 @@ export default function MembersManager({
     const body: {
       user_id: string;
       role?: string;
-      profile: { first_name: string; last_name: string; nickname: string; birthdate: string | null };
+      profile: Record<string, unknown>;
       permissions?: PermissionMap;
       archived?: boolean;
       phone?: string;
@@ -183,6 +217,20 @@ export default function MembersManager({
         last_name: eLast,
         nickname: eNick,
         birthdate: eBday || null,
+        city: eExt.city,
+        state: eExt.state,
+        zip: eExt.zip,
+        occupation: eExt.occupation,
+        playing_since: eExt.playing_since || null,
+        swings: eExt.swings || null,
+        typical_shot: eExt.typical_shot || null,
+        shirt_size: eExt.shirt_size || null,
+        fun_fact: eExt.fun_fact,
+        best_shot: eExt.best_shot,
+        venmo_username: eExt.venmo_username,
+        paypal_username: eExt.paypal_username,
+        mailing_address: eExt.mailing_address,
+        show_on_map: eExt.show_on_map,
       },
     };
     if (canManage && ePhone.trim() && ePhone.trim() !== (editing.phone || "")) body.phone = ePhone.trim();
@@ -442,6 +490,75 @@ export default function MembersManager({
             </label>
             <input className={styles.input} type="date" value={eBday} onChange={(e) => setEBday(e.target.value)} />
           </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Occupation <span className={styles.optional}>(optional)</span></label>
+            <input className={styles.input} value={eExt.occupation} onChange={(e) => setEExt({ ...eExt, occupation: e.target.value })} maxLength={80} />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>City <span className={styles.optional}>(optional)</span></label>
+            <input className={styles.input} value={eExt.city} onChange={(e) => setEExt({ ...eExt, city: e.target.value })} maxLength={60} />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>State <span className={styles.optional}>(2-letter)</span></label>
+            <input className={styles.input} value={eExt.state} onChange={(e) => setEExt({ ...eExt, state: e.target.value })} maxLength={2} placeholder="MI" />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>ZIP <span className={styles.optional}>(optional)</span></label>
+            <input className={styles.input} inputMode="numeric" value={eExt.zip} onChange={(e) => setEExt({ ...eExt, zip: e.target.value })} maxLength={10} />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Mailing address <span className={styles.optional}>(optional)</span></label>
+            <input className={styles.input} value={eExt.mailing_address} onChange={(e) => setEExt({ ...eExt, mailing_address: e.target.value })} maxLength={200} />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Venmo <span className={styles.optional}>(username)</span></label>
+            <input className={styles.input} value={eExt.venmo_username} onChange={(e) => setEExt({ ...eExt, venmo_username: e.target.value })} placeholder="username" maxLength={60} />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>PayPal <span className={styles.optional}>(paypal.me username)</span></label>
+            <input className={styles.input} value={eExt.paypal_username} onChange={(e) => setEExt({ ...eExt, paypal_username: e.target.value })} placeholder="username" maxLength={60} />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Playing since <span className={styles.optional}>(year)</span></label>
+            <input className={styles.input} inputMode="numeric" value={eExt.playing_since} onChange={(e) => setEExt({ ...eExt, playing_since: e.target.value.replace(/[^0-9]/g, "") })} maxLength={4} placeholder="e.g. 2008" />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Swings</label>
+            <select className={styles.roleSelect} value={eExt.swings} onChange={(e) => setEExt({ ...eExt, swings: e.target.value })}>
+              <option value="">—</option>
+              {SWING_OPTS.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Typical shot</label>
+            <select className={styles.roleSelect} value={eExt.typical_shot} onChange={(e) => setEExt({ ...eExt, typical_shot: e.target.value })}>
+              <option value="">—</option>
+              {SHOT_OPTS.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Shirt size</label>
+            <select className={styles.roleSelect} value={eExt.shirt_size} onChange={(e) => setEExt({ ...eExt, shirt_size: e.target.value })}>
+              <option value="">—</option>
+              {SHIRT_OPTS.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Fun fact <span className={styles.optional}>(optional)</span></label>
+            <input className={styles.input} value={eExt.fun_fact} onChange={(e) => setEExt({ ...eExt, fun_fact: e.target.value })} maxLength={200} />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Best shot <span className={styles.optional}>(optional)</span></label>
+            <input className={styles.input} value={eExt.best_shot} onChange={(e) => setEExt({ ...eExt, best_shot: e.target.value })} maxLength={200} />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input type="checkbox" checked={eExt.show_on_map} onChange={(e) => setEExt({ ...eExt, show_on_map: e.target.checked })} />
+              Show on members map
+            </label>
+          </div>
+
           {editingCanManage && (
             <div className={styles.field}>
               <label className={styles.label}>Phone <span className={styles.optional}>(login number)</span></label>

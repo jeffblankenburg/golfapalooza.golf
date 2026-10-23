@@ -117,6 +117,87 @@ export default function RoundsDrawer({
   const stats = data?.stats ?? { roundsCounted: 0, avgScore: null, bestScore: null };
   const hcp = data?.handicapIndex ?? null;
 
+  // Unfinished rounds (live now, or set aside after sitting idle 48h) float to the
+  // top so you can pick a round back up; completed rounds are the history below.
+  const unfinished = rounds.filter((r) => r.status === "in_progress" || r.status === "abandoned");
+  const history = rounds.filter((r) => r.status === "completed");
+
+  const renderRound = (r: RoundSummary) => {
+    const { mon, day, year } = shortDate(r.round_date);
+    const isOpen = openId === r.id;
+    return (
+      <div key={r.id} className={styles.roundItem} data-open={isOpen || undefined}>
+        <button
+          type="button"
+          className={styles.roundRow}
+          aria-expanded={isOpen}
+          onClick={() => setOpenId(isOpen ? null : r.id)}
+        >
+          <div className={styles.roundDate}>
+            <span className={styles.roundDateMon}>{mon}</span>
+            <span className={styles.roundDateDay}>{day}</span>
+            <span className={styles.roundDateMon}>{year}</span>
+          </div>
+          <div className={styles.roundInfo}>
+            <span className={styles.roundCourse}>{r.course_name}</span>
+            <span className={styles.roundBadges}>
+              <span className={styles.roundBadge}>{typeLabel(r.round_type)}</span>
+              {r.format === "scramble" && <span className={styles.roundBadge}>Scramble</span>}
+              {r.status === "in_progress" && <span className={styles.roundBadge} data-live>In progress</span>}
+              {r.status === "abandoned" && <span className={styles.roundBadge} data-warn>Paused</span>}
+              {r.is_incomplete && (
+                <span className={styles.roundBadge} data-warn>
+                  Incomplete ({r.holes_played}/{r.expected_holes})
+                </span>
+              )}
+              {r.tee_name && (
+                <span className={styles.roundTee}>
+                  {r.tee_name}
+                  {r.tee_gender === "women" ? " (W)" : ""}
+                </span>
+              )}
+            </span>
+          </div>
+          <div className={styles.roundScore}>
+            {r.final_score != null ? (
+              <>
+                <span className={styles.roundScoreNum}>{r.final_score}</span>
+                {r.score_to_par != null && (
+                  <span
+                    className={styles.roundToPar}
+                    data-sign={r.score_to_par < 0 ? "under" : r.score_to_par > 0 ? "over" : "even"}
+                  >
+                    {toParLabel(r.score_to_par)}
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className={styles.roundScoreDash}>—</span>
+            )}
+          </div>
+          <svg className={styles.roundChev} width="16" height="16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden>
+            <path d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {isOpen && (
+          <RoundDetail
+            id={r.id}
+            orgId={orgId}
+            viewerId={viewerId}
+            onResume={() => {
+              onCloseDrawer();
+              router.push(`/new/${slug}/rounds/${r.id}/score`);
+            }}
+            onDeleted={() => {
+              setOpenId(null);
+              setReload((n) => n + 1);
+            }}
+          />
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className={styles.roundsWrap}>
       {stats.roundsCounted > 0 && (
@@ -151,82 +232,20 @@ export default function RoundsDrawer({
           <span className={styles.roundsEmptySub}>Log your rounds to track scores and your handicap here.</span>
         </div>
       ) : (
-        <div className={styles.roundList}>
-          {rounds.map((r) => {
-            const { mon, day, year } = shortDate(r.round_date);
-            const isOpen = openId === r.id;
-            return (
-              <div key={r.id} className={styles.roundItem} data-open={isOpen || undefined}>
-                <button
-                  type="button"
-                  className={styles.roundRow}
-                  aria-expanded={isOpen}
-                  onClick={() => setOpenId(isOpen ? null : r.id)}
-                >
-                  <div className={styles.roundDate}>
-                    <span className={styles.roundDateMon}>{mon}</span>
-                    <span className={styles.roundDateDay}>{day}</span>
-                    <span className={styles.roundDateMon}>{year}</span>
-                  </div>
-                  <div className={styles.roundInfo}>
-                    <span className={styles.roundCourse}>{r.course_name}</span>
-                    <span className={styles.roundBadges}>
-                      <span className={styles.roundBadge}>{typeLabel(r.round_type)}</span>
-                      {r.format === "scramble" && <span className={styles.roundBadge}>Scramble</span>}
-                      {r.status === "in_progress" && <span className={styles.roundBadge} data-live>In progress</span>}
-                      {r.is_incomplete && (
-                        <span className={styles.roundBadge} data-warn>
-                          Incomplete ({r.holes_played}/{r.expected_holes})
-                        </span>
-                      )}
-                      {r.tee_name && (
-                        <span className={styles.roundTee}>
-                          {r.tee_name}
-                          {r.tee_gender === "women" ? " (W)" : ""}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <div className={styles.roundScore}>
-                    {r.final_score != null ? (
-                      <>
-                        <span className={styles.roundScoreNum}>{r.final_score}</span>
-                        {r.score_to_par != null && (
-                          <span
-                            className={styles.roundToPar}
-                            data-sign={r.score_to_par < 0 ? "under" : r.score_to_par > 0 ? "over" : "even"}
-                          >
-                            {toParLabel(r.score_to_par)}
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <span className={styles.roundScoreDash}>—</span>
-                    )}
-                  </div>
-                  <svg className={styles.roundChev} width="16" height="16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden>
-                    <path d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {isOpen && (
-                  <RoundDetail
-                    id={r.id}
-                    orgId={orgId}
-                    viewerId={viewerId}
-                    onResume={() => {
-                      onCloseDrawer();
-                      router.push(`/new/${slug}/rounds/${r.id}/score`);
-                    }}
-                    onDeleted={() => {
-                      setOpenId(null);
-                      setReload((n) => n + 1);
-                    }}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <>
+          {unfinished.length > 0 && (
+            <div className={styles.roundList}>
+              <span className={styles.roundGroupLabel}>Unfinished</span>
+              {unfinished.map(renderRound)}
+            </div>
+          )}
+          {history.length > 0 && (
+            <div className={styles.roundList}>
+              {unfinished.length > 0 && <span className={styles.roundGroupLabel}>History</span>}
+              {history.map(renderRound)}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

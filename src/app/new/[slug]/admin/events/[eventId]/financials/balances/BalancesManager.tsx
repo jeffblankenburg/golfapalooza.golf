@@ -213,10 +213,12 @@ export default function BalancesManager({ orgId, eventId, rows: initialRows }: {
                 <label className={styles.label}>Notes <span className={styles.optional}>(optional)</span></label>
                 <input className={styles.input} value={notes} maxLength={200} onChange={(e) => setNotes(e.target.value)} />
               </div>
-              {error && <p className={styles.formError}>{error}</p>}
-              <button type="button" className={styles.createBtn} disabled={busy} style={{ opacity: busy ? 0.6 : 1 }} onClick={record}>
-                {busy ? "Saving…" : "Record"}
-              </button>
+              <div className={styles.stickyModalAction}>
+                {error && <p className={styles.formError} style={{ marginTop: 0 }}>{error}</p>}
+                <button type="button" className={styles.createBtn} disabled={busy} style={{ opacity: busy ? 0.6 : 1 }} onClick={record}>
+                  {busy ? "Saving…" : "Record"}
+                </button>
+              </div>
             </div>
           </>
         )}

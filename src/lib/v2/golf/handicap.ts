@@ -7,7 +7,8 @@ import { calculateHandicapIndex, type RoundDifferential } from "@/lib/v2/golf/ca
  * legacy pipeline (src/lib/golf/handicap.ts) with v2 table names. Personal &
  * global: rounds are gathered by user_id across every group.
  *
- * (v2 omits the legacy handicap_history audit table for now.)
+ * Also appends a v2_player_handicap_history audit row (the index over time + the
+ * exact differentials that produced it), restoring v1 parity (#234).
  */
 export async function recalculateHandicap(
   supabase: SupabaseClient,
@@ -78,4 +79,21 @@ export async function recalculateHandicap(
     },
     { onConflict: "user_id" },
   );
+
+  // Audit trail (#234): record this recalculation + the differentials behind it.
+  // Best-effort — a history-log failure must never block the index update.
+  try {
+    await supabase.from("v2_player_handicap_history").insert({
+      user_id: userId,
+      handicap_index: result.handicap_index,
+      low_handicap_index: result.low_handicap_index,
+      rounds_used: result.rounds_used,
+      total_rounds: result.total_rounds,
+      differentials_used: result.differentials,
+      calculation_method: result.calculation_method,
+      effective_date: today,
+    });
+  } catch {
+    /* best-effort */
+  }
 }

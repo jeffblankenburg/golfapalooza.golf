@@ -110,6 +110,13 @@ export default async function EventOptionsPage({ params }: { params: Promise<{ s
         Opt-in add-ons members choose, all-or-nothing. An option&apos;s price is the sum of the costs bundled into it. Anything not in Trip Cost belongs in an option.
       </p>
 
+      <Link
+        href={`/new/${slug}/admin/events/${eventId}/options/grid`}
+        style={{ display: "inline-block", marginTop: 4, marginBottom: 2, color: "var(--brand)", fontWeight: 600, fontSize: "0.85rem", textDecoration: "none" }}
+      >
+        View selections grid →
+      </Link>
+
       <OptionsManager
         slug={slug}
         orgId={org.id}

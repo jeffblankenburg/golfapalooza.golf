@@ -111,10 +111,12 @@ export const FEATURE_CATALOG: FeatureDef[] = [
   { key: "music", label: "Music", bucket: "community", scope: "group", icon: "music", status: "available", surface: "drawer", blurb: "The group jukebox & walk-up songs.", topbar: true, defaultEnabled: true },
   { key: "notebook", label: "Notebook", bucket: "community", scope: "group", icon: "book", status: "planned", surface: "route", blurb: "Shared notes & inside jokes." },
   { key: "loozers", label: "Members", bucket: "community", scope: "group", icon: "users", status: "available", surface: "route", blurb: "The member directory." },
+  { key: "birthdays", label: "Birthdays", bucket: "community", scope: "group", icon: "cake", status: "available", surface: "route", blurb: "Who's celebrating & when." },
   { key: "add_rookie", label: "Add a Rookie", bucket: "community", scope: "group", icon: "userPlus", status: "planned", surface: "route", blurb: "Nominate new members." },
 
   // ── Stories & Recognition (group-wide) ───────────────────────────────────
   { key: "articles", label: "Articles", bucket: "stories", scope: "group", icon: "news", status: "available", surface: "route", blurb: "News, recaps & posts.", defaultPublic: true },
+  { key: "announcements", label: "Announcements", bucket: "stories", scope: "group", icon: "megaphone", status: "available", surface: "route", blurb: "Group-wide announcements." },
   { key: "polls", label: "Polls", bucket: "stories", scope: "group", icon: "poll", status: "planned", surface: "route", blurb: "Vote on group questions." },
   { key: "accolades", label: "Accolades", bucket: "stories", scope: "group", icon: "medal", status: "planned", surface: "route", blurb: "Awards & years of history." },
   { key: "best_line", label: "Best Line", bucket: "stories", scope: "group", icon: "quote", status: "planned", surface: "route", blurb: "The best lines of the trip." },
@@ -122,6 +124,7 @@ export const FEATURE_CATALOG: FeatureDef[] = [
   // ── You (personal) ───────────────────────────────────────────────────────
   { key: "profile", label: "Profile", bucket: "you", scope: "group", icon: "user", status: "available", surface: "drawer", blurb: "Your account & preferences.", topbar: true, alwaysOn: true },
   { key: "my_rounds", label: "My Rounds", bucket: "you", scope: "group", icon: "flag", status: "planned", surface: "route", blurb: "Your rounds & handicap." },
+  { key: "my_money", label: "My Money", bucket: "you", scope: "group", icon: "wallet", status: "available", surface: "route", blurb: "What you owe and are owed, across everything." },
   { key: "financials", label: "Financials", bucket: "you", scope: "event", icon: "wallet", status: "planned", surface: "route", blurb: "Your buy-ins & payouts." },
 ];
 
@@ -309,11 +312,14 @@ export const MAX_PINNED = 3;
  */
 const FEATURE_ROUTES: Record<string, (slug: string) => string> = {
   articles: (slug) => `/new/${slug}/articles`,
+  announcements: (slug) => `/new/${slug}/announcements`,
+  birthdays: (slug) => `/new/${slug}/birthdays`,
   courses: (slug) => `/new/${slug}/courses`,
   loozers: (slug) => `/new/${slug}/loozers`,
   schedule: (slug) => `/new/${slug}/schedule`,
   options: (slug) => `/new/${slug}/options`,
   balance: (slug) => `/new/${slug}/balance`,
+  my_money: (slug) => `/new/${slug}/money`,
   pickem: (slug) => `/new/${slug}/pickem`,
 };
 

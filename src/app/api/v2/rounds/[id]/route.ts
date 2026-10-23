@@ -242,11 +242,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const actorIsPlayer = loozerIds.includes(userId);
   const otherLoozers = loozerIds.filter((u) => u !== userId);
 
-  // In-progress rounds delete wholesale (it's a live session). A completed round
-  // shared with other Loozers only removes the actor's own score; the round is
-  // deleted outright only when no other Loozer remains (solo, or the actor is the
-  // last one out), or when a non-player creator deletes it.
-  const deleteWhole = round.status === "in_progress" || !actorIsPlayer || otherLoozers.length === 0;
+  // In-progress and paused (abandoned) rounds delete wholesale — both are an
+  // unfinished scoring session, not a shared result. A completed round shared with
+  // other Loozers only removes the actor's own score; the round is deleted outright
+  // only when no other Loozer remains (solo, or the actor is the last one out), or
+  // when a non-player creator deletes it.
+  const deleteWhole =
+    round.status === "in_progress" || round.status === "abandoned" || !actorIsPlayer || otherLoozers.length === 0;
 
   if (deleteWhole) {
     const { error } = await admin.from("v2_rounds").delete().eq("id", id);

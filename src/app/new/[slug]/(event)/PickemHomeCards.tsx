@@ -27,12 +27,17 @@ export default async function PickemHomeCards({ orgId, userId, slug, eventId }: 
   const supabase = await v2ServerClient();
   const { data: contests } = await supabase
     .from("v2_contests")
-    .select("id, name, event_id")
+    .select("id, name, event_id, config")
     .eq("org_id", orgId)
     .eq("contest_type", "pickem")
     .eq("status", "active")
     .or(`event_id.is.null,event_id.eq.${eventId}`);
   if (!contests || contests.length === 0) return null;
+
+  const money = (cents: number) => {
+    const whole = cents % 100 === 0;
+    return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 })}`;
+  };
 
   const ids = contests.map((c) => c.id);
   const { data: gameRows } = await supabase
@@ -53,6 +58,7 @@ export default async function PickemHomeCards({ orgId, userId, slug, eventId }: 
       const picked = cGames.filter((g) => myPicked.has(g.id)).length;
       const locked = isSlateLocked(cGames as unknown as PickemGame[], now);
       const badge = locked ? "Locked" : picked >= total ? "Picked" : "Make picks";
+      const entry = Number((c.config as { entry_cents?: number } | null)?.entry_cents) || 0;
       return (
         <Link key={c.id} href={`/new/${slug}/contests/${c.id}`} className={styles.draftCard}>
           <div className={styles.draftTop}>
@@ -62,6 +68,7 @@ export default async function PickemHomeCards({ orgId, userId, slug, eventId }: 
           <PickemTag />
           <div className={styles.draftStats}>
             <span><strong>{picked}/{total}</strong> picked</span>
+            {entry > 0 && <span><strong>{money(entry)}</strong> entry</span>}
           </div>
         </Link>
       );

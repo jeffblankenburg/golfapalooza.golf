@@ -3,6 +3,7 @@ import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgMember } from "@/lib/v2/orgs";
 import { v2Now } from "@/lib/v2/simulator";
 import { submitPick } from "@/lib/v2/contests/pickem-server";
+import { addContestParticipants } from "@/lib/v2/contests/enrollment";
 
 /**
  * Save one Pick'em pick — GROUP-scoped (event_id NULL). Thin shell: eligibility
@@ -23,5 +24,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!(await isOrgMember(admin, userId, orgId))) return NextResponse.json({ error: "Not a member" }, { status: 403 });
 
   const r = await submitPick(admin, contestId, userId, body, await v2Now(), contest.status as string);
+  // Making a pick IS entering the pool (the group lane's opt-in) — enroll them so
+  // the buy-in obligation + the collector's paid-roster see them. Idempotent.
+  if (r.ok) await addContestParticipants(admin, contestId, [userId]).catch(() => {});
   return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: r.error }, { status: r.status });
 }

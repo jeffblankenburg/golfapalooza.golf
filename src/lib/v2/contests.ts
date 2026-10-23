@@ -16,7 +16,7 @@ export const CONTEST_TYPES = [
 export type ContestType = (typeof CONTEST_TYPES)[number];
 
 export const CONTEST_SELECT =
-  "id, org_id, event_id, parent_contest_id, contest_type, name, scoring_source, holes, contest_date, start_time, course_id, tee_id, config, payout_splits, auto_enroll, declared_no_winner, status, winners_locked_at, winners_locked_by, sort_order, created_by, created_at, updated_at";
+  "id, org_id, event_id, parent_contest_id, contest_type, name, scoring_source, holes, contest_date, start_time, course_id, tee_id, config, payout_splits, auto_enroll, declared_no_winner, status, winners_locked_at, winners_locked_by, sort_order, collected_by, created_by, created_at, updated_at";
 
 export interface Contest {
   id: string;
@@ -39,6 +39,7 @@ export interface Contest {
   winners_locked_at: string | null;
   winners_locked_by: string | null;
   sort_order: number;
+  collected_by: string | null; // who collects this contest's buy-in (null = event treasurer / creator)
   created_by: string | null;
   created_at: string;
   updated_at: string;

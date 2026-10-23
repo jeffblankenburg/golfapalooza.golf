@@ -5766,6 +5766,31 @@ button.rosterChip {
   background: color-mix(in srgb, var(--ink) 3%, var(--card));
   border-top: 1px solid var(--line);
 }
+/* Expandable owed-breakdown under a member row (group financials rollup). */
+.orgBalLines {
+  padding: 2px 12px 12px 12px;
+  background: color-mix(in srgb, var(--ink) 2%, var(--card));
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.orgBalLineRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+.orgBalLineRow span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.balCaret {
+  display: inline-block;
+  width: 0.7em;
+  margin-right: 4px;
+  color: var(--ink-soft);
+  transition: transform 0.12s ease;
+}
+.balCaret[data-open="1"] { transform: rotate(90deg); }
 
 /* Home "My Money" card — compact balance link (#237). */
 .balanceModuleCard {

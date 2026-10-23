@@ -30,6 +30,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 const EDITABLE = new Set([
   "name", "contest_date", "start_time", "course_id", "tee_id", "holes", "config", "payout_splits",
   "auto_enroll", "declared_no_winner", "status", "sort_order", "winners_locked_at", "winners_locked_by",
+  "collected_by",
 ]);
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string; eventId: string; contestId: string }> }) {
@@ -51,6 +52,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const patch: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(body)) if (EDITABLE.has(k)) patch[k] = v;
+  // Empty collector string means "use the default" (event treasurer / creator).
+  if ("collected_by" in patch) patch.collected_by = (patch.collected_by as string | null) || null;
   // The buy-in is stored in v2_cost_items, not on the contest — pull it aside.
   const hasBuyIn = "entry_amount_cents" in body;
   const buyInCents = hasBuyIn ? (typeof body.entry_amount_cents === "number" ? (body.entry_amount_cents as number) : null) : undefined;

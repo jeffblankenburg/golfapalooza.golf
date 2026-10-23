@@ -14,6 +14,7 @@ import ContestPayouts from "./ContestPayouts";
 import BoxesManageView, { loadBoxesContestRow } from "../../../../contests/[contestId]/BoxesManageView";
 import BoxesEditLauncher from "../../../../contests/[contestId]/BoxesEditLauncher";
 import ContestParticipants from "@/components/v2/contests/ContestParticipants";
+import ContestCollector from "@/components/v2/contests/ContestCollector";
 import type { PayoutSplit } from "@/lib/v2/contests/payouts";
 import styles from "@/app/new/new.module.css";
 
@@ -64,6 +65,12 @@ export default async function ContestDetailPage({ params, searchParams }: { para
           initialSplits={(contest.payout_splits as { place: number; kind: string; amount: number }[] | null) ?? []}
           enrolledCount={enrolled ?? 0}
         />
+        <ContestCollector
+          base={`/api/v2/orgs/${org.id}/events/${eventId}/contests/${contestId}`}
+          orgId={org.id}
+          nameMode={org.name_display}
+          initialCollectedBy={contest.collected_by}
+        />
         <ContestParticipants apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`} />
       </div>
     );
@@ -91,6 +98,12 @@ export default async function ContestDetailPage({ params, searchParams }: { para
           nameMode={org.name_display}
         />
         <div className={styles.page} style={{ paddingTop: 0 }}>
+          <ContestCollector
+            base={`/api/v2/orgs/${org.id}/events/${eventId}/contests/${contestId}`}
+            orgId={org.id}
+            nameMode={org.name_display}
+            initialCollectedBy={contest.collected_by}
+          />
           <ContestParticipants apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`} />
         </div>
       </>
@@ -253,6 +266,13 @@ export default async function ContestDetailPage({ params, searchParams }: { para
           teamSize={teamSize}
         />
       </div>
+
+      <ContestCollector
+        base={`/api/v2/orgs/${org.id}/events/${eventId}/contests/${contestId}`}
+        orgId={org.id}
+        nameMode={org.name_display}
+        initialCollectedBy={contest.collected_by}
+      />
 
       <SideGames
         orgId={org.id}

@@ -107,9 +107,11 @@ export interface UpdateBoxesInput {
 
 /**
  * Edit/reconfigure an existing Boxes pool. Square ownership (the 100 cells) is
- * preserved — only the contest config and, optionally, the game set change. Games
- * are replaced wholesale; digits re-draw per game at lock, so swapping games in a
- * draft pool is safe.
+ * preserved. The game set is MERGED, not replaced: games that stay keep their
+ * already-revealed numbers + reveal schedule (matched by ESPN id / matchup), newly
+ * added games get their reveal scheduled if the board is already locked, and only
+ * games the admin actually removed are deleted. (Previously this deleted + recreated
+ * every game, silently wiping revealed numbers + reveal times on a locked pool.)
  */
 export async function updateBoxesContest(admin: SupabaseClient, contestId: string, patch: UpdateBoxesInput): Promise<void> {
   const { data: existing, error: readErr } = await admin.from("v2_contests").select("config").eq("id", contestId).maybeSingle();
@@ -142,11 +144,27 @@ export async function updateBoxesContest(admin: SupabaseClient, contestId: strin
   }
 
   if (patch.games) {
-    const { error: delErr } = await admin.from("v2_boxes_games").delete().eq("contest_id", contestId);
-    if (delErr) throw new Error(delErr.message);
-    if (patch.games.length) {
-      const rows = patch.games.map((g, i) => ({
-        contest_id: contestId,
+    const cfg = (existing.config as Record<string, unknown>) ?? {};
+    const boardLocked = cfg.phase === "locked" || cfg.phase === "final" || !!cfg.board_locked_at;
+    const leadDays = Number.isFinite(cfg.reveal_lead_days as number) ? (cfg.reveal_lead_days as number) : 7;
+    // Reveal time for a game on a LOCKED board = kickoff − lead days (null otherwise:
+    // a draft board schedules reveals at lock_board, not here).
+    const revealFor = (startTime: string | null): string | null =>
+      boardLocked && startTime ? new Date(new Date(startTime).getTime() - leadDays * 86400000).toISOString() : null;
+
+    const { data: existingGames } = await admin
+      .from("v2_boxes_games")
+      .select("id, espn_event_id, label, start_time, locked_at")
+      .eq("contest_id", contestId);
+    // Match on ESPN id when present (stable), else the matchup label + kickoff.
+    const keyOf = (espn: string | null | undefined, label: string | null | undefined, start: string | null | undefined) =>
+      espn || `${label ?? ""}|${start ?? ""}`;
+    const existingByKey = new Map((existingGames ?? []).map((g) => [keyOf(g.espn_event_id as string, g.label as string, g.start_time as string), g]));
+    const usedIds = new Set<string>();
+
+    for (let i = 0; i < patch.games.length; i++) {
+      const g = patch.games[i];
+      const base = {
         espn_event_id: g.espnEventId,
         league: g.league,
         label: g.label ?? null,
@@ -157,9 +175,30 @@ export async function updateBoxesContest(admin: SupabaseClient, contestId: strin
         start_time: g.startTime || null,
         game_alloc: g.gameAlloc ?? null,
         period_alloc: g.periodAlloc ?? null,
-      }));
-      const { error: insErr } = await admin.from("v2_boxes_games").insert(rows);
-      if (insErr) throw new Error(insErr.message);
+      };
+      const match = existingByKey.get(keyOf(g.espnEventId, g.label, g.startTime || null));
+      if (match) {
+        usedIds.add(match.id as string);
+        // Update editable fields; PRESERVE locked_at / row_digits / col_digits /
+        // reveal_at. Only reschedule the reveal if the kickoff moved and it hasn't
+        // been revealed yet.
+        const update: Record<string, unknown> = { ...base };
+        if (!match.locked_at && (match.start_time as string | null) !== (g.startTime || null)) {
+          update.reveal_at = revealFor(g.startTime || null);
+        }
+        const { error } = await admin.from("v2_boxes_games").update(update).eq("id", match.id);
+        if (error) throw new Error(error.message);
+      } else {
+        const { error } = await admin.from("v2_boxes_games").insert({ contest_id: contestId, ...base, reveal_at: revealFor(g.startTime || null) });
+        if (error) throw new Error(error.message);
+      }
+    }
+
+    // Delete only the games the admin removed from the slate.
+    const toDelete = (existingGames ?? []).map((g) => g.id as string).filter((id) => !usedIds.has(id));
+    if (toDelete.length) {
+      const { error } = await admin.from("v2_boxes_games").delete().in("id", toDelete);
+      if (error) throw new Error(error.message);
     }
   }
 }

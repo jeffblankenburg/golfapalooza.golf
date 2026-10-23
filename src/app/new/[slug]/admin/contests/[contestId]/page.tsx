@@ -47,6 +47,7 @@ export default async function BoxesDetailPage({ params }: { params: Promise<{ sl
           orgId={org.id}
           contestId={contestId}
           currentUserId={ctx.userId}
+          nameMode={org.name_display}
           initialEntryCents={Number((contest.config as { entry_cents?: number } | null)?.entry_cents) || 0}
           initialCollectedBy={(contest.collected_by as string | null) ?? null}
         />
@@ -68,6 +69,7 @@ export default async function BoxesDetailPage({ params }: { params: Promise<{ sl
         payoutsHref={`/new/${slug}/admin/contests/${contestId}/payouts`}
         playerHref={`/new/${slug}/contests/${contestId}`}
         editHref={`/new/${slug}/admin/contests?edit=${contestId}`}
+        nameMode={org.name_display}
       />
       <div className={styles.page} style={{ paddingTop: 0 }}>
         <ContestParticipants apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`} />

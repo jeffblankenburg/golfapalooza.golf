@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getPlatformContext } from "@/lib/v2/context";
 import { v2AdminClient } from "@/lib/v2/supabase";
 import { CONTEST_SELECT, contestTypeLabel, loadBuyInCents, type Contest } from "@/lib/v2/contests";
+import { pickName } from "@/lib/v2/profile";
 import { resolveContestHoles } from "@/lib/v2/contests/holes";
 import { computeSkins } from "@/lib/v2/contests/skins";
 import { fmtTime } from "@/lib/v2/schedule";
@@ -87,6 +88,7 @@ export default async function ContestDetailPage({ params, searchParams }: { para
           payoutsHref={`/new/${slug}/admin/contests/${contestId}/payouts`}
           playerHref={`/new/${slug}/contests/${contestId}`}
           editHref={`${manageUrl}?edit=1`}
+          nameMode={org.name_display}
         />
         <div className={styles.page} style={{ paddingTop: 0 }}>
           <ContestParticipants apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`} />
@@ -170,7 +172,7 @@ export default async function ContestDetailPage({ params, searchParams }: { para
     .from("v2_contest_participants").select("v2_profiles!inner(id, display_name, first_name, last_name)").eq("contest_id", contestId);
   const playerList = (partProfiles || []).map((r) => {
     const p = (r as { v2_profiles: unknown }).v2_profiles as { id: string; display_name: string | null; first_name: string | null; last_name: string | null };
-    return { user_id: p.id, name: p.display_name || `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Member" };
+    return { user_id: p.id, name: pickName(p, org.name_display) };
   });
 
   // Representative team size (most common) for the type-aware payout preview.

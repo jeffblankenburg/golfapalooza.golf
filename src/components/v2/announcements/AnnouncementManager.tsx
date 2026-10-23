@@ -378,7 +378,7 @@ export default function AnnouncementManager({
                     <label key={m.user_id} className={styles.permRow} style={{ padding: "10px 12px" }}>
                       <input type="checkbox" checked={picked.has(m.user_id)} onChange={() => toggleMember(m.user_id)} />
                       <span className={styles.permText}>
-                        <span className={styles.permLabel}>{m.display_name}</span>
+                        <span className={styles.permLabel}>{pickName(m, nameMode)}</span>
                       </span>
                     </label>
                   ))}

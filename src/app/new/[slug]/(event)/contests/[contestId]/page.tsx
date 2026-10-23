@@ -5,6 +5,7 @@ import { v2Now } from "@/lib/v2/simulator";
 import { resolvePayouts } from "@/lib/v2/contests/boxes";
 import { buildGameAllocations } from "@/lib/v2/contests/boxes-alloc";
 import { loadPickemBoard } from "@/lib/v2/contests/pickem-server";
+import { pickName } from "@/lib/v2/profile";
 import BoxesPlay, { type PlayGame } from "./BoxesPlay";
 // Same member component the event lane uses — mounted here with the group pick URL.
 import PickemContent from "../../pickem/PickemContent";
@@ -63,9 +64,9 @@ export default async function ContestDetailPage({ params }: { params: Promise<{ 
 
   const ownerIds = [...new Set([...(cells ?? []).map((c) => c.user_id).filter((x): x is string => !!x), ctx.userId])];
   const { data: profiles } = ownerIds.length
-    ? await supabase.from("v2_profiles").select("id, display_name, avatar_url").in("id", ownerIds)
-    : { data: [] as { id: string; display_name: string | null; avatar_url: string | null }[] };
-  const nameById = new Map((profiles ?? []).map((p) => [p.id, p.display_name || "Member"]));
+    ? await supabase.from("v2_profiles").select("id, display_name, first_name, last_name, avatar_url").in("id", ownerIds)
+    : { data: [] as { id: string; display_name: string | null; first_name: string | null; last_name: string | null; avatar_url: string | null }[] };
+  const nameById = new Map((profiles ?? []).map((p) => [p.id, pickName(p, org.name_display)]));
   const avatarById = new Map((profiles ?? []).map((p) => [p.id, p.avatar_url ?? null]));
   const myName = nameById.get(ctx.userId) || "You";
   const myAvatar = avatarById.get(ctx.userId) ?? null;

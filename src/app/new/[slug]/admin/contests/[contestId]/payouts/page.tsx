@@ -4,6 +4,7 @@ import { getPlatformContext } from "@/lib/v2/context";
 import { resolvePayouts, computeGamePayoutsFromSlices } from "@/lib/v2/contests/boxes";
 import { buildGameAllocations } from "@/lib/v2/contests/boxes-alloc";
 import { getLeague, fetchGameScore, periodScoresFromGame } from "@/lib/v2/sports/espn";
+import { pickName } from "@/lib/v2/profile";
 import MasterPayouts, { type PayoutPerson } from "./MasterPayouts";
 
 /** Pool-wide master payouts: who won how much across every game, with pay links. */
@@ -75,8 +76,8 @@ export default async function MasterPayoutsPage({ params }: { params: Promise<{ 
   // Names + payment info for everyone who won.
   const winnerIds = Object.keys(won);
   const { data: profiles } = winnerIds.length
-    ? await supabase.from("v2_profiles").select("id, display_name, venmo_username, paypal_username, mailing_address").in("id", winnerIds)
-    : { data: [] as { id: string; display_name: string | null; venmo_username: string | null; paypal_username: string | null; mailing_address: string | null }[] };
+    ? await supabase.from("v2_profiles").select("id, display_name, first_name, last_name, venmo_username, paypal_username, mailing_address").in("id", winnerIds)
+    : { data: [] as { id: string; display_name: string | null; first_name: string | null; last_name: string | null; venmo_username: string | null; paypal_username: string | null; mailing_address: string | null }[] };
   const profById = new Map((profiles ?? []).map((p) => [p.id, p]));
   // Paid is now one row per (member, game); roll it up to a per-member total.
   const paidById = new Map<string, { cents: number; note: string | null }>();
@@ -93,7 +94,7 @@ export default async function MasterPayoutsPage({ params }: { params: Promise<{ 
       const paid = paidById.get(uid);
       return {
         userId: uid,
-        name: p?.display_name || "Member",
+        name: pickName(p, org.name_display),
         wonCents: won[uid].total,
         paidCents: paid?.cents ?? 0,
         note: paid?.note ?? null,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { pickName, type NameMode } from "@/lib/v2/profile";
 import styles from "@/app/new/new.module.css";
 
 /**
@@ -21,12 +22,14 @@ export default function GroupContestMoney({
   orgId,
   contestId,
   currentUserId,
+  nameMode,
   initialEntryCents,
   initialCollectedBy,
 }: {
   orgId: string;
   contestId: string;
   currentUserId: string;
+  nameMode: NameMode;
   initialEntryCents: number;
   initialCollectedBy: string | null;
 }) {
@@ -49,8 +52,8 @@ export default function GroupContestMoney({
     (async () => {
       const mr = await fetch(`/api/v2/orgs/${orgId}/members`);
       if (mr.ok) {
-        const list = ((await mr.json()).members || []) as { user_id: string; display_name: string; venmo_username: string | null; archived?: boolean }[];
-        setMembers(list.filter((m) => !m.archived).map((m) => ({ user_id: m.user_id, name: m.display_name, venmo: m.venmo_username })).sort((a, b) => a.name.localeCompare(b.name)));
+        const list = ((await mr.json()).members || []) as { user_id: string; display_name: string; first_name: string | null; last_name: string | null; venmo_username: string | null; archived?: boolean }[];
+        setMembers(list.filter((m) => !m.archived).map((m) => ({ user_id: m.user_id, name: pickName(m, nameMode), venmo: m.venmo_username })).sort((a, b) => a.name.localeCompare(b.name)));
       }
       await loadRoster();
     })();

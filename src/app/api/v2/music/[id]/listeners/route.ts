@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { hasPermission } from "@/lib/v2/permissions-server";
+import { orgNameMode } from "@/lib/v2/orgs";
+import { pickName } from "@/lib/v2/profile";
 
 /**
  * GET /api/v2/music/[id]/listeners — who played (with play count + last played)
@@ -10,6 +12,8 @@ import { hasPermission } from "@/lib/v2/permissions-server";
 interface ProfileRef {
   id: string;
   display_name: string;
+  first_name: string | null;
+  last_name: string | null;
   avatar_url: string | null;
 }
 
@@ -24,12 +28,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!(await hasPermission(admin, userId, song.org_id, "manage_music"))) {
     return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   }
+  const mode = await orgNameMode(admin, song.org_id);
 
   const [playsRes, likesRes] = await Promise.all([
     admin.from("v2_song_plays").select("user_id, played_at").eq("song_id", id),
     admin
       .from("v2_song_favorites")
-      .select("user_id, created_at, profile:v2_profiles(id, display_name, avatar_url)")
+      .select("user_id, created_at, profile:v2_profiles(id, display_name, first_name, last_name, avatar_url)")
       .eq("song_id", id)
       .order("created_at", { ascending: false }),
   ]);
@@ -49,7 +54,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const playerIds = [...byUser.keys()];
   const profById = new Map<string, ProfileRef>();
   if (playerIds.length) {
-    const { data: profs } = await admin.from("v2_profiles").select("id, display_name, avatar_url").in("id", playerIds);
+    const { data: profs } = await admin.from("v2_profiles").select("id, display_name, first_name, last_name, avatar_url").in("id", playerIds);
     for (const p of profs || []) profById.set(p.id, p as ProfileRef);
   }
 
@@ -59,7 +64,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       const p = profById.get(uid);
       return {
         user_id: uid,
-        display_name: p?.display_name || "Member",
+        display_name: pickName(p, mode),
         avatar_url: p?.avatar_url ?? null,
         count: agg.count,
         last_played_at: agg.last,
@@ -72,7 +77,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const p = (Array.isArray(l.profile) ? l.profile[0] : l.profile) as ProfileRef | null;
     return {
       user_id: l.user_id,
-      display_name: p?.display_name || "Member",
+      display_name: pickName(p, mode),
       avatar_url: p?.avatar_url ?? null,
       created_at: l.created_at,
     };

@@ -28,7 +28,7 @@ export default async function AdminHub({
       </Link>
       <h1 className={styles.title}>Administration</h1>
 
-      <EventsSection orgId={org.id} slug={org.slug} isAdmin />
+      <EventsSection orgId={org.id} slug={org.slug} isAdmin nameMode={org.name_display} />
 
       <div className={styles.section}>
         <p className={styles.sectionLabel}>Group administration</p>

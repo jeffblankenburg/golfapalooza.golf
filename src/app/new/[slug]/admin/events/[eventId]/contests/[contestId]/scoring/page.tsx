@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getPlatformContext } from "@/lib/v2/context";
 import { v2AdminClient } from "@/lib/v2/supabase";
 import { resolveContestHoles } from "@/lib/v2/contests/holes";
+import { pickName } from "@/lib/v2/profile";
 import ScoringManager from "../ScoringManager";
 import styles from "@/app/new/new.module.css";
 
@@ -44,7 +45,7 @@ export default async function ContestScoringPage({ params }: { params: Promise<{
   const names: Record<string, string> = {};
   for (const r of partRows || []) {
     const p = (r as { v2_profiles: unknown }).v2_profiles as { id: string; display_name: string | null; first_name: string | null; last_name: string | null };
-    names[p.id] = p.display_name || `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Member";
+    names[p.id] = pickName(p, org.name_display);
   }
 
   return (

@@ -8,6 +8,7 @@ import styles from "./BoxesAdmin.module.css";
 import { resolvePayouts } from "@/lib/v2/contests/boxes";
 import { buildGameAllocations } from "@/lib/v2/contests/boxes-alloc";
 import BoxesEditor, { money, dateLabel, type BoxesContestRow } from "./BoxesEditor";
+import { pickName, type NameMode } from "@/lib/v2/profile";
 
 // One unified list for the group Contests hub — every created pool, any type,
 // in one place (no per-type sections), with a single "Add contest" control.
@@ -83,7 +84,7 @@ function ContestTypeTag({ kind }: { kind: "boxes" | "pickem" }) {
   );
 }
 
-export default function GroupContestsAdmin({ orgId, slug, items, currentUserId }: { orgId: string; slug: string; items: GroupContestItem[]; currentUserId: string }) {
+export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, nameMode }: { orgId: string; slug: string; items: GroupContestItem[]; currentUserId: string; nameMode: NameMode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const collectionBase = `/api/v2/orgs/${orgId}/contests`;
@@ -221,6 +222,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId }
           orgId={orgId}
           item={settingsFor}
           currentUserId={currentUserId}
+          nameMode={nameMode}
           onClose={() => setSettingsFor(null)}
           onSaved={() => { setSettingsFor(null); router.refresh(); }}
         />
@@ -288,7 +290,7 @@ function PickemRow({ it, adminBase, isOpen, onToggle, onSettings }: { it: Pickem
 
 /** Quick settings for a Pick'em (name / status / buy-in / collector) — the parity
  *  with Squares' gear-editor. Deep management (games, payouts) stays on detail. */
-function PickemQuickSettings({ orgId, item, currentUserId, onClose, onSaved }: { orgId: string; item: PickemItem; currentUserId: string; onClose: () => void; onSaved: () => void }) {
+function PickemQuickSettings({ orgId, item, currentUserId, nameMode, onClose, onSaved }: { orgId: string; item: PickemItem; currentUserId: string; nameMode: NameMode; onClose: () => void; onSaved: () => void }) {
   const base = `/api/v2/orgs/${orgId}/contests/${item.id}`;
   const [name, setName] = useState(item.name);
   const [status, setStatus] = useState(item.status);
@@ -302,8 +304,8 @@ function PickemQuickSettings({ orgId, item, currentUserId, onClose, onSaved }: {
     (async () => {
       const r = await fetch(`/api/v2/orgs/${orgId}/members`);
       if (r.ok) {
-        const list = ((await r.json()).members || []) as { user_id: string; display_name: string; venmo_username: string | null; archived?: boolean }[];
-        setMembers(list.filter((m) => !m.archived).map((m) => ({ user_id: m.user_id, name: m.display_name, venmo: m.venmo_username })).sort((a, b) => a.name.localeCompare(b.name)));
+        const list = ((await r.json()).members || []) as { user_id: string; display_name: string; first_name: string | null; last_name: string | null; venmo_username: string | null; archived?: boolean }[];
+        setMembers(list.filter((m) => !m.archived).map((m) => ({ user_id: m.user_id, name: pickName(m, nameMode), venmo: m.venmo_username })).sort((a, b) => a.name.localeCompare(b.name)));
       }
     })();
   }, [orgId]);

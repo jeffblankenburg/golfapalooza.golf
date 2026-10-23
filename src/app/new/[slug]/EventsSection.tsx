@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import ConfirmModal from "../_components/ConfirmModal";
 import Modal from "../_components/Modal";
+import { pickName, type NameMode } from "@/lib/v2/profile";
 import styles from "../new.module.css";
 
 interface EventRow {
@@ -56,10 +57,12 @@ export default function EventsSection({
   orgId,
   slug,
   isAdmin,
+  nameMode,
 }: {
   orgId: string;
   slug: string;
   isAdmin: boolean;
+  nameMode: NameMode;
 }) {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [members, setMembers] = useState<MemberOpt[]>([]);
@@ -91,17 +94,17 @@ export default function EventsSection({
     (async () => {
       const r = await fetch(`/api/v2/orgs/${orgId}/members`);
       if (!r.ok) return;
-      const list = ((await r.json()).members || []) as { user_id: string; display_name: string; venmo_username: string | null; archived?: boolean }[];
+      const list = ((await r.json()).members || []) as { user_id: string; display_name: string; first_name: string | null; last_name: string | null; venmo_username: string | null; archived?: boolean }[];
       const opts = list
         .filter((m) => !m.archived)
-        .map((m) => ({ user_id: m.user_id, name: m.display_name, venmo: m.venmo_username }))
+        .map((m) => ({ user_id: m.user_id, name: pickName(m, nameMode), venmo: m.venmo_username }))
         .sort((a, b) => a.name.localeCompare(b.name));
       if (active) setMembers(opts);
     })();
     return () => {
       active = false;
     };
-  }, [orgId]);
+  }, [orgId, nameMode]);
 
   function openNew() {
     setForm({ ...empty, timezone: detectTz() });

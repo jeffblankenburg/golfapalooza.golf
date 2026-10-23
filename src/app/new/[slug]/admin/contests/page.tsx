@@ -100,5 +100,5 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
     return { kind: "boxes", id: c.id as string, createdAt: c.created_at as string, box };
   });
 
-  return <GroupContestsAdmin orgId={org.id} slug={slug} items={items} currentUserId={ctx.userId} />;
+  return <GroupContestsAdmin orgId={org.id} slug={slug} items={items} currentUserId={ctx.userId} nameMode={org.name_display} />;
 }

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolvePayouts, computeGamePayoutsFromSlices, winningCell } from "@/lib/v2/contests/boxes";
 import { buildGameAllocations } from "@/lib/v2/contests/boxes-alloc";
 import { getLeague, fetchGameScore, periodScoresFromGame } from "@/lib/v2/sports/espn";
+import { pickName, type NameMode } from "@/lib/v2/profile";
 import BoxesManage, { type ManageGame, type PayoutRow, type GameWinner, type GameBox } from "./BoxesManage";
 import type { BoxesContestRow } from "../BoxesEditor";
 
@@ -57,6 +58,7 @@ export default async function BoxesManageView({
   payoutsHref,
   playerHref,
   editHref,
+  nameMode,
 }: {
   supabase: SupabaseClient;
   contest: { id: string; name: string; status: string; config: unknown };
@@ -65,6 +67,7 @@ export default async function BoxesManageView({
   payoutsHref: string;
   playerHref: string;
   editHref: string;
+  nameMode: NameMode;
 }) {
   const contestId = contest.id;
 
@@ -91,9 +94,9 @@ export default async function BoxesManageView({
   // Owner names for any claimed squares.
   const ownerIds = [...new Set((cells ?? []).map((c) => c.user_id).filter((x): x is string => !!x))];
   const { data: profiles } = ownerIds.length
-    ? await supabase.from("v2_profiles").select("id, display_name").in("id", ownerIds)
-    : { data: [] as { id: string; display_name: string | null }[] };
-  const nameById = new Map((profiles ?? []).map((p) => [p.id, p.display_name || "Member"]));
+    ? await supabase.from("v2_profiles").select("id, display_name, first_name, last_name").in("id", ownerIds)
+    : { data: [] as { id: string; display_name: string | null; first_name: string | null; last_name: string | null }[] };
+  const nameById = new Map((profiles ?? []).map((p) => [p.id, pickName(p, nameMode)]));
 
   const owners: Record<string, string> = {};
   for (const c of cells ?? []) if (c.user_id) owners[`${c.grid_row},${c.grid_col}`] = nameById.get(c.user_id) || "Member";

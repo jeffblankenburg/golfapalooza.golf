@@ -6,10 +6,13 @@ import styles from "@/app/new/new.module.css";
 
 /**
  * Per-contest collector picker (#235). Sets `v2_contests.collected_by` — who members
- * settle this contest's buy-in with. Null (the default option) falls back to the
- * event's treasurer, then the contest creator (resolveContestPayeeId). The collector
+ * settle this contest's buy-in with. Defaults the selection to the active user (the
+ * admin setting it up), never an abstract "creator/treasurer" option. The collector
  * needs a Venmo handle or members won't get a pay button in My Money, so the picker
  * gates on it. Auto-saves on change (no Save button).
+ *
+ * Style-agnostic: pass `labelClassName`/`selectClassName` to match the host form
+ * (e.g. the Squares editor's classes); defaults match the shared `.input` look.
  */
 interface MemberOpt { user_id: string; name: string; venmo: string | null }
 
@@ -17,16 +20,21 @@ export default function ContestCollector({
   base,
   orgId,
   nameMode,
+  currentUserId,
   initialCollectedBy,
-  defaultLabel = "Event treasurer (default)",
+  labelClassName,
+  selectClassName,
 }: {
   base: string; // contest API root, e.g. /api/v2/orgs/{org}/events/{event}/contests/{contest}
   orgId: string;
   nameMode: NameMode;
+  currentUserId: string;
   initialCollectedBy: string | null;
-  defaultLabel?: string;
+  labelClassName?: string;
+  selectClassName?: string;
 }) {
-  const [collectedBy, setCollectedBy] = useState(initialCollectedBy || "");
+  // Pre-select the active user when nobody's set yet (parity with GroupContestMoney).
+  const [collectedBy, setCollectedBy] = useState(initialCollectedBy || currentUserId);
   const [members, setMembers] = useState<MemberOpt[]>([]);
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
 
@@ -60,30 +68,26 @@ export default function ContestCollector({
   const collectorVenmo = collectedBy ? members.find((m) => m.user_id === collectedBy)?.venmo : undefined;
 
   return (
-    <div style={{ marginTop: 20 }}>
-      <p className={styles.sectionLabel}>Who&apos;s collecting?</p>
-      <div className={styles.field}>
-        <label className={styles.label}>
-          Collector <span className={styles.optional}>(members settle their buy-in with this person)</span>
-        </label>
-        <select className={styles.roleSelect} value={collectedBy} onChange={(e) => save(e.target.value)}>
-          <option value="">{defaultLabel}</option>
-          {collectedBy && !members.some((m) => m.user_id === collectedBy) && (
-            <option value={collectedBy}>Current collector</option>
-          )}
-          {members.map((m) => (
-            <option key={m.user_id} value={m.user_id} disabled={!m.venmo && m.user_id !== collectedBy}>
-              {m.name}{m.venmo ? "" : " (needs Venmo)"}
-            </option>
-          ))}
-        </select>
-        {collectedBy && collectorVenmo === null && (
-          <p className={styles.formError} style={{ marginTop: 4 }}>
-            This collector has no Venmo on file — members won&apos;t get a pay button.
-          </p>
+    <div className={styles.field} style={{ marginTop: 16 }}>
+      <label className={labelClassName ?? styles.label}>
+        Who&apos;s collecting? <span className={styles.optional}>(needs Venmo)</span>
+      </label>
+      <select className={selectClassName ?? styles.selectInput} value={collectedBy} onChange={(e) => save(e.target.value)}>
+        {collectedBy && !members.some((m) => m.user_id === collectedBy) && (
+          <option value={collectedBy}>Current collector</option>
         )}
-        {status === "saved" && <p className={styles.roundFormHint} style={{ marginTop: 4 }}>Saved.</p>}
-      </div>
+        {members.map((m) => (
+          <option key={m.user_id} value={m.user_id} disabled={!m.venmo && m.user_id !== collectedBy}>
+            {m.name}{m.venmo ? "" : " (needs Venmo)"}
+          </option>
+        ))}
+      </select>
+      {collectedBy && collectorVenmo === null && (
+        <p className={styles.formError} style={{ marginTop: 4 }}>
+          This collector has no Venmo on file — members won&apos;t get a pay button.
+        </p>
+      )}
+      {status === "saved" && <p className={styles.roundFormHint} style={{ marginTop: 4 }}>Saved.</p>}
     </div>
   );
 }

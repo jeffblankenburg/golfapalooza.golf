@@ -194,7 +194,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
       </div>
 
       {editing !== undefined && (
-        <SquaresEditor collectionBase={collectionBase} editing={editing} nameMode={nameMode} onClose={() => setEditing(undefined)} />
+        <SquaresEditor collectionBase={collectionBase} editing={editing} nameMode={nameMode} currentUserId={currentUserId} onClose={() => setEditing(undefined)} />
       )}
 
       <Modal open={pickemOpen} title="New Pick'em" onClose={() => setPickemOpen(false)}>

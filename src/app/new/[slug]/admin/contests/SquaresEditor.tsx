@@ -165,6 +165,7 @@ export default function SquaresEditor({
   editing,
   eventId = null,
   nameMode = "nickname",
+  currentUserId = "",
   onClose,
   onSaved,
 }: {
@@ -173,7 +174,8 @@ export default function SquaresEditor({
   // When set, a newly-created pool is EVENT-scoped (event_id). Omitted/null =
   // group-scoped. Editing an existing pool never changes its scope.
   eventId?: string | null;
-  nameMode?: NameMode; // for the collector picker's member names (edit mode only)
+  nameMode?: NameMode;       // for the collector picker's member names (edit mode only)
+  currentUserId?: string;    // pre-selected collector (the active admin)
   onClose: () => void;
   onSaved?: () => void;
 }) {
@@ -399,8 +401,10 @@ export default function SquaresEditor({
                     base={`${collectionBase}/${editingId}`}
                     orgId={orgId}
                     nameMode={nameMode}
+                    currentUserId={currentUserId}
                     initialCollectedBy={editing?.collectedBy ?? null}
-                    defaultLabel="Contest creator (default)"
+                    labelClassName={styles.label}
+                    selectClassName={styles.selectInput}
                   />
                 )}
               </Section>

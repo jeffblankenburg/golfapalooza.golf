@@ -77,8 +77,8 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
           base={`/api/v2/orgs/${org.id}/contests/${contestId}`}
           orgId={org.id}
           nameMode={org.name_display}
+          currentUserId={ctx.userId}
           initialCollectedBy={(contest.collected_by as string | null) ?? null}
-          defaultLabel="Contest creator (default)"
         />
         <ContestParticipants apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`} />
       </div>

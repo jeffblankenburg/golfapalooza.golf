@@ -15,11 +15,13 @@ export default function SquaresEditLauncher({
   collectionBase,
   returnHref,
   nameMode = "nickname",
+  currentUserId = "",
 }: {
   row: SquaresContestRow;
   collectionBase: string;
   returnHref: string;
   nameMode?: NameMode;
+  currentUserId?: string;
 }) {
   const router = useRouter();
   return (
@@ -27,6 +29,7 @@ export default function SquaresEditLauncher({
       collectionBase={collectionBase}
       editing={row}
       nameMode={nameMode}
+      currentUserId={currentUserId}
       onClose={() => router.push(returnHref)}
       onSaved={() => router.refresh()}
     />

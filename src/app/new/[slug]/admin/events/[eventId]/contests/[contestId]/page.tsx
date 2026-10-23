@@ -69,6 +69,7 @@ export default async function ContestDetailPage({ params, searchParams }: { para
           base={`/api/v2/orgs/${org.id}/events/${eventId}/contests/${contestId}`}
           orgId={org.id}
           nameMode={org.name_display}
+          currentUserId={ctx.userId}
           initialCollectedBy={contest.collected_by}
         />
         <ContestParticipants apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`} />
@@ -83,7 +84,7 @@ export default async function ContestDetailPage({ params, searchParams }: { para
     const manageUrl = `/new/${slug}/admin/events/${eventId}/contests/${contestId}`;
     if ((await searchParams)?.edit) {
       const row = await loadSquaresContestRow(admin, contest);
-      return <SquaresEditLauncher row={row} collectionBase={`/api/v2/orgs/${org.id}/contests`} returnHref={manageUrl} nameMode={org.name_display} />;
+      return <SquaresEditLauncher row={row} collectionBase={`/api/v2/orgs/${org.id}/contests`} returnHref={manageUrl} nameMode={org.name_display} currentUserId={ctx.userId} />;
     }
     return (
       <>
@@ -102,6 +103,7 @@ export default async function ContestDetailPage({ params, searchParams }: { para
             base={`/api/v2/orgs/${org.id}/events/${eventId}/contests/${contestId}`}
             orgId={org.id}
             nameMode={org.name_display}
+            currentUserId={ctx.userId}
             initialCollectedBy={contest.collected_by}
           />
           <ContestParticipants apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`} />
@@ -271,6 +273,7 @@ export default async function ContestDetailPage({ params, searchParams }: { para
         base={`/api/v2/orgs/${org.id}/events/${eventId}/contests/${contestId}`}
         orgId={org.id}
         nameMode={org.name_display}
+        currentUserId={ctx.userId}
         initialCollectedBy={contest.collected_by}
       />
 

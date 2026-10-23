@@ -69,9 +69,16 @@ export default function ContestCollector({
 
   return (
     <div className={styles.field} style={{ marginTop: 16 }}>
-      <label className={labelClassName ?? styles.label}>
-        Who&apos;s collecting? <span className={styles.optional}>(needs Venmo)</span>
-      </label>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+        <label className={labelClassName ?? styles.label}>
+          Who&apos;s collecting? <span className={styles.optional}>(needs Venmo)</span>
+        </label>
+        {status !== "idle" && (
+          <span className={styles.optional} style={{ whiteSpace: "nowrap" }}>
+            {status === "saving" ? "Saving…" : "Saved"}
+          </span>
+        )}
+      </div>
       <select className={selectClassName ?? styles.selectInput} value={collectedBy} onChange={(e) => save(e.target.value)}>
         {collectedBy && !members.some((m) => m.user_id === collectedBy) && (
           <option value={collectedBy}>Current collector</option>
@@ -87,7 +94,6 @@ export default function ContestCollector({
           This collector has no Venmo on file — members won&apos;t get a pay button.
         </p>
       )}
-      {status === "saved" && <p className={styles.roundFormHint} style={{ marginTop: 4 }}>Saved.</p>}
     </div>
   );
 }

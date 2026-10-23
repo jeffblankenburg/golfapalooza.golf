@@ -218,7 +218,7 @@ export default function ProfileDrawer({ active, orgId, canSim }: { active: boole
           <input type="number" className={styles.input} value={p.playing_since ?? ""} min={1900} max={new Date().getFullYear()} onChange={(e) => set("playing_since", e.target.value ? Number(e.target.value) : null)} />
         </Field>
         <Field label="Shirt size">
-          <select className={styles.input} value={p.shirt_size || ""} onChange={(e) => set("shirt_size", e.target.value || null)}>
+          <select className={styles.selectInput} value={p.shirt_size || ""} onChange={(e) => set("shirt_size", e.target.value || null)}>
             <option value="">—</option>
             {SHIRTS.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
@@ -227,13 +227,13 @@ export default function ProfileDrawer({ active, orgId, canSim }: { active: boole
 
       <div className={styles.profileTwoCol}>
         <Field label="Swings">
-          <select className={styles.input} value={p.swings || ""} onChange={(e) => set("swings", e.target.value || null)}>
+          <select className={styles.selectInput} value={p.swings || ""} onChange={(e) => set("swings", e.target.value || null)}>
             <option value="">—</option>
             {SWINGS.map((s) => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
           </select>
         </Field>
         <Field label="Typical shot">
-          <select className={styles.input} value={p.typical_shot || ""} onChange={(e) => set("typical_shot", e.target.value || null)}>
+          <select className={styles.selectInput} value={p.typical_shot || ""} onChange={(e) => set("typical_shot", e.target.value || null)}>
             <option value="">—</option>
             {SHOTS.map((s) => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
           </select>

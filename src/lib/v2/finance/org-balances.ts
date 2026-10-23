@@ -1,7 +1,7 @@
 /**
  * Group-wide admin financial rollup (#237, final slice). One board that nets EVERY
  * member's money across the whole org — every event (trip cost + options + event
- * ledger) PLUS every group contest buy-in (Pick'em entry, Boxes squares) and any
+ * ledger) PLUS every group contest buy-in (Pick'em entry, Squares squares) and any
  * group-level ledger rows. The member-facing mirror is loadMyMoney; this is the
  * admin's "who owes what, across everything" view.
  *
@@ -53,7 +53,7 @@ export async function loadOrgBalances(admin: SupabaseClient, orgId: string): Pro
   }
 
   // 2) Group contest buy-ins (event_id NULL): Pick'em entry per participant,
-  //    Boxes per-square cost × squares owned.
+  //    Squares per-square cost × squares owned.
   const { data: gcontests } = await admin
     .from("v2_contests")
     .select("id, name, contest_type, config")
@@ -61,16 +61,16 @@ export async function loadOrgBalances(admin: SupabaseClient, orgId: string): Pro
     .is("event_id", null);
 
   const pickemFee = new Map<string, number>();
-  const boxesCost = new Map<string, number>();
+  const squaresCost = new Map<string, number>();
   const contestName = new Map<string, string>();
   for (const c of gcontests || []) {
     contestName.set(c.id as string, (c.name as string) || "Contest");
     if (c.contest_type === "pickem") {
       const fee = Number((c.config as { entry_cents?: number } | null)?.entry_cents) || 0;
       if (fee > 0) pickemFee.set(c.id as string, fee);
-    } else if (c.contest_type === "boxes") {
+    } else if (c.contest_type === "squares") {
       const cost = Number((c.config as { cell_cost_cents?: number } | null)?.cell_cost_cents) || 0;
-      if (cost > 0) boxesCost.set(c.id as string, cost);
+      if (cost > 0) squaresCost.set(c.id as string, cost);
     }
   }
 
@@ -78,8 +78,8 @@ export async function loadOrgBalances(admin: SupabaseClient, orgId: string): Pro
     const { data: parts } = await admin.from("v2_contest_participants").select("contest_id, user_id").in("contest_id", [...pickemFee.keys()]);
     for (const p of parts || []) addOwed(p.user_id as string, pickemFee.get(p.contest_id as string) || 0, contestName.get(p.contest_id as string) || "Contest");
   }
-  if (boxesCost.size) {
-    const { data: cells } = await admin.from("v2_boxes_cells").select("contest_id, user_id").in("contest_id", [...boxesCost.keys()]).not("user_id", "is", null);
+  if (squaresCost.size) {
+    const { data: cells } = await admin.from("v2_squares_cells").select("contest_id, user_id").in("contest_id", [...squaresCost.keys()]).not("user_id", "is", null);
     const perUserContest = new Map<string, number>(); // "uid|cid" → squares
     for (const x of cells || []) {
       const k = `${x.user_id}|${x.contest_id}`;
@@ -87,7 +87,7 @@ export async function loadOrgBalances(admin: SupabaseClient, orgId: string): Pro
     }
     for (const [k, n] of perUserContest) {
       const [uid, cid] = k.split("|");
-      const amt = (boxesCost.get(cid) || 0) * n;
+      const amt = (squaresCost.get(cid) || 0) * n;
       addOwed(uid, amt, `${contestName.get(cid) || "Squares"} (${n} sq)`);
     }
   }

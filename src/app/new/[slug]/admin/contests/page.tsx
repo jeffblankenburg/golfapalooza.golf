@@ -2,12 +2,12 @@ import { redirect } from "next/navigation";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
 import GroupContestsAdmin, { type GroupContestItem } from "./GroupContestsAdmin";
-import { type BoxesContestRow } from "./BoxesEditor";
+import { type SquaresContestRow } from "./SquaresEditor";
 
 /**
  * Group-level contests — pools that belong to the whole group (event_id NULL),
  * available to all members, independent of the single active event. All types
- * (Boxes, Pick'em, …) live in one list, created from one "Add contest" control.
+ * (Squares, Pick'em, …) live in one list, created from one "Add contest" control.
  */
 export default async function GroupContestsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -24,15 +24,15 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
     .select("id, name, status, config, contest_type, created_at, collected_by")
     .eq("org_id", org.id)
     .is("event_id", null)
-    .in("contest_type", ["boxes", "pickem"])
+    .in("contest_type", ["squares", "pickem"])
     .order("created_at", { ascending: false });
 
-  const boxesIds = (contests ?? []).filter((c) => c.contest_type === "boxes").map((c) => c.id);
-  const { data: games } = boxesIds.length
+  const squaresIds = (contests ?? []).filter((c) => c.contest_type === "squares").map((c) => c.id);
+  const { data: games } = squaresIds.length
     ? await supabase
-        .from("v2_boxes_games")
+        .from("v2_squares_games")
         .select("contest_id, espn_event_id, league, label, team_row, team_col, start_time, game_alloc, period_alloc, sort_order")
-        .in("contest_id", boxesIds)
+        .in("contest_id", squaresIds)
         .order("sort_order")
     : { data: [] as Record<string, unknown>[] };
 
@@ -67,18 +67,18 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
       (c.config as {
         cell_cost_cents?: number;
         pot_allocation?: string;
-        period_weights?: BoxesContestRow["periodWeights"];
+        period_weights?: SquaresContestRow["periodWeights"];
         max_squares_primary?: number;
         max_squares_secondary?: number | null;
         primary_ends_at?: string | null;
         secondary_ends_at?: string | null;
       } | null) ?? {};
-    const box: BoxesContestRow = {
+    const box: SquaresContestRow = {
       id: c.id,
       name: c.name,
       status: c.status,
       cellCostCents: cfg.cell_cost_cents ?? 0,
-      potAllocation: (cfg.pot_allocation as BoxesContestRow["potAllocation"]) ?? "equal",
+      potAllocation: (cfg.pot_allocation as SquaresContestRow["potAllocation"]) ?? "equal",
       periodWeights: cfg.period_weights ?? {},
       maxSquaresPrimary: cfg.max_squares_primary ?? 10,
       maxSquaresSecondary: cfg.max_squares_secondary === undefined ? null : cfg.max_squares_secondary,
@@ -90,14 +90,14 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
           espnEventId: g.espn_event_id as string,
           league: g.league as string,
           label: (g.label as string) ?? null,
-          teamRow: (g.team_row as BoxesContestRow["games"][number]["teamRow"]) ?? null,
-          teamCol: (g.team_col as BoxesContestRow["games"][number]["teamCol"]) ?? null,
+          teamRow: (g.team_row as SquaresContestRow["games"][number]["teamRow"]) ?? null,
+          teamCol: (g.team_col as SquaresContestRow["games"][number]["teamCol"]) ?? null,
           startTime: (g.start_time as string) ?? null,
-          gameAlloc: (g.game_alloc as BoxesContestRow["games"][number]["gameAlloc"]) ?? null,
-          periodAlloc: (g.period_alloc as BoxesContestRow["games"][number]["periodAlloc"]) ?? null,
+          gameAlloc: (g.game_alloc as SquaresContestRow["games"][number]["gameAlloc"]) ?? null,
+          periodAlloc: (g.period_alloc as SquaresContestRow["games"][number]["periodAlloc"]) ?? null,
         })),
     };
-    return { kind: "boxes", id: c.id as string, createdAt: c.created_at as string, box };
+    return { kind: "squares", id: c.id as string, createdAt: c.created_at as string, box };
   });
 
   return <GroupContestsAdmin orgId={org.id} slug={slug} items={items} currentUserId={ctx.userId} nameMode={org.name_display} />;

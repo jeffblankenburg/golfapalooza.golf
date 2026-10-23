@@ -2,14 +2,15 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
-import BoxesManageView from "./BoxesManageView";
+import SquaresManageView from "./SquaresManageView";
 // Same admin component the event lane uses — mounted here with the group API base.
 import PickemAdmin from "../../events/[eventId]/contests/[contestId]/PickemAdmin";
 import ContestParticipants from "@/components/v2/contests/ContestParticipants";
+import ContestCollector from "@/components/v2/contests/ContestCollector";
 import GroupContestMoney from "./GroupContestMoney";
 import styles from "@/app/new/new.module.css";
 
-export default async function BoxesDetailPage({ params }: { params: Promise<{ slug: string; contestId: string }> }) {
+export default async function SquaresDetailPage({ params }: { params: Promise<{ slug: string; contestId: string }> }) {
   const { slug, contestId } = await params;
   const ctx = await getPlatformContext();
   if (!ctx) redirect("/new/signup");
@@ -56,12 +57,12 @@ export default async function BoxesDetailPage({ params }: { params: Promise<{ sl
     );
   }
 
-  if (contest.contest_type !== "boxes") notFound();
+  if (contest.contest_type !== "squares") notFound();
 
-  // Boxes manage view — shared with the event lane; mounted with the GROUP links.
+  // Squares manage view — shared with the event lane; mounted with the GROUP links.
   return (
     <>
-      <BoxesManageView
+      <SquaresManageView
         supabase={supabase}
         contest={contest}
         base={`/api/v2/orgs/${org.id}/contests/${contestId}`}
@@ -72,6 +73,13 @@ export default async function BoxesDetailPage({ params }: { params: Promise<{ sl
         nameMode={org.name_display}
       />
       <div className={styles.page} style={{ paddingTop: 0 }}>
+        <ContestCollector
+          base={`/api/v2/orgs/${org.id}/contests/${contestId}`}
+          orgId={org.id}
+          nameMode={org.name_display}
+          initialCollectedBy={(contest.collected_by as string | null) ?? null}
+          defaultLabel="Contest creator (default)"
+        />
         <ContestParticipants apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`} />
       </div>
     </>

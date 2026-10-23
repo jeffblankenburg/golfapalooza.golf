@@ -1,8 +1,8 @@
 "use client";
 
 import { Fragment } from "react";
-import styles from "./BoxesGrid.module.css";
-import { type BoxesGridState, type Cell, cellKey } from "@/lib/v2/contests/boxes";
+import styles from "./SquaresGrid.module.css";
+import { type SquaresGridState, type Cell, cellKey } from "@/lib/v2/contests/squares";
 /* eslint-disable @next/next/no-img-element */
 
 export interface AxisTeam {
@@ -23,14 +23,14 @@ const money = (c: number) => `$${c / 100 % 1 === 0 ? (c / 100).toFixed(0) : (c /
 const TEN = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 /**
- * The 10×10 Boxes grid (#230). Digit headers across the top (columns) and down
+ * The 10×10 Squares grid (#230). Digit headers across the top (columns) and down
  * the left (rows), team-colored axis bars naming each team (home across the top,
  * away down the left), owner initials in each cell, and two highlight states:
  *   - `currentWinner` — the square winning on the LIVE score (a moving green ring),
  *   - `periodWinners` — squares that LOCKED a period (green fill + winnings badge).
- * Pure presentation; all winner math comes from `boxes.ts`.
+ * Pure presentation; all winner math comes from `squares.ts`.
  */
-export default function BoxesGrid({
+export default function SquaresGrid({
   grid,
   teamRow,
   teamCol,
@@ -41,7 +41,7 @@ export default function BoxesGrid({
   bare = false,
   onCellClick,
 }: {
-  grid: BoxesGridState;
+  grid: SquaresGridState;
   teamRow?: AxisTeam;
   teamCol?: AxisTeam;
   currentWinner?: Cell | null;

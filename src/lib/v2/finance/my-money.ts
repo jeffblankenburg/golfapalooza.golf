@@ -115,21 +115,21 @@ export async function loadMyMoney(
     }
   }
 
-  // 2b) Boxes (Squares) buy-ins (event-less) → the pool's collector. Ownership is
-  // cells in v2_boxes_cells (NOT contest_participants), and the fee is per-square
+  // 2b) Squares (Squares) buy-ins (event-less) → the pool's collector. Ownership is
+  // cells in v2_squares_cells (NOT contest_participants), and the fee is per-square
   // (config.cell_cost_cents) × squares owned.
-  const { data: myCells } = await admin.from("v2_boxes_cells").select("contest_id").eq("user_id", userId);
+  const { data: myCells } = await admin.from("v2_squares_cells").select("contest_id").eq("user_id", userId);
   const cellsByContest = new Map<string, number>();
   for (const c of myCells || []) cellsByContest.set(c.contest_id as string, (cellsByContest.get(c.contest_id as string) || 0) + 1);
   if (cellsByContest.size) {
-    const { data: boxes } = await admin
+    const { data: squaresPools } = await admin
       .from("v2_contests")
       .select("id, name, config, collected_by, created_by")
       .in("id", [...cellsByContest.keys()])
       .eq("org_id", orgId)
       .is("event_id", null)
-      .eq("contest_type", "boxes");
-    for (const b of boxes || []) {
+      .eq("contest_type", "squares");
+    for (const b of squaresPools || []) {
       const cost = Number((b.config as { cell_cost_cents?: number } | null)?.cell_cost_cents) || 0;
       const n = cellsByContest.get(b.id as string) || 0;
       const amt = cost * n;
@@ -195,7 +195,7 @@ export async function loadMyMoney(
 }
 
 /** What others owe this member for GROUP contests they collect — Pick'em (flat
- *  entry per participant) + Boxes (per-square cost × squares owned), minus any
+ *  entry per participant) + Squares (per-square cost × squares owned), minus any
  *  payments recorded to this member for that contest. */
 async function loadGroupContestIncoming(
   admin: SupabaseClient,
@@ -231,16 +231,16 @@ async function loadGroupContestIncoming(
     for (const p of parts || []) add(p.user_id as string, pickemFee.get(p.contest_id as string) || 0);
   }
 
-  // Boxes: per-square cost × squares each member owns.
-  const boxesCost = new Map<string, number>();
+  // Squares: per-square cost × squares each member owns.
+  const squaresCost = new Map<string, number>();
   for (const c of mine) {
-    if (c.contest_type !== "boxes") continue;
+    if (c.contest_type !== "squares") continue;
     const cost = Number((c.config as { cell_cost_cents?: number } | null)?.cell_cost_cents) || 0;
-    if (cost > 0) { boxesCost.set(c.id as string, cost); allIds.push(c.id as string); }
+    if (cost > 0) { squaresCost.set(c.id as string, cost); allIds.push(c.id as string); }
   }
-  if (boxesCost.size) {
-    const { data: cells } = await admin.from("v2_boxes_cells").select("contest_id, user_id").in("contest_id", [...boxesCost.keys()]).not("user_id", "is", null);
-    for (const x of cells || []) add(x.user_id as string, boxesCost.get(x.contest_id as string) || 0);
+  if (squaresCost.size) {
+    const { data: cells } = await admin.from("v2_squares_cells").select("contest_id, user_id").in("contest_id", [...squaresCost.keys()]).not("user_id", "is", null);
+    for (const x of cells || []) add(x.user_id as string, squaresCost.get(x.contest_id as string) || 0);
   }
 
   // Subtract payments recorded to me for these contests.

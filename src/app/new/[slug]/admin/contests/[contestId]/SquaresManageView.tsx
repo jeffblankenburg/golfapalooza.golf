@@ -1,22 +1,22 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { resolvePayouts, computeGamePayoutsFromSlices, winningCell } from "@/lib/v2/contests/boxes";
-import { buildGameAllocations } from "@/lib/v2/contests/boxes-alloc";
+import { resolvePayouts, computeGamePayoutsFromSlices, winningCell } from "@/lib/v2/contests/squares";
+import { buildGameAllocations } from "@/lib/v2/contests/squares-alloc";
 import { getLeague, fetchGameScore, periodScoresFromGame } from "@/lib/v2/sports/espn";
 import { pickName, type NameMode } from "@/lib/v2/profile";
-import BoxesManage, { type ManageGame, type PayoutRow, type GameWinner, type GameBox } from "./BoxesManage";
-import type { BoxesContestRow } from "../BoxesEditor";
+import SquaresManage, { type ManageGame, type PayoutRow, type GameWinner, type GameBox } from "./SquaresManage";
+import type { SquaresContestRow } from "../SquaresEditor";
 
 /**
- * Map a contest row + its games into the BoxesContestRow the editor expects.
+ * Map a contest row + its games into the SquaresContestRow the editor expects.
  * Shared so the group hub list and the event edit launcher build it identically.
  */
-export async function loadBoxesContestRow(
+export async function loadSquaresContestRow(
   supabase: SupabaseClient,
   contest: { id: string; name: string; status: string; config: unknown },
-): Promise<BoxesContestRow> {
+): Promise<SquaresContestRow> {
   const cfg = (contest.config as Record<string, unknown>) ?? {};
   const { data: gameRows } = await supabase
-    .from("v2_boxes_games")
+    .from("v2_squares_games")
     .select("espn_event_id, league, label, team_row, team_col, start_time, game_alloc, period_alloc, sort_order")
     .eq("contest_id", contest.id)
     .order("sort_order");
@@ -25,8 +25,8 @@ export async function loadBoxesContestRow(
     name: contest.name,
     status: contest.status,
     cellCostCents: (cfg.cell_cost_cents as number) ?? 0,
-    potAllocation: (cfg.pot_allocation as BoxesContestRow["potAllocation"]) ?? "equal",
-    periodWeights: (cfg.period_weights as BoxesContestRow["periodWeights"]) ?? {},
+    potAllocation: (cfg.pot_allocation as SquaresContestRow["potAllocation"]) ?? "equal",
+    periodWeights: (cfg.period_weights as SquaresContestRow["periodWeights"]) ?? {},
     maxSquaresPrimary: (cfg.max_squares_primary as number) ?? 10,
     maxSquaresSecondary: cfg.max_squares_secondary === undefined ? null : (cfg.max_squares_secondary as number | null),
     primaryEndsAt: (cfg.primary_ends_at as string | null) ?? null,
@@ -35,22 +35,22 @@ export async function loadBoxesContestRow(
       espnEventId: g.espn_event_id as string,
       league: g.league as string,
       label: (g.label as string) ?? null,
-      teamRow: (g.team_row as BoxesContestRow["games"][number]["teamRow"]) ?? null,
-      teamCol: (g.team_col as BoxesContestRow["games"][number]["teamCol"]) ?? null,
+      teamRow: (g.team_row as SquaresContestRow["games"][number]["teamRow"]) ?? null,
+      teamCol: (g.team_col as SquaresContestRow["games"][number]["teamCol"]) ?? null,
       startTime: (g.start_time as string) ?? null,
-      gameAlloc: (g.game_alloc as BoxesContestRow["games"][number]["gameAlloc"]) ?? null,
-      periodAlloc: (g.period_alloc as BoxesContestRow["games"][number]["periodAlloc"]) ?? null,
+      gameAlloc: (g.game_alloc as SquaresContestRow["games"][number]["gameAlloc"]) ?? null,
+      periodAlloc: (g.period_alloc as SquaresContestRow["games"][number]["periodAlloc"]) ?? null,
     })),
   };
 }
 
 /**
- * Loads a Boxes pool's manage data (grid, games, ESPN-scored payouts) and renders
- * BoxesManage. Scope-agnostic: the group and event manage pages both call this,
+ * Loads a Squares pool's manage data (grid, games, ESPN-scored payouts) and renders
+ * SquaresManage. Scope-agnostic: the group and event manage pages both call this,
  * passing their own `base` (contest API root) + admin link hrefs. The data-loading
  * keys only off the contest id, so it's identical for either scope.
  */
-export default async function BoxesManageView({
+export default async function SquaresManageView({
   supabase,
   contest,
   base,
@@ -72,20 +72,20 @@ export default async function BoxesManageView({
   const contestId = contest.id;
 
   const { data: gameRows } = await supabase
-    .from("v2_boxes_games")
+    .from("v2_squares_games")
     .select("id, espn_event_id, league, label, team_row, team_col, row_digits, col_digits, locked_at, reveal_at, status, period_scores, game_alloc, period_alloc, start_time, sort_order")
     .eq("contest_id", contestId)
     .order("start_time", { ascending: true, nullsFirst: false })
     .order("sort_order");
 
   const { data: cells } = await supabase
-    .from("v2_boxes_cells")
+    .from("v2_squares_cells")
     .select("grid_row, grid_col, user_id")
     .eq("contest_id", contestId);
 
   // Per-game paid state (one row per pool, member, game).
   const { data: paidRows } = await supabase
-    .from("v2_boxes_payouts")
+    .from("v2_squares_payouts")
     .select("user_id, game_id, paid_cents, note")
     .eq("contest_id", contestId);
   const paidByGameUser = new Map<string, { cents: number; note: string | null }>();
@@ -201,7 +201,7 @@ export default async function BoxesManageView({
   }
 
   return (
-    <BoxesManage
+    <SquaresManage
       base={base}
       backHref={backHref}
       payoutsHref={payoutsHref}

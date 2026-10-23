@@ -2,7 +2,7 @@ import Link from "next/link";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { v2Now } from "@/lib/v2/simulator";
 import { isSlateLocked, type PickemGame } from "@/lib/v2/contests/pickem";
-import styles from "./BoxesHomeCards.module.css";
+import styles from "./SquaresHomeCards.module.css";
 
 /** Small "this is a Pick'em" marker (box + check glyph + label), matching the
  *  type badge used on the admin list. */

@@ -1,9 +1,9 @@
 import type { CSSProperties } from "react";
-import BoxesSimulator from "@/components/v2/contests/BoxesSimulator";
+import SquaresSimulator from "@/components/v2/contests/SquaresSimulator";
 
-export const metadata = { title: "Boxes Simulator" };
+export const metadata = { title: "Squares Simulator" };
 
-// Temporary standalone host for the Boxes grid + scoring + simulator (#230/#232).
+// Temporary standalone host for the Squares grid + scoring + simulator (#230/#232).
 // Pure client UI, no data — this becomes the admin "Simulate" panel on the real
 // contest. Defines the v2 palette locally so it renders outside the app shell.
 const palette: CSSProperties = {
@@ -19,11 +19,11 @@ const palette: CSSProperties = {
   padding: "16px",
 };
 
-export default function BoxesSimPage() {
+export default function SquaresSimPage() {
   return (
     <div style={palette}>
       <div style={{ maxWidth: 440, margin: "0 auto" }}>
-        <BoxesSimulator />
+        <SquaresSimulator />
       </div>
     </div>
   );

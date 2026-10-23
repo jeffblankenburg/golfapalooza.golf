@@ -5,7 +5,7 @@ import { isOrgMember } from "@/lib/v2/orgs";
 type Params = Promise<{ id: string; contestId: string }>;
 
 /**
- * Members claim / release Boxes squares (#230). Buying is open only in the
+ * Members claim / release Squares squares (#230). Buying is open only in the
  * primary or secondary draft phase, and is capped per person (primary vs
  * secondary limits). Ownership is contest-level (one square = every game).
  */
@@ -23,7 +23,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
     .eq("id", contestId)
     .eq("org_id", orgId)
     .maybeSingle();
-  if (!contest || contest.contest_type !== "boxes") return NextResponse.json({ error: "Boxes pool not found" }, { status: 404 });
+  if (!contest || contest.contest_type !== "squares") return NextResponse.json({ error: "Squares pool not found" }, { status: 404 });
 
   let body: { action?: string; row?: number; col?: number };
   try {
@@ -43,7 +43,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
   }
 
   const { data: cell } = await admin
-    .from("v2_boxes_cells")
+    .from("v2_squares_cells")
     .select("id, user_id")
     .eq("contest_id", contestId)
     .eq("grid_row", row)
@@ -53,7 +53,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
 
   if (action === "release") {
     if (cell.user_id !== userId) return NextResponse.json({ error: "Not your square" }, { status: 403 });
-    const { error } = await admin.from("v2_boxes_cells").update({ user_id: null, purchased_at: null }).eq("id", cell.id);
+    const { error } = await admin.from("v2_squares_cells").update({ user_id: null, purchased_at: null }).eq("id", cell.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true, owner: null });
   }
@@ -62,7 +62,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
   if (cell.user_id) return NextResponse.json({ error: "That square's taken." }, { status: 409 });
 
   const { count } = await admin
-    .from("v2_boxes_cells")
+    .from("v2_squares_cells")
     .select("id", { count: "exact", head: true })
     .eq("contest_id", contestId)
     .eq("user_id", userId);
@@ -73,7 +73,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
   }
 
   const { error } = await admin
-    .from("v2_boxes_cells")
+    .from("v2_squares_cells")
     .update({ user_id: userId, purchased_at: new Date().toISOString() })
     .eq("id", cell.id)
     .is("user_id", null); // guard against a race

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Modal from "@/app/new/_components/Modal";
-import BoxesEditor from "../../../contests/BoxesEditor";
+import SquaresEditor from "../../../contests/SquaresEditor";
 import styles from "@/app/new/new.module.css";
 
 // Event-wide (cross-day) competitions — aren't born from a schedule slot.
@@ -11,14 +11,14 @@ const KINDS = [
   { key: "bspitw", label: "BSPITW", blurb: "Best scramble partner, all days" },
   { key: "hundred_feet", label: "100 Feet!", blurb: "Cumulative distance, hole 18" },
   { key: "pickem", label: "Pick'em", blurb: "Pick games vs. the spread" },
-  { key: "boxes", label: "Boxes", blurb: "Squares pool for any games" },
+  { key: "squares", label: "Squares", blurb: "Squares pool for any games" },
   { key: "other", label: "Other", blurb: "A custom event-wide contest" },
 ];
 
 export default function AddCompetition({ orgId, eventId }: { orgId: string; eventId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [boxesOpen, setBoxesOpen] = useState(false);
+  const [squaresOpen, setSquaresOpen] = useState(false);
   const [kind, setKind] = useState("bspitw");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -27,10 +27,10 @@ export default function AddCompetition({ orgId, eventId }: { orgId: string; even
   async function create(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
-    // Boxes needs its full editor (game picker + payouts), not a one-field create.
-    if (kind === "boxes") {
+    // Squares needs its full editor (game picker + payouts), not a one-field create.
+    if (kind === "squares") {
       setOpen(false);
-      setBoxesOpen(true);
+      setSquaresOpen(true);
       return;
     }
     setBusy(true);
@@ -73,7 +73,7 @@ export default function AddCompetition({ orgId, eventId }: { orgId: string; even
             <p className={styles.contestKindBlurb}>{KINDS.find((k) => k.key === kind)?.blurb}</p>
           </div>
 
-          {kind !== "boxes" && (
+          {kind !== "squares" && (
             <div className={styles.field}>
               <label className={styles.label}>Name <span className={styles.optional}>(optional)</span></label>
               <input className={styles.input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Defaults to the type name" maxLength={80} />
@@ -83,17 +83,17 @@ export default function AddCompetition({ orgId, eventId }: { orgId: string; even
           {error && <p className={styles.formError}>{error}</p>}
 
           <button type="submit" className={styles.createBtn} disabled={busy} style={{ opacity: busy ? 0.6 : 1 }}>
-            {kind === "boxes" ? "Set up Boxes pool →" : busy ? "Adding…" : "Add competition"}
+            {kind === "squares" ? "Set up Squares pool →" : busy ? "Adding…" : "Add competition"}
           </button>
         </form>
       </Modal>
 
-      {boxesOpen && (
-        <BoxesEditor
+      {squaresOpen && (
+        <SquaresEditor
           collectionBase={`/api/v2/orgs/${orgId}/contests`}
           editing={null}
           eventId={eventId}
-          onClose={() => setBoxesOpen(false)}
+          onClose={() => setSquaresOpen(false)}
           onSaved={() => router.refresh()}
         />
       )}

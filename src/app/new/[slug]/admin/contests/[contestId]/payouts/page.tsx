@@ -1,8 +1,8 @@
 import { redirect, notFound } from "next/navigation";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
-import { resolvePayouts, computeGamePayoutsFromSlices } from "@/lib/v2/contests/boxes";
-import { buildGameAllocations } from "@/lib/v2/contests/boxes-alloc";
+import { resolvePayouts, computeGamePayoutsFromSlices } from "@/lib/v2/contests/squares";
+import { buildGameAllocations } from "@/lib/v2/contests/squares-alloc";
 import { getLeague, fetchGameScore, periodScoresFromGame } from "@/lib/v2/sports/espn";
 import { pickName } from "@/lib/v2/profile";
 import MasterPayouts, { type PayoutPerson } from "./MasterPayouts";
@@ -23,12 +23,12 @@ export default async function MasterPayoutsPage({ params }: { params: Promise<{ 
     .eq("id", contestId)
     .eq("org_id", org.id)
     .maybeSingle();
-  if (!contest || contest.contest_type !== "boxes") notFound();
+  if (!contest || contest.contest_type !== "squares") notFound();
 
   const [{ data: gameRows }, { data: cells }, { data: paidRows }] = await Promise.all([
-    supabase.from("v2_boxes_games").select("id, espn_event_id, league, label, row_digits, col_digits, locked_at, period_scores, game_alloc, period_alloc").eq("contest_id", contestId).order("start_time", { ascending: true, nullsFirst: false }).order("sort_order"),
-    supabase.from("v2_boxes_cells").select("grid_row, grid_col, user_id").eq("contest_id", contestId),
-    supabase.from("v2_boxes_payouts").select("user_id, game_id, paid_cents, note").eq("contest_id", contestId),
+    supabase.from("v2_squares_games").select("id, espn_event_id, league, label, row_digits, col_digits, locked_at, period_scores, game_alloc, period_alloc").eq("contest_id", contestId).order("start_time", { ascending: true, nullsFirst: false }).order("sort_order"),
+    supabase.from("v2_squares_cells").select("grid_row, grid_col, user_id").eq("contest_id", contestId),
+    supabase.from("v2_squares_payouts").select("user_id, game_id, paid_cents, note").eq("contest_id", contestId),
   ]);
 
   const ownerById: Record<string, string> = {};

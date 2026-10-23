@@ -11,8 +11,8 @@ import ContestSettings from "./ContestSettings";
 import SideGames, { type SideGame } from "./SideGames";
 import PickemAdmin from "./PickemAdmin";
 import ContestPayouts from "./ContestPayouts";
-import BoxesManageView, { loadBoxesContestRow } from "../../../../contests/[contestId]/BoxesManageView";
-import BoxesEditLauncher from "../../../../contests/[contestId]/BoxesEditLauncher";
+import SquaresManageView, { loadSquaresContestRow } from "../../../../contests/[contestId]/SquaresManageView";
+import SquaresEditLauncher from "../../../../contests/[contestId]/SquaresEditLauncher";
 import ContestParticipants from "@/components/v2/contests/ContestParticipants";
 import ContestCollector from "@/components/v2/contests/ContestCollector";
 import type { PayoutSplit } from "@/lib/v2/contests/payouts";
@@ -76,18 +76,18 @@ export default async function ContestDetailPage({ params, searchParams }: { para
     );
   }
 
-  // Boxes has its own manage surface (grid lifecycle + ESPN payout sheet), shared
-  // with the group lane. Reuses the scope-agnostic boxes routes; `?edit` opens the
+  // Squares has its own manage surface (grid lifecycle + ESPN payout sheet), shared
+  // with the group lane. Reuses the scope-agnostic squares routes; `?edit` opens the
   // same full editor (games included) as the group hub.
-  if (contest.contest_type === "boxes") {
+  if (contest.contest_type === "squares") {
     const manageUrl = `/new/${slug}/admin/events/${eventId}/contests/${contestId}`;
     if ((await searchParams)?.edit) {
-      const row = await loadBoxesContestRow(admin, contest);
-      return <BoxesEditLauncher row={row} collectionBase={`/api/v2/orgs/${org.id}/contests`} returnHref={manageUrl} />;
+      const row = await loadSquaresContestRow(admin, contest);
+      return <SquaresEditLauncher row={row} collectionBase={`/api/v2/orgs/${org.id}/contests`} returnHref={manageUrl} />;
     }
     return (
       <>
-        <BoxesManageView
+        <SquaresManageView
           supabase={admin}
           contest={contest}
           base={`/api/v2/orgs/${org.id}/contests/${contestId}`}

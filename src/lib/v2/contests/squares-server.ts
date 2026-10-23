@@ -1,14 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * Server-side Boxes create (#230). Builds a GROUP-scoped contest (event_id NULL,
- * org_id set) — a Boxes pool available to all members, beside the single active
+ * Server-side Squares create (#230). Builds a GROUP-scoped contest (event_id NULL,
+ * org_id set) — a Squares pool available to all members, beside the single active
  * event — plus its per-game rows (teams on the axes, from the ESPN picker) and
  * the 100 empty squares. Money (buy-in/payout) is layered on later; here we just
  * stand up the grid so people can claim squares.
  */
 
-export interface BoxesGameInput {
+export interface SquaresGameInput {
   espnEventId: string;
   league: string;
   label?: string | null;
@@ -24,7 +24,7 @@ export interface BoxesGameInput {
 // mixed-sport pool can weight each correctly. Each inner map is periodKey → %.
 export type PeriodWeights = Record<string, Record<string, number>>;
 
-export interface CreateBoxesInput {
+export interface CreateSquaresInput {
   orgId: string;
   eventId?: string | null; // NULL/omitted = group-scoped; set = event-scoped
   name: string;
@@ -35,17 +35,17 @@ export interface CreateBoxesInput {
   maxSquaresSecondary: number | null; // secondary draft cap; null = unlimited
   primaryEndsAt?: string | null; // ISO; primary draft ends → secondary begins
   secondaryEndsAt?: string | null; // ISO; secondary auto-closes (null = until admin closes)
-  games: BoxesGameInput[];
+  games: SquaresGameInput[];
   createdBy: string;
 }
 
-export async function createBoxesContest(admin: SupabaseClient, input: CreateBoxesInput): Promise<{ id: string }> {
+export async function createSquaresContest(admin: SupabaseClient, input: CreateSquaresInput): Promise<{ id: string }> {
   const { data: contest, error } = await admin
     .from("v2_contests")
     .insert({
       org_id: input.orgId,
       event_id: input.eventId ?? null, // NULL = group-scoped, set = event-scoped
-      contest_type: "boxes",
+      contest_type: "squares",
       name: input.name,
       scoring_source: "derived", // graded from ESPN period scores
       status: "draft",
@@ -80,20 +80,20 @@ export async function createBoxesContest(admin: SupabaseClient, input: CreateBox
       game_alloc: g.gameAlloc ?? null,
       period_alloc: g.periodAlloc ?? null,
     }));
-    const { error: gErr } = await admin.from("v2_boxes_games").insert(gameRows);
+    const { error: gErr } = await admin.from("v2_squares_games").insert(gameRows);
     if (gErr) throw new Error(gErr.message);
   }
 
   // Seed the 100 open squares in one batch.
   const cells: { contest_id: string; grid_row: number; grid_col: number }[] = [];
   for (let r = 0; r < 10; r++) for (let c = 0; c < 10; c++) cells.push({ contest_id: contest.id, grid_row: r, grid_col: c });
-  const { error: cErr } = await admin.from("v2_boxes_cells").insert(cells);
+  const { error: cErr } = await admin.from("v2_squares_cells").insert(cells);
   if (cErr) throw new Error(cErr.message);
 
   return { id: contest.id };
 }
 
-export interface UpdateBoxesInput {
+export interface UpdateSquaresInput {
   name?: string;
   cellCostCents?: number;
   potAllocation?: "equal" | "round_weighted" | "custom";
@@ -102,18 +102,18 @@ export interface UpdateBoxesInput {
   maxSquaresSecondary?: number | null;
   primaryEndsAt?: string | null;
   secondaryEndsAt?: string | null;
-  games?: BoxesGameInput[]; // when present, the game set is REPLACED wholesale
+  games?: SquaresGameInput[]; // when present, the game set is REPLACED wholesale
 }
 
 /**
- * Edit/reconfigure an existing Boxes pool. Square ownership (the 100 cells) is
+ * Edit/reconfigure an existing Squares pool. Square ownership (the 100 cells) is
  * preserved. The game set is MERGED, not replaced: games that stay keep their
  * already-revealed numbers + reveal schedule (matched by ESPN id / matchup), newly
  * added games get their reveal scheduled if the board is already locked, and only
  * games the admin actually removed are deleted. (Previously this deleted + recreated
  * every game, silently wiping revealed numbers + reveal times on a locked pool.)
  */
-export async function updateBoxesContest(admin: SupabaseClient, contestId: string, patch: UpdateBoxesInput): Promise<void> {
+export async function updateSquaresContest(admin: SupabaseClient, contestId: string, patch: UpdateSquaresInput): Promise<void> {
   const { data: existing, error: readErr } = await admin.from("v2_contests").select("config").eq("id", contestId).maybeSingle();
   if (readErr || !existing) throw new Error(readErr?.message ?? "Contest not found");
 
@@ -153,7 +153,7 @@ export async function updateBoxesContest(admin: SupabaseClient, contestId: strin
       boardLocked && startTime ? new Date(new Date(startTime).getTime() - leadDays * 86400000).toISOString() : null;
 
     const { data: existingGames } = await admin
-      .from("v2_boxes_games")
+      .from("v2_squares_games")
       .select("id, espn_event_id, label, start_time, locked_at")
       .eq("contest_id", contestId);
     // Match on ESPN id when present (stable), else the matchup label + kickoff.
@@ -186,10 +186,10 @@ export async function updateBoxesContest(admin: SupabaseClient, contestId: strin
         if (!match.locked_at && (match.start_time as string | null) !== (g.startTime || null)) {
           update.reveal_at = revealFor(g.startTime || null);
         }
-        const { error } = await admin.from("v2_boxes_games").update(update).eq("id", match.id);
+        const { error } = await admin.from("v2_squares_games").update(update).eq("id", match.id);
         if (error) throw new Error(error.message);
       } else {
-        const { error } = await admin.from("v2_boxes_games").insert({ contest_id: contestId, ...base, reveal_at: revealFor(g.startTime || null) });
+        const { error } = await admin.from("v2_squares_games").insert({ contest_id: contestId, ...base, reveal_at: revealFor(g.startTime || null) });
         if (error) throw new Error(error.message);
       }
     }
@@ -197,7 +197,7 @@ export async function updateBoxesContest(admin: SupabaseClient, contestId: strin
     // Delete only the games the admin removed from the slate.
     const toDelete = (existingGames ?? []).map((g) => g.id as string).filter((id) => !usedIds.has(id));
     if (toDelete.length) {
-      const { error } = await admin.from("v2_boxes_games").delete().in("id", toDelete);
+      const { error } = await admin.from("v2_squares_games").delete().in("id", toDelete);
       if (error) throw new Error(error.message);
     }
   }

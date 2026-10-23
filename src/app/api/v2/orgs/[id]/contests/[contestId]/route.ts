@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
-import { updateBoxesContest, type BoxesGameInput } from "@/lib/v2/contests/boxes-server";
+import { updateSquaresContest, type SquaresGameInput } from "@/lib/v2/contests/squares-server";
 
 type Params = Promise<{ id: string; contestId: string }>;
 
-// Generic contest-level fields editable on non-Boxes group contests (e.g. Pick'em).
+// Generic contest-level fields editable on non-Squares group contests (e.g. Pick'em).
 const EDITABLE = new Set(["status", "payout_splits", "name", "collected_by"]);
 
 async function gate(request: Request, orgId: string, contestId: string) {
@@ -23,7 +23,7 @@ async function gate(request: Request, orgId: string, contestId: string) {
   return { admin, contest: contest as { id: string; contest_type: string; org_id: string } };
 }
 
-/** Edit a group contest. Boxes reconfigures the grid/games/pot; other types
+/** Edit a group contest. Squares reconfigures the grid/games/pot; other types
  *  (Pick'em) take a generic contest-level update (status, payout splits, name). */
 export async function PATCH(request: Request, { params }: { params: Params }) {
   const { id: orgId, contestId } = await params;
@@ -37,8 +37,8 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
-  // ── Non-Boxes (Pick'em, …): generic column update ──
-  if (g.contest.contest_type !== "boxes") {
+  // ── Non-Squares (Pick'em, …): generic column update ──
+  if (g.contest.contest_type !== "squares") {
     const patch: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(body)) if (EDITABLE.has(k)) patch[k] = v;
     if ("name" in patch) {
@@ -64,7 +64,7 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
     return NextResponse.json({ ok: true });
   }
 
-  // ── Boxes: reconfigure the pool ──
+  // ── Squares: reconfigure the pool ──
   const b = body as {
     name?: string;
     cell_cost_cents?: number;
@@ -74,7 +74,7 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
     max_squares_secondary?: number | null;
     primary_ends_at?: string | null;
     secondary_ends_at?: string | null;
-    games?: BoxesGameInput[];
+    games?: SquaresGameInput[];
   };
 
   const name = b.name != null ? b.name.trim() : undefined;
@@ -83,7 +83,7 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
   const potAllocation =
     b.pot_allocation === "equal" || b.pot_allocation === "round_weighted" || b.pot_allocation === "custom" ? b.pot_allocation : undefined;
 
-  let games: BoxesGameInput[] | undefined;
+  let games: SquaresGameInput[] | undefined;
   if (Array.isArray(b.games)) {
     if (b.games.length === 0) return NextResponse.json({ error: "Keep at least one game" }, { status: 400 });
     for (const x of b.games) {
@@ -100,7 +100,7 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
     "max_squares_secondary" in b ? (b.max_squares_secondary == null ? null : Math.max(1, Math.round(b.max_squares_secondary))) : undefined;
 
   try {
-    await updateBoxesContest(g.admin, contestId, {
+    await updateSquaresContest(g.admin, contestId, {
       name,
       cellCostCents,
       potAllocation,
@@ -117,7 +117,7 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
   }
 }
 
-/** Delete a group contest (Boxes cascades to its games + squares; others cascade their own rows). */
+/** Delete a group contest (Squares cascades to its games + squares; others cascade their own rows). */
 export async function DELETE(request: Request, { params }: { params: Params }) {
   const { id: orgId, contestId } = await params;
   const g = await gate(request, orgId, contestId);

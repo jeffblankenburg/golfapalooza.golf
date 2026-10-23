@@ -1,5 +1,5 @@
 /**
- * Boxes / Squares pure scoring (#230). Deterministic: given the grid of owners,
+ * Squares / Squares pure scoring (#230). Deterministic: given the grid of owners,
  * the row/column digit assignments, and the scores, the winning square is fixed.
  *
  * ONE function, three consumers that can never disagree:
@@ -9,7 +9,7 @@
  * No ESPN, no DB — pure data in, winners out.
  */
 
-export interface BoxesGridState {
+export interface SquaresGridState {
   /** Owner label/id keyed by "row,col" (0-9 grid positions). Missing = unsold. */
   owners: Record<string, string | null>;
   /** Digit (0-9) assigned to each of the 10 rows; [] until drawn + locked. */
@@ -28,14 +28,14 @@ export const cellKey = (row: number, col: number) => `${row},${col}`;
 export const lastDigit = (score: number | null | undefined): number | null =>
   score == null ? null : ((Math.trunc(score) % 10) + 10) % 10;
 
-export const digitsDrawn = (grid: BoxesGridState) => grid.rowDigits.length === 10 && grid.colDigits.length === 10;
+export const digitsDrawn = (grid: SquaresGridState) => grid.rowDigits.length === 10 && grid.colDigits.length === 10;
 
 /**
  * The square that wins for a pair of scores — or null if the digits aren't drawn
  * yet or a score is missing. The row team's last digit selects the grid row
  * (via the row-digit assignment); the col team's selects the column.
  */
-export function winningCell(grid: BoxesGridState, rowScore: number | null, colScore: number | null): Cell | null {
+export function winningCell(grid: SquaresGridState, rowScore: number | null, colScore: number | null): Cell | null {
   const rd = lastDigit(rowScore);
   const cd = lastDigit(colScore);
   if (rd == null || cd == null || !digitsDrawn(grid)) return null;
@@ -45,7 +45,7 @@ export function winningCell(grid: BoxesGridState, rowScore: number | null, colSc
   return { row, col };
 }
 
-export function ownerAt(grid: BoxesGridState, cell: Cell | null): string | null {
+export function ownerAt(grid: SquaresGridState, cell: Cell | null): string | null {
   return cell ? grid.owners[cellKey(cell.row, cell.col)] ?? null : null;
 }
 
@@ -72,7 +72,7 @@ export interface PeriodOutcome extends PeriodDef {
 
 /** Per-period winners + payouts. `potCents` is split by each period's weightPct. */
 export function computePeriods(
-  grid: BoxesGridState,
+  grid: SquaresGridState,
   potCents: number,
   periods: PeriodDef[],
   scores: Record<string, PeriodScore>,
@@ -268,7 +268,7 @@ export interface GamePayout {
  * (resolvePayouts) feeds `computeGamePayoutsFromSlices` directly with resolved cents.
  */
 export function computeGamePayouts(
-  compute: BoxesGridState,
+  compute: SquaresGridState,
   gamePotCents: number,
   periods: PeriodDef[],
   weights: Record<string, number> | undefined,
@@ -284,7 +284,7 @@ export function computeGamePayouts(
 
 /** Carry-orphan payout for ONE game from already-resolved per-period dollar slices. */
 export function computeGamePayoutsFromSlices(
-  compute: BoxesGridState,
+  compute: SquaresGridState,
   periodSlices: { key: string; label: string; cents: number }[],
   scores: Record<string, { away: number | null; home: number | null } | null>,
 ): GamePayout {

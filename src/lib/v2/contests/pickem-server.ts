@@ -128,7 +128,7 @@ export interface EspnGameInput {
 }
 
 /**
- * Add games to the slate straight from the ESPN picker (parity with Boxes). Teams,
+ * Add games to the slate straight from the ESPN picker (parity with Squares). Teams,
  * kickoff, TV, and the line (spread + favorite) come from the feed; the admin can
  * tweak the line afterward. Dedups by `espn_event_id` so re-opening the picker and
  * re-confirming never duplicates a game.

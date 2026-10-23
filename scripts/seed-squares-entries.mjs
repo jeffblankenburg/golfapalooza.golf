@@ -1,12 +1,12 @@
-// Test-only: fill a Boxes pool end to end so it's ready to draw. Assigns all 100
+// Test-only: fill a Squares pool end to end so it's ready to draw. Assigns all 100
 // squares to the org's members (round-robin) AND sets the flexible payout
 // allocations — every game a fixed $80 (Q1 $10 / Half $20 / Q3 $10 / Final $40)
 // except the LAST game (by kickoff), which is "the rest" and splits the remainder
 // by percent. Idempotent: re-running reassigns squares + re-writes allocations.
 //
-//   node scripts/seed-boxes-entries.mjs [contestId]
+//   node scripts/seed-squares-entries.mjs [contestId]
 //
-// With no id it targets the most recently created boxes pool.
+// With no id it targets the most recently created squares pool.
 import { readFileSync } from "fs";
 import { createClient } from "@supabase/supabase-js";
 
@@ -38,12 +38,12 @@ async function main() {
   // 1) Resolve the contest.
   let contestId = process.argv[2];
   if (!contestId) {
-    const { data } = await sb.from("v2_contests").select("id, name, org_id, config").eq("contest_type", "boxes").order("created_at", { ascending: false }).limit(1);
-    if (!data?.length) { console.error("No boxes contests found."); process.exit(1); }
+    const { data } = await sb.from("v2_contests").select("id, name, org_id, config").eq("contest_type", "squares").order("created_at", { ascending: false }).limit(1);
+    if (!data?.length) { console.error("No squares contests found."); process.exit(1); }
     contestId = data[0].id;
   }
   const { data: contest, error: cErr } = await sb.from("v2_contests").select("id, name, org_id, config, contest_type").eq("id", contestId).maybeSingle();
-  if (cErr || !contest || contest.contest_type !== "boxes") { console.error("Boxes contest not found:", contestId); process.exit(1); }
+  if (cErr || !contest || contest.contest_type !== "squares") { console.error("Squares contest not found:", contestId); process.exit(1); }
   console.log(`Pool: ${contest.name} (${contest.id})`);
 
   // 2) Members of the org.
@@ -53,7 +53,7 @@ async function main() {
   console.log(`Members: ${userIds.length}`);
 
   // 3) Allocations: last game (by kickoff, nulls last) = rest; all others $80 fixed.
-  const { data: games } = await sb.from("v2_boxes_games").select("id, label, league, start_time, sort_order").eq("contest_id", contest.id);
+  const { data: games } = await sb.from("v2_squares_games").select("id, label, league, start_time, sort_order").eq("contest_id", contest.id);
   const ordered = [...(games ?? [])].sort((a, b) => {
     const ax = a.start_time ?? "9999", bx = b.start_time ?? "9999";
     return ax === bx ? (a.sort_order ?? 0) - (b.sort_order ?? 0) : ax < bx ? -1 : 1;
@@ -64,13 +64,13 @@ async function main() {
     const isRest = i === ordered.length - 1;
     const game_alloc = isRest ? REST_GAME : FIXED_GAME;
     const period_alloc = isRest ? REST_PERIODS[s] : FIXED_PERIODS[s];
-    const { error } = await sb.from("v2_boxes_games").update({ game_alloc, period_alloc }).eq("id", g.id);
+    const { error } = await sb.from("v2_squares_games").update({ game_alloc, period_alloc }).eq("id", g.id);
     if (error) { console.error(`alloc ${g.label}:`, error.message); process.exit(1); }
     console.log(`  ${g.label}: ${isRest ? "REST" : "$80"} (${s})`);
   }
 
   // 4) Fill all 100 squares round-robin across members.
-  const { data: cells } = await sb.from("v2_boxes_cells").select("id, grid_row, grid_col").eq("contest_id", contest.id).order("grid_row").order("grid_col");
+  const { data: cells } = await sb.from("v2_squares_cells").select("id, grid_row, grid_col").eq("contest_id", contest.id).order("grid_row").order("grid_col");
   if (!cells?.length) { console.error("No cells for this pool."); process.exit(1); }
   const now = new Date().toISOString();
   let n = 0;
@@ -78,7 +78,7 @@ async function main() {
     cells.map((c, i) => {
       const uid = userIds[i % userIds.length];
       n++;
-      return sb.from("v2_boxes_cells").update({ user_id: uid, purchased_at: now }).eq("id", c.id);
+      return sb.from("v2_squares_cells").update({ user_id: uid, purchased_at: now }).eq("id", c.id);
     }),
   );
   console.log(`Filled ${n}/${cells.length} squares.`);

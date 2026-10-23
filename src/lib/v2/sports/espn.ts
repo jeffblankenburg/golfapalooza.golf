@@ -7,7 +7,7 @@
  * Endpoint: https://site.api.espn.com/apis/site/v2/sports/{path}/scoreboard
  */
 
-/** How a game is divided for Boxes payouts — NCAA hoops plays two halves; the NBA
+/** How a game is divided for Squares payouts — NCAA hoops plays two halves; the NBA
  *  and both footballs play four quarters. Drives the period presets. */
 export type PeriodStructure = "halves" | "quarters";
 

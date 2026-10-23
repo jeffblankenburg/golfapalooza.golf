@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { v2ServerClient } from "@/lib/v2/supabase";
-import { winningCell, resolvePayouts, computeGamePayoutsFromSlices } from "@/lib/v2/contests/boxes";
-import { buildGameAllocations } from "@/lib/v2/contests/boxes-alloc";
+import { winningCell, resolvePayouts, computeGamePayoutsFromSlices } from "@/lib/v2/contests/squares";
+import { buildGameAllocations } from "@/lib/v2/contests/squares-alloc";
 import { getLeague } from "@/lib/v2/sports/espn";
-import styles from "./BoxesHomeCards.module.css";
+import styles from "./SquaresHomeCards.module.css";
 /* eslint-disable @next/next/no-img-element */
 
 type TeamRef = { abbrev?: string; logo?: string; color?: string } | null;
@@ -71,7 +71,7 @@ const startLabel = (iso: string | null): string => {
 };
 
 /**
- * Home-page Boxes cards (#230). ONE card per pool (never per game — a slate or a
+ * Home-page Squares cards (#230). ONE card per pool (never per game — a slate or a
  * tournament can carry many). While drafting, the card shows the member's claimed
  * count + how many squares are gone. Once numbers are locked, the card features
  * just the game that matters right now — live first, else next up, else most
@@ -79,14 +79,14 @@ const startLabel = (iso: string | null): string => {
  * live, a highlight on any combo that is currently winning (fed by the cached
  * live_score the scores cron writes). The full game list lives on the pool detail.
  */
-export default async function BoxesHomeCards({ orgId, userId, slug }: { orgId: string; userId: string; slug: string }) {
+export default async function SquaresHomeCards({ orgId, userId, slug }: { orgId: string; userId: string; slug: string }) {
   const supabase = await v2ServerClient();
   const { data: contestRows } = await supabase
     .from("v2_contests")
     .select("id, name, config")
     .eq("org_id", orgId)
     .is("event_id", null)
-    .eq("contest_type", "boxes");
+    .eq("contest_type", "squares");
 
   const active = (contestRows ?? []).filter((c) => {
     const phase = (c.config as { phase?: string } | null)?.phase;
@@ -95,9 +95,9 @@ export default async function BoxesHomeCards({ orgId, userId, slug }: { orgId: s
   if (active.length === 0) return null;
 
   const ids = active.map((c) => c.id);
-  const { data: cells } = await supabase.from("v2_boxes_cells").select("contest_id, grid_row, grid_col, user_id").in("contest_id", ids);
+  const { data: cells } = await supabase.from("v2_squares_cells").select("contest_id, grid_row, grid_col, user_id").in("contest_id", ids);
   const { data: gameRows } = await supabase
-    .from("v2_boxes_games")
+    .from("v2_squares_games")
     .select("contest_id, id, label, league, team_row, team_col, row_digits, col_digits, locked_at, start_time, live_score, period_scores, game_alloc, period_alloc, status, sort_order")
     .in("contest_id", ids)
     .order("start_time", { ascending: true, nullsFirst: false })

@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import styles from "./BoxesAdmin.module.css";
+import styles from "./SquaresAdmin.module.css";
 import GameSelectModal from "@/components/v2/sports/GameSelectModal";
 import { parseStake, formatStake } from "@/lib/v2/rounds/stake";
 import { getLeague, type EspnGame } from "@/lib/v2/sports/espn";
-import { PERIOD_PRESETS, resolvePayouts, type Alloc, type GameAllocation } from "@/lib/v2/contests/boxes";
+import { PERIOD_PRESETS, resolvePayouts, type Alloc, type GameAllocation } from "@/lib/v2/contests/squares";
 
 type Structure = "quarters" | "halves";
 const defaultWeights = (s: Structure): Record<string, number> =>
@@ -46,7 +46,7 @@ export interface StoredGame {
   periodAlloc: Record<string, StoredAlloc> | null;
 }
 
-export interface BoxesContestRow {
+export interface SquaresContestRow {
   id: string;
   name: string;
   status: string;
@@ -135,7 +135,7 @@ function toEspnGame(g: StoredGame): EspnGame {
 }
 
 // Seed the per-game ($) and per-period allocation editor maps from a stored contest.
-function seedAllocs(editing: BoxesContestRow | null): { ga: Record<string, EditorAlloc>; pa: Record<string, Record<string, EditorAlloc>> } {
+function seedAllocs(editing: SquaresContestRow | null): { ga: Record<string, EditorAlloc>; pa: Record<string, Record<string, EditorAlloc>> } {
   const ga: Record<string, EditorAlloc> = {};
   const pa: Record<string, Record<string, EditorAlloc>> = {};
   if (!editing) return { ga, pa };
@@ -152,12 +152,12 @@ function seedAllocs(editing: BoxesContestRow | null): { ga: Record<string, Edito
 }
 
 /**
- * The Boxes create/edit modal — scope-agnostic. Mounted by the group hub
- * (BoxesAdmin) and by the event contests admin; `collectionBase` is the contests
+ * The Squares create/edit modal — scope-agnostic. Mounted by the group hub
+ * (SquaresAdmin) and by the event contests admin; `collectionBase` is the contests
  * collection API root (POST to create, PATCH/DELETE `${base}/${id}` to edit). Any
  * aspect of the pool, including the game slate, is editable here at any time.
  */
-export default function BoxesEditor({
+export default function SquaresEditor({
   collectionBase,
   editing,
   eventId = null,
@@ -165,7 +165,7 @@ export default function BoxesEditor({
   onSaved,
 }: {
   collectionBase: string;
-  editing: BoxesContestRow | null; // null = create
+  editing: SquaresContestRow | null; // null = create
   // When set, a newly-created pool is EVENT-scoped (event_id). Omitted/null =
   // group-scoped. Editing an existing pool never changes its scope.
   eventId?: string | null;
@@ -296,7 +296,7 @@ export default function BoxesEditor({
     setSaving(true);
     setErr(null);
     const payload = {
-      ...(editingId ? {} : { contest_type: "boxes", event_id: eventId ?? null }),
+      ...(editingId ? {} : { contest_type: "squares", event_id: eventId ?? null }),
       name: name.trim(),
       cell_cost_cents: Math.round((cost ?? 0) * 100),
       pot_allocation: potAllocation,
@@ -368,7 +368,7 @@ export default function BoxesEditor({
         <div className={styles.overlay} onClick={onClose}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.formHead}>
-              <span className={styles.formTitle}>{editingId ? "Edit Boxes pool" : "New Boxes pool"}</span>
+              <span className={styles.formTitle}>{editingId ? "Edit Squares pool" : "New Squares pool"}</span>
               <button type="button" className={styles.cancel} onClick={onClose}>Cancel</button>
             </div>
 

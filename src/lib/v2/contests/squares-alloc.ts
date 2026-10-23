@@ -1,5 +1,5 @@
 /**
- * Boxes payout allocation bridge (#230). Turns stored game rows into the
+ * Squares payout allocation bridge (#230). Turns stored game rows into the
  * `GameAllocation[]` the flexible engine (resolvePayouts) consumes — preferring
  * each game's explicit `game_alloc` / `period_alloc`, and falling back to the
  * legacy per-structure percentage config (pot_allocation + period_weights) when a
@@ -11,10 +11,10 @@ import {
   type GameAllocation,
   PERIOD_PRESETS,
   gamePotShares,
-} from "./boxes";
+} from "./squares";
 import { getLeague, type PeriodStructure } from "../sports/espn";
 
-export interface BoxesGameLike {
+export interface SquaresGameLike {
   id: string;
   league: string;
   game_alloc?: unknown;
@@ -46,7 +46,7 @@ function structureOf(league: string): PeriodStructure | null {
  * `potCents` is only needed to translate the legacy pot split into per-game
  * `amount`s; flexible games ignore it.
  */
-export function buildGameAllocations(games: BoxesGameLike[], potCents: number, legacy: LegacyPayoutConfig): GameAllocation[] {
+export function buildGameAllocations(games: SquaresGameLike[], potCents: number, legacy: LegacyPayoutConfig): GameAllocation[] {
   // Legacy per-game pot shares (used only when a game has no explicit game_alloc).
   const legacyShares = gamePotShares(games.length, potCents, legacy.potAllocation);
 

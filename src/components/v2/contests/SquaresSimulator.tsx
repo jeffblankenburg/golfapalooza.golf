@@ -1,16 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import styles from "./BoxesSimulator.module.css";
-import BoxesGrid from "./BoxesGrid";
+import styles from "./SquaresSimulator.module.css";
+import SquaresGrid from "./SquaresGrid";
 import {
-  type BoxesGridState,
+  type SquaresGridState,
   cellKey,
   computePeriods,
   drawDigits,
   winningCell,
   PERIOD_PRESETS,
-} from "@/lib/v2/contests/boxes";
+} from "@/lib/v2/contests/squares";
 import { LEAGUES, getLeague } from "@/lib/v2/sports/espn";
 
 const SAMPLE = [
@@ -20,13 +20,13 @@ const SAMPLE = [
 const money = (c: number) => `$${c / 100 % 1 === 0 ? (c / 100).toFixed(0) : (c / 100).toFixed(2)}`;
 
 /**
- * Boxes Simulator (#232 + #230). Drives the grid with local state only — no DB,
+ * Squares Simulator (#232 + #230). Drives the grid with local state only — no DB,
  * no ESPN, no money moved. "Play" a game by bumping the score (watch the winning
  * square move live) and End each period to lock its winner + payout. This is both
  * the admin test harness (verify scoring before real games) and a preview of the
- * live in-game watch experience, running on the exact same pure `boxes.ts` math.
+ * live in-game watch experience, running on the exact same pure `squares.ts` math.
  */
-export default function BoxesSimulator() {
+export default function SquaresSimulator() {
   const [owners, setOwners] = useState<Record<string, string | null>>({});
   const [rowDigits, setRowDigits] = useState<number[]>([]);
   const [colDigits, setColDigits] = useState<number[]>([]);
@@ -38,7 +38,7 @@ export default function BoxesSimulator() {
   const [colScore, setColScore] = useState(0);
   const [finals, setFinals] = useState<Record<string, { rowScore: number; colScore: number }>>({});
 
-  const grid: BoxesGridState = { owners, rowDigits, colDigits };
+  const grid: SquaresGridState = { owners, rowDigits, colDigits };
   const league = getLeague(leagueKey)!;
   const periods = PERIOD_PRESETS[league.periods];
   const potCents = Math.round((parseFloat(potStr) || 0) * 100);
@@ -80,7 +80,7 @@ export default function BoxesSimulator() {
   return (
     <div className={styles.sim}>
       <div className={styles.head}>
-        <h2 className={styles.title}>Boxes Simulator</h2>
+        <h2 className={styles.title}>Squares Simulator</h2>
         <p className={styles.sub}>Verify scoring with any scores — no game, no money. Same math the real contest uses.</p>
       </div>
 
@@ -102,7 +102,7 @@ export default function BoxesSimulator() {
         <span className={styles.hint}>{drawn ? "Tap a square to claim it as “You”." : "Draw digits to assign numbers."}</span>
       </div>
 
-      <BoxesGrid
+      <SquaresGrid
         grid={grid}
         teamRow={{ label: teamRow }}
         teamCol={{ label: teamCol }}

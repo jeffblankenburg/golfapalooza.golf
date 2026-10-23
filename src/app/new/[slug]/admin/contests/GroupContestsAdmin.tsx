@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Modal from "@/app/new/_components/Modal";
-import styles from "./BoxesAdmin.module.css";
-import { resolvePayouts } from "@/lib/v2/contests/boxes";
-import { buildGameAllocations } from "@/lib/v2/contests/boxes-alloc";
-import BoxesEditor, { money, dateLabel, type BoxesContestRow } from "./BoxesEditor";
+import styles from "./SquaresAdmin.module.css";
+import { resolvePayouts } from "@/lib/v2/contests/squares";
+import { buildGameAllocations } from "@/lib/v2/contests/squares-alloc";
+import SquaresEditor, { money, dateLabel, type SquaresContestRow } from "./SquaresEditor";
 import { pickName, type NameMode } from "@/lib/v2/profile";
 
 // One unified list for the group Contests hub — every created pool, any type,
@@ -21,7 +21,7 @@ export interface PickemGamePreview {
   isTiebreaker: boolean;
 }
 export type GroupContestItem =
-  | { kind: "boxes"; id: string; createdAt: string; box: BoxesContestRow }
+  | { kind: "squares"; id: string; createdAt: string; box: SquaresContestRow }
   | {
       kind: "pickem";
       id: string;
@@ -36,7 +36,7 @@ export type GroupContestItem =
 
 // Contest types an admin can create at the group level today.
 const ADDABLE = [
-  { key: "boxes", label: "Boxes pool", blurb: "Squares grid for any games" },
+  { key: "squares", label: "Squares pool", blurb: "Squares grid for any games" },
   { key: "pickem", label: "Pick'em", blurb: "Pick games vs. the spread" },
 ] as const;
 
@@ -60,8 +60,8 @@ function spreadLabel(g: PickemGamePreview): string {
 }
 
 /** The glyph for a contest type — shared by the list badge and the add menu. */
-function ContestTypeIcon({ kind, size = 13 }: { kind: "boxes" | "pickem"; size?: number }) {
-  return kind === "boxes" ? (
+function ContestTypeIcon({ kind, size = 13 }: { kind: "squares" | "pickem"; size?: number }) {
+  return kind === "squares" ? (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
       <rect x="3" y="3" width="18" height="18" rx="2" />
       <path d="M9 3v18M15 3v18M3 9h18M3 15h18" />
@@ -75,11 +75,11 @@ function ContestTypeIcon({ kind, size = 13 }: { kind: "boxes" | "pickem"; size?:
 }
 
 /** Contest-type badge — glyph + label, matching the home-page type tags. */
-function ContestTypeTag({ kind }: { kind: "boxes" | "pickem" }) {
+function ContestTypeTag({ kind }: { kind: "squares" | "pickem" }) {
   return (
     <span className={styles.typeTag}>
       <ContestTypeIcon kind={kind} />
-      {kind === "boxes" ? "Squares" : "Pick'em"}
+      {kind === "squares" ? "Squares" : "Pick'em"}
     </span>
   );
 }
@@ -91,8 +91,8 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
   const adminBase = `/new/${slug}/admin/contests`;
 
   const [menuOpen, setMenuOpen] = useState(false);
-  // undefined = Boxes editor closed; null = creating; a row = editing that pool.
-  const [editing, setEditing] = useState<BoxesContestRow | null | undefined>(undefined);
+  // undefined = Squares editor closed; null = creating; a row = editing that pool.
+  const [editing, setEditing] = useState<SquaresContestRow | null | undefined>(undefined);
   const [pickemOpen, setPickemOpen] = useState(false);
   const [pickemName, setPickemName] = useState("");
   const [settingsFor, setSettingsFor] = useState<PickemItem | null>(null);
@@ -106,18 +106,18 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
       return next;
     });
 
-  // Open the Boxes editor when linked from a pool's manage page (?edit=<id>).
+  // Open the Squares editor when linked from a pool's manage page (?edit=<id>).
   useEffect(() => {
     const editId = searchParams.get("edit");
     if (!editId) return;
-    const it = items.find((x) => x.kind === "boxes" && x.id === editId);
-    if (it && it.kind === "boxes") setEditing(it.box);
+    const it = items.find((x) => x.kind === "squares" && x.id === editId);
+    if (it && it.kind === "squares") setEditing(it.box);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   function pick(kind: string) {
     setMenuOpen(false);
-    if (kind === "boxes") setEditing(null);
+    if (kind === "squares") setEditing(null);
     else if (kind === "pickem") { setPickemName(""); setErr(null); setPickemOpen(true); }
   }
 
@@ -185,7 +185,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
       </div>
 
       {editing !== undefined && (
-        <BoxesEditor collectionBase={collectionBase} editing={editing} onClose={() => setEditing(undefined)} />
+        <SquaresEditor collectionBase={collectionBase} editing={editing} onClose={() => setEditing(undefined)} />
       )}
 
       <Modal open={pickemOpen} title="New Pick'em" onClose={() => setPickemOpen(false)}>
@@ -209,8 +209,8 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
       <div className={styles.list}>
         {items.length === 0 && editing === undefined && <p className={styles.empty}>No contests yet. Add one above.</p>}
         {items.map((it) =>
-          it.kind === "boxes" ? (
-            <BoxesRow key={it.id} c={it.box} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onEdit={() => setEditing(it.box)} />
+          it.kind === "squares" ? (
+            <SquaresRow key={it.id} c={it.box} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onEdit={() => setEditing(it.box)} />
           ) : (
             <PickemRow key={it.id} it={it} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onSettings={() => setSettingsFor(it)} />
           ),
@@ -231,7 +231,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
   );
 }
 
-/** One Pick'em in the list — mirrors BoxesRow: expandable (matchups preview) with
+/** One Pick'em in the list — mirrors SquaresRow: expandable (matchups preview) with
  *  a gear (quick settings) + an arrow to the full manage page. */
 function PickemRow({ it, adminBase, isOpen, onToggle, onSettings }: { it: PickemItem; adminBase: string; isOpen: boolean; onToggle: () => void; onSettings: () => void }) {
   const pot = it.entryCents * it.participantCount;
@@ -358,8 +358,8 @@ function PickemQuickSettings({ orgId, item, currentUserId, nameMode, onClose, on
   );
 }
 
-/** One Boxes pool in the list — expandable (game table) with a gear to edit. */
-function BoxesRow({ c, adminBase, isOpen, onToggle, onEdit }: { c: BoxesContestRow; adminBase: string; isOpen: boolean; onToggle: () => void; onEdit: () => void }) {
+/** One Squares pool in the list — expandable (game table) with a gear to edit. */
+function SquaresRow({ c, adminBase, isOpen, onToggle, onEdit }: { c: SquaresContestRow; adminBase: string; isOpen: boolean; onToggle: () => void; onEdit: () => void }) {
   const cPot = c.cellCostCents * 100;
   const cAlloc = buildGameAllocations(
     c.games.map((g) => ({ id: g.espnEventId, league: g.league, game_alloc: g.gameAlloc, period_alloc: g.periodAlloc })),
@@ -378,7 +378,7 @@ function BoxesRow({ c, adminBase, isOpen, onToggle, onEdit }: { c: BoxesContestR
       <div className={styles.rowHead}>
         <button type="button" className={styles.rowMain} onClick={onToggle} aria-expanded={isOpen}>
           <span className={styles.rowHeadText}>
-            <ContestTypeTag kind="boxes" />
+            <ContestTypeTag kind="squares" />
             <span className={styles.rowName}>{c.name}</span>
             <span className={styles.rowMeta}>{money(c.cellCostCents)}/square, {money(cPot)} pot, {c.status}</span>
             <span className={styles.rowCount}>{c.games.length} game{c.games.length === 1 ? "" : "s"}</span>

@@ -25,7 +25,7 @@ const PHASE_MOVES: Record<string, string> = {
 };
 
 /**
- * Boxes lifecycle (#230). Admin advances the draft phases and triggers the
+ * Squares lifecycle (#230). Admin advances the draft phases and triggers the
  * one-shot number draw. The draw is server-rolled and IRREVERSIBLE: once a game
  * has digits + locked_at, it can't be re-rolled (no fishing for 0/3/7).
  */
@@ -43,7 +43,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
     .eq("id", contestId)
     .eq("org_id", orgId)
     .maybeSingle();
-  if (!contest || contest.contest_type !== "boxes") return NextResponse.json({ error: "Boxes pool not found" }, { status: 404 });
+  if (!contest || contest.contest_type !== "squares") return NextResponse.json({ error: "Squares pool not found" }, { status: 404 });
 
   let body: {
     action?: string;
@@ -81,12 +81,12 @@ export async function POST(request: Request, { params }: { params: Params }) {
   // a week before kickoff — without drawing any numbers yet. Reveals happen
   // per-game after this (scheduled by the cron, or by hand).
   if (action === "lock_board") {
-    const { data: games } = await admin.from("v2_boxes_games").select("id, start_time, reveal_at, locked_at").eq("contest_id", contestId);
+    const { data: games } = await admin.from("v2_squares_games").select("id, start_time, reveal_at, locked_at").eq("contest_id", contestId);
     if (!games || games.length === 0) return NextResponse.json({ error: "No games yet." }, { status: 400 });
     for (const g of games) {
       if (g.reveal_at || g.locked_at || !g.start_time) continue;
       const revealAt = new Date(new Date(g.start_time as string).getTime() - REVEAL_LEAD_DAYS * 86400000).toISOString();
-      await admin.from("v2_boxes_games").update({ reveal_at: revealAt }).eq("id", g.id);
+      await admin.from("v2_squares_games").update({ reveal_at: revealAt }).eq("id", g.id);
     }
     cfg.phase = "locked";
     cfg.board_locked_at = new Date().toISOString();
@@ -100,10 +100,10 @@ export async function POST(request: Request, { params }: { params: Params }) {
   if (action === "schedule_reveal") {
     const gameId = body.gameId;
     if (!gameId) return NextResponse.json({ error: "Missing game." }, { status: 400 });
-    const { data: g } = await admin.from("v2_boxes_games").select("id, locked_at").eq("id", gameId).eq("contest_id", contestId).maybeSingle();
+    const { data: g } = await admin.from("v2_squares_games").select("id, locked_at").eq("id", gameId).eq("contest_id", contestId).maybeSingle();
     if (!g) return NextResponse.json({ error: "Game not found." }, { status: 404 });
     if (g.locked_at) return NextResponse.json({ error: "That game's numbers are already revealed." }, { status: 409 });
-    const { error } = await admin.from("v2_boxes_games").update({ reveal_at: body.revealAt || null }).eq("id", gameId);
+    const { error } = await admin.from("v2_squares_games").update({ reveal_at: body.revealAt || null }).eq("id", gameId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
@@ -113,11 +113,11 @@ export async function POST(request: Request, { params }: { params: Params }) {
   if (action === "reveal_game") {
     const gameId = body.gameId;
     if (!gameId) return NextResponse.json({ error: "Missing game." }, { status: 400 });
-    const { data: g } = await admin.from("v2_boxes_games").select("id, locked_at").eq("id", gameId).eq("contest_id", contestId).maybeSingle();
+    const { data: g } = await admin.from("v2_squares_games").select("id, locked_at").eq("id", gameId).eq("contest_id", contestId).maybeSingle();
     if (!g) return NextResponse.json({ error: "Game not found." }, { status: 404 });
     if (g.locked_at) return NextResponse.json({ error: "Those numbers are already revealed — they can't be re-rolled." }, { status: 409 });
     const now = new Date().toISOString();
-    const { error } = await admin.from("v2_boxes_games").update({ row_digits: drawDigits(), col_digits: drawDigits(), locked_at: now }).eq("id", gameId);
+    const { error } = await admin.from("v2_squares_games").update({ row_digits: drawDigits(), col_digits: drawDigits(), locked_at: now }).eq("id", gameId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!boardLocked) {
       cfg.phase = "locked";
@@ -130,12 +130,12 @@ export async function POST(request: Request, { params }: { params: Params }) {
 
   // Reveal ALL remaining games now (the old all-at-once behavior).
   if (action === "reveal_all" || action === "draw") {
-    const { data: games } = await admin.from("v2_boxes_games").select("id, locked_at").eq("contest_id", contestId);
+    const { data: games } = await admin.from("v2_squares_games").select("id, locked_at").eq("contest_id", contestId);
     if (!games || games.length === 0) return NextResponse.json({ error: "No games to reveal." }, { status: 400 });
     const now = new Date().toISOString();
     for (const g of games) {
       if (g.locked_at) continue; // skip already-revealed (one-shot per game)
-      const { error } = await admin.from("v2_boxes_games").update({ row_digits: drawDigits(), col_digits: drawDigits(), locked_at: now }).eq("id", g.id);
+      const { error } = await admin.from("v2_squares_games").update({ row_digits: drawDigits(), col_digits: drawDigits(), locked_at: now }).eq("id", g.id);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     }
     cfg.phase = "locked";
@@ -174,14 +174,14 @@ export async function POST(request: Request, { params }: { params: Params }) {
         note,
       }));
     if (rows.length === 0) return NextResponse.json({ error: "Missing game." }, { status: 400 });
-    const { error } = await admin.from("v2_boxes_payouts").upsert(rows, { onConflict: "contest_id,user_id,game_id" });
+    const { error } = await admin.from("v2_squares_payouts").upsert(rows, { onConflict: "contest_id,user_id,game_id" });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
   // Unmark one game (gameId given) or every game for a member (no gameId).
   if (action === "unmark_paid") {
     if (!body.userId) return NextResponse.json({ error: "Missing member." }, { status: 400 });
-    let q = admin.from("v2_boxes_payouts").delete().eq("contest_id", contestId).eq("user_id", body.userId);
+    let q = admin.from("v2_squares_payouts").delete().eq("contest_id", contestId).eq("user_id", body.userId);
     if (body.gameId) q = q.eq("game_id", body.gameId);
     const { error } = await q;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

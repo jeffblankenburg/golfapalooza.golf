@@ -4,12 +4,12 @@ import { getLeague, fetchGameScore, periodScoresFromGame } from "@/lib/v2/sports
 
 /**
  * @swagger
- * /api/cron/v2-boxes-scores:
+ * /api/cron/v2-squares-scores:
  *   get:
- *     summary: Poll ESPN for live Boxes games and cache scores
+ *     summary: Poll ESPN for live Squares games and cache scores
  *     tags: [Cron]
  *     description: |
- *       Bearer-authed. Runs every minute but is DATA-GATED: it first finds Boxes
+ *       Bearer-authed. Runs every minute but is DATA-GATED: it first finds Squares
  *       pools whose phase is "locked" (numbers drawn) and only then looks at their
  *       games. A game is polled only when its numbers are set, it isn't final yet,
  *       and its ESPN kickoff has arrived (start_time <= now + 15m; NULL kickoff =
@@ -27,11 +27,11 @@ export async function GET(request: NextRequest) {
 
   const admin = v2AdminClient();
 
-  // 1) Locked Boxes pools only (numbers drawn → a winning square exists).
+  // 1) Locked Squares pools only (numbers drawn → a winning square exists).
   const { data: pools } = await admin
     .from("v2_contests")
     .select("id")
-    .eq("contest_type", "boxes")
+    .eq("contest_type", "squares")
     .eq("config->>phase", "locked");
   const poolIds = (pools ?? []).map((p) => p.id);
   if (poolIds.length === 0) return NextResponse.json({ pools: 0, polled: 0, finalized: 0 });
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
   // 2) Games worth polling: numbers set, not final, kickoff reached.
   const cushion = new Date(Date.now() + 15 * 60 * 1000).toISOString();
   const { data: games } = await admin
-    .from("v2_boxes_games")
+    .from("v2_squares_games")
     .select("id, league, espn_event_id, start_time")
     .in("contest_id", poolIds)
     .neq("status", "final")
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
         detail: s.score.detail,
       };
       const { error } = await admin
-        .from("v2_boxes_games")
+        .from("v2_squares_games")
         .update({ period_scores: periodScoresFromGame(s.score, s.structure), live_score: live, status, updated_at: now })
         .eq("id", s.id);
       if (!error) {

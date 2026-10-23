@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
-import { createBoxesContest, type BoxesGameInput } from "@/lib/v2/contests/boxes-server";
+import { createSquaresContest, type SquaresGameInput } from "@/lib/v2/contests/squares-server";
 import { createPickem } from "@/lib/v2/contests/pickem-server";
 
 type Params = Promise<{ id: string }>;
@@ -9,7 +9,7 @@ type Params = Promise<{ id: string }>;
 /**
  * Group-scoped contests (#231) — contests that belong to the org directly
  * (event_id NULL), available to all members, beside the single active event.
- * Today this creates Boxes pools (#230); other group contest types slot in here.
+ * Today this creates Squares pools (#230); other group contest types slot in here.
  */
 export async function POST(request: Request, { params }: { params: Params }) {
   const { id: orgId } = await params;
@@ -21,7 +21,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
 
   let body: {
     contest_type?: string;
-    event_id?: string | null; // set → event-scoped Boxes pool; omitted → group-scoped
+    event_id?: string | null; // set → event-scoped Squares pool; omitted → group-scoped
     name?: string;
     cell_cost_cents?: number;
     pot_allocation?: string;
@@ -30,7 +30,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
     max_squares_secondary?: number | null;
     primary_ends_at?: string | null;
     secondary_ends_at?: string | null;
-    games?: BoxesGameInput[];
+    games?: SquaresGameInput[];
   };
   try {
     body = await request.json();
@@ -51,8 +51,8 @@ export async function POST(request: Request, { params }: { params: Params }) {
     }
   }
 
-  if (body.contest_type !== "boxes") {
-    return NextResponse.json({ error: "Only boxes and pickem contests are supported here for now" }, { status: 400 });
+  if (body.contest_type !== "squares") {
+    return NextResponse.json({ error: "Only squares and pickem contests are supported here for now" }, { status: 400 });
   }
   const name = (body.name || "").trim();
   if (!name) return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -72,7 +72,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
     body.max_squares_secondary == null ? null : Math.max(1, Math.round(body.max_squares_secondary));
 
   try {
-    const { id } = await createBoxesContest(admin, {
+    const { id } = await createSquaresContest(admin, {
       orgId,
       eventId: typeof body.event_id === "string" ? body.event_id : null,
       name,

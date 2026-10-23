@@ -3,9 +3,9 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import styles from "./BoxesPlay.module.css";
-import BoxesGrid from "@/components/v2/contests/BoxesGrid";
-import { cellKey, winningCell, type BoxesGridState, type Cell } from "@/lib/v2/contests/boxes";
+import styles from "./SquaresPlay.module.css";
+import SquaresGrid from "@/components/v2/contests/SquaresGrid";
+import { cellKey, winningCell, type SquaresGridState, type Cell } from "@/lib/v2/contests/squares";
 
 type TeamRef = { name?: string; abbrev?: string; color?: string; logo?: string } | null;
 export interface PlayGame {
@@ -68,7 +68,7 @@ const PHASE_NOTE: Record<string, string> = {
   final: "This pool is final.",
 };
 
-export default function BoxesPlay({
+export default function SquaresPlay({
   base,
   homeHref,
   name,
@@ -131,7 +131,7 @@ export default function BoxesPlay({
   const claimed = Object.keys(owners).length;
 
   const g = games[sel];
-  const grid: BoxesGridState = { owners, rowDigits: g?.rowDigits ?? [], colDigits: g?.colDigits ?? [] };
+  const grid: SquaresGridState = { owners, rowDigits: g?.rowDigits ?? [], colDigits: g?.colDigits ?? [] };
 
   async function tap(row: number, col: number) {
     if (!buyingOpen) return;
@@ -158,7 +158,7 @@ export default function BoxesPlay({
     setInflight((s) => new Set(s).add(k));
 
     try {
-      const res = await fetch(`${base}/boxes/claim`, {
+      const res = await fetch(`${base}/squares/claim`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: isMine ? "release" : "claim", row, col }),
@@ -220,7 +220,7 @@ export default function BoxesPlay({
         <>
           {/* Drafting: a team-agnostic board (squares are owned once, across every
               game), so no teams/digits here — the games live in the list below. */}
-          <BoxesGrid grid={grid} bare mine={mineSet} avatars={avatars} onCellClick={tap} />
+          <SquaresGrid grid={grid} bare mine={mineSet} avatars={avatars} onCellClick={tap} />
           {peek && <p className={styles.peek}>That&apos;s <strong>{peek}</strong>&apos;s square.</p>}
           <p className={styles.help}>Tap an open square to claim it. Tap one of yours to release it, or someone else&apos;s to see who it is.</p>
 
@@ -272,7 +272,7 @@ export default function BoxesPlay({
                     </span>
                   </div>
                 )}
-                <BoxesGrid
+                <SquaresGrid
                   grid={grid}
                   teamRow={{ label: g.teamRow?.name ?? g.teamRow?.abbrev ?? "Away", sub: "away", color: g.teamRow?.color ?? null, logo: g.teamRow?.logo ?? null }}
                   teamCol={{ label: g.teamCol?.name ?? g.teamCol?.abbrev ?? "Home", sub: "home", color: g.teamCol?.color ?? null, logo: g.teamCol?.logo ?? null }}

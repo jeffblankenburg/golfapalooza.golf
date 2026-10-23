@@ -10,7 +10,7 @@ import type { EspnGame } from "@/lib/v2/sports/espn";
  * Focused ESPN game browser (#230) — a modal around <GamePicker>. Decouples
  * "find games" from "configure the contest": the owning form shows the selected
  * games, this modal does the browsing. Selection is live (onChange), so Done just
- * closes. Reusable by any sports contest (Boxes, bracket, pick'em…).
+ * closes. Reusable by any sports contest (Squares, bracket, pick'em…).
  */
 export default function GameSelectModal({
   value,

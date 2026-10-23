@@ -54,7 +54,7 @@ export default function MasterPayouts({
     setBusy(person.userId);
     setErr(null);
     try {
-      const res = await fetch(`/api/v2/orgs/${orgId}/contests/${contestId}/boxes/action`, {
+      const res = await fetch(`/api/v2/orgs/${orgId}/contests/${contestId}/squares/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, userId: person.userId, ...extra }),

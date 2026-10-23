@@ -1,7 +1,7 @@
-// One-off: backfill v2_boxes_games.start_time from ESPN for games picked before
+// One-off: backfill v2_squares_games.start_time from ESPN for games picked before
 // start_time was threaded through (#230). Reads each game's ESPN summary (which
 // carries the kickoff date) and fills start_time where NULL. Idempotent.
-//   node scripts/backfill-boxes-start-times.mjs
+//   node scripts/backfill-squares-start-times.mjs
 import { readFileSync } from "fs";
 import { createClient } from "@supabase/supabase-js";
 
@@ -25,7 +25,7 @@ const LEAGUE_PATH = {
 
 const sb = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 const { data: games, error } = await sb
-  .from("v2_boxes_games")
+  .from("v2_squares_games")
   .select("id, league, espn_event_id, start_time")
   .is("start_time", null)
   .not("espn_event_id", "is", null);
@@ -43,7 +43,7 @@ for (const g of games ?? []) {
     const data = await res.json();
     const date = data?.header?.competitions?.[0]?.date;
     if (!date) { console.log(`skip ${g.id} (no date)`); continue; }
-    const { error: upErr } = await sb.from("v2_boxes_games").update({ start_time: date }).eq("id", g.id);
+    const { error: upErr } = await sb.from("v2_squares_games").update({ start_time: date }).eq("id", g.id);
     if (upErr) { console.log(`fail ${g.id}: ${upErr.message}`); continue; }
     filled += 1;
     console.log(`set ${g.id} -> ${date}`);

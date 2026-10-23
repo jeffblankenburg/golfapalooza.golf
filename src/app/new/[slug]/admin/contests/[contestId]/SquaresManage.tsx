@@ -3,10 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import styles from "./BoxesManage.module.css";
-import BoxesGrid from "@/components/v2/contests/BoxesGrid";
+import styles from "./SquaresManage.module.css";
+import SquaresGrid from "@/components/v2/contests/SquaresGrid";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
-import type { BoxesGridState, Cell } from "@/lib/v2/contests/boxes";
+import type { SquaresGridState, Cell } from "@/lib/v2/contests/squares";
 
 export interface ManageGame {
   id: string;
@@ -76,7 +76,7 @@ function gameStatus(g: ManageGame): { label: string; tone: string } {
   return { label: "Numbers hidden", tone: "hidden" };
 }
 
-export default function BoxesManage({
+export default function SquaresManage({
   base,
   backHref,
   payoutsHref,
@@ -145,7 +145,7 @@ export default function BoxesManage({
     setBusy(busyKey ?? action);
     setErr(null);
     try {
-      const res = await fetch(`${base}/boxes/action`, {
+      const res = await fetch(`${base}/squares/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, ...extra }),
@@ -253,7 +253,7 @@ export default function BoxesManage({
   function renderGame(g: ManageGame) {
     const isOpen = openGames.has(g.id);
     const st = gameStatus(g);
-    const grid: BoxesGridState = { owners, rowDigits: g.rowDigits, colDigits: g.colDigits };
+    const grid: SquaresGridState = { owners, rowDigits: g.rowDigits, colDigits: g.colDigits };
     const winners = winnersByGame[g.id] ?? [];
     const payouts = payoutsByGame[g.id] ?? [];
     const scored = scoredGameIds.includes(g.id);
@@ -293,7 +293,7 @@ export default function BoxesManage({
                 </span>
               </div>
             )}
-            <BoxesGrid
+            <SquaresGrid
               grid={grid}
               teamRow={{ label: g.teamRow?.name ?? g.teamRow?.abbrev ?? "Away", sub: "away", color: g.teamRow?.color ?? null, logo: g.teamRow?.logo ?? null }}
               teamCol={{ label: g.teamCol?.name ?? g.teamCol?.abbrev ?? "Home", sub: "home", color: g.teamCol?.color ?? null, logo: g.teamCol?.logo ?? null }}

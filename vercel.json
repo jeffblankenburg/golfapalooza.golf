@@ -45,11 +45,11 @@
       "schedule": "* * * * *"
     },
     {
-      "path": "/api/cron/v2-boxes-scores",
+      "path": "/api/cron/v2-squares-scores",
       "schedule": "* * * * *"
     },
     {
-      "path": "/api/cron/v2-boxes-reveal",
+      "path": "/api/cron/v2-squares-reveal",
       "schedule": "* * * * *"
     },
     {

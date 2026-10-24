@@ -114,8 +114,13 @@ Migration (tournament tables + grants/realtime + `bracket` contest_type); `src/l
 - [ ] Buy-in + payouts flow through the existing money model.
 - [ ] `npx tsc --noEmit` + `npx eslint` clean.
 
+## Resolved: dedicated tournament tables (not `v2_matchups`)
+The tournament bracket lives in its own `v2_tournament_*` tables, **not** in #224's `v2_matchups`. Rationale:
+1. **Shared across contests.** One tournament feeds the bracket pool + auction + brocket + survivor at once. `v2_matchups` is contest-scoped (one set of games per contest), so putting the bracket there would duplicate the field/tree/results per contest and let them drift.
+2. **Different shape + lifecycle.** Tournament games carry bracket-tree fields (`next_game_id`, `advances_to_slot`, `region`) and a seeded-team FK that don't belong on an ad-hoc slate row; the tournament has its own `setup→locked→live→final` lifecycle, ESPN-populated, independent of any one contest.
+3. **No cost to sharing.** `v2_matchups` stays contest-scoped for ad-hoc slates (pick'em/parlays/straight); the two meet only at the **gradeable shape** (`external_ref`/`status`/`result`) and the **pick JSONB** (`v2_picks` serves tournament round-by-round picks), bridged by #225's single `gradeGames` helper. So one grader still covers both without merging the tables.
+
 ## Open decisions (design-merit, not scope-cutting)
-- **Tournament games vs `v2_matchups`**: dedicated `v2_tournament_games` (recommended — shared across contests, carries bracket-tree fields `next_game_id`/`advances_to_slot`) vs. extending #224's `v2_matchups` to be tournament-scoped. The recommendation keeps `v2_matchups` contest-scoped for ad-hoc slates and shares a grading helper; confirm before building (touches #224/#225).
 - Shared-tournament lifecycle: who creates/owns/locks the tournament when multiple contests reference it, and what happens to dependents if it's deleted.
 - `upfront` vs `round_by_round` default (recommend upfront).
 - Each league adapter's ESPN bracket endpoint shape (March Madness first).

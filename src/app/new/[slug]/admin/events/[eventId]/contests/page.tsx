@@ -112,9 +112,9 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
     const wid = winnerIdByContest.get(s.id);
     const winner = s.declared_no_winner ? "No winner" : wid ? `Winner: ${winnerName.get(wid) || "set"}` : null;
     const meta = [contestTypeLabel(s.contest_type), hole ? `hole ${hole}` : null, winner].filter(Boolean).join(", ");
-    // Right side: pot total (buy-in × players), else the buy-in, else a player count.
+    // Right side: a useful stat — total pot (buy-in × players), else a player count.
     const pot = buy * players;
-    const right = pot > 0 ? `${money(pot)} pot` : buy > 0 ? `${money(buy)} buy-in` : players > 0 ? `${players} player${players === 1 ? "" : "s"}` : "";
+    const right = pot > 0 ? `${money(pot)} pot` : `${players} player${players === 1 ? "" : "s"}`;
     return { id: s.id, type: s.contest_type, name: s.name, meta, right };
   }
 
@@ -142,18 +142,26 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
       if (buy > 0) facts.push({ label: "Buy-in", value: money(buy) });
     }
 
+    // Buy-in stays in the small meta line (pickem/squares) or the facts — never in the
+    // prominent count badge. The count badge carries a useful stat: total pot, or the
+    // games count for pickem/squares.
+    const isPickSquares = c.contest_type === "pickem" || c.contest_type === "squares";
+    const pot = buy * players;
     const metaParts = isGolfTeam
       ? [when, `${nTeams} team${nTeams === 1 ? "" : "s"}`, `${players} player${players === 1 ? "" : "s"}`]
-      : (c.contest_type === "pickem" || c.contest_type === "squares")
-        ? [games ? `${games} game${games === 1 ? "" : "s"}` : "No games yet", buy > 0 ? `${money(buy)} buy-in` : null]
+      : isPickSquares
+        ? [buy > 0 ? `${money(buy)} buy-in` : "No buy-in"]
         : [when, `${players} player${players === 1 ? "" : "s"}`];
+    const count = isPickSquares
+      ? (games ? `${games} game${games === 1 ? "" : "s"}` : undefined)
+      : pot > 0 ? `${money(pot)} pot` : undefined;
 
     return {
       id: c.id,
       type: c.contest_type,
       name: c.name,
       meta: metaParts.filter(Boolean).join(", "),
-      count: buy > 0 && isGolfTeam ? `${money(buy)} buy-in` : undefined,
+      count,
       needsAttention: needsAttention.has(c.id),
       detailHref: `${base}/${c.id}`,
       facts,

@@ -9,7 +9,8 @@ import { computeSkins } from "@/lib/v2/contests/skins";
 import { fmtTime } from "@/lib/v2/schedule";
 import ContestSettings from "./ContestSettings";
 import SideGames, { type SideGame } from "./SideGames";
-import PickemAdmin from "./PickemAdmin";
+import PickemAdmin, { type Game } from "./PickemAdmin";
+import { listGames } from "@/lib/v2/contests/pickem-server";
 import ContestPayouts from "./ContestPayouts";
 import SquaresManageView, { loadSquaresContestRow } from "../../../../contests/[contestId]/SquaresManageView";
 import SquaresEditLauncher from "../../../../contests/[contestId]/SquaresEditLauncher";
@@ -44,9 +45,10 @@ export default async function ContestDetailPage({ params, searchParams }: { para
 
   // Pick'em has its own admin surface (game slate + results + open/close + money).
   if (contest.contest_type === "pickem") {
-    const [feeMap, { count: enrolled }] = await Promise.all([
+    const [feeMap, { count: enrolled }, pickemGames] = await Promise.all([
       loadBuyInCents(admin, [contestId]),
       admin.from("v2_contest_participants").select("id", { count: "exact", head: true }).eq("contest_id", contestId),
+      listGames(admin, contestId),
     ]);
     return (
       <div className={styles.page}>
@@ -64,6 +66,7 @@ export default async function ContestDetailPage({ params, searchParams }: { para
           initialFeeCents={feeMap.get(contestId) ?? 0}
           initialSplits={(contest.payout_splits as { place: number; kind: string; amount: number }[] | null) ?? []}
           enrolledCount={enrolled ?? 0}
+          initialGames={pickemGames as Game[]}
         />
         <ContestCollector
           base={`/api/v2/orgs/${org.id}/events/${eventId}/contests/${contestId}`}

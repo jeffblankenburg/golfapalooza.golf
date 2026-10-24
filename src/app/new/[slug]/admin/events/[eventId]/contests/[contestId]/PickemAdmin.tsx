@@ -14,7 +14,7 @@ import PayoutSplitsEditor, { ordinal } from "./PayoutSplitsEditor";
 
 const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: cents % 100 === 0 ? 0 : 2, maximumFractionDigits: 2 })}`;
 
-interface Game {
+export interface Game {
   id: string;
   away_team: string; home_team: string;
   away_logo_url: string | null; home_logo_url: string | null;
@@ -72,7 +72,7 @@ function TeamCombobox({ value, onChange, placeholder }: { value: string; onChang
 // Scope-agnostic: the mount supplies `base` (API root for this contest) and
 // `adminBase` (admin URL root). Event mounts pass the event-nested paths; a
 // group mount passes the group paths. The component itself is identical.
-export default function PickemAdmin({ base, playersHref, showMoney = true, showStatus = true, initialStatus, initialFeeCents, initialSplits, enrolledCount }: {
+export default function PickemAdmin({ base, playersHref, showMoney = true, showStatus = true, initialStatus, initialFeeCents, initialSplits, enrolledCount, initialGames = [] }: {
   base: string;
   // Enrollment page link. Event scope has a roster/players page; group scope
   // (opt-in) has none, so it's omitted and the Players block is hidden.
@@ -85,8 +85,9 @@ export default function PickemAdmin({ base, playersHref, showMoney = true, showS
   showStatus?: boolean;
   initialStatus: string;
   initialFeeCents: number; initialSplits: PayoutSplit[]; enrolledCount: number;
+  initialGames?: Game[]; // server-rendered so the slate shows immediately (no fetch flash)
 }) {
-  const [games, setGames] = useState<Game[]>([]);
+  const [games, setGames] = useState<Game[]>(initialGames);
   const [status, setStatus] = useState(initialStatus);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

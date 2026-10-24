@@ -24,6 +24,8 @@ export interface PickemGamePreview {
   scored: boolean;                        // both scores in → completed
   winner: "away" | "home" | null;         // ATS covering side (null = push / unscored)
   pctCorrect: number | null;              // % of pickers who covered, once scored
+  majoritySide: "away" | "home" | null;   // the crowd's pick before the game is scored
+  majorityPct: number | null;             // % of pickers on the majority side
 }
 
 /** Short team label for the compact admin preview: ESPN abbreviation, else full name. */
@@ -33,7 +35,7 @@ function teamShort(g: PickemGamePreview, side: "away" | "home"): string {
   return (abbrev || "").trim() || full;
 }
 export type GroupContestItem =
-  | { kind: "squares"; id: string; createdAt: string; box: SquaresContestRow; results: Record<string, { final: boolean; winner: string | null }> }
+  | { kind: "squares"; id: string; createdAt: string; box: SquaresContestRow }
   | {
       kind: "pickem";
       id: string;
@@ -223,7 +225,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
         {items.length === 0 && editing === undefined && <p className={styles.empty}>No contests yet. Add one above.</p>}
         {items.map((it) =>
           it.kind === "squares" ? (
-            <SquaresRow key={it.id} c={it.box} results={it.results} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onEdit={() => setSquaresSettingsFor(it.box)} />
+            <SquaresRow key={it.id} c={it.box} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onEdit={() => setSquaresSettingsFor(it.box)} />
           ) : (
             <PickemRow key={it.id} it={it} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onSettings={() => setSettingsFor(it)} />
           ),
@@ -304,7 +306,7 @@ function PickemRow({ it, adminBase, isOpen, onToggle, onSettings }: { it: Pickem
                       {" @ "}
                       <span style={{ fontWeight: g.scored && g.winner === "home" ? 800 : undefined }}>{teamWithLine(g, "home")}</span>
                     </td>
-                    <td className={styles.gtPay}>{g.scored ? (g.pctCorrect != null ? `${g.pctCorrect}% correct` : "Final") : ""}</td>
+                    <td className={styles.gtPay}>{g.scored ? (g.pctCorrect != null ? `${g.pctCorrect}%` : "Final") : (g.majoritySide ? `${teamShort(g, g.majoritySide)} ${g.majorityPct}%` : "")}</td>
                   </tr>
                 ))}
               </tbody>
@@ -471,6 +473,12 @@ function SquaresQuickSettings({ orgId, box, currentUserId, nameMode, onClose, on
             <input className={styles.input} style={{ width: "100%", paddingLeft: 26 }} inputMode="decimal" value={costStr} placeholder="0" onChange={(e) => setCostStr(e.target.value.replace(/[^0-9.]/g, ""))} />
           </span>
         </label>
+        <label>
+          <span style={QS_LABEL}>Who&apos;s collecting? (needs Venmo)</span>
+          <select className={styles.selectInput} value={collectedBy} onChange={(e) => setCollectedBy(e.target.value)}>
+            {members.map((m) => <option key={m.user_id} value={m.user_id} disabled={!m.venmo && m.user_id !== collectedBy}>{m.name}{m.venmo ? "" : " (needs Venmo)"}</option>)}
+          </select>
+        </label>
         <div>
           <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.9rem", cursor: canToggleVisibility ? "pointer" : "default", opacity: canToggleVisibility ? 1 : 0.6 }}>
             <input type="checkbox" checked={visible} disabled={!canToggleVisibility || togglingVis} onChange={toggleVisible} />
@@ -478,12 +486,6 @@ function SquaresQuickSettings({ orgId, box, currentUserId, nameMode, onClose, on
           </label>
           {!canToggleVisibility && <p className={styles.capHint} style={{ marginTop: 4 }}>Buying is underway — manage visibility on the pool page.</p>}
         </div>
-        <label>
-          <span style={QS_LABEL}>Who&apos;s collecting? (needs Venmo)</span>
-          <select className={styles.selectInput} value={collectedBy} onChange={(e) => setCollectedBy(e.target.value)}>
-            {members.map((m) => <option key={m.user_id} value={m.user_id} disabled={!m.venmo && m.user_id !== collectedBy}>{m.name}{m.venmo ? "" : " (needs Venmo)"}</option>)}
-          </select>
-        </label>
         <div>
           <span style={QS_LABEL}>Squares per person</span>
           <div className={styles.caps}>
@@ -521,7 +523,7 @@ function SquaresQuickSettings({ orgId, box, currentUserId, nameMode, onClose, on
 }
 
 /** One Squares pool in the list — expandable (game table) with a gear to edit. */
-function SquaresRow({ c, results, adminBase, isOpen, onToggle, onEdit }: { c: SquaresContestRow; results: Record<string, { final: boolean; winner: string | null }>; adminBase: string; isOpen: boolean; onToggle: () => void; onEdit: () => void }) {
+function SquaresRow({ c, adminBase, isOpen, onToggle, onEdit }: { c: SquaresContestRow; adminBase: string; isOpen: boolean; onToggle: () => void; onEdit: () => void }) {
   const cPot = c.cellCostCents * 100;
   const cAlloc = buildGameAllocations(
     c.games.map((g) => ({ id: g.espnEventId, league: g.league, game_alloc: g.gameAlloc, period_alloc: g.periodAlloc })),
@@ -568,26 +570,16 @@ function SquaresRow({ c, results, adminBase, isOpen, onToggle, onEdit }: { c: Sq
           ) : (
             <table className={styles.gameTable}>
               <tbody>
-                {orderedGames.map((g) => {
-                  const res = results[g.espnEventId];
-                  return (
+                {orderedGames.map((g) => (
                   <tr key={g.espnEventId}>
                     <td className={styles.gtWhen}>{g.startTime ? dateLabel(g.startTime) : "TBD"}</td>
-                    <td className={styles.gtGame}>
-                      {g.label || "Game"}
-                      {res?.final && (
-                        <span style={{ marginLeft: 6, fontSize: "0.72rem", fontWeight: 700, color: "#15803d" }}>
-                          {res.winner ? `✓ ${res.winner}` : "Final"}
-                        </span>
-                      )}
-                    </td>
+                    <td className={styles.gtGame}>{g.label || "Game"}</td>
                     <td className={styles.gtPay}>
                       {money(centsByGame.get(g.espnEventId) ?? 0)}
                       {g.espnEventId === restId && <span className={styles.rowRest}>rest</span>}
                     </td>
                   </tr>
-                  );
-                })}
+                ))}
               </tbody>
             </table>
           )}

@@ -4,8 +4,6 @@ import { getPlatformContext } from "@/lib/v2/context";
 import GroupContestsAdmin, { type GroupContestItem } from "./GroupContestsAdmin";
 import { type SquaresContestRow } from "./SquaresEditor";
 import { coveringSide, type PickemGame } from "@/lib/v2/contests/pickem";
-import { winningCell, ownerAt } from "@/lib/v2/contests/squares";
-import { pickName } from "@/lib/v2/profile";
 
 /**
  * Group-level contests — pools that belong to the whole group (event_id NULL),
@@ -34,40 +32,10 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
   const { data: games } = squaresIds.length
     ? await supabase
         .from("v2_squares_games")
-        .select("contest_id, espn_event_id, league, label, team_row, team_col, start_time, game_alloc, period_alloc, sort_order, status, period_scores, row_digits, col_digits")
+        .select("contest_id, espn_event_id, league, label, team_row, team_col, start_time, game_alloc, period_alloc, sort_order")
         .in("contest_id", squaresIds)
         .order("sort_order")
     : { data: [] as Record<string, unknown>[] };
-
-  // Per-game final winner (owner of the final-period winning square) for completed
-  // Squares games — the accordion's "Final" highlight. Owners come from the cells.
-  const { data: squaresCells } = squaresIds.length
-    ? await supabase.from("v2_squares_cells").select("contest_id, grid_row, grid_col, user_id").in("contest_id", squaresIds).not("user_id", "is", null)
-    : { data: [] as { contest_id: string; grid_row: number; grid_col: number; user_id: string }[] };
-  const ownersByContest = new Map<string, Record<string, string>>();
-  for (const cell of squaresCells ?? []) {
-    const m = ownersByContest.get(cell.contest_id as string) ?? {};
-    m[`${cell.grid_row},${cell.grid_col}`] = cell.user_id as string;
-    ownersByContest.set(cell.contest_id as string, m);
-  }
-  const ownerIds = [...new Set((squaresCells ?? []).map((c) => c.user_id as string))];
-  const { data: ownerProfiles } = ownerIds.length
-    ? await supabase.from("v2_profiles").select("id, display_name, first_name, last_name").in("id", ownerIds)
-    : { data: [] as { id: string; display_name: string | null; first_name: string | null; last_name: string | null }[] };
-  const ownerName = new Map((ownerProfiles ?? []).map((p) => [p.id as string, pickName(p, org.name_display)]));
-  // "contestId:espnEventId" → { final, winner } (the same game can live in two pools
-  // with different numbers/cells, so key by contest too).
-  const squaresResult = new Map<string, { final: boolean; winner: string | null }>();
-  for (const g of games ?? []) {
-    const key = `${g.contest_id}:${g.espn_event_id}`;
-    const final = (g.status as string) === "final";
-    if (!final) { squaresResult.set(key, { final: false, winner: null }); continue; }
-    const ps = (g.period_scores as Record<string, { away: number | null; home: number | null } | null> | null)?.Final ?? null;
-    const grid = { owners: ownersByContest.get(g.contest_id as string) ?? {}, rowDigits: (g.row_digits as number[]) ?? [], colDigits: (g.col_digits as number[]) ?? [] };
-    const cell = ps ? winningCell(grid, ps.away, ps.home) : null;
-    const uid = ownerAt(grid, cell);
-    squaresResult.set(key, { final: true, winner: uid ? (ownerName.get(uid) ?? "Member") : null });
-  }
 
   // Pick'em enrichment: matchups (preview), participant count + buy-in (meta).
   const pickemIds = (contests ?? []).filter((c) => c.contest_type === "pickem").map((c) => c.id);
@@ -88,12 +56,11 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
     : { data: [] as { game_id: string; picked_team: string }[] };
   const winnerByGame = new Map<string, "away" | "home" | null>();
   for (const g of pickemGames ?? []) winnerByGame.set(g.id as string, coveringSide(g as unknown as PickemGame));
-  const pickTally = new Map<string, { covered: number; total: number }>();
+  const pickCounts = new Map<string, { away: number; home: number }>();
   for (const p of picks ?? []) {
-    const t = pickTally.get(p.game_id as string) ?? { covered: 0, total: 0 };
-    t.total++;
-    if (p.picked_team === winnerByGame.get(p.game_id as string)) t.covered++;
-    pickTally.set(p.game_id as string, t);
+    const c = pickCounts.get(p.game_id as string) ?? { away: 0, home: 0 };
+    if (p.picked_team === "away") c.away++; else if (p.picked_team === "home") c.home++;
+    pickCounts.set(p.game_id as string, c);
   }
 
   const items: GroupContestItem[] = (contests ?? []).map((c) => {
@@ -107,14 +74,19 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
           .filter((g) => g.contest_id === c.id)
           .map((g) => {
             const scored = g.away_score != null && g.home_score != null;
-            const tally = pickTally.get(g.id as string);
+            const counts = pickCounts.get(g.id as string) ?? { away: 0, home: 0 };
+            const total = counts.away + counts.home;
+            const winner = scored ? (winnerByGame.get(g.id as string) ?? null) : null;
+            const covered = winner === "away" ? counts.away : winner === "home" ? counts.home : 0;
             return {
               awayTeam: g.away_team as string, homeTeam: g.home_team as string,
               awayAbbrev: (g.away_abbrev as string | null) ?? null, homeAbbrev: (g.home_abbrev as string | null) ?? null,
               spread: g.spread as number | null, favorite: (g.favorite as "away" | "home" | null) ?? null,
               gameTime: (g.game_time as string) ?? null, isTiebreaker: !!g.is_tiebreaker,
-              scored, winner: scored ? (winnerByGame.get(g.id as string) ?? null) : null,
-              pctCorrect: scored && tally && tally.total > 0 ? Math.round((tally.covered / tally.total) * 100) : null,
+              scored, winner,
+              pctCorrect: scored && total > 0 ? Math.round((covered / total) * 100) : null,
+              majoritySide: total > 0 ? (counts.away >= counts.home ? ("away" as const) : ("home" as const)) : null,
+              majorityPct: total > 0 ? Math.round((Math.max(counts.away, counts.home) / total) * 100) : null,
             };
           }),
       };
@@ -155,11 +127,7 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
           periodAlloc: (g.period_alloc as SquaresContestRow["games"][number]["periodAlloc"]) ?? null,
         })),
     };
-    const results: Record<string, { final: boolean; winner: string | null }> = {};
-    for (const g of (games ?? []).filter((g) => g.contest_id === c.id)) {
-      results[g.espn_event_id as string] = squaresResult.get(`${c.id}:${g.espn_event_id}`) ?? { final: false, winner: null };
-    }
-    return { kind: "squares", id: c.id as string, createdAt: c.created_at as string, box, results };
+    return { kind: "squares", id: c.id as string, createdAt: c.created_at as string, box };
   });
 
   return <GroupContestsAdmin orgId={org.id} slug={slug} items={items} currentUserId={ctx.userId} nameMode={org.name_display} />;

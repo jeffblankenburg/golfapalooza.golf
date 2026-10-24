@@ -5,8 +5,9 @@ import { getPlatformContext } from "@/lib/v2/context";
 import SquaresManageView, { loadSquaresContestRow } from "./SquaresManageView";
 import SquaresEditor from "../SquaresEditor";
 // Same admin component the event lane uses — mounted here with the group API base.
-import PickemAdmin from "../../events/[eventId]/contests/[contestId]/PickemAdmin";
+import PickemAdmin, { type Game } from "../../events/[eventId]/contests/[contestId]/PickemAdmin";
 import GroupContestMoney from "./GroupContestMoney";
+import { listGames } from "@/lib/v2/contests/pickem-server";
 import { type PayoutSplit } from "@/lib/v2/contests/payouts";
 import styles from "@/app/new/new.module.css";
 
@@ -30,8 +31,10 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
   // Pick'em manage view — the shared PickemAdmin, mounted with the GROUP base.
   // No players link (group Pick'em is opt-in, not a managed roster).
   if (contest.contest_type === "pickem") {
-    const { count: enrolled } = await supabase
-      .from("v2_contest_participants").select("id", { count: "exact", head: true }).eq("contest_id", contestId);
+    const [{ count: enrolled }, pickemGames] = await Promise.all([
+      supabase.from("v2_contest_participants").select("id", { count: "exact", head: true }).eq("contest_id", contestId),
+      listGames(supabase, contestId),
+    ]);
     return (
       <div className={styles.page}>
         <Link href={`/new/${slug}/admin/contests`} className={styles.back}>← Contests</Link>
@@ -44,6 +47,7 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
           initialFeeCents={0}
           initialSplits={(contest.payout_splits as { place: number; kind: string; amount: number }[] | null) ?? []}
           enrolledCount={enrolled ?? 0}
+          initialGames={pickemGames as Game[]}
         />
         <GroupContestMoney
           orgId={org.id}

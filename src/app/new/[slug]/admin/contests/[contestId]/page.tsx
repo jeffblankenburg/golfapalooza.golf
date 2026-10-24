@@ -3,7 +3,9 @@ import { redirect, notFound } from "next/navigation";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
 import SquaresManageView, { loadSquaresContestRow } from "./SquaresManageView";
-import SquaresEditor from "../SquaresEditor";
+import SquaresGamesButton from "./SquaresGamesButton";
+import MasterPayouts from "./payouts/MasterPayouts";
+import { loadMasterPayouts } from "./payouts/loadMasterPayouts";
 // Same admin component the event lane uses — mounted here with the group API base.
 import PickemAdmin, { type Game } from "../../events/[eventId]/contests/[contestId]/PickemAdmin";
 import GroupContestMoney from "./GroupContestMoney";
@@ -61,9 +63,10 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
 
   if (contest.contest_type !== "squares") notFound();
 
-  // Squares manage view (grids / reveals / results / paid) + an inline games & payouts
-  // editor. Basics/collector/visibility live in the gear quick-settings on the list.
+  // Squares manage view (grids / reveals / results / paid) = the single on-page list.
+  // Games + payouts are edited in a modal; the winnings sheet is a bottom collapsible.
   const squaresRow = await loadSquaresContestRow(supabase, contest);
+  const payoutPeople = await loadMasterPayouts(supabase, contestId, (contest.config as Record<string, unknown>) ?? {}, org.name_display);
   return (
     <>
       <SquaresManageView
@@ -76,15 +79,18 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
         nameMode={org.name_display}
       />
       <div className={styles.page} style={{ paddingTop: 0 }}>
-        <p className={styles.sectionLabel}>Games &amp; payouts</p>
-        <SquaresEditor
-          variant="inline"
-          gamesOnly
-          editing={squaresRow}
+        <SquaresGamesButton
+          row={squaresRow}
           collectionBase={`/api/v2/orgs/${org.id}/contests`}
           nameMode={org.name_display}
           currentUserId={ctx.userId}
         />
+        <details style={{ marginTop: 20, border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
+          <summary style={{ padding: "12px 14px", cursor: "pointer", fontWeight: 700 }}>Winnings &amp; payouts</summary>
+          <div style={{ padding: "0 14px 14px" }}>
+            <MasterPayouts orgId={org.id} slug={slug} contestId={contestId} name={contest.name as string} people={payoutPeople} embedded />
+          </div>
+        </details>
       </div>
     </>
   );

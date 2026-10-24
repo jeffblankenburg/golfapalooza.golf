@@ -27,12 +27,14 @@ export default function MasterPayouts({
   contestId,
   name,
   people,
+  embedded = false,
 }: {
   orgId: string;
   slug: string;
   contestId: string;
   name: string;
   people: PayoutPerson[];
+  embedded?: boolean; // inside the detail-page collapsible: no back link / page chrome
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -70,11 +72,15 @@ export default function MasterPayouts({
   }
 
   return (
-    <div className={styles.page}>
-      <div className={styles.topRow}>
-        <Link href={`/new/${slug}/admin/contests/${contestId}`} className={styles.back}>← {name}</Link>
-      </div>
-      <h1 className={styles.title}>Master payouts</h1>
+    <div className={embedded ? undefined : styles.page}>
+      {!embedded && (
+        <>
+          <div className={styles.topRow}>
+            <Link href={`/new/${slug}/admin/contests/${contestId}`} className={styles.back}>← {name}</Link>
+          </div>
+          <h1 className={styles.title}>Master payouts</h1>
+        </>
+      )}
       <div className={styles.summary}>
         <span>Total won <b>{money(totalWon)}</b></span>
         <span>Still owed <b data-owed={totalOwed > 0 || undefined}>{money(totalOwed)}</b></span>

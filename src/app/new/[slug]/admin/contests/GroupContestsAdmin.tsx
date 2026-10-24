@@ -9,6 +9,8 @@ import { resolvePayouts } from "@/lib/v2/contests/squares";
 import { buildGameAllocations } from "@/lib/v2/contests/squares-alloc";
 import SquaresEditor, { money, dateLabel, isoToLocal, localToISO, type SquaresContestRow } from "./SquaresEditor";
 import { pickName, type NameMode } from "@/lib/v2/profile";
+import { computePickemPayouts, type PayoutSplit } from "@/lib/v2/contests/pickem";
+import PayoutSplitsEditor, { ordinal } from "../events/[eventId]/contests/[contestId]/PayoutSplitsEditor";
 
 // One unified list for the group Contests hub — every created pool, any type,
 // in one place (no per-type sections), with a single "Add contest" control.
@@ -44,6 +46,7 @@ export type GroupContestItem =
       status: string;
       entryCents: number;
       collectedBy: string | null;
+      payoutSplits: PayoutSplit[];
       participantCount: number;
       games: PickemGamePreview[];
     };
@@ -326,9 +329,14 @@ function PickemQuickSettings({ orgId, item, currentUserId, nameMode, onClose, on
   const [status, setStatus] = useState(item.status);
   const [fee, setFee] = useState(centsToStr(item.entryCents));
   const [collectedBy, setCollectedBy] = useState(item.collectedBy || currentUserId);
+  const [splits, setSplits] = useState<PayoutSplit[]>(item.payoutSplits || []);
   const [members, setMembers] = useState<{ user_id: string; name: string; venmo: string | null }[]>([]);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  const feeCents = Math.round((Number(fee) || 0) * 100);
+  const pot = feeCents * item.participantCount;
+  const payouts = computePickemPayouts(pot, splits);
 
   useEffect(() => {
     (async () => {
@@ -348,7 +356,7 @@ function PickemQuickSettings({ orgId, item, currentUserId, nameMode, onClose, on
     const res = await fetch(base, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: n, status, entry_cents: Math.round((Number(fee) || 0) * 100), collected_by: collectedBy || null }),
+      body: JSON.stringify({ name: n, status, entry_cents: feeCents, collected_by: collectedBy || null, payout_splits: splits }),
     });
     if (!res.ok) { setErr((await res.json().catch(() => ({}))).error || "Could not save"); setSaving(false); return; }
     onSaved();
@@ -382,6 +390,24 @@ function PickemQuickSettings({ orgId, item, currentUserId, nameMode, onClose, on
             {members.map((m) => <option key={m.user_id} value={m.user_id} disabled={!m.venmo && m.user_id !== collectedBy}>{m.name}{m.venmo ? "" : " (needs Venmo)"}</option>)}
           </select>
         </label>
+        <div>
+          <span style={QS_LABEL}>Payout splits <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(how the pot is divided by place)</span></span>
+          <PayoutSplitsEditor value={splits} onSave={setSplits} />
+          {feeCents > 0 && item.participantCount > 0 && (
+            <p style={{ margin: "6px 0 0", fontSize: "0.78rem", color: "var(--ink-soft)" }}>
+              Pot: {money(feeCents)} × {item.participantCount} in = <strong style={{ color: "var(--brand)" }}>{money(pot)}</strong>
+            </p>
+          )}
+          {feeCents > 0 && payouts.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+              {payouts.map((p) => (
+                <span key={p.place} style={{ fontSize: "0.75rem", fontWeight: 700, padding: "3px 8px", borderRadius: 999, background: "var(--brand-tint, #e8f2ec)", color: "var(--brand, #0a5c36)" }}>
+                  {ordinal(p.place)}: {money(p.amountCents)}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
         {err && <p className={styles.err} style={{ margin: 0 }}>{err}</p>}
         <button type="button" className={styles.create} onClick={() => void save()} disabled={saving || !name.trim()}>
           {saving ? "Saving…" : "Save"}

@@ -3,7 +3,7 @@ import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
 import GroupContestsAdmin, { type GroupContestItem } from "./GroupContestsAdmin";
 import { type SquaresContestRow } from "./SquaresEditor";
-import { coveringSide, type PickemGame } from "@/lib/v2/contests/pickem";
+import { coveringSide, type PickemGame, type PayoutSplit } from "@/lib/v2/contests/pickem";
 
 /**
  * Group-level contests — pools that belong to the whole group (event_id NULL),
@@ -22,7 +22,7 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
   // Every group-scoped contest, any type, newest first — one unified list.
   const { data: contests } = await supabase
     .from("v2_contests")
-    .select("id, name, status, config, contest_type, created_at, collected_by")
+    .select("id, name, status, config, contest_type, created_at, collected_by, payout_splits")
     .eq("org_id", org.id)
     .is("event_id", null)
     .in("contest_type", ["squares", "pickem"])
@@ -69,6 +69,7 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
         kind: "pickem", id: c.id as string, createdAt: c.created_at as string, name: c.name as string, status: c.status as string,
         entryCents: Number((c.config as { entry_cents?: number } | null)?.entry_cents) || 0,
         collectedBy: (c as { collected_by?: string | null }).collected_by ?? null,
+        payoutSplits: ((c as { payout_splits?: unknown }).payout_splits as PayoutSplit[] | null) ?? [],
         participantCount: pickemPartCount.get(c.id as string) || 0,
         games: (pickemGames ?? [])
           .filter((g) => g.contest_id === c.id)

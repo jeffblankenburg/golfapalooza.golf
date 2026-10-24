@@ -9,9 +9,7 @@ import MasterPayouts from "./payouts/MasterPayouts";
 import { loadMasterPayouts } from "./payouts/loadMasterPayouts";
 // Same admin component the event lane uses — mounted here with the group API base.
 import PickemAdmin, { type Game } from "../../events/[eventId]/contests/[contestId]/PickemAdmin";
-import GroupContestMoney from "./GroupContestMoney";
 import { listGames } from "@/lib/v2/contests/pickem-server";
-import { type PayoutSplit } from "@/lib/v2/contests/payouts";
 import styles from "@/app/new/new.module.css";
 
 export default async function SquaresDetailPage({ params }: { params: Promise<{ slug: string; contestId: string }> }) {
@@ -51,12 +49,6 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
           initialSplits={(contest.payout_splits as { place: number; kind: string; amount: number }[] | null) ?? []}
           enrolledCount={enrolled ?? 0}
           initialGames={pickemGames as Game[]}
-        />
-        <GroupContestMoney
-          orgId={org.id}
-          contestId={contestId}
-          initialEntryCents={Number((contest.config as { entry_cents?: number } | null)?.entry_cents) || 0}
-          initialSplits={(contest.payout_splits as PayoutSplit[] | null) ?? []}
         />
         <ContestEntryPaid orgId={org.id} contestId={contestId} title="Who's paid their entry" emptyText="No one's entered yet." />
       </div>

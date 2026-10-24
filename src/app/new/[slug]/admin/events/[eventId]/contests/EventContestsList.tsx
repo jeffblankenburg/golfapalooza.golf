@@ -81,7 +81,7 @@ export default function EventContestsList({
           kind={c.type}
           name={c.name}
           meta={c.meta}
-          rightStat={c.count}
+          count={c.count}
           detailHref={c.detailHref}
           onGear={() => setGearFor(c.id)}
           isOpen={isOpen}
@@ -103,6 +103,10 @@ export default function EventContestsList({
           )}
           {c.sides.length > 0 && (
             <div>
+              <div className={cardStyles.sideHead}>
+                <span>Contest type</span>
+                <span>Players</span>
+              </div>
               {c.sides.map((s) => (
                 <div key={s.id} className={cardStyles.sideRow}>
                   <span className={cardStyles.sideMain}>
@@ -145,16 +149,8 @@ export default function EventContestsList({
     );
   }
 
-  const header = (
-    <div className={cardStyles.listHead}>
-      <span className={cardStyles.listHeadType}>Contest type</span>
-      <span className={cardStyles.listHeadStat}>Players</span>
-    </div>
-  );
-
   return (
     <>
-      {days.length > 0 && header}
       {days.map((d) => (
         <div key={d.day} className={styles.contestDay}>
           <div className={styles.schedDateHead}>{d.label}</div>
@@ -164,12 +160,9 @@ export default function EventContestsList({
         </div>
       ))}
       {eventWide.length > 0 && (
-        <>
-          {header}
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
-            {eventWide.map(renderCard)}
-          </div>
-        </>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
+          {eventWide.map(renderCard)}
+        </div>
       )}
     </>
   );

@@ -149,7 +149,7 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
       : isPickSquares
         ? [buy > 0 ? `${money(buy)} buy-in` : "No buy-in"]
         : [when, buy > 0 ? `${money(buy)} buy-in` : null];
-    const count = String(players); // bare number; the "Players" column header labels it
+    const count = `${players} player${players === 1 ? "" : "s"}`;
 
     return {
       id: c.id,

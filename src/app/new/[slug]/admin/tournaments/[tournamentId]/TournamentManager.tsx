@@ -87,8 +87,8 @@ export default function TournamentManager({
         </p>
       )}
 
-      {!generated ? (
-        <div style={{ marginTop: 16 }}>
+      <div style={{ marginTop: 16 }}>
+          {generated && <p className={styles.roundFormHint} style={{ marginTop: 0 }}>Changing the field below rebuilds the bracket. Use <strong>Regenerate</strong> if teams show as TBD.</p>}
           {canImportEspn && (
             <div style={{ marginBottom: 18, padding: 12, border: "1px solid var(--line)", borderRadius: 10 }}>
               <p className={styles.sectionLabel} style={{ marginTop: 0 }}>Import field from ESPN</p>
@@ -121,14 +121,15 @@ export default function TournamentManager({
           <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
             <button type="button" className={styles.createBtnGhost} disabled={busy || parsed.length === 0}
               onClick={() => void act({ action: "set_field", teams: parsed })}>Save field</button>
-            <button type="button" className={styles.create} disabled={busy || regions.length !== 4 || teams.length === 0}
-              onClick={() => void act({ action: "generate" })} title={regions.length !== 4 ? "Need exactly 4 regions" : teams.length === 0 ? "Save the field first" : ""}>
-              Generate bracket
+            <button type="button" className={styles.create} disabled={busy || regions.length !== 4}
+              onClick={() => void act({ action: "generate" })} title={regions.length !== 4 ? "Need exactly 4 regions" : ""}>
+              {generated ? "Regenerate bracket" : "Generate bracket"}
             </button>
           </div>
-        </div>
-      ) : (
-        <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 18 }}>
+      </div>
+
+      {generated && (
+        <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 18 }}>
           {err && <p className={styles.err} style={{ margin: 0 }}>{err}</p>}
           {rounds.map((round) => (
             <div key={round}>

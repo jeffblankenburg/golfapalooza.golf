@@ -26,16 +26,25 @@ export async function POST(request: Request, { params }: { params: Params }) {
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid body" }, { status: 400 }); }
 
   try {
+    // Re-wire a generated bracket after the field changes — otherwise replacing the
+    // teams (delete + re-insert) would null the games' team FKs (ON DELETE SET NULL).
+    const resyncBracket = async () => {
+      const { count } = await admin.from("v2_tournament_games").select("id", { count: "exact", head: true }).eq("tournament_id", tournamentId);
+      if (count && count > 0) await generateStructure(admin, tournamentId);
+    };
+
     if (body.action === "import_espn") {
       const dates = (body.dates ?? []).filter((d) => /^\d{8}$/.test(d));
       if (!dates.length) return NextResponse.json({ error: "Round-1 date(s) required (YYYYMMDD)" }, { status: 400 });
       const field = await fetchBracketField(t.sport as string, dates);
       if (!field.length) return NextResponse.json({ error: "ESPN returned no Round-1 teams for those dates. Check the dates." }, { status: 422 });
       await setTournamentField(admin, tournamentId, field);
+      await resyncBracket();
       return NextResponse.json({ ok: true, imported: field.length });
     }
     if (body.action === "set_field") {
       await setTournamentField(admin, tournamentId, body.teams ?? []);
+      await resyncBracket();
       return NextResponse.json({ ok: true });
     }
     if (body.action === "generate") {

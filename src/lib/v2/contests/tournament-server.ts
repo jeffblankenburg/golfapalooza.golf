@@ -87,7 +87,7 @@ export async function setTournamentField(admin: SupabaseClient, tournamentId: st
  * slot. Locks the tournament. Requires exactly 4 regions (March Madness shape).
  */
 export async function generateStructure(admin: SupabaseClient, tournamentId: string): Promise<{ games: number }> {
-  const { data: teamRows } = await admin.from("v2_tournament_teams").select("id, seed, region").eq("tournament_id", tournamentId);
+  const { data: teamRows } = await admin.from("v2_tournament_teams").select("id, seed, region").eq("tournament_id", tournamentId).order("region").order("seed");
   const teams = (teamRows ?? []) as { id: string; seed: number; region: string | null }[];
   const regions = [...new Set(teams.map((t) => t.region).filter((r): r is string => !!r))];
   if (regions.length !== 4) throw new Error(`A standard bracket needs exactly 4 regions (found ${regions.length}).`);

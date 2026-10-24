@@ -12,6 +12,7 @@ const KINDS = [
   { key: "hundred_feet", label: "100 Feet!", blurb: "Cumulative distance, hole 18" },
   { key: "pickem", label: "Pick'em", blurb: "Pick games vs. the spread" },
   { key: "squares", label: "Squares", blurb: "Squares pool for any games" },
+  { key: "auction", label: "Auction", blurb: "Bid on a tournament's teams" },
   { key: "other", label: "Other", blurb: "A custom event-wide contest" },
 ];
 

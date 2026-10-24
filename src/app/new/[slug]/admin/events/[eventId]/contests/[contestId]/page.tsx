@@ -13,6 +13,8 @@ import PickemAdmin, { type Game } from "./PickemAdmin";
 import { listGames } from "@/lib/v2/contests/pickem-server";
 import ContestPayouts from "./ContestPayouts";
 import SquaresManageView, { loadSquaresContestRow } from "../../../../contests/[contestId]/SquaresManageView";
+import AuctionManager from "../../../../contests/[contestId]/AuctionManager";
+import { loadAuction } from "@/lib/v2/contests/auction-server";
 import SquaresEditLauncher from "../../../../contests/[contestId]/SquaresEditLauncher";
 import ContestParticipants from "@/components/v2/contests/ContestParticipants";
 import ContestCollector from "@/components/v2/contests/ContestCollector";
@@ -77,6 +79,24 @@ export default async function ContestDetailPage({ params, searchParams }: { para
         />
         <ContestParticipants apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`} />
       </div>
+    );
+  }
+
+  // Auction reuses the scope-agnostic recorder + routes (keyed by contestId), so an
+  // event-scoped auction drives off the same /contests/{id}/... base as a group one.
+  if (contest.contest_type === "auction") {
+    const [state, { data: tournaments }] = await Promise.all([
+      loadAuction(admin, contestId),
+      admin.from("v2_tournaments").select("id, name").eq("org_id", org.id).order("created_at", { ascending: false }),
+    ]);
+    if (!state) redirect(`/new/${slug}/admin/events/${eventId}/contests`);
+    return (
+      <AuctionManager
+        slug={slug}
+        apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`}
+        state={state}
+        tournaments={tournaments ?? []}
+      />
     );
   }
 

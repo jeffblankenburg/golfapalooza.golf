@@ -8,6 +8,7 @@ import PickemAdmin from "../../events/[eventId]/contests/[contestId]/PickemAdmin
 import ContestParticipants from "@/components/v2/contests/ContestParticipants";
 import ContestCollector from "@/components/v2/contests/ContestCollector";
 import GroupContestMoney from "./GroupContestMoney";
+import { type PayoutSplit } from "@/lib/v2/contests/payouts";
 import styles from "@/app/new/new.module.css";
 
 export default async function SquaresDetailPage({ params }: { params: Promise<{ slug: string; contestId: string }> }) {
@@ -51,6 +52,7 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
           nameMode={org.name_display}
           initialEntryCents={Number((contest.config as { entry_cents?: number } | null)?.entry_cents) || 0}
           initialCollectedBy={(contest.collected_by as string | null) ?? null}
+          initialSplits={(contest.payout_splits as PayoutSplit[] | null) ?? []}
         />
         <ContestParticipants apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`} />
       </div>

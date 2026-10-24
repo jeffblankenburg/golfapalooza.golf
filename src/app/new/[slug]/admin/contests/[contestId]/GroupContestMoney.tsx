@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { pickName, type NameMode } from "@/lib/v2/profile";
+import { computePickemPayouts, type PayoutSplit } from "@/lib/v2/contests/pickem";
+import PayoutSplitsEditor, { ordinal } from "../../events/[eventId]/contests/[contestId]/PayoutSplitsEditor";
 import styles from "@/app/new/new.module.css";
 
 /**
- * Money for a GROUP (event-less) contest — the buy-in + who collects it + a
- * mark-paid roster. The buy-in is DERIVED (config.entry_cents) so it flows into
- * members' "My Money" attributed to the collector; only payments are stored. The
- * collector must have a Venmo handle so members can settle up.
+ * Money for a GROUP (event-less) contest — the buy-in, who collects it, how the pot
+ * pays out (place-based splits), and a mark-paid roster. The buy-in is DERIVED
+ * (config.entry_cents) so it flows into members' "My Money" attributed to the
+ * collector; only payments are stored. The collector must have a Venmo handle so
+ * members can settle up.
  */
 interface MemberOpt { user_id: string; name: string; venmo: string | null }
 interface RosterRow { userId: string; name: string; paidCents: number }
@@ -25,6 +28,7 @@ export default function GroupContestMoney({
   nameMode,
   initialEntryCents,
   initialCollectedBy,
+  initialSplits,
 }: {
   orgId: string;
   contestId: string;
@@ -32,9 +36,11 @@ export default function GroupContestMoney({
   nameMode: NameMode;
   initialEntryCents: number;
   initialCollectedBy: string | null;
+  initialSplits: PayoutSplit[];
 }) {
   const base = `/api/v2/orgs/${orgId}/contests/${contestId}`;
   const [fee, setFee] = useState(initialEntryCents ? String(initialEntryCents / 100) : "");
+  const [splits, setSplits] = useState<PayoutSplit[]>(initialSplits || []);
   // Default the collector to whoever's setting it up (the active admin) rather than
   // an abstract "creator" choice — they can reassign it.
   const [collectedBy, setCollectedBy] = useState(initialCollectedBy || currentUserId);
@@ -83,8 +89,14 @@ export default function GroupContestMoney({
     } finally { setBusy(null); }
   }
 
+  function saveSplits(next: PayoutSplit[]) {
+    setSplits(next);
+    void patch({ payout_splits: next });
+  }
+
   const pot = entryCents * roster.length;
   const collectorVenmo = members.find((m) => m.user_id === collectedBy)?.venmo;
+  const payouts = computePickemPayouts(pot, splits);
 
   return (
     <div style={{ marginTop: 20 }}>
@@ -104,12 +116,22 @@ export default function GroupContestMoney({
 
       <div className={styles.field}>
         <label className={styles.label}>Who&apos;s collecting? <span className={styles.optional}>(needs Venmo)</span></label>
-        <select className={styles.roleSelect} value={collectedBy}
+        <select className={styles.selectInput} value={collectedBy}
           onChange={(e) => { setCollectedBy(e.target.value); patch({ collected_by: e.target.value || null }).then(loadRoster); }}>
           {members.map((m) => <option key={m.user_id} value={m.user_id} disabled={!m.venmo && m.user_id !== collectedBy}>{m.name}{m.venmo ? "" : " (needs Venmo)"}</option>)}
         </select>
         {entryCents > 0 && collectedBy && !collectorVenmo && (
           <p className={styles.formError} style={{ marginTop: 4 }}>This collector has no Venmo on file — members won&apos;t get a pay button.</p>
+        )}
+      </div>
+
+      <div className={styles.field}>
+        <label className={styles.label}>Payout splits <span className={styles.optional}>(how the pot is divided by place)</span></label>
+        <PayoutSplitsEditor value={splits} onSave={saveSplits} />
+        {entryCents > 0 && payouts.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+            {payouts.map((p) => <span key={p.place} className={styles.roleBadge}>{ordinal(p.place)}: {money(p.amountCents)}</span>)}
+          </div>
         )}
       </div>
 

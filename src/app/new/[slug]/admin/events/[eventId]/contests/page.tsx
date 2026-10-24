@@ -107,13 +107,13 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
 
   function sideRow(s: Contest): SideRow {
     const hole = s.holes && s.holes.length ? s.holes[0] : null;
+    const buy = buyIns.get(s.id) || 0;
     const players = partCount.get(s.id) || 0;
     const wid = winnerIdByContest.get(s.id);
     const winner = s.declared_no_winner ? "No winner" : wid ? `Winner: ${winnerName.get(wid) || "set"}` : null;
     const meta = [contestTypeLabel(s.contest_type), hole ? `hole ${hole}` : null, winner].filter(Boolean).join(", ");
-    // Right side: the participant count (bare number, consistent with the card badge).
-    const right = String(players);
-    return { id: s.id, type: s.contest_type, name: s.name, meta, right };
+    const pot = buy * players;
+    return { id: s.id, type: s.contest_type, name: s.name, meta, pot: pot > 0 ? money(pot) : "", players: String(players) };
   }
 
   function toCard(c: Contest): EventCard {

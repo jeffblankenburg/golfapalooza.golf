@@ -15,7 +15,8 @@ export interface SideRow {
   type: string;
   name: string;
   meta: string; // e.g. "Skins (net), hole 7" (+ winner when set)
-  right: string; // pot total or participant count, shown on the right
+  pot: string; // total pot (money), or "" when there's no buy-in
+  players: string; // participant count (bare number)
 }
 
 /** Everything a card needs, normalized server-side (lane-agnostic). */
@@ -105,6 +106,7 @@ export default function EventContestsList({
             <div>
               <div className={cardStyles.sideHead}>
                 <span>Contest type</span>
+                <span>Pot</span>
                 <span>Players</span>
               </div>
               {c.sides.map((s) => (
@@ -113,7 +115,8 @@ export default function EventContestsList({
                     <span className={cardStyles.sideName}>{s.name}</span>
                     <span className={cardStyles.sideMeta}>{s.meta}</span>
                   </span>
-                  {s.right && <span className={cardStyles.sideRight}>{s.right}</span>}
+                  <span className={cardStyles.sideVal}>{s.pot}</span>
+                  <span className={cardStyles.sideVal}>{s.players}</span>
                 </div>
               ))}
             </div>

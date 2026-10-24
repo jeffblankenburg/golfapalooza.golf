@@ -9,7 +9,7 @@ The v2 contest spine is **already sport-agnostic**. `v2_contests` + `v2_contest_
 ## What already maps (reuse, near-free)
 
 - **Daily Pick'em (ATS)** → we already have `v2_pickem_games`/`v2_pickem_picks` + `src/lib/v2/contests/pickem.ts`. Bromadness's daily pick'em is that + multi-day + sessions + a tiebreaker game. **Extend, don't rebuild.**
-- **Auction (salary-cap draft, seed-based scoring)** → a **Calcutta variant** (we already have Calcutta). Map onto/extend it.
+- **Auction (salary-cap draft, seed-based scoring)** → a **standalone contest type** (NOT Calcutta — that's a separate golf-player auction). The third group/event contest type beside Squares + Pick'em. See #227.
 - **Money**: buy-in via cost_items/Options, winners via `v2_contest_winners`, `computePlacePayouts`, ledger — reusable by every contest here.
 - **Participants / roster sync / exclusions**, the **admin UI shell** (ContestSettings, PayoutSplitsEditor, type-branched detail page), and the **cron pattern** (`v2-feature-open` atomic-claim) — all reusable.
 
@@ -20,7 +20,7 @@ The v2 contest spine is **already sport-agnostic**. `v2_contests` + `v2_contest_
 | Daily Pick'em (ATS, sessions, tiebreaker) | extend `v2_pickem` | multi-day + session split + tiebreaker game | Low |
 | Standard bracket pool | new bracket family | bracket structure, round-weighted scoring, round locks | High |
 | Brocket (Round 1 only) | bracket subset | scope to round 1 | Low (after bracket) |
-| Auction / salary-cap | extend Calcutta | seed-based scoring, salary cap, live bidding | Medium |
+| Auction / salary-cap | new standalone type (3rd contest) | entity auction, salary cap, draft-order recorder, seed-based scoring | Medium |
 | Parlays (4-leg spread/OU, 8:1) | pick-types on the slate | spread+OU pick types, leg validation, fixed-odds payout | Medium |
 | Props / over-unders | pick-types on the slate | market definitions | Medium |
 | Survivor / elimination | new type | alive/eliminated state, elimination grading | Medium |
@@ -48,7 +48,7 @@ Confidence pools, head-to-head matchup bets, player props, generic trip predicti
 - **Phase 1 — Generalize the slate**: reusable matchup/pick substrate; ship straight-up pick contests for any sport. Low lift, immediate payoff.
 - **Phase 2 — ESPN ingestion + auto-grading cron**: reuse boxscore.email patterns. One provider, scheduled grading, standings re-rank, notifications.
 - **Phase 3 — Bracket family**: structure + round scoring → bracket pool + brocket.
-- **Phase 4 — Auction as a Calcutta variant**: seed scoring, salary cap.
+- **Phase 4 — Auction (standalone 3rd contest type)**: entity auction + draft-order recorder; seed-based scoring + salary cap. Draft ships without brackets; scoring rides results.
 - **Phase 5 — Parlays / props**: needs the house/bankroll model.
 - **Phase 6 — Survivor + custom user brackets.**
 
@@ -74,7 +74,7 @@ These are **group-scoped** (org-level), **available to all members**, and **even
 - [ ] #224 — Phase 1: generalize the pick substrate (slate + picks) *(foundation)*
 - [ ] #225 — Phase 2: ESPN ingestion + auto-grading cron
 - [ ] #226 — Phase 3: bracket pool (flagship, first ship)
-- [ ] #227 — Phase 4: auction / salary-cap draft (Calcutta variant)
+- [ ] #227 — Auction: standalone group/event contest (third type, bromadness NCAA auction)
 - [ ] #228 — Phase 5: parlays + props (real-money house/bankroll)
 - [ ] #229 — Phase 6: survivor + custom user-made brackets
 - [ ] #230 — Boxes / Squares (10x10 grid, per-period payouts) *(pick-free; needs only #225)*

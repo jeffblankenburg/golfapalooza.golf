@@ -28,12 +28,14 @@ export type GroupContestItem =
       lockMode: "slate" | "per_game";
       participantCount: number;
       games: PickemGamePreview[];
-    };
+    }
+  | { kind: "auction"; id: string; createdAt: string; name: string; status: string; tournamentName: string | null; participantCount: number; complete: boolean };
 
 // Contest types an admin can create at the group level today.
 const ADDABLE = [
   { key: "squares", label: "Squares pool", blurb: "Squares grid for any games" },
   { key: "pickem", label: "Pick'em", blurb: "Pick games vs. the spread" },
+  { key: "auction", label: "Auction", blurb: "Bid on a tournament's teams" },
 ] as const;
 
 type PickemItem = Extract<GroupContestItem, { kind: "pickem" }>;
@@ -55,6 +57,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
   // undefined = Squares editor closed; null = creating; a row = editing that pool.
   const [editing, setEditing] = useState<SquaresContestRow | null | undefined>(undefined);
   const [pickemOpen, setPickemOpen] = useState(false);
+  const [nameKind, setNameKind] = useState<"pickem" | "auction">("pickem");
   const [pickemName, setPickemName] = useState("");
   const [settingsFor, setSettingsFor] = useState<PickemItem | null>(null);
   const [squaresSettingsFor, setSquaresSettingsFor] = useState<SquaresContestRow | null>(null);
@@ -80,7 +83,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
   function pick(kind: string) {
     setMenuOpen(false);
     if (kind === "squares") setEditing(null);
-    else if (kind === "pickem") { setPickemName(""); setErr(null); setPickemOpen(true); }
+    else if (kind === "pickem" || kind === "auction") { setNameKind(kind); setPickemName(""); setErr(null); setPickemOpen(true); }
   }
 
   async function createPickem() {
@@ -92,7 +95,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
       const res = await fetch(collectionBase, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contest_type: "pickem", name: n }),
+        body: JSON.stringify({ contest_type: nameKind, name: n }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) { setErr(d.error || "Could not create."); setSaving(false); return; }
@@ -150,7 +153,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
         <SquaresEditor collectionBase={collectionBase} editing={null} nameMode={nameMode} currentUserId={currentUserId} onClose={() => setEditing(undefined)} />
       )}
 
-      <Modal open={pickemOpen} title="New Pick'em" onClose={() => setPickemOpen(false)}>
+      <Modal open={pickemOpen} title={nameKind === "auction" ? "New Auction" : "New Pick'em"} onClose={() => setPickemOpen(false)}>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <input
             className={styles.input}
@@ -159,7 +162,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
             autoFocus
             onChange={(e) => setPickemName(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") void createPickem(); }}
-            placeholder="e.g. Bowl Week Pick'em"
+            placeholder={nameKind === "auction" ? "e.g. March Madness Auction" : "e.g. Bowl Week Pick'em"}
           />
           {err && <p className={styles.err} style={{ margin: 0 }}>{err}</p>}
           <button type="button" className={styles.create} onClick={() => void createPickem()} disabled={saving || !pickemName.trim()}>
@@ -173,6 +176,12 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
         {items.map((it) =>
           it.kind === "squares" ? (
             <SquaresRow key={it.id} c={it.box} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onEdit={() => setSquaresSettingsFor(it.box)} />
+          ) : it.kind === "auction" ? (
+            <ContestCard key={it.id} kind="auction" name={it.name}
+              meta={[it.tournamentName || "No tournament", it.complete ? "complete" : statusLabel(it.status)].join(", ")}
+              count={`${it.participantCount} player${it.participantCount === 1 ? "" : "s"}`}
+              detailHref={`${adminBase}/${it.id}`} detailLabel="Open auction"
+              isOpen={false} onToggle={() => router.push(`${adminBase}/${it.id}`)} />
           ) : (
             <PickemRow key={it.id} it={it} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onSettings={() => setSettingsFor(it)} />
           ),

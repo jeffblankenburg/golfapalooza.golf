@@ -49,7 +49,27 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
   const pickemPartCount = new Map<string, number>();
   for (const p of pickemParts ?? []) pickemPartCount.set(p.contest_id as string, (pickemPartCount.get(p.contest_id as string) || 0) + 1);
 
+  // Auction enrichment: participant count + bound tournament name.
+  const auctionIds = (contests ?? []).filter((c) => c.contest_type === "auction").map((c) => c.id);
+  const tournamentIds = [...new Set((contests ?? []).filter((c) => c.contest_type === "auction").map((c) => (c.config as { tournament_id?: string } | null)?.tournament_id).filter((x): x is string => !!x))];
+  const [{ data: auctionParts }, { data: tourneys }] = await Promise.all([
+    auctionIds.length ? supabase.from("v2_contest_participants").select("contest_id").in("contest_id", auctionIds) : Promise.resolve({ data: [] as { contest_id: string }[] }),
+    tournamentIds.length ? supabase.from("v2_tournaments").select("id, name").in("id", tournamentIds) : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ]);
+  const auctionPartCount = new Map<string, number>();
+  for (const p of auctionParts ?? []) auctionPartCount.set(p.contest_id as string, (auctionPartCount.get(p.contest_id as string) || 0) + 1);
+  const tournamentName = new Map((tourneys ?? []).map((t) => [t.id as string, t.name as string]));
+
   const items: GroupContestItem[] = (contests ?? []).map((c) => {
+    if (c.contest_type === "auction") {
+      const tid = (c.config as { tournament_id?: string } | null)?.tournament_id;
+      return {
+        kind: "auction", id: c.id as string, createdAt: c.created_at as string, name: c.name as string, status: c.status as string,
+        tournamentName: tid ? tournamentName.get(tid) ?? null : null,
+        participantCount: auctionPartCount.get(c.id as string) || 0,
+        complete: (c.config as { auction_complete?: boolean } | null)?.auction_complete === true,
+      };
+    }
     if (c.contest_type === "pickem") {
       return {
         kind: "pickem", id: c.id as string, createdAt: c.created_at as string, name: c.name as string, status: c.status as string,

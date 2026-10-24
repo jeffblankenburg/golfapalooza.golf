@@ -51,8 +51,21 @@ export async function POST(request: Request, { params }: { params: Params }) {
     }
   }
 
+  // Auction: a bare contest to start; the admin binds a tournament + settings + runs the
+  // draft on the manage page.
+  if (body.contest_type === "auction") {
+    const auctionName = (body.name || "").trim();
+    if (!auctionName) return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    const { data, error } = await admin.from("v2_contests").insert({
+      org_id: orgId, event_id: null, contest_type: "auction", name: auctionName,
+      scoring_source: "manual", status: "draft", auto_enroll: false, created_by: userId,
+    }).select("id").single();
+    if (error || !data) return NextResponse.json({ error: error?.message ?? "Create failed" }, { status: 500 });
+    return NextResponse.json({ id: data.id });
+  }
+
   if (body.contest_type !== "squares") {
-    return NextResponse.json({ error: "Only squares and pickem contests are supported here for now" }, { status: 400 });
+    return NextResponse.json({ error: "Only squares, pickem, and auction contests are supported here for now" }, { status: 400 });
   }
   const name = (body.name || "").trim();
   if (!name) return NextResponse.json({ error: "Name is required" }, { status: 400 });

@@ -50,7 +50,8 @@ export default async function PickemPage({ params }: { params: Promise<{ slug: s
         games={board.games}
         initialPicks={board.myPicks}
         leaderboard={board.leaderboard}
-        locked={board.locked}
+        lockedGameIds={board.lockedGameIds}
+        allLocked={board.locked}
         meId={ctx.userId}
         totalGames={board.totalGames}
       />

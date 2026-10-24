@@ -44,6 +44,8 @@ export interface EventCard {
     entryAmountCents: number | null;
     config: Record<string, unknown> | null;
     showCourse: boolean;
+    showLockMode: boolean;
+    lockMode: "slate" | "per_game";
   };
 }
 
@@ -144,6 +146,8 @@ export default function EventContestsList({
           courses={courses}
           config={c.gear.config}
           showCourse={c.gear.showCourse}
+          showLockMode={c.gear.showLockMode}
+          initialLockMode={c.gear.lockMode}
           showTrigger={false}
           controlledOpen={gearFor === c.id}
           onControlledClose={() => setGearFor(null)}

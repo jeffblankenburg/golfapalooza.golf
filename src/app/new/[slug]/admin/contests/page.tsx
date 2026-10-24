@@ -56,6 +56,7 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
         entryCents: Number((c.config as { entry_cents?: number } | null)?.entry_cents) || 0,
         collectedBy: (c as { collected_by?: string | null }).collected_by ?? null,
         payoutSplits: ((c as { payout_splits?: unknown }).payout_splits as PayoutSplit[] | null) ?? [],
+        lockMode: (c.config as { lock_mode?: string } | null)?.lock_mode === "per_game" ? "per_game" : "slate",
         participantCount: pickemPartCount.get(c.id as string) || 0,
         games: pickemPreviews.get(c.id as string) || [],
       };

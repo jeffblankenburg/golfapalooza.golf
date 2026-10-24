@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { v2Now } from "@/lib/v2/simulator";
-import { isSlateLocked, type PickemGame } from "@/lib/v2/contests/pickem";
+import { slateLockAt, gameLocked, lockModeOf, type PickemGame } from "@/lib/v2/contests/pickem";
 import styles from "./SquaresHomeCards.module.css";
 
 /** Small "this is a Pick'em" marker (box + check glyph + label), matching the
@@ -56,7 +56,9 @@ export default async function PickemHomeCards({ orgId, userId, slug, eventId }: 
       const total = cGames.length;
       if (total === 0) return null; // nothing to pick yet
       const picked = cGames.filter((g) => myPicked.has(g.id)).length;
-      const locked = isSlateLocked(cGames as unknown as PickemGame[], now);
+      const lockMode = lockModeOf(c.config as Record<string, unknown> | null);
+      const slateLock = slateLockAt(cGames as unknown as PickemGame[]);
+      const locked = cGames.length > 0 && cGames.every((g) => gameLocked(g as unknown as PickemGame, lockMode, slateLock, now));
       const badge = locked ? "Locked" : picked >= total ? "Picked" : "Make picks";
       const entry = Number((c.config as { entry_cents?: number } | null)?.entry_cents) || 0;
       return (

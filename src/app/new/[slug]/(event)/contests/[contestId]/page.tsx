@@ -40,7 +40,8 @@ export default async function ContestDetailPage({ params }: { params: Promise<{ 
           games={board.games}
           initialPicks={board.myPicks}
           leaderboard={board.leaderboard}
-          locked={board.locked}
+          lockedGameIds={board.lockedGameIds}
+          allLocked={board.locked}
           meId={ctx.userId}
           totalGames={board.totalGames}
         />

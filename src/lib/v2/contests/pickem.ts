@@ -74,6 +74,21 @@ export function isSlateLocked(games: PickemGame[], now: Date): boolean {
 }
 
 /**
+ * How picks lock (admin choice, `config.lock_mode`):
+ *   'slate'     — every pick locks once the FIRST game starts (default, original).
+ *   'per_game'  — each game's pick locks at that game's own kickoff.
+ */
+export type LockMode = "slate" | "per_game";
+export const lockModeOf = (config: Record<string, unknown> | null | undefined): LockMode =>
+  (config?.lock_mode === "per_game" ? "per_game" : "slate");
+
+/** Is picking closed for this game now? */
+export function gameLocked(game: PickemGame, lockMode: LockMode, slateLock: string | null, now: Date): boolean {
+  if (lockMode === "per_game") return !!game.game_time && now.getTime() >= new Date(game.game_time).getTime();
+  return slateLock != null && now.getTime() >= new Date(slateLock).getTime();
+}
+
+/**
  * Did a pick cover the spread? null until the game is scored. A no-line game
  * (`spread`/`favorite` null) grades straight-up. A PUSH — the margin lands exactly
  * on the line, including a no-line tie — returns null: nobody is credited or dinged.

@@ -54,6 +54,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   for (const [k, v] of Object.entries(body)) if (EDITABLE.has(k)) patch[k] = v;
   // Empty collector string means "use the default" (event treasurer / creator).
   if ("collected_by" in patch) patch.collected_by = (patch.collected_by as string | null) || null;
+  // Pick'em pick-lock behavior merges into config (parity with the group route).
+  if ("lock_mode" in body) {
+    const { data: cur } = await admin.from("v2_contests").select("config").eq("id", contestId).maybeSingle();
+    const cfg = { ...((patch.config as Record<string, unknown>) ?? (cur?.config as Record<string, unknown>) ?? {}) };
+    if (body.lock_mode === "per_game") cfg.lock_mode = "per_game"; else delete cfg.lock_mode;
+    patch.config = cfg;
+  }
   // The buy-in is stored in v2_cost_items, not on the contest — pull it aside.
   const hasBuyIn = "entry_amount_cents" in body;
   const buyInCents = hasBuyIn ? (typeof body.entry_amount_cents === "number" ? (body.entry_amount_cents as number) : null) : undefined;

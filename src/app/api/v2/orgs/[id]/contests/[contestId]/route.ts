@@ -47,14 +47,20 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
       patch.name = name;
     }
     if ("collected_by" in patch) patch.collected_by = (patch.collected_by as string | null) || null;
-    // Group-contest buy-in lives in config.entry_cents (no entry_amount_cents column;
-    // event contests fund via cost_items instead). Merge it into the existing config.
-    if ("entry_cents" in body) {
+    // Config-merged keys (read current config once, merge, write back):
+    //  - entry_cents: group-contest buy-in (event contests fund via cost_items).
+    //  - lock_mode: Pick'em pick-lock behavior ('slate' = all lock at first kickoff,
+    //    the default; 'per_game' = each game locks at its own start time).
+    if ("entry_cents" in body || "lock_mode" in body) {
       const { data: cur } = await g.admin.from("v2_contests").select("config").eq("id", contestId).maybeSingle();
       const cfg = { ...((cur?.config as Record<string, unknown>) ?? {}) };
-      const cents = Math.max(0, Math.round(Number(body.entry_cents) || 0));
-      if (cents > 0) cfg.entry_cents = cents;
-      else delete cfg.entry_cents;
+      if ("entry_cents" in body) {
+        const cents = Math.max(0, Math.round(Number(body.entry_cents) || 0));
+        if (cents > 0) cfg.entry_cents = cents; else delete cfg.entry_cents;
+      }
+      if ("lock_mode" in body) {
+        if (body.lock_mode === "per_game") cfg.lock_mode = "per_game"; else delete cfg.lock_mode;
+      }
       patch.config = cfg;
     }
     if (Object.keys(patch).length === 0) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });

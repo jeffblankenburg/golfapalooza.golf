@@ -25,6 +25,7 @@ export type GroupContestItem =
       entryCents: number;
       collectedBy: string | null;
       payoutSplits: PayoutSplit[];
+      lockMode: "slate" | "per_game";
       participantCount: number;
       games: PickemGamePreview[];
     };
@@ -239,6 +240,7 @@ function PickemQuickSettings({ orgId, item, currentUserId, nameMode, onClose, on
   const [fee, setFee] = useState(centsToStr(item.entryCents));
   const [collectedBy, setCollectedBy] = useState(item.collectedBy || currentUserId);
   const [splits, setSplits] = useState<PayoutSplit[]>(item.payoutSplits || []);
+  const [lockMode, setLockMode] = useState<"slate" | "per_game">(item.lockMode);
   const [members, setMembers] = useState<{ user_id: string; name: string; venmo: string | null }[]>([]);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -265,7 +267,7 @@ function PickemQuickSettings({ orgId, item, currentUserId, nameMode, onClose, on
     const res = await fetch(base, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: n, status, entry_cents: feeCents, collected_by: collectedBy || null, payout_splits: splits }),
+      body: JSON.stringify({ name: n, status, entry_cents: feeCents, collected_by: collectedBy || null, payout_splits: splits, lock_mode: lockMode }),
     });
     if (!res.ok) { setErr((await res.json().catch(() => ({}))).error || "Could not save"); setSaving(false); return; }
     onSaved();
@@ -317,6 +319,13 @@ function PickemQuickSettings({ orgId, item, currentUserId, nameMode, onClose, on
             </div>
           )}
         </div>
+        <label>
+          <span style={QS_LABEL}>When do picks lock?</span>
+          <select className={styles.selectInput} value={lockMode} onChange={(e) => setLockMode(e.target.value as "slate" | "per_game")}>
+            <option value="slate">All picks lock when the first game starts</option>
+            <option value="per_game">Each game locks at its own start time</option>
+          </select>
+        </label>
         {err && <p className={styles.err} style={{ margin: 0 }}>{err}</p>}
         <button type="button" className={styles.create} onClick={() => void save()} disabled={saving || !name.trim()}>
           {saving ? "Saving…" : "Save"}

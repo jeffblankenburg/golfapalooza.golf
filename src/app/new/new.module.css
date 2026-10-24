@@ -6356,10 +6356,12 @@ select.optCellInput {
   background: color-mix(in srgb, #15803d 8%, var(--card));
 }
 .pickTeam[data-win] .pickTeamName { color: #15803d; font-weight: 800; }
-.pickTeamScore { font-weight: 800; font-variant-numeric: tabular-nums; flex: none; color: var(--ink); }
+.pickTeamScore { font-weight: 800; font-variant-numeric: tabular-nums; flex: none; color: var(--ink); margin-left: auto; }
 .pickTeam:disabled { cursor: default; opacity: 0.85; }
 .pickLogo { width: 26px; height: 26px; object-fit: contain; flex: none; }
-.pickTeamName { font-weight: 600; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+/* Name sits right next to the logo (left-justified, shrinks with ellipsis); the line
+   follows immediately after it. Only the score is pushed to the right edge. */
+.pickTeamName { font-weight: 600; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
 .pickSpread { font-size: 0.8rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; flex: none; }
 .pickMark { position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 0.75rem; font-weight: 800; color: #fff; }
 .pickMark[data-ok] { background: #15803d; }

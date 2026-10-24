@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
 import { FBS_TEAMS, getTeamLogoUrl } from "@/lib/data/fbs-teams";
-import { isSlateLocked, rankPickem, type PickemGame, type PickemPick } from "@/lib/v2/contests/pickem";
+import { rankPickem, slateLockAt, gameLocked, lockModeOf, type LockMode, type PickemGame, type PickemPick } from "@/lib/v2/contests/pickem";
 import { fetchGameScore } from "@/lib/v2/sports/espn";
 import { orgNameMode } from "@/lib/v2/orgs";
 import { pickName } from "@/lib/v2/profile";
@@ -346,13 +346,17 @@ export async function submitPick(
 ): Promise<PickemResult<null>> {
   if (!body.gameId) return { ok: false, status: 400, error: "gameId required" };
 
-  const { data: game } = await admin.from("v2_matchups").select("id, contest_id").eq("id", body.gameId).maybeSingle();
+  const { data: game } = await admin.from("v2_matchups").select("id, contest_id, start_time").eq("id", body.gameId).maybeSingle();
   if (!game || game.contest_id !== contestId) return { ok: false, status: 404, error: "Game not found" };
   if (contestStatus !== "active") return { ok: false, status: 403, error: "Pick'em isn't open" };
 
+  const { data: contest } = await admin.from("v2_contests").select("config").eq("id", contestId).maybeSingle();
+  const lockMode = lockModeOf(contest?.config as Record<string, unknown> | null);
   const { data: games } = await admin.from("v2_matchups").select("start_time").eq("contest_id", contestId);
   const asGames = (games || []).map((g) => ({ game_time: g.start_time })) as PickemGame[];
-  if (isSlateLocked(asGames, now)) return { ok: false, status: 403, error: "Picks are locked" };
+  if (gameLocked({ game_time: (game as { start_time: string | null }).start_time } as PickemGame, lockMode, slateLockAt(asGames), now)) {
+    return { ok: false, status: 403, error: "Picks are locked" };
+  }
 
   const side = teamToFav(body.pickedTeam);
   const tb = typeof body.tiebreakerTotal === "number" && body.tiebreakerTotal >= 0 ? Math.round(body.tiebreakerTotal) : null;
@@ -391,7 +395,9 @@ export interface PickemBoard {
   games: PickemGame[];
   leaderboard: PickemLeaderEntry[];
   myPicks: Record<string, { picked: "away" | "home" | null; tiebreaker: number | null }>;
-  locked: boolean;
+  locked: boolean;          // every game is locked (all started)
+  lockedGameIds: string[];  // games whose picking is closed (per lock_mode)
+  lockMode: LockMode;
   totalGames: number;
 }
 
@@ -414,7 +420,11 @@ export async function loadPickemBoard(
     picked_team: favToTeam((p.pick as { side?: Side } | null)?.side), tiebreaker_total: (p.tiebreaker as number | null) ?? null,
   }));
 
-  const locked = isSlateLocked(games, input.now);
+  const { data: contest } = await supabase.from("v2_contests").select("config").eq("id", input.contestId).maybeSingle();
+  const lockMode = lockModeOf(contest?.config as Record<string, unknown> | null);
+  const slateLock = slateLockAt(games);
+  const lockedSet = new Set(games.filter((g) => gameLocked(g, lockMode, slateLock, input.now)).map((g) => g.id));
+  const locked = games.length > 0 && games.every((g) => lockedSet.has(g.id));
   const ranked = rankPickem(games, picks);
 
   const userIds = [...new Set(picks.map((p) => p.user_id))];
@@ -426,8 +436,10 @@ export async function loadPickemBoard(
   ]);
   const prof = new Map((profs || []).map((p) => [p.id as string, p]));
 
+  // Reveal a user's pick on a game only once THAT game is locked (per lock_mode) — so
+  // you can't peek at picks for a game that hasn't started.
   const picksByUser = new Map<string, PickemPick[]>();
-  if (locked) for (const p of picks) (picksByUser.get(p.user_id) || picksByUser.set(p.user_id, []).get(p.user_id)!).push(p);
+  for (const p of picks) if (lockedSet.has(p.game_id)) (picksByUser.get(p.user_id) || picksByUser.set(p.user_id, []).get(p.user_id)!).push(p);
 
   const leaderboard: PickemLeaderEntry[] = ranked.map((r) => ({
     userId: r.userId,
@@ -435,11 +447,11 @@ export async function loadPickemBoard(
     avatarUrl: (prof.get(r.userId)?.avatar_url as string | null) ?? null,
     correct: r.correct, decided: r.decided, pickedCount: r.pickedCount,
     tiebreakerTotal: r.tiebreakerTotal, tiebreakerDiff: r.tiebreakerDiff, rank: r.rank,
-    picks: locked ? (picksByUser.get(r.userId) || []).map((p) => ({ gameId: p.game_id, pickedTeam: p.picked_team })) : null,
+    picks: (picksByUser.get(r.userId) || []).map((p) => ({ gameId: p.game_id, pickedTeam: p.picked_team })),
   }));
 
   const myPicks: Record<string, { picked: "away" | "home" | null; tiebreaker: number | null }> = {};
   for (const p of picks) if (p.user_id === input.viewerId) myPicks[p.game_id] = { picked: p.picked_team, tiebreaker: p.tiebreaker_total };
 
-  return { games, leaderboard, myPicks, locked, totalGames: games.length };
+  return { games, leaderboard, myPicks, locked, lockedGameIds: [...lockedSet], lockMode, totalGames: games.length };
 }

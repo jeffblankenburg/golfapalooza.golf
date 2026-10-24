@@ -40,6 +40,8 @@ export default function ContestSettings({
   courses,
   config,
   showCourse = true,
+  showLockMode = false,
+  initialLockMode = "slate",
   showTrigger = true,
   controlledOpen,
   onControlledClose,
@@ -59,6 +61,9 @@ export default function ContestSettings({
   config: Record<string, unknown> | null;
   // Non-golf types (pickem/squares/bspitw/…) don't play a course — hide that picker.
   showCourse?: boolean;
+  // Pick'em only: the pick-lock behavior (config.lock_mode).
+  showLockMode?: boolean;
+  initialLockMode?: "slate" | "per_game";
   // Controlled mode (no built-in pencil trigger): a parent (e.g. the card gear) drives
   // visibility via controlledOpen/onControlledClose. Default = self-triggered on the
   // detail page.
@@ -81,6 +86,7 @@ export default function ContestSettings({
   const [day, setDay] = useState(contestDate || "");
   const [time, setTime] = useState(startTime ? startTime.slice(0, 5) : "");
   const [buyin, setBuyin] = useState(entryAmountCents != null ? (entryAmountCents / 100).toString() : "");
+  const [lockMode, setLockMode] = useState<"slate" | "per_game">(initialLockMode);
   const [courseId, setCourseId] = useState<string | null>(initialCourseId);
   const [teeId, setTeeId] = useState<string | null>(initialTeeId);
   const [courseName, setCourseName] = useState<string | null>(initialCourseName);
@@ -117,6 +123,7 @@ export default function ContestSettings({
     setDay(contestDate || "");
     setTime(startTime ? startTime.slice(0, 5) : "");
     setBuyin(entryAmountCents != null ? (entryAmountCents / 100).toString() : "");
+    setLockMode(initialLockMode);
     setCourseId(initialCourseId);
     setTeeId(initialTeeId);
     setCourseName(initialCourseName);
@@ -190,7 +197,7 @@ export default function ContestSettings({
     const res = await fetch(base, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), contest_date: day || null, start_time: time || null, course_id: courseId, tee_id: teeId, config: nextConfig, entry_amount_cents: Number.isFinite(cents as number) ? cents : null }),
+      body: JSON.stringify({ name: name.trim(), contest_date: day || null, start_time: time || null, course_id: courseId, tee_id: teeId, config: nextConfig, entry_amount_cents: Number.isFinite(cents as number) ? cents : null, ...(showLockMode ? { lock_mode: lockMode } : {}) }),
     });
     setBusy(false);
     if (!res.ok) {
@@ -245,6 +252,16 @@ export default function ContestSettings({
               <input className={styles.input} style={{ paddingLeft: 26 }} inputMode="decimal" value={buyin} onChange={(e) => setBuyin(e.target.value)} placeholder="0" />
             </span>
           </div>
+
+          {showLockMode && (
+            <div className={styles.field}>
+              <label className={styles.label}>When do picks lock?</label>
+              <select className={styles.selectInput} value={lockMode} onChange={(e) => setLockMode(e.target.value as "slate" | "per_game")}>
+                <option value="slate">All picks lock when the first game starts</option>
+                <option value="per_game">Each game locks at its own start time</option>
+              </select>
+            </div>
+          )}
 
           {showCourse && (
           <div className={styles.field}>

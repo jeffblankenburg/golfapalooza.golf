@@ -28,7 +28,7 @@ function spreadFor(g: PickemGame, side: "away" | "home"): string {
 }
 
 export default function PickemContent({
-  pickUrl, games, initialPicks, leaderboard, locked, meId, totalGames,
+  pickUrl, games, initialPicks, leaderboard, lockedGameIds, allLocked, meId, totalGames,
 }: {
   // Scope-agnostic: the mount supplies the endpoint to POST a pick to (event-
   // scoped or group-scoped). The pick UI is identical in either case.
@@ -36,13 +36,15 @@ export default function PickemContent({
   games: PickemGame[];
   initialPicks: Record<string, MyPick>;
   leaderboard: LeaderEntry[];
-  locked: boolean;
+  lockedGameIds: string[]; // games whose picking is closed (per the contest's lock mode)
+  allLocked: boolean;      // every game has started
   meId: string;
   totalGames: number;
 }) {
   const [tab, setTab] = useState<"picks" | "leaderboard">("picks");
   const [picks, setPicks] = useState<Record<string, MyPick>>(initialPicks);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const lockedGames = new Set(lockedGameIds);
 
   async function save(gameId: string, next: MyPick) {
     const prev = picks[gameId];
@@ -68,7 +70,7 @@ export default function PickemContent({
     const myResult = on && scored ? pickIsCorrect(g, side) : null; // my pick right/wrong
     const score = side === "away" ? g.away_score : g.home_score;
     return (
-      <button type="button" className={styles.pickTeam} data-on={on || undefined} data-win={covered || undefined} disabled={locked}
+      <button type="button" className={styles.pickTeam} data-on={on || undefined} data-win={covered || undefined} disabled={lockedGames.has(g.id)}
         onClick={() => save(g.id, { picked: on ? null : side, tiebreaker: picks[g.id]?.tiebreaker ?? null })}>
         {logo && <img src={logo} alt="" className={styles.pickLogo} />}
         <span className={styles.pickTeamName}>{name}</span>
@@ -97,7 +99,7 @@ export default function PickemContent({
           <p className={styles.dnsHint}>No games posted yet.</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {locked && <p className={styles.roundFormHint} style={{ marginTop: 0 }}>Picks are locked, the games have started.</p>}
+            {allLocked && <p className={styles.roundFormHint} style={{ marginTop: 0 }}>Picks are locked, the games have started.</p>}
             {games.map((g) => (
               <div key={g.id} className={styles.pickCard}>
                 <div className={styles.pickCardMeta}>
@@ -112,7 +114,7 @@ export default function PickemContent({
                 {g.is_tiebreaker && (
                   <div className={styles.field} style={{ marginTop: 8, marginBottom: 0 }}>
                     <label className={styles.label}>Total points (both teams)</label>
-                    <input className={styles.input} inputMode="numeric" disabled={locked}
+                    <input className={styles.input} inputMode="numeric" disabled={lockedGames.has(g.id)}
                       defaultValue={picks[g.id]?.tiebreaker != null ? String(picks[g.id]?.tiebreaker) : ""}
                       placeholder="e.g. 52"
                       onBlur={(e) => {
@@ -132,7 +134,7 @@ export default function PickemContent({
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {leaderboard.map((e) => {
               const isMe = e.userId === meId;
-              const canExpand = locked && e.picks && e.picks.length > 0;
+              const canExpand = !!e.picks && e.picks.length > 0;
               return (
                 <div key={e.userId}>
                   <button type="button" className={styles.pickLeaderRow} data-me={isMe || undefined}

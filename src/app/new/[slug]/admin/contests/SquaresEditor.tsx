@@ -393,8 +393,10 @@ export default function SquaresEditor({
                 <input className={styles.input} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. March Madness Squares" />
                 <label className={styles.label}>Price per square</label>
                 <div className={styles.cost}>
-                  <span>$</span>
-                  <input value={costStr} inputMode="decimal" onChange={(e) => setCostStr(e.target.value)} onBlur={() => setCostStr(formatStake(cost))} />
+                  <span style={{ position: "relative", display: "inline-block" }}>
+                    <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--ink-soft, #59635b)", fontWeight: 700, pointerEvents: "none" }}>$</span>
+                    <input value={costStr} inputMode="decimal" style={{ paddingLeft: 22 }} onChange={(e) => setCostStr(e.target.value)} onBlur={() => setCostStr(formatStake(cost))} />
+                  </span>
                   <span className={styles.costNote}>pot fills to {money(Math.round((cost ?? 0) * 100) * 100)} if all 100 sell</span>
                 </div>
                 {editingId && (

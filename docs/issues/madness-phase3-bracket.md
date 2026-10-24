@@ -1,56 +1,123 @@
-Part of #223 (epic). The flagship contest: a **64-team single-elim bracket pool** on the generalized slate (Phase 1) + ESPN grading (Phase 2), as a **group-scoped contest** (event-independent, available to all members — see prerequisite #231). First contest to ship.
+Part of #223 (epic). **Phase 3 = the shared tournament substrate + the bracket pool (its first consumer).** A bracketed event (March Madness, NFL/NHL playoffs) is a thing *many* contests sit on at once — the bracket pool, the **auction (#227)**, brocket, survivor — all sharing ONE seeded field, ONE bracket tree, and ONE set of results. So the tournament is modeled **once** (org-level), and contests reference it. The bracket pool is the flagship contest that proves the substrate. Group-scoped (event-independent; prerequisite #231).
 
-## `contest_type = 'bracket'`
-Migration: add `bracket` to the `v2_contests.contest_type` CHECK + `CONTEST_TYPES`; `defaultScoringSource='derived'` (graded from matchup results); `defaultAutoEnroll=false` (opt-in buy-in).
+Grounded in bromadness (`~/GitHub/bromadness.com`): `tournaments` / `teams` / `games` are tournament-scoped and shared across its auction, brocket, and pick'em. We keep that shape; we add ESPN population + manual-first editing on top.
 
-## Data model
-### Field (imported from ESPN, admin-confirmed — decisions log)
-`v2_bracket_field`:
-```
-contest_id, espn_team_id, name, seed, region, play_in_slot?   -- 64 (or 68) rows
-```
-### Structure (standard, generated)
-The single-elim slot tree is deterministic from seeds + regions. Each game is a `v2_matchups` row (reuse Phase 1) with `slot` (e.g. `r1-east-1v16`), `round`, and feeder slots encoded in `slot`/config. `competitor_a/b` fill from the field for R1; later rounds fill from **actual** results as they finalize (ESPN auto-match).
-### Per-user bracket picks
-`v2_bracket_picks`:
-```
-id, contest_id, user_id, slot, picked_espn_team_id, UNIQUE(contest_id, user_id, slot)
-```
-In `upfront` mode picks **cascade** (your R2 pick must be one of your own R1 winners) — enforced client-side + validated server-side against the user's feeder picks. In `round_by_round` mode, picks are made against the *actual* matchups each round and can reuse `v2_picks` directly.
+## Why a shared tournament, not a per-contest field
 
-## Config (admin-configurable — decisions log)
+The earlier draft stored the field per-contest (`v2_bracket_field(contest_id, …)`). That duplicates the same 64 teams + bracket + results across the pool AND the auction, and they'd drift. Instead: one `v2_tournament_*`, referenced by every contest via `config.tournament_id`. Results entered once feed the pool standings, the auction's seed-scoring, and the champion/runner-up payouts simultaneously.
+
+This is distinct from #224's **contest-scoped** `v2_matchups` (ad-hoc slates for pick'em/parlays, one set of games per contest). Tournaments are their own shared substrate. The two meet only at the grading layer (see "ESPN grading" below).
+
+---
+
+## Part A — The tournament substrate (the reusable layer)
+
+### Tables (next migration; grants + realtime like the pickem tables)
+
+**`v2_tournaments`** — one bracketed event, org-scoped, shared by many contests.
+```
+id, org_id, sport (config key, e.g. 'mens-college-basketball'), season (e.g. '2027'),
+name, status ('setup'|'locked'|'live'|'final'),
+source ('espn'|'manual'), external_ref JSONB ({ espn_tournament_id? }),
+config JSONB, created_by, created_at, updated_at
+```
+
+**`v2_tournament_teams`** — the seeded field (= `getField()`).
+```
+id, tournament_id → v2_tournaments ON DELETE CASCADE,
+espn_id?, name, short_name?, seed, region?  (region/conference label),
+logo_url?, eliminated BOOL DEFAULT false, play_in_slot? (feeds an R1 slot),
+UNIQUE(tournament_id, region, seed) partial where not a play-in
+```
+
+**`v2_tournament_games`** — the bracket tree (= `getBracket()`), ported from bromadness `games`.
+```
+id, tournament_id → v2_tournaments ON DELETE CASCADE,
+round INT (0 play-in … N final), region?, game_number INT, slot TEXT UNIQUE per tournament,
+team_a_id? / team_b_id? → v2_tournament_teams,
+next_game_id? → v2_tournament_games, advances_to_slot ('a'|'b'),   -- winner propagation
+start_time?, external_ref JSONB ({ espn_event_id? }),
+status ('scheduled'|'in_progress'|'final'),
+result JSONB ({ winner_team_id, score_a, score_b }) when final,
+UNIQUE(tournament_id, slot)
+```
+
+### The source interface + adapters
+`TournamentSource` (lib): `getField()` → teams; `getBracket()` → games; and the derived reads every consumer needs:
+- `teamWins(teamId)` — count of `v2_tournament_games.result.winner_team_id === teamId` (bromadness computes this query-time; the **auction's** points = Σ seed × wins read straight from here).
+- `champion()` — final-round winner; `runnerUp()` — the finalist who lost the final.
+
+**Population is a swappable layer, manual-first:**
+- **Manual** is a permanent first-class source: admin builds/edits the field (seed + region) and enters results by hand. Always available, for any event we don't adapt or a one-off.
+- **Per-league ESPN adapters** (each shipped only when fully correct end-to-end — seeds, regions, the tree, advancement): March Madness is the reference (explicit seeds + 4 regions + First Four), then NFL (14 seeds, 7/conf) and NHL (16 seeds) as their own units. Each fills `v2_tournament_teams` + the initial `v2_tournament_games` from ESPN; the admin can override any seed/pairing.
+
+### Structure generation + advancement (ported from bromadness)
+The single-elim tree is deterministic from seeds + regions: fixed R1 pairings `[1,16][8,9][5,12][4,13][6,11][3,14][7,10][2,15]`, then a `buildGameLinks()` pass wires every `next_game_id` + `advances_to_slot`; play-in (round 0) games feed their R1 slot. When a game's `result` finalizes, the winner propagates into `next_game_id`'s `team_{a|b}_id` and the loser is marked `eliminated` — identical to bromadness `handleSetWinner`. Later rounds therefore fill from **actual** results, no re-linking.
+
+---
+
+## Part B — The bracket pool contest (`contest_type = 'bracket'`)
+
+The flagship consumer. Migration adds `bracket` to the `v2_contests.contest_type` CHECK + `CONTEST_TYPES`; `defaultScoringSource='derived'`; `defaultAutoEnroll=false` (opt-in buy-in). `config.tournament_id` binds the pool to a tournament.
+
+### Per-user picks — `v2_bracket_picks`
+```
+id, contest_id, user_id, slot, picked_team_id → v2_tournament_teams,
+UNIQUE(contest_id, user_id, slot)
+```
+- **`upfront`** (default): users fill the whole bracket before lock; R2+ picks **cascade** (your pick for a slot must be one of your own feeder-slot winners) — enforced client-side, validated server-side.
+- **`round_by_round`**: picks are made against the *actual* matchups each round (reuse the #224 `v2_picks` straight-pick pattern against tournament games).
+
+### Config (admin-configurable; sensible defaults need zero fiddling)
 ```
 config.bracket = {
-  pick_model:  'upfront' | 'round_by_round',                 // default upfront
-  scoring:     'flat' | 'round_weighted' | 'weighted_upset', // default round_weighted
-  weights:     [1,2,4,8,16,32],                              // per round when weighted
-  upset_bonus: <curve by seed differential>,                 // when weighted_upset
-  tiebreaker:  'champ_total_points',                         // default, overridable
-  sport:       'mens-college-basketball'
+  pick_model: 'upfront' | 'round_by_round',                 // default upfront
+  scoring:    'flat' | 'round_weighted' | 'weighted_upset', // default round_weighted
+  weights:    [1,2,4,8,16,32],                              // per round when weighted
+  upset_bonus: <curve by seed differential>,                // when weighted_upset
+  tiebreaker: 'champ_total_points',                         // default
 }
 ```
-Sensible defaults → quick setup needs zero fiddling; knobs are there.
 
-## Scoring: `rankBracket(field, slots, actualResults, userPicks, config)` (pure)
-Per slot: compare the user's picked winner to the actual winner (`matchup.result`); award by round weight (+ upset bonus if configured). Sum; tiebreak by the champ-game total-points guess.
+### Scoring — `rankBracket(source, picks, config)` (pure)
+Per slot, compare the user's picked winner to `v2_tournament_games.result.winner_team_id`; award by round weight (+ upset bonus if configured); sum; tiebreak by the champ-game total-points guess. A pure function, same pattern as `pickem.ts` / `rankStraight`.
 
-## ESPN grading
-Each game's `v2_matchups.external_ref` auto-matches to an ESPN event by (field team `espn_id`s + round date window) — no per-game linking (decisions log). Phase 2's cron fills `result`; `rankBracket` reads it live.
+### Brocket
+Not new tables — a bracket pool scoped to round 1 (+2), straight-up, `scoring` = seed of the correctly-picked team. A config/preset of the bracket contest.
+
+---
+
+## How the auction (#227) reuses this
+The auction is another consumer of the **same** tournament: `config.tournament_id` → `getField()` seeds its entity catalog; `teamWins()` drives the seed-based points; `champion()`/`runnerUp()` drive the owner bonuses. No auction-owned tournament tables. (The auction's own ownership/bidding tables are separate; see #227.)
+
+## ESPN grading (#225) across both substrates
+`v2_tournament_games` and the contest-scoped `v2_matchups` share the SAME gradeable shape (`external_ref` + `status` + `result`). #225's grader auto-matches by `espn_event_id` (else competitor `espn_id`s + date window) and fills `result` on finalize for **both** — one normalized grading helper, two row sources. Rankers read `result` live (no stored per-pick grade). Manual result entry writes `result` directly (and triggers advancement).
 
 ## Money
-Buy-in as an Option (`setContestBuyIn`), payouts via `payout_splits` + `computePlacePayouts`, winners → `v2_contest_winners`, settle via ledger. Admin sets winner-take-all / top-N in the existing `PayoutSplitsEditor`. No new money plumbing.
+Buy-in as an Option (`setContestBuyIn`), payouts via `payout_splits` + `computePlacePayouts`, winners → `v2_contest_winners`, settle via the ledger, admin edits in `PayoutSplitsEditor`. No new money plumbing.
 
 ## Admin + user UI
 - `AddCompetition.tsx`: add `bracket` to the event-wide kinds.
-- `BracketAdmin.tsx` (new; branched in `[contestId]/page.tsx`): import field from ESPN → confirm/lock → set config → monitor grading + standings.
-- User: `BracketPicker` (fill the bracket, upfront or per-round) + standings view.
-- API: `.../contests/[contestId]/bracket/route.ts` (field/structure/picks), `.../bracket/import` (ESPN field pull); grading via Phase 2 cron.
+- **Tournament manager** (new, shared): create/pick a tournament → import from an ESPN adapter OR build the field by hand → confirm/lock the field → the tree generates → enter/monitor results. Reused by any tournament-based contest (pool, auction, brocket).
+- `BracketAdmin.tsx` (new; branched in `[contestId]/page.tsx`): bind the pool to a tournament, set `config.bracket`, monitor grading + standings.
+- User: `BracketPicker` (fill the bracket, upfront cascade or per-round) + standings view.
+- API: `.../tournaments/*` (field/structure/results CRUD + ESPN import), `.../contests/[contestId]/bracket/*` (picks, standings).
+
+## Touch-points
+Migration (tournament tables + grants/realtime + `bracket` contest_type); `src/lib/v2/contests/tournament.ts` (TournamentSource + structure gen + advancement + derived reads); `src/lib/v2/contests/bracket.ts` (`rankBracket`); per-league adapters under `src/lib/v2/sports/`; the shared grading helper (with #225); tournament manager + BracketAdmin + BracketPicker; routes.
 
 ## Acceptance
-- [ ] Admin imports + locks the 64-team ESPN field; structure generates.
-- [ ] Users fill brackets per the configured `pick_model`; picks validate (cascade in upfront).
-- [ ] ESPN auto-grades; standings rank by the configured `scoring`; tiebreaker resolves.
+- [ ] One tournament (field + tree + results) is created once and shared: the bracket pool and a second contest (auction stub or a manual check) both read the same `getField()`/`teamWins()`/`champion()`.
+- [ ] Admin imports + locks a 64-team ESPN field (March Madness adapter); the tree generates; a manual tournament also works end-to-end.
+- [ ] Users fill brackets per the configured `pick_model`; cascade validates in upfront.
+- [ ] A result entered once (ESPN or manual) advances the tree, eliminates the loser, and updates pool standings; `rankBracket` ranks by the configured `scoring`; tiebreaker resolves.
 - [ ] Buy-in + payouts flow through the existing money model.
-- [ ] `npm run build` green.
+- [ ] `npx tsc --noEmit` + `npx eslint` clean.
 
-**Dependencies:** Phase 1 (slate), Phase 2 (ESPN grading). **Enables:** Brocket (a scoped round-1 subset), and the bracket engine reused by custom user brackets (Phase 6).
+## Open decisions (design-merit, not scope-cutting)
+- **Tournament games vs `v2_matchups`**: dedicated `v2_tournament_games` (recommended — shared across contests, carries bracket-tree fields `next_game_id`/`advances_to_slot`) vs. extending #224's `v2_matchups` to be tournament-scoped. The recommendation keeps `v2_matchups` contest-scoped for ad-hoc slates and shares a grading helper; confirm before building (touches #224/#225).
+- Shared-tournament lifecycle: who creates/owns/locks the tournament when multiple contests reference it, and what happens to dependents if it's deleted.
+- `upfront` vs `round_by_round` default (recommend upfront).
+- Each league adapter's ESPN bracket endpoint shape (March Madness first).
+
+**Dependencies:** #224 (pick substrate patterns + `round_by_round` picks), #225 (ESPN grading, generalized to tournament games), #231 (group-scoped contests). **Enables:** #227 (auction — consumes the tournament), brocket (a preset), survivor + custom brackets (#229).

@@ -29,7 +29,6 @@ export default function SquaresGamesButton({
       </button>
       {open && (
         <SquaresEditor
-          variant="modal"
           gamesOnly
           editing={row}
           collectionBase={collectionBase}

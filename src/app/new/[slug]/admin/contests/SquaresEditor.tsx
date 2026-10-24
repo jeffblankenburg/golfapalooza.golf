@@ -167,7 +167,6 @@ export default function SquaresEditor({
   eventId = null,
   nameMode = "nickname",
   currentUserId = "",
-  variant = "modal",
   gamesOnly = false,
   onClose = () => {},
   onSaved,
@@ -179,16 +178,12 @@ export default function SquaresEditor({
   eventId?: string | null;
   nameMode?: NameMode;       // for the collector picker's member names (edit mode only)
   currentUserId?: string;    // pre-selected collector (the active admin)
-  // "modal" (default) = full-screen overlay for create/full edit. "inline" = render
-  // as a page section (no portal/overlay) for the detail page's games/payouts editor.
-  variant?: "modal" | "inline";
   // When true, render ONLY the Games & payouts section and save a games-only partial
-  // (basics/draft live in the gear). Used by the detail page.
+  // (basics/draft live in the gear). Used by the "+ Add games" button on the detail page.
   gamesOnly?: boolean;
-  onClose?: () => void; // modal only; inline (detail page) never calls it
+  onClose?: () => void;
   onSaved?: () => void;
 }) {
-  const inline = variant === "inline";
   const router = useRouter();
   const editingId = editing?.id ?? null;
   // Org id lives in the collection base: /api/v2/orgs/<orgId>/contests
@@ -280,7 +275,6 @@ export default function SquaresEditor({
   }, [games]);
 
   useEffect(() => {
-    if (inline) return; // inline is a page section — no modal scroll-lock / Escape-to-close
     // While the game picker is stacked on top, let IT handle Escape.
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !pickerOpen) onClose();
@@ -292,7 +286,7 @@ export default function SquaresEditor({
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [pickerOpen, onClose, inline]);
+  }, [pickerOpen, onClose]);
 
   async function save() {
     if (saving) return;
@@ -361,7 +355,7 @@ export default function SquaresEditor({
         return;
       }
       onSaved?.();
-      if (!inline) onClose(); // inline stays on the page; just refresh
+      onClose();
       router.refresh();
     } catch {
       setErr("Something went wrong.");
@@ -391,13 +385,11 @@ export default function SquaresEditor({
   }
 
   const inner = (
-    <div className={inline ? styles.inlineEditor : styles.modal} onClick={inline ? undefined : (e) => e.stopPropagation()}>
-      {!inline && (
-        <div className={styles.formHead}>
-          <span className={styles.formTitle}>{editingId ? "Edit Squares pool" : "New Squares pool"}</span>
-          <button type="button" className={styles.cancel} onClick={onClose}>Cancel</button>
-        </div>
-      )}
+    <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.formHead}>
+        <span className={styles.formTitle}>{editingId ? "Edit Squares pool" : "New Squares pool"}</span>
+        <button type="button" className={styles.cancel} onClick={onClose}>Cancel</button>
+      </div>
 
             <div className={styles.modalBody}>
               {!gamesOnly && (<>
@@ -640,7 +632,7 @@ export default function SquaresEditor({
 
   return (
     <>
-      {inline ? inner : createPortal(
+      {createPortal(
         <div className={styles.overlay} onClick={onClose}>{inner}</div>,
         document.body,
       )}

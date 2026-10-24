@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import styles from "@/app/new/new.module.css";
 
 /**
- * "Who's paid for their squares" — entry (buy-in) payment status for a Squares pool.
- * Each owner owes (squares owned × cost); mark paid records a ledger payment to the
- * collector. The squares-aware /payments endpoint supplies per-member owed amounts.
+ * "Who's paid their entry" — buy-in (entry) payment status for a GROUP contest.
+ * The per-member obligation is DERIVED by the type-aware /payments endpoint
+ * (Pick'em = flat entry; Squares = squares owned × cost); marking paid records a
+ * ledger payment to the collector. Shared by both the Squares and Pick'em detail
+ * pages — the only difference is the wording, passed in via props.
  */
 interface Row { userId: string; name: string; owedCents: number; paidCents: number }
 
@@ -15,7 +17,17 @@ function money(cents: number): string {
   return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 })}`;
 }
 
-export default function SquaresEntryPaid({ orgId, contestId }: { orgId: string; contestId: string }) {
+export default function ContestEntryPaid({
+  orgId,
+  contestId,
+  title,
+  emptyText,
+}: {
+  orgId: string;
+  contestId: string;
+  title: string;      // e.g. "Who's paid for their squares" / "Who's paid their entry"
+  emptyText: string;  // e.g. "No squares claimed yet." / "No one's entered yet."
+}) {
   const base = `/api/v2/orgs/${orgId}/contests/${contestId}`;
   const [roster, setRoster] = useState<Row[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -44,11 +56,11 @@ export default function SquaresEntryPaid({ orgId, contestId }: { orgId: string; 
   return (
     <details style={{ marginTop: 20, border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
       <summary style={{ padding: "12px 14px", cursor: "pointer", fontWeight: 700 }}>
-        Who&apos;s paid for their squares{roster.length > 0 ? ` (${roster.length - unpaid}/${roster.length})` : ""}
+        {title}{roster.length > 0 ? ` (${roster.length - unpaid}/${roster.length})` : ""}
       </summary>
       <div style={{ padding: "0 14px 14px" }}>
         {roster.length === 0 ? (
-          <p className={styles.dnsHint} style={{ marginTop: 4 }}>No squares claimed yet.</p>
+          <p className={styles.dnsHint} style={{ marginTop: 4 }}>{emptyText}</p>
         ) : (
           <div className={styles.memberList} style={{ marginTop: 4 }}>
             {roster.map((r) => {

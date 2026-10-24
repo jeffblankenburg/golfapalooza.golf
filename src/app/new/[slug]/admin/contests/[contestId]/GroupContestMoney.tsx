@@ -6,12 +6,12 @@ import PayoutSplitsEditor, { ordinal } from "../../events/[eventId]/contests/[co
 import styles from "@/app/new/new.module.css";
 
 /**
- * Payouts + who's paid for a GROUP (event-less) contest. The buy-in and collector
- * live in the gear quick-settings; here the admin divides the pot by place and marks
- * members paid. The buy-in is derived (config.entry_cents); only payments are stored.
+ * Payout splits for a GROUP (event-less) Pick'em. The buy-in and collector live in
+ * the gear quick-settings; entry-paid status is its own accordion (ContestEntryPaid)
+ * and winnings are settled in the Winnings & payouts manager. Here the admin only
+ * divides the pot by place. The buy-in + pot size are derived (config.entry_cents ×
+ * entrants); nothing here is stored except the splits.
  */
-interface RosterRow { userId: string; name: string; paidCents: number }
-
 function money(cents: number): string {
   const whole = cents % 100 === 0;
   return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 })}`;
@@ -30,49 +30,33 @@ export default function GroupContestMoney({
 }) {
   const base = `/api/v2/orgs/${orgId}/contests/${contestId}`;
   const [splits, setSplits] = useState<PayoutSplit[]>(initialSplits || []);
-  const [roster, setRoster] = useState<RosterRow[]>([]);
+  const [roster, setRoster] = useState<number>(0);
   const [entryCents, setEntryCents] = useState(initialEntryCents);
-  const [busy, setBusy] = useState<string | null>(null);
-
-  async function loadRoster() {
-    const r = await fetch(`${base}/payments`);
-    if (r.ok) { const d = await r.json(); setRoster(d.roster || []); setEntryCents(d.entryCents || 0); }
-  }
 
   useEffect(() => {
-    loadRoster();
+    (async () => {
+      const r = await fetch(`${base}/payments`);
+      if (r.ok) { const d = await r.json(); setRoster((d.roster || []).length); setEntryCents(d.entryCents || 0); }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgId, contestId]);
-
-  async function togglePaid(row: RosterRow) {
-    if (busy) return;
-    setBusy(row.userId);
-    try {
-      const paid = row.paidCents >= entryCents && entryCents > 0;
-      if (paid) await fetch(`${base}/payments?userId=${row.userId}`, { method: "DELETE" });
-      else await fetch(`${base}/payments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: row.userId }) });
-      await loadRoster();
-    } finally { setBusy(null); }
-  }
 
   function saveSplits(next: PayoutSplit[]) {
     setSplits(next);
     void fetch(base, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ payout_splits: next }) });
   }
 
-  const pot = entryCents * roster.length;
+  const pot = entryCents * roster;
   const payouts = computePickemPayouts(pot, splits);
 
   return (
     <div style={{ marginTop: 20 }}>
-      <p className={styles.sectionLabel}>Payouts &amp; who&apos;s paid</p>
-
-      <div className={styles.field}>
+      <div className={styles.field} style={{ marginBottom: 0 }}>
         <label className={styles.label}>Payout splits <span className={styles.optional}>(how the pot is divided by place)</span></label>
         <PayoutSplitsEditor value={splits} onSave={saveSplits} />
-        {entryCents > 0 && roster.length > 0 && (
+        {entryCents > 0 && roster > 0 && (
           <p className={styles.roundFormHint} style={{ marginTop: 6 }}>
-            Pot: {money(entryCents)} × {roster.length} in = <strong style={{ color: "var(--brand)" }}>{money(pot)}</strong>
+            Pot: {money(entryCents)} × {roster} in = <strong style={{ color: "var(--brand)" }}>{money(pot)}</strong>
           </p>
         )}
         {entryCents > 0 && payouts.length > 0 && (
@@ -81,29 +65,6 @@ export default function GroupContestMoney({
           </div>
         )}
       </div>
-
-      {entryCents > 0 && (
-        <div style={{ marginTop: 8 }}>
-          <p className={styles.sectionLabel}>Who&apos;s paid</p>
-          {roster.length === 0 ? (
-            <p className={styles.dnsHint} style={{ marginTop: 4 }}>No one&apos;s entered yet.</p>
-          ) : (
-            <div className={styles.memberList} style={{ marginTop: 4 }}>
-              {roster.map((r) => {
-                const paid = r.paidCents >= entryCents;
-                return (
-                  <div key={r.userId} className={styles.finRow}>
-                    <div className={styles.finRowMain}><span className={styles.finRowName}>{r.name}</span></div>
-                    <button type="button" className={paid ? styles.paidToggleOn : styles.paidToggle} disabled={busy === r.userId} onClick={() => togglePaid(r)}>
-                      {busy === r.userId ? "…" : paid ? "Paid ✓" : "Mark paid"}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

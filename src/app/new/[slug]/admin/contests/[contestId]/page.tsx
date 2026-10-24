@@ -4,7 +4,7 @@ import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
 import SquaresManageView, { loadSquaresContestRow } from "./SquaresManageView";
 import SquaresGamesButton from "./SquaresGamesButton";
-import SquaresEntryPaid from "./SquaresEntryPaid";
+import ContestEntryPaid from "./ContestEntryPaid";
 import MasterPayouts from "./payouts/MasterPayouts";
 import { loadMasterPayouts } from "./payouts/loadMasterPayouts";
 // Same admin component the event lane uses — mounted here with the group API base.
@@ -58,6 +58,7 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
           initialEntryCents={Number((contest.config as { entry_cents?: number } | null)?.entry_cents) || 0}
           initialSplits={(contest.payout_splits as PayoutSplit[] | null) ?? []}
         />
+        <ContestEntryPaid orgId={org.id} contestId={contestId} title="Who's paid their entry" emptyText="No one's entered yet." />
       </div>
     );
   }
@@ -86,7 +87,7 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
           nameMode={org.name_display}
           currentUserId={ctx.userId}
         />
-        <SquaresEntryPaid orgId={org.id} contestId={contestId} />
+        <ContestEntryPaid orgId={org.id} contestId={contestId} title="Who's paid for their squares" emptyText="No squares claimed yet." />
         <details style={{ marginTop: 20, border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
           <summary style={{ padding: "12px 14px", cursor: "pointer", fontWeight: 700 }}>Winnings &amp; payouts</summary>
           <div style={{ padding: "0 14px 14px" }}>

@@ -7,6 +7,8 @@
  * side it applies to. A pick is correct if the chosen side covered.
  */
 
+import { rankStraight, type Matchup, type Pick as SlatePick } from "./slate";
+
 export interface PickemGame {
   id: string;
   away_team: string;
@@ -97,49 +99,32 @@ export function coveringSide(g: PickemGame): "away" | "home" | null {
   return adjusted > 0 ? "home" : "away";
 }
 
-/** Build the leaderboard: correct DESC, then closest tiebreaker (a filled tiebreaker beats none). */
+/**
+ * Build the leaderboard: correct DESC, then closest tiebreaker (a filled tiebreaker
+ * beats none). A thin adapter over the shared `rankStraight` substrate ranker (#224):
+ * map the flat Pick'em game/pick shape to generic matchups/picks (away→'a', home→'b'),
+ * rank, and map the rows back. One ranker, many contest types.
+ */
 export function rankPickem(games: PickemGame[], picks: PickemPick[]): PickemLeaderRow[] {
-  const gameById = new Map(games.map((g) => [g.id, g]));
-  const tb = games.find((g) => g.is_tiebreaker) || null;
-  const tbActual = tb && gameIsScored(tb) ? (tb.away_score as number) + (tb.home_score as number) : null;
-
-  const byUser = new Map<string, PickemPick[]>();
-  for (const p of picks) (byUser.get(p.user_id) || byUser.set(p.user_id, []).get(p.user_id)!).push(p);
-
-  const rows: PickemLeaderRow[] = [...byUser.entries()].map(([userId, ups]) => {
-    let correct = 0, decided = 0, pickedCount = 0;
-    let tiebreakerTotal: number | null = null;
-    for (const p of ups) {
-      const g = gameById.get(p.game_id);
-      if (!g) continue;
-      if (p.picked_team) pickedCount += 1;
-      if (g.is_tiebreaker && p.tiebreaker_total != null) tiebreakerTotal = p.tiebreaker_total;
-      if (gameIsScored(g) && p.picked_team) {
-        const result = pickIsCorrect(g, p.picked_team);
-        if (result !== null) { // null = push: a wash, not a decided game
-          decided += 1;
-          if (result) correct += 1;
-        }
-      }
-    }
-    const tiebreakerDiff = tiebreakerTotal != null && tbActual != null ? Math.abs(tiebreakerTotal - tbActual) : null;
-    return { userId, correct, decided, pickedCount, tiebreakerTotal, tiebreakerDiff, rank: 0 };
-  });
-
-  rows.sort((a, b) => {
-    if (b.correct !== a.correct) return b.correct - a.correct;
-    if (a.tiebreakerDiff != null && b.tiebreakerDiff != null) return a.tiebreakerDiff - b.tiebreakerDiff;
-    if (a.tiebreakerDiff != null) return -1; // a has a tiebreaker, b doesn't → a higher
-    if (b.tiebreakerDiff != null) return 1;
-    return 0;
-  });
-
-  // Dense-ish ranks: ties share a rank; the next distinct score takes its position index.
-  rows.forEach((r, i) => {
-    if (i === 0) { r.rank = 1; return; }
-    const prev = rows[i - 1];
-    const tied = prev.correct === r.correct && prev.tiebreakerDiff === r.tiebreakerDiff;
-    r.rank = tied ? prev.rank : i + 1;
-  });
-  return rows;
+  const matchups: Matchup[] = games.map((g) => ({
+    id: g.id, slot: g.id, round: null, sortOrder: g.sort_order,
+    competitorA: { name: g.away_team }, competitorB: { name: g.home_team },
+    startTime: g.game_time, spread: g.spread,
+    favorite: g.favorite === "away" ? "a" : g.favorite === "home" ? "b" : null,
+    overUnder: null,
+    status: g.away_score != null && g.home_score != null ? "final" : "scheduled",
+    result: g.away_score != null && g.home_score != null
+      ? { winner: g.winning_team === "away" ? "a" : g.winning_team === "home" ? "b" : null, score_a: g.away_score, score_b: g.home_score }
+      : null,
+    isTiebreaker: g.is_tiebreaker,
+  }));
+  const slatePicks: SlatePick[] = picks.map((p) => ({
+    matchupId: p.game_id, userId: p.user_id,
+    pick: p.picked_team === "away" ? { side: "a" } : p.picked_team === "home" ? { side: "b" } : null,
+    tiebreaker: p.tiebreaker_total,
+  }));
+  return rankStraight(matchups, slatePicks).map((r) => ({
+    userId: r.userId, correct: r.correct, decided: r.decided, pickedCount: r.pickedCount,
+    tiebreakerTotal: r.tiebreaker, tiebreakerDiff: r.tiebreakerDiff, rank: r.rank,
+  }));
 }

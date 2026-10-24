@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Modal from "@/app/new/_components/Modal";
 import styles from "./SquaresAdmin.module.css";
 import { resolvePayouts } from "@/lib/v2/contests/squares";
 import { buildGameAllocations } from "@/lib/v2/contests/squares-alloc";
 import SquaresEditor, { money, dateLabel, isoToLocal, localToISO, type SquaresContestRow } from "./SquaresEditor";
+import ContestCard, { CardGameTable, ContestTypeIcon, cardStyles } from "@/app/new/_components/contest-card/ContestCard";
 import { pickName, type NameMode } from "@/lib/v2/profile";
 import { computePickemPayouts, type PayoutSplit } from "@/lib/v2/contests/pickem";
 import PayoutSplitsEditor, { ordinal } from "../events/[eventId]/contests/[contestId]/PayoutSplitsEditor";
@@ -76,30 +76,6 @@ function teamWithLine(g: PickemGamePreview, side: "away" | "home"): string {
   return `${label} -${g.spread}`;
 }
 
-/** The glyph for a contest type — shared by the list badge and the add menu. */
-function ContestTypeIcon({ kind, size = 13 }: { kind: "squares" | "pickem"; size?: number }) {
-  return kind === "squares" ? (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <path d="M9 3v18M15 3v18M3 9h18M3 15h18" />
-    </svg>
-  ) : (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
-      <rect x="3" y="3" width="18" height="18" rx="2" fill="currentColor" stroke="currentColor" strokeWidth={2} />
-      <path d="M8 12l2.5 2.5L16 9" fill="none" stroke="#fff" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-/** Contest-type badge — glyph + label, matching the home-page type tags. */
-function ContestTypeTag({ kind }: { kind: "squares" | "pickem" }) {
-  return (
-    <span className={styles.typeTag}>
-      <ContestTypeIcon kind={kind} />
-      {kind === "squares" ? "Squares" : "Pick'em"}
-    </span>
-  );
-}
 
 export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, nameMode }: { orgId: string; slug: string; items: GroupContestItem[]; currentUserId: string; nameMode: NameMode }) {
   const router = useRouter();
@@ -271,53 +247,33 @@ function PickemRow({ it, adminBase, isOpen, onToggle, onSettings }: { it: Pickem
     statusLabel(it.status),
   ].filter(Boolean).join(", ");
   return (
-    <div className={styles.rowWrap} data-open={isOpen || undefined}>
-      <div className={styles.rowHead}>
-        <button type="button" className={styles.rowMain} onClick={onToggle} aria-expanded={isOpen}>
-          <span className={styles.rowHeadText}>
-            <ContestTypeTag kind="pickem" />
-            <span className={styles.rowName}>{it.name}</span>
-            <span className={styles.rowMeta}>{meta}</span>
-            <span className={styles.rowCount}>{realGames.length} game{realGames.length === 1 ? "" : "s"}</span>
-          </span>
-          <svg className={styles.rowChev} data-open={isOpen || undefined} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
-        </button>
-        <div className={styles.rowActions}>
-          <button type="button" onClick={onSettings} aria-label="Quick settings" title="Quick settings">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </button>
-          <Link href={`${adminBase}/${it.id}`} aria-label="Open Pick'em details" title="Open Pick'em details">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7" /></svg>
-          </Link>
-        </div>
-      </div>
-      {isOpen && (
-        <div className={styles.rowBody}>
-          {realGames.length === 0 ? (
-            <p className={styles.rowEmpty}>No games yet. Open the Pick&apos;em to build the slate.</p>
-          ) : (
-            <table className={styles.gameTable}>
-              <tbody>
-                {realGames.map((g, i) => (
-                  <tr key={i}>
-                    <td className={styles.gtWhen}>{gameWhen(g.gameTime)}</td>
-                    <td className={styles.gtGame}>
-                      <span style={{ fontWeight: g.scored && g.winner === "away" ? 800 : undefined }}>{teamWithLine(g, "away")}</span>
-                      {" @ "}
-                      <span style={{ fontWeight: g.scored && g.winner === "home" ? 800 : undefined }}>{teamWithLine(g, "home")}</span>
-                    </td>
-                    <td className={styles.gtPay}>{g.scored ? (g.pctCorrect != null ? `${g.pctCorrect}%` : "Final") : (g.majoritySide ? `${teamShort(g, g.majoritySide)} ${g.majorityPct}%` : "")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-    </div>
+    <ContestCard
+      kind="pickem"
+      name={it.name}
+      meta={meta}
+      count={`${realGames.length} game${realGames.length === 1 ? "" : "s"}`}
+      detailHref={`${adminBase}/${it.id}`}
+      detailLabel="Open Pick'em details"
+      onGear={onSettings}
+      isOpen={isOpen}
+      onToggle={onToggle}
+    >
+      <CardGameTable
+        empty="No games yet. Open the Pick'em to build the slate."
+        rows={realGames.map((g, i) => ({
+          key: String(i),
+          when: gameWhen(g.gameTime),
+          game: (
+            <>
+              <span style={{ fontWeight: g.scored && g.winner === "away" ? 800 : undefined }}>{teamWithLine(g, "away")}</span>
+              {" @ "}
+              <span style={{ fontWeight: g.scored && g.winner === "home" ? 800 : undefined }}>{teamWithLine(g, "home")}</span>
+            </>
+          ),
+          pay: g.scored ? (g.pctCorrect != null ? `${g.pctCorrect}%` : "Final") : (g.majoritySide ? `${teamShort(g, g.majoritySide)} ${g.majorityPct}%` : ""),
+        }))}
+      />
+    </ContestCard>
   );
 }
 
@@ -564,53 +520,32 @@ function SquaresRow({ c, adminBase, isOpen, onToggle, onEdit }: { c: SquaresCont
     return a.startTime.localeCompare(b.startTime);
   });
   return (
-    <div className={styles.rowWrap} data-open={isOpen || undefined}>
-      <div className={styles.rowHead}>
-        <button type="button" className={styles.rowMain} onClick={onToggle} aria-expanded={isOpen}>
-          <span className={styles.rowHeadText}>
-            <ContestTypeTag kind="squares" />
-            <span className={styles.rowName}>{c.name}</span>
-            <span className={styles.rowMeta}>{money(c.cellCostCents)}/square, {money(cPot)} pot, {c.status}</span>
-            <span className={styles.rowCount}>{c.games.length} game{c.games.length === 1 ? "" : "s"}</span>
-          </span>
-          <svg className={styles.rowChev} data-open={isOpen || undefined} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
-        </button>
-        <div className={styles.rowActions}>
-          <button type="button" onClick={onEdit} aria-label="Edit settings" title="Edit settings">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </button>
-          <Link href={`${adminBase}/${c.id}`} aria-label="Open pool details" title="Open pool details">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
-        </div>
-      </div>
-      {isOpen && (
-        <div className={styles.rowBody}>
-          {orderedGames.length === 0 ? (
-            <p className={styles.rowEmpty}>No games yet. Tap the gear to add some.</p>
-          ) : (
-            <table className={styles.gameTable}>
-              <tbody>
-                {orderedGames.map((g) => (
-                  <tr key={g.espnEventId}>
-                    <td className={styles.gtWhen}>{g.startTime ? dateLabel(g.startTime) : "TBD"}</td>
-                    <td className={styles.gtGame}>{g.label || "Game"}</td>
-                    <td className={styles.gtPay}>
-                      {money(centsByGame.get(g.espnEventId) ?? 0)}
-                      {g.espnEventId === restId && <span className={styles.rowRest}>rest</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-    </div>
+    <ContestCard
+      kind="squares"
+      name={c.name}
+      meta={`${money(c.cellCostCents)}/square, ${money(cPot)} pot, ${c.status}`}
+      count={`${c.games.length} game${c.games.length === 1 ? "" : "s"}`}
+      detailHref={`${adminBase}/${c.id}`}
+      detailLabel="Open pool details"
+      gearLabel="Edit settings"
+      onGear={onEdit}
+      isOpen={isOpen}
+      onToggle={onToggle}
+    >
+      <CardGameTable
+        empty="No games yet. Tap the gear to add some."
+        rows={orderedGames.map((g) => ({
+          key: g.espnEventId,
+          when: g.startTime ? dateLabel(g.startTime) : "TBD",
+          game: g.label || "Game",
+          pay: (
+            <>
+              {money(centsByGame.get(g.espnEventId) ?? 0)}
+              {g.espnEventId === restId && <span className={cardStyles.rowRest}>rest</span>}
+            </>
+          ),
+        }))}
+      />
+    </ContestCard>
   );
 }

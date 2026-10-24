@@ -179,6 +179,10 @@ When adding features to the authenticated home page (`HomeContent.tsx`), always 
 
 Spectator sub-pages live under `src/app/(public)/spectator/` and use `createAdminClient()` to bypass RLS. **Only expose truly public data** — never phone numbers, financials, chat, or private user data.
 
+## UI / Design Conventions (v2)
+
+**Before building or restyling any v2 (`/new`) UI, consult `docs/v2-design-guide.md`.** It's the example-first reference for how elements should render and behave — money inputs (`$` inside the box), selects (`.selectInput`, not `.input`), save semantics (forms save on Save; pages auto-save), collector/people pickers, type icons, CSS-module & portal theming gotchas, layout/chrome, and text conventions. When a new "this is the consistent way" decision is made, add a line there.
+
 ## Verification Checklist
 
 **After completing any implementation task, always provide a verification checklist.** A concise list of manual tests the user can work through to confirm the feature works:

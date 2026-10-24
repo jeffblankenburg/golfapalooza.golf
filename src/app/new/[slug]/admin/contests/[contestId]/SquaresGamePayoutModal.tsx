@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Modal from "@/app/new/_components/Modal";
-import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import { getLeague } from "@/lib/v2/sports/espn";
 import { PERIOD_PRESETS } from "@/lib/v2/contests/squares";
 import {
@@ -42,9 +41,10 @@ export default function SquaresGamePayoutModal({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [confirmDel, setConfirmDel] = useState(false);
+  const [now] = useState(() => Date.now()); // captured once on open
 
   // Only games that haven't started / drawn numbers can be deleted.
-  const canDelete = !game.locked && !game.final && (!game.startTime || new Date(game.startTime).getTime() > Date.now());
+  const canDelete = !game.locked && !game.final && (!game.startTime || new Date(game.startTime).getTime() > now);
 
   async function act(payload: Record<string, unknown>) {
     setBusy(true); setErr(null);

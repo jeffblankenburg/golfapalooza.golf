@@ -77,13 +77,24 @@ export function isSlateLocked(games: PickemGame[], now: Date): boolean {
  * on the line, including a no-line tie — returns null: nobody is credited or dinged.
  */
 export function pickIsCorrect(g: PickemGame, picked: "away" | "home" | null): boolean | null {
-  if (!gameIsScored(g) || !picked) return null;
+  const side = coveringSide(g);
+  if (!picked || side === null) return null;
+  return picked === side;
+}
+
+/**
+ * Which side COVERED the spread once the game is scored — "away" | "home", or null
+ * (unscored, or a push / no-line tie where nobody covered). Same math as
+ * pickIsCorrect; use it to highlight the winning team on a completed game.
+ */
+export function coveringSide(g: PickemGame): "away" | "home" | null {
+  if (!gameIsScored(g)) return null;
   const margin = (g.home_score as number) - (g.away_score as number); // + = home won by
   const spread = Math.abs(Number(g.spread ?? 0));
   const homeSpread = g.favorite === "home" ? -spread : spread; // home favored → must win by > spread
   const adjusted = margin + homeSpread;
   if (adjusted === 0) return null; // push
-  return picked === "home" ? adjusted > 0 : adjusted < 0;
+  return adjusted > 0 ? "home" : "away";
 }
 
 /** Build the leaderboard: correct DESC, then closest tiebreaker (a filled tiebreaker beats none). */

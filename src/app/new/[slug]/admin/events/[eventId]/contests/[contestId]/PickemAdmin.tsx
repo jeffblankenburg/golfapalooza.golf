@@ -72,7 +72,7 @@ function TeamCombobox({ value, onChange, placeholder }: { value: string; onChang
 // Scope-agnostic: the mount supplies `base` (API root for this contest) and
 // `adminBase` (admin URL root). Event mounts pass the event-nested paths; a
 // group mount passes the group paths. The component itself is identical.
-export default function PickemAdmin({ base, playersHref, showMoney = true, initialStatus, initialFeeCents, initialSplits, enrolledCount }: {
+export default function PickemAdmin({ base, playersHref, showMoney = true, showStatus = true, initialStatus, initialFeeCents, initialSplits, enrolledCount }: {
   base: string;
   // Enrollment page link. Event scope has a roster/players page; group scope
   // (opt-in) has none, so it's omitted and the Players block is hidden.
@@ -80,6 +80,9 @@ export default function PickemAdmin({ base, playersHref, showMoney = true, initi
   // Event scope funds Pick'em via an Option (entry fee + pot payouts). Group scope
   // has no Options model (money deferred / settle-up), so hide that whole section.
   showMoney?: boolean;
+  // Group scope moves visibility into the gear quick-settings, so the detail-page
+  // status toggle is hidden there to avoid a duplicate control.
+  showStatus?: boolean;
   initialStatus: string;
   initialFeeCents: number; initialSplits: PayoutSplit[]; enrolledCount: number;
 }) {
@@ -226,14 +229,16 @@ export default function PickemAdmin({ base, playersHref, showMoney = true, initi
 
   return (
     <div style={{ marginTop: 8 }}>
-      <div className={styles.cscAcc} style={{ marginBottom: 16 }}>
-        <div className={styles.cscAccBody} style={{ paddingTop: 12 }}>
-          <label className={styles.profileToggle} style={{ marginTop: 0 }}>
-            <input type="checkbox" checked={status === "active"} onChange={toggleOpen} disabled={busy} />
-            <span>Open to members {status === "active" ? "(visible, picks allowed)" : "(hidden)"}</span>
-          </label>
+      {showStatus && (
+        <div className={styles.cscAcc} style={{ marginBottom: 16 }}>
+          <div className={styles.cscAccBody} style={{ paddingTop: 12 }}>
+            <label className={styles.profileToggle} style={{ marginTop: 0 }}>
+              <input type="checkbox" checked={status === "active"} onChange={toggleOpen} disabled={busy} />
+              <span>Open to members {status === "active" ? "(visible, picks allowed)" : "(hidden)"}</span>
+            </label>
+          </div>
         </div>
-      </div>
+      )}
 
       {playersHref && (
         <Link href={playersHref} className={styles.cscAcc} style={{ display: "block", marginBottom: 16, textDecoration: "none" }}>

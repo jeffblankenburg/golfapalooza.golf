@@ -98,7 +98,7 @@ export default function SquaresManage({
   backHref: string;
   payoutsHref: string;
   playerHref: string;
-  editHref: string;
+  editHref?: string;
   name: string;
   phase: string;
   cellCostCents: number;
@@ -326,7 +326,7 @@ export default function SquaresManage({
         <span className={styles.topActions}>
           <Link href={payoutsHref} className={styles.edit}>Payouts</Link>
           <Link href={playerHref} className={styles.edit}>Player view</Link>
-          <Link href={editHref} className={styles.edit}>Edit settings</Link>
+          {editHref && <Link href={editHref} className={styles.edit}>Edit settings</Link>}
         </span>
       </div>
 
@@ -379,7 +379,7 @@ export default function SquaresManage({
 
       {/* Games — one accordion each, in kickoff order */}
       {active.length === 0 && completed.length === 0 ? (
-        <p className={styles.noGames}>No games yet. Add some from Edit settings.</p>
+        <p className={styles.noGames}>No games yet. Add some in Games &amp; payouts.</p>
       ) : (
         <div className={styles.gameList}>{active.map(renderGame)}</div>
       )}

@@ -24,6 +24,7 @@ export async function loadSquaresContestRow(
     id: contest.id,
     name: contest.name,
     status: contest.status,
+    phase: (cfg.phase as string) ?? "setup",
     cellCostCents: (cfg.cell_cost_cents as number) ?? 0,
     potAllocation: (cfg.pot_allocation as SquaresContestRow["potAllocation"]) ?? "equal",
     periodWeights: (cfg.period_weights as SquaresContestRow["periodWeights"]) ?? {},
@@ -67,7 +68,7 @@ export default async function SquaresManageView({
   backHref: string;
   payoutsHref: string;
   playerHref: string;
-  editHref: string;
+  editHref?: string;
   nameMode: NameMode;
 }) {
   const contestId = contest.id;

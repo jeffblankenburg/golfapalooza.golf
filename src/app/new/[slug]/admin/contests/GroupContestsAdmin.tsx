@@ -7,7 +7,7 @@ import Modal from "@/app/new/_components/Modal";
 import styles from "./SquaresAdmin.module.css";
 import { resolvePayouts } from "@/lib/v2/contests/squares";
 import { buildGameAllocations } from "@/lib/v2/contests/squares-alloc";
-import SquaresEditor, { money, dateLabel, type SquaresContestRow } from "./SquaresEditor";
+import SquaresEditor, { money, dateLabel, isoToLocal, localToISO, type SquaresContestRow } from "./SquaresEditor";
 import { pickName, type NameMode } from "@/lib/v2/profile";
 
 // One unified list for the group Contests hub — every created pool, any type,
@@ -21,6 +21,9 @@ export interface PickemGamePreview {
   favorite: "away" | "home" | null;
   gameTime: string | null;
   isTiebreaker: boolean;
+  scored: boolean;                        // both scores in → completed
+  winner: "away" | "home" | null;         // ATS covering side (null = push / unscored)
+  pctCorrect: number | null;              // % of pickers who covered, once scored
 }
 
 /** Short team label for the compact admin preview: ESPN abbreviation, else full name. */
@@ -30,7 +33,7 @@ function teamShort(g: PickemGamePreview, side: "away" | "home"): string {
   return (abbrev || "").trim() || full;
 }
 export type GroupContestItem =
-  | { kind: "squares"; id: string; createdAt: string; box: SquaresContestRow }
+  | { kind: "squares"; id: string; createdAt: string; box: SquaresContestRow; results: Record<string, { final: boolean; winner: string | null }> }
   | {
       kind: "pickem";
       id: string;
@@ -61,11 +64,11 @@ function gameWhen(iso: string | null): string {
   if (!iso) return "TBD";
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
-function spreadLabel(g: PickemGamePreview): string {
-  if (g.isTiebreaker) return "Tiebreaker";
-  if (g.spread == null || !g.favorite) return "";
-  const fav = teamShort(g, g.favorite);
-  return `${fav} -${g.spread}`;
+/** Team label with the line inline — the favorite carries "-spread". */
+function teamWithLine(g: PickemGamePreview, side: "away" | "home"): string {
+  const label = teamShort(g, side);
+  if (g.isTiebreaker || g.spread == null || !g.favorite || g.favorite !== side) return label;
+  return `${label} -${g.spread}`;
 }
 
 /** The glyph for a contest type — shared by the list badge and the add menu. */
@@ -105,6 +108,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
   const [pickemOpen, setPickemOpen] = useState(false);
   const [pickemName, setPickemName] = useState("");
   const [settingsFor, setSettingsFor] = useState<PickemItem | null>(null);
+  const [squaresSettingsFor, setSquaresSettingsFor] = useState<SquaresContestRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -115,12 +119,12 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
       return next;
     });
 
-  // Open the Squares editor when linked from a pool's manage page (?edit=<id>).
+  // Open the Squares quick-settings when linked with ?settings=<id>.
   useEffect(() => {
-    const editId = searchParams.get("edit");
-    if (!editId) return;
-    const it = items.find((x) => x.kind === "squares" && x.id === editId);
-    if (it && it.kind === "squares") setEditing(it.box);
+    const id = searchParams.get("settings");
+    if (!id) return;
+    const it = items.find((x) => x.kind === "squares" && x.id === id);
+    if (it && it.kind === "squares") setSquaresSettingsFor(it.box);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
@@ -193,8 +197,8 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
         )}
       </div>
 
-      {editing !== undefined && (
-        <SquaresEditor collectionBase={collectionBase} editing={editing} nameMode={nameMode} currentUserId={currentUserId} onClose={() => setEditing(undefined)} />
+      {editing === null && (
+        <SquaresEditor collectionBase={collectionBase} editing={null} nameMode={nameMode} currentUserId={currentUserId} onClose={() => setEditing(undefined)} />
       )}
 
       <Modal open={pickemOpen} title="New Pick'em" onClose={() => setPickemOpen(false)}>
@@ -219,7 +223,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
         {items.length === 0 && editing === undefined && <p className={styles.empty}>No contests yet. Add one above.</p>}
         {items.map((it) =>
           it.kind === "squares" ? (
-            <SquaresRow key={it.id} c={it.box} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onEdit={() => setEditing(it.box)} />
+            <SquaresRow key={it.id} c={it.box} results={it.results} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onEdit={() => setSquaresSettingsFor(it.box)} />
           ) : (
             <PickemRow key={it.id} it={it} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onSettings={() => setSettingsFor(it)} />
           ),
@@ -234,6 +238,17 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
           nameMode={nameMode}
           onClose={() => setSettingsFor(null)}
           onSaved={() => { setSettingsFor(null); router.refresh(); }}
+        />
+      )}
+
+      {squaresSettingsFor && (
+        <SquaresQuickSettings
+          orgId={orgId}
+          box={squaresSettingsFor}
+          currentUserId={currentUserId}
+          nameMode={nameMode}
+          onClose={() => { setSquaresSettingsFor(null); router.refresh(); }}
+          onSaved={() => { setSquaresSettingsFor(null); router.refresh(); }}
         />
       )}
     </div>
@@ -284,8 +299,12 @@ function PickemRow({ it, adminBase, isOpen, onToggle, onSettings }: { it: Pickem
                 {realGames.map((g, i) => (
                   <tr key={i}>
                     <td className={styles.gtWhen}>{gameWhen(g.gameTime)}</td>
-                    <td className={styles.gtGame}>{teamShort(g, "away")} @ {teamShort(g, "home")}</td>
-                    <td className={styles.gtPay}>{spreadLabel(g)}</td>
+                    <td className={styles.gtGame}>
+                      <span style={{ fontWeight: g.scored && g.winner === "away" ? 800 : undefined }}>{teamWithLine(g, "away")}</span>
+                      {" @ "}
+                      <span style={{ fontWeight: g.scored && g.winner === "home" ? 800 : undefined }}>{teamWithLine(g, "home")}</span>
+                    </td>
+                    <td className={styles.gtPay}>{g.scored ? (g.pctCorrect != null ? `${g.pctCorrect}% correct` : "Final") : ""}</td>
                   </tr>
                 ))}
               </tbody>
@@ -349,7 +368,7 @@ function PickemQuickSettings({ orgId, item, currentUserId, nameMode, onClose, on
           </select>
         </label>
         <label>
-          <span style={{ display: "block", fontSize: "0.8125rem", fontWeight: 600, marginBottom: 4 }}>Entry fee</span>
+          <span style={{ display: "block", fontSize: "0.8125rem", fontWeight: 600, marginBottom: 4 }}>Buy-in</span>
           <span style={{ position: "relative", display: "block" }}>
             <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--ink-soft)", pointerEvents: "none" }}>$</span>
             <input className={styles.input} style={{ paddingLeft: 26 }} inputMode="decimal" value={fee} placeholder="0" onChange={(e) => setFee(e.target.value.replace(/[^0-9.]/g, ""))} />
@@ -370,8 +389,139 @@ function PickemQuickSettings({ orgId, item, currentUserId, nameMode, onClose, on
   );
 }
 
+const QS_LABEL = { display: "block", fontSize: "0.8125rem", fontWeight: 600, marginBottom: 4 } as const;
+
+/** Quick settings for a Squares pool (name / buy-in / visibility / collector / draft
+ *  rules) — parity with Pick'em's gear. Games & payouts live on the detail page. */
+function SquaresQuickSettings({ orgId, box, currentUserId, nameMode, onClose, onSaved }: { orgId: string; box: SquaresContestRow; currentUserId: string; nameMode: NameMode; onClose: () => void; onSaved: () => void }) {
+  const base = `/api/v2/orgs/${orgId}/contests/${box.id}`;
+  const [name, setName] = useState(box.name);
+  const [costStr, setCostStr] = useState(box.cellCostCents ? String(box.cellCostCents / 100) : "");
+  const [collectedBy, setCollectedBy] = useState(box.collectedBy || currentUserId);
+  const [members, setMembers] = useState<{ user_id: string; name: string; venmo: string | null }[]>([]);
+  const [maxPrimary, setMaxPrimary] = useState(String(box.maxSquaresPrimary));
+  const [secUnlimited, setSecUnlimited] = useState(box.maxSquaresSecondary == null);
+  const [maxSecondary, setMaxSecondary] = useState(String(box.maxSquaresSecondary ?? 20));
+  const [primaryEnds, setPrimaryEnds] = useState(isoToLocal(box.primaryEndsAt));
+  const [secondaryEnds, setSecondaryEnds] = useState(isoToLocal(box.secondaryEndsAt));
+  const [visible, setVisible] = useState(box.status === "active");
+  const [phase, setPhase] = useState(box.phase);
+  const [togglingVis, setTogglingVis] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const r = await fetch(`/api/v2/orgs/${orgId}/members`);
+      if (r.ok) {
+        const list = ((await r.json()).members || []) as { user_id: string; display_name: string; first_name: string | null; last_name: string | null; venmo_username: string | null; archived?: boolean }[];
+        setMembers(list.filter((m) => !m.archived).map((m) => ({ user_id: m.user_id, name: pickName(m, nameMode), venmo: m.venmo_username })).sort((a, b) => a.name.localeCompare(b.name)));
+      }
+    })();
+  }, [orgId]);
+
+  // The simple gear toggle only owns the first open/close; once buying has moved
+  // past primary the detail-page lifecycle governs visibility.
+  const canToggleVisibility = phase === "setup" || phase === "primary";
+
+  async function toggleVisible() {
+    if (togglingVis || !canToggleVisibility) return;
+    const next = !visible;
+    setTogglingVis(true); setErr(null); setVisible(next);
+    const res = await fetch(`${base}/squares/action`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: next ? "open_primary" : "back_to_setup" }),
+    });
+    if (res.ok) { const d = await res.json().catch(() => ({})); setPhase(d.phase ?? (next ? "primary" : "setup")); }
+    else { setVisible(!next); setErr((await res.json().catch(() => ({}))).error || "Could not change visibility"); }
+    setTogglingVis(false);
+  }
+
+  async function save() {
+    const n = name.trim();
+    if (!n || saving) return;
+    setSaving(true); setErr(null);
+    const res = await fetch(base, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: n,
+        cell_cost_cents: Math.round((Number(costStr) || 0) * 100),
+        collected_by: collectedBy || null,
+        max_squares_primary: Math.max(1, parseInt(maxPrimary, 10) || 1),
+        max_squares_secondary: secUnlimited ? null : Math.max(1, parseInt(maxSecondary, 10) || 1),
+        primary_ends_at: localToISO(primaryEnds),
+        secondary_ends_at: localToISO(secondaryEnds),
+      }),
+    });
+    if (!res.ok) { setErr((await res.json().catch(() => ({}))).error || "Could not save"); setSaving(false); return; }
+    onSaved();
+  }
+
+  return (
+    <Modal open title="Squares settings" onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <label>
+          <span style={QS_LABEL}>Name</span>
+          <input className={styles.input} style={{ width: "100%" }} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+        </label>
+        <label>
+          <span style={QS_LABEL}>Buy-in (per square)</span>
+          <span style={{ position: "relative", display: "block" }}>
+            <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--ink-soft, #59635b)", pointerEvents: "none" }}>$</span>
+            <input className={styles.input} style={{ width: "100%", paddingLeft: 26 }} inputMode="decimal" value={costStr} placeholder="0" onChange={(e) => setCostStr(e.target.value.replace(/[^0-9.]/g, ""))} />
+          </span>
+        </label>
+        <div>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.9rem", cursor: canToggleVisibility ? "pointer" : "default", opacity: canToggleVisibility ? 1 : 0.6 }}>
+            <input type="checkbox" checked={visible} disabled={!canToggleVisibility || togglingVis} onChange={toggleVisible} />
+            <span>Visible to members {visible ? "(open for buying)" : "(draft, hidden)"}</span>
+          </label>
+          {!canToggleVisibility && <p className={styles.capHint} style={{ marginTop: 4 }}>Buying is underway — manage visibility on the pool page.</p>}
+        </div>
+        <label>
+          <span style={QS_LABEL}>Who&apos;s collecting? (needs Venmo)</span>
+          <select className={styles.selectInput} value={collectedBy} onChange={(e) => setCollectedBy(e.target.value)}>
+            {members.map((m) => <option key={m.user_id} value={m.user_id} disabled={!m.venmo && m.user_id !== collectedBy}>{m.name}{m.venmo ? "" : " (needs Venmo)"}</option>)}
+          </select>
+        </label>
+        <div>
+          <span style={QS_LABEL}>Squares per person</span>
+          <div className={styles.caps}>
+            <label className={styles.capField}>
+              <span className={styles.capName}>Primary draft</span>
+              <input className={styles.capInput} value={maxPrimary} inputMode="numeric" onChange={(e) => setMaxPrimary(e.target.value.replace(/\D/g, ""))} />
+            </label>
+            <div className={styles.capField}>
+              <span className={styles.capName}>Secondary draft</span>
+              <div className={styles.capRow}>
+                <div className={styles.seg} role="group" aria-label="Secondary cap">
+                  <button type="button" data-on={secUnlimited || undefined} onClick={() => setSecUnlimited(true)}>Unlimited</button>
+                  <button type="button" data-on={!secUnlimited || undefined} onClick={() => setSecUnlimited(false)}>Limit</button>
+                </div>
+                {!secUnlimited && <input className={styles.capInput} value={maxSecondary} inputMode="numeric" onChange={(e) => setMaxSecondary(e.target.value.replace(/\D/g, ""))} />}
+              </div>
+            </div>
+          </div>
+        </div>
+        <label>
+          <span style={QS_LABEL}>Primary draft ends</span>
+          <input className={styles.input} style={{ width: "100%" }} type="datetime-local" value={primaryEnds} onChange={(e) => setPrimaryEnds(e.target.value)} />
+        </label>
+        <label>
+          <span style={QS_LABEL}>Secondary draft ends (optional)</span>
+          <input className={styles.input} style={{ width: "100%" }} type="datetime-local" value={secondaryEnds} onChange={(e) => setSecondaryEnds(e.target.value)} />
+        </label>
+        {err && <p className={styles.err} style={{ margin: 0 }}>{err}</p>}
+        <button type="button" className={styles.create} onClick={() => void save()} disabled={saving || !name.trim()}>
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 /** One Squares pool in the list — expandable (game table) with a gear to edit. */
-function SquaresRow({ c, adminBase, isOpen, onToggle, onEdit }: { c: SquaresContestRow; adminBase: string; isOpen: boolean; onToggle: () => void; onEdit: () => void }) {
+function SquaresRow({ c, results, adminBase, isOpen, onToggle, onEdit }: { c: SquaresContestRow; results: Record<string, { final: boolean; winner: string | null }>; adminBase: string; isOpen: boolean; onToggle: () => void; onEdit: () => void }) {
   const cPot = c.cellCostCents * 100;
   const cAlloc = buildGameAllocations(
     c.games.map((g) => ({ id: g.espnEventId, league: g.league, game_alloc: g.gameAlloc, period_alloc: g.periodAlloc })),
@@ -418,16 +568,26 @@ function SquaresRow({ c, adminBase, isOpen, onToggle, onEdit }: { c: SquaresCont
           ) : (
             <table className={styles.gameTable}>
               <tbody>
-                {orderedGames.map((g) => (
+                {orderedGames.map((g) => {
+                  const res = results[g.espnEventId];
+                  return (
                   <tr key={g.espnEventId}>
                     <td className={styles.gtWhen}>{g.startTime ? dateLabel(g.startTime) : "TBD"}</td>
-                    <td className={styles.gtGame}>{g.label || "Game"}</td>
+                    <td className={styles.gtGame}>
+                      {g.label || "Game"}
+                      {res?.final && (
+                        <span style={{ marginLeft: 6, fontSize: "0.72rem", fontWeight: 700, color: "#15803d" }}>
+                          {res.winner ? `✓ ${res.winner}` : "Final"}
+                        </span>
+                      )}
+                    </td>
                     <td className={styles.gtPay}>
                       {money(centsByGame.get(g.espnEventId) ?? 0)}
                       {g.espnEventId === restId && <span className={styles.rowRest}>rest</span>}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}

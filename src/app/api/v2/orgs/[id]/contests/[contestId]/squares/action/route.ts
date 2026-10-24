@@ -77,6 +77,20 @@ export async function POST(request: Request, { params }: { params: Params }) {
     return NextResponse.json({ ok: true, phase: cfg.phase });
   }
 
+  // Hide the pool from members (gear "Visible to members" OFF) — back to setup.
+  // Only valid before buying has progressed; once secondary/closed/locked it's the
+  // detail-page lifecycle's job. Symmetric with open_primary.
+  if (action === "back_to_setup") {
+    if (boardLocked) return NextResponse.json({ error: "The board is locked — it can't be hidden." }, { status: 409 });
+    if (cfg.phase !== "setup" && cfg.phase !== "primary") {
+      return NextResponse.json({ error: "The draft is already underway — manage visibility on the detail page." }, { status: 409 });
+    }
+    cfg.phase = "setup";
+    const { error } = await admin.from("v2_contests").update({ config: cfg, status: "draft" }).eq("id", contestId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, phase: "setup" });
+  }
+
   // Lock the board (ownership frozen) and seed each game's default reveal time —
   // a week before kickoff — without drawing any numbers yet. Reveals happen
   // per-game after this (scheduled by the cron, or by hand).

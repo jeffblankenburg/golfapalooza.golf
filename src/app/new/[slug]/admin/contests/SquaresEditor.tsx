@@ -52,6 +52,7 @@ export interface SquaresContestRow {
   id: string;
   name: string;
   status: string;
+  phase: string; // config.phase: setup|primary|secondary|closed|locked|final
   cellCostCents: number;
   potAllocation: "equal" | "round_weighted" | "custom";
   periodWeights: Record<string, Record<string, number>>;
@@ -64,13 +65,13 @@ export interface SquaresContestRow {
 }
 
 export const money = (c: number) => `$${c / 100 % 1 === 0 ? (c / 100).toFixed(0) : (c / 100).toFixed(2)}`;
-const isoToLocal = (iso: string | null): string => {
+export const isoToLocal = (iso: string | null): string => {
   if (!iso) return "";
   const d = new Date(iso);
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 };
-const localToISO = (s: string): string | null => (s ? new Date(s).toISOString() : null);
+export const localToISO = (s: string): string | null => (s ? new Date(s).toISOString() : null);
 export const dateLabel = (iso: string | null): string =>
   iso ? new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
 
@@ -166,7 +167,9 @@ export default function SquaresEditor({
   eventId = null,
   nameMode = "nickname",
   currentUserId = "",
-  onClose,
+  variant = "modal",
+  gamesOnly = false,
+  onClose = () => {},
   onSaved,
 }: {
   collectionBase: string;
@@ -176,9 +179,16 @@ export default function SquaresEditor({
   eventId?: string | null;
   nameMode?: NameMode;       // for the collector picker's member names (edit mode only)
   currentUserId?: string;    // pre-selected collector (the active admin)
-  onClose: () => void;
+  // "modal" (default) = full-screen overlay for create/full edit. "inline" = render
+  // as a page section (no portal/overlay) for the detail page's games/payouts editor.
+  variant?: "modal" | "inline";
+  // When true, render ONLY the Games & payouts section and save a games-only partial
+  // (basics/draft live in the gear). Used by the detail page.
+  gamesOnly?: boolean;
+  onClose?: () => void; // modal only; inline (detail page) never calls it
   onSaved?: () => void;
 }) {
+  const inline = variant === "inline";
   const router = useRouter();
   const editingId = editing?.id ?? null;
   // Org id lives in the collection base: /api/v2/orgs/<orgId>/contests
@@ -270,6 +280,7 @@ export default function SquaresEditor({
   }, [games]);
 
   useEffect(() => {
+    if (inline) return; // inline is a page section — no modal scroll-lock / Escape-to-close
     // While the game picker is stacked on top, let IT handle Escape.
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !pickerOpen) onClose();
@@ -281,11 +292,11 @@ export default function SquaresEditor({
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [pickerOpen, onClose]);
+  }, [pickerOpen, onClose, inline]);
 
   async function save() {
     if (saving) return;
-    if (!name.trim()) return setErr("Give it a name.");
+    if (!gamesOnly && !name.trim()) return setErr("Give it a name.");
     if (games.length === 0) return setErr("Pick at least one game.");
     // Block when payouts exceed the full-board pot (over-promised)…
     if (potCents > 0 && resolved.shortfallCents > 0) {
@@ -305,16 +316,23 @@ export default function SquaresEditor({
     }
     setSaving(true);
     setErr(null);
+    // Detail-page games/payouts editor: send ONLY the games + payout config (basics/
+    // draft are owned by the gear). The full editor (create/full edit) sends all.
+    const basics = gamesOnly
+      ? {}
+      : {
+          ...(editingId ? { collected_by: collectedBy || null } : { contest_type: "squares", event_id: eventId ?? null }),
+          name: name.trim(),
+          cell_cost_cents: Math.round((cost ?? 0) * 100),
+          max_squares_primary: Math.max(1, parseInt(maxPrimaryStr, 10) || 1),
+          max_squares_secondary: secondaryUnlimited ? null : Math.max(1, parseInt(maxSecondaryStr, 10) || 1),
+          primary_ends_at: localToISO(primaryEndsStr),
+          secondary_ends_at: localToISO(secondaryEndsStr),
+        };
     const payload = {
-      ...(editingId ? { collected_by: collectedBy || null } : { contest_type: "squares", event_id: eventId ?? null }),
-      name: name.trim(),
-      cell_cost_cents: Math.round((cost ?? 0) * 100),
+      ...basics,
       pot_allocation: potAllocation,
       period_weights: Object.fromEntries(structures.map((s) => [s, periodWeights[s] ?? defaultWeights(s)])),
-      max_squares_primary: Math.max(1, parseInt(maxPrimaryStr, 10) || 1),
-      max_squares_secondary: secondaryUnlimited ? null : Math.max(1, parseInt(maxSecondaryStr, 10) || 1),
-      primary_ends_at: localToISO(primaryEndsStr),
-      secondary_ends_at: localToISO(secondaryEndsStr),
       games: games.map((g) => {
         const s = getLeague(g.league)?.periods;
         const pa = s === "quarters" || s === "halves" ? palloc[g.espnEventId] : null;
@@ -343,7 +361,7 @@ export default function SquaresEditor({
         return;
       }
       onSaved?.();
-      onClose();
+      if (!inline) onClose(); // inline stays on the page; just refresh
       router.refresh();
     } catch {
       setErr("Something went wrong.");
@@ -372,17 +390,17 @@ export default function SquaresEditor({
     }
   }
 
-  return (
-    <>
-      {createPortal(
-        <div className={styles.overlay} onClick={onClose}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.formHead}>
-              <span className={styles.formTitle}>{editingId ? "Edit Squares pool" : "New Squares pool"}</span>
-              <button type="button" className={styles.cancel} onClick={onClose}>Cancel</button>
-            </div>
+  const inner = (
+    <div className={inline ? styles.inlineEditor : styles.modal} onClick={inline ? undefined : (e) => e.stopPropagation()}>
+      {!inline && (
+        <div className={styles.formHead}>
+          <span className={styles.formTitle}>{editingId ? "Edit Squares pool" : "New Squares pool"}</span>
+          <button type="button" className={styles.cancel} onClick={onClose}>Cancel</button>
+        </div>
+      )}
 
             <div className={styles.modalBody}>
+              {!gamesOnly && (<>
               <Section
                 title="Basics"
                 open={openSec.basics}
@@ -446,6 +464,7 @@ export default function SquaresEditor({
                 <input className={styles.input} type="datetime-local" value={secondaryEndsStr} onChange={(e) => setSecondaryEndsStr(e.target.value)} />
                 <p className={styles.capHint}>Primary ends → secondary begins. Leave secondary blank to close it by hand — you can always close picks early from the pool page.</p>
               </Section>
+              </>)}
 
               <Section
                 title="Games & payouts"
@@ -602,7 +621,7 @@ export default function SquaresEditor({
             <div className={styles.modalFooter}>
               {err && <p className={styles.err}>{err}</p>}
               <div className={styles.footerRow}>
-                {editingId &&
+                {!gamesOnly && editingId &&
                   (confirmDel ? (
                     <span className={styles.delInline}>
                       <button type="button" className={styles.delConfirm} onClick={remove} disabled={saving}>Delete?</button>
@@ -612,12 +631,17 @@ export default function SquaresEditor({
                     <button type="button" className={styles.delBtn} onClick={() => setConfirmDel(true)}>Delete</button>
                   ))}
                 <button type="button" className={styles.create} onClick={save} disabled={saving}>
-                  {saving ? "Saving…" : editingId ? "Save changes" : "Create pool"}
+                  {saving ? "Saving…" : gamesOnly ? "Save games & payouts" : editingId ? "Save changes" : "Create pool"}
                 </button>
               </div>
             </div>
           </div>
-        </div>,
+  );
+
+  return (
+    <>
+      {inline ? inner : createPortal(
+        <div className={styles.overlay} onClick={onClose}>{inner}</div>,
         document.body,
       )}
 

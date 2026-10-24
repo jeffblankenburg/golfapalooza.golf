@@ -2,11 +2,10 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
-import SquaresManageView from "./SquaresManageView";
+import SquaresManageView, { loadSquaresContestRow } from "./SquaresManageView";
+import SquaresEditor from "../SquaresEditor";
 // Same admin component the event lane uses — mounted here with the group API base.
 import PickemAdmin from "../../events/[eventId]/contests/[contestId]/PickemAdmin";
-import ContestParticipants from "@/components/v2/contests/ContestParticipants";
-import ContestCollector from "@/components/v2/contests/ContestCollector";
 import GroupContestMoney from "./GroupContestMoney";
 import { type PayoutSplit } from "@/lib/v2/contests/payouts";
 import styles from "@/app/new/new.module.css";
@@ -40,6 +39,7 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
         <PickemAdmin
           base={`/api/v2/orgs/${org.id}/contests/${contestId}`}
           showMoney={false}
+          showStatus={false}
           initialStatus={contest.status as string}
           initialFeeCents={0}
           initialSplits={(contest.payout_splits as { place: number; kind: string; amount: number }[] | null) ?? []}
@@ -48,20 +48,18 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
         <GroupContestMoney
           orgId={org.id}
           contestId={contestId}
-          currentUserId={ctx.userId}
-          nameMode={org.name_display}
           initialEntryCents={Number((contest.config as { entry_cents?: number } | null)?.entry_cents) || 0}
-          initialCollectedBy={(contest.collected_by as string | null) ?? null}
           initialSplits={(contest.payout_splits as PayoutSplit[] | null) ?? []}
         />
-        <ContestParticipants apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`} />
       </div>
     );
   }
 
   if (contest.contest_type !== "squares") notFound();
 
-  // Squares manage view — shared with the event lane; mounted with the GROUP links.
+  // Squares manage view (grids / reveals / results / paid) + an inline games & payouts
+  // editor. Basics/collector/visibility live in the gear quick-settings on the list.
+  const squaresRow = await loadSquaresContestRow(supabase, contest);
   return (
     <>
       <SquaresManageView
@@ -71,18 +69,18 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
         backHref={`/new/${slug}/admin/contests`}
         payoutsHref={`/new/${slug}/admin/contests/${contestId}/payouts`}
         playerHref={`/new/${slug}/contests/${contestId}`}
-        editHref={`/new/${slug}/admin/contests?edit=${contestId}`}
         nameMode={org.name_display}
       />
       <div className={styles.page} style={{ paddingTop: 0 }}>
-        <ContestCollector
-          base={`/api/v2/orgs/${org.id}/contests/${contestId}`}
-          orgId={org.id}
+        <p className={styles.sectionLabel}>Games &amp; payouts</p>
+        <SquaresEditor
+          variant="inline"
+          gamesOnly
+          editing={squaresRow}
+          collectionBase={`/api/v2/orgs/${org.id}/contests`}
           nameMode={org.name_display}
           currentUserId={ctx.userId}
-          initialCollectedBy={(contest.collected_by as string | null) ?? null}
         />
-        <ContestParticipants apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`} />
       </div>
     </>
   );

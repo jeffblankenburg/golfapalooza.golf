@@ -3,7 +3,8 @@ import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
 import GroupContestsAdmin, { type GroupContestItem } from "./GroupContestsAdmin";
 import { type SquaresContestRow } from "./SquaresEditor";
-import { coveringSide, type PickemGame, type PayoutSplit } from "@/lib/v2/contests/pickem";
+import { type PayoutSplit } from "@/lib/v2/contests/pickem";
+import { buildPickemPreviews } from "@/lib/v2/contests/pickem-preview";
 
 /**
  * Group-level contests — pools that belong to the whole group (event_id NULL),
@@ -39,29 +40,14 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
 
   // Pick'em enrichment: matchups (preview), participant count + buy-in (meta).
   const pickemIds = (contests ?? []).filter((c) => c.contest_type === "pickem").map((c) => c.id);
-  const { data: pickemGames } = pickemIds.length
-    ? await supabase.from("v2_pickem_games").select("id, contest_id, away_team, home_team, away_abbrev, home_abbrev, spread, favorite, away_score, home_score, winning_team, game_time, is_tiebreaker, sort_order").in("contest_id", pickemIds).order("sort_order")
-    : { data: [] as Record<string, unknown>[] };
-  const { data: pickemParts } = pickemIds.length
-    ? await supabase.from("v2_contest_participants").select("contest_id").in("contest_id", pickemIds)
-    : { data: [] as { contest_id: string }[] };
+  const [pickemPreviews, { data: pickemParts }] = await Promise.all([
+    buildPickemPreviews(supabase, pickemIds),
+    pickemIds.length
+      ? supabase.from("v2_contest_participants").select("contest_id").in("contest_id", pickemIds)
+      : Promise.resolve({ data: [] as { contest_id: string }[] }),
+  ]);
   const pickemPartCount = new Map<string, number>();
   for (const p of pickemParts ?? []) pickemPartCount.set(p.contest_id as string, (pickemPartCount.get(p.contest_id as string) || 0) + 1);
-
-  // Per-game winner (ATS covering side) + % of pickers who covered — for the
-  // accordion's completed-game highlight.
-  const pickemGameIds = (pickemGames ?? []).map((g) => g.id as string);
-  const { data: picks } = pickemGameIds.length
-    ? await supabase.from("v2_pickem_picks").select("game_id, picked_team").in("game_id", pickemGameIds).not("picked_team", "is", null)
-    : { data: [] as { game_id: string; picked_team: string }[] };
-  const winnerByGame = new Map<string, "away" | "home" | null>();
-  for (const g of pickemGames ?? []) winnerByGame.set(g.id as string, coveringSide(g as unknown as PickemGame));
-  const pickCounts = new Map<string, { away: number; home: number }>();
-  for (const p of picks ?? []) {
-    const c = pickCounts.get(p.game_id as string) ?? { away: 0, home: 0 };
-    if (p.picked_team === "away") c.away++; else if (p.picked_team === "home") c.home++;
-    pickCounts.set(p.game_id as string, c);
-  }
 
   const items: GroupContestItem[] = (contests ?? []).map((c) => {
     if (c.contest_type === "pickem") {
@@ -71,25 +57,7 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
         collectedBy: (c as { collected_by?: string | null }).collected_by ?? null,
         payoutSplits: ((c as { payout_splits?: unknown }).payout_splits as PayoutSplit[] | null) ?? [],
         participantCount: pickemPartCount.get(c.id as string) || 0,
-        games: (pickemGames ?? [])
-          .filter((g) => g.contest_id === c.id)
-          .map((g) => {
-            const scored = g.away_score != null && g.home_score != null;
-            const counts = pickCounts.get(g.id as string) ?? { away: 0, home: 0 };
-            const total = counts.away + counts.home;
-            const winner = scored ? (winnerByGame.get(g.id as string) ?? null) : null;
-            const covered = winner === "away" ? counts.away : winner === "home" ? counts.home : 0;
-            return {
-              awayTeam: g.away_team as string, homeTeam: g.home_team as string,
-              awayAbbrev: (g.away_abbrev as string | null) ?? null, homeAbbrev: (g.home_abbrev as string | null) ?? null,
-              spread: g.spread as number | null, favorite: (g.favorite as "away" | "home" | null) ?? null,
-              gameTime: (g.game_time as string) ?? null, isTiebreaker: !!g.is_tiebreaker,
-              scored, winner,
-              pctCorrect: scored && total > 0 ? Math.round((covered / total) * 100) : null,
-              majoritySide: total > 0 ? (counts.away >= counts.home ? ("away" as const) : ("home" as const)) : null,
-              majorityPct: total > 0 ? Math.round((Math.max(counts.away, counts.home) / total) * 100) : null,
-            };
-          }),
+        games: pickemPreviews.get(c.id as string) || [],
       };
     }
     const cfg =

@@ -195,21 +195,14 @@
   font-size: 0.72rem;
   color: var(--ink-soft, #59635b);
 }
-.sideAction {
+/* Right-aligned read-only value on a side-game row (pot total / participant count). */
+.sideRight {
   flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  color: var(--ink-soft, #59635b);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
-}
-.sideAction:hover {
-  background: color-mix(in srgb, var(--ink, #17211c) 6%, transparent);
-  color: var(--ink, #17211c);
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--brand, #0a5c36);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 /* A labelled sub-summary line inside a body (e.g. scramble teams/course/time). */
 .bodyFacts {

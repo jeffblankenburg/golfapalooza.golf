@@ -1,18 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import ContestCard, { cardStyles } from "@/app/new/_components/contest-card/ContestCard";
+import { PickemPreview, SquaresPreview } from "@/app/new/_components/contest-card/previews";
+import type { PickemGamePreview } from "@/lib/v2/contests/pickem-preview";
+import type { SquaresContestRow } from "@/app/new/[slug]/admin/contests/SquaresEditor";
 import ContestSettings, { type CourseOption } from "./[contestId]/ContestSettings";
 import styles from "@/app/new/new.module.css";
 
-/** A nested side game shown inside a parent scramble's accordion. */
+/** A nested side game shown (read-only) inside a parent scramble's accordion —
+ *  managed on the scramble's detail page, so not clickable here. */
 export interface SideRow {
   id: string;
   type: string;
   name: string;
-  meta: string; // e.g. "Skins (net), $40 pot" / "CTP, hole 7"
-  winner: string | null; // resolved winner name, "No winner", or null (not set)
+  meta: string; // e.g. "Skins (net), hole 7" (+ winner when set)
+  right: string; // pot total or participant count, shown on the right
 }
 
 /** Everything a card needs, normalized server-side (lane-agnostic). */
@@ -27,6 +30,10 @@ export interface EventCard {
   facts: { label: string; value: string }[];
   sides: SideRow[];
   bodyHint?: string; // shown when there are no facts/sides
+  // When present, the accordion renders the full game table (same as the group lane)
+  // instead of the facts summary.
+  pickemGames?: PickemGamePreview[];
+  squaresRow?: SquaresContestRow;
   gear: {
     contestDate: string | null;
     startTime: string | null;
@@ -66,8 +73,6 @@ export default function EventContestsList({
       return next;
     });
 
-  const detailBase = `/new/${slug}/admin/events/${eventId}/contests`;
-
   function renderCard(c: EventCard) {
     const isOpen = expanded.has(c.id);
     return (
@@ -83,6 +88,12 @@ export default function EventContestsList({
           onToggle={() => toggle(c.id)}
           badge={c.needsAttention ? <span className={styles.needsAttn} style={{ marginLeft: 8 }}>Needs attention</span> : undefined}
         >
+          {c.pickemGames ? (
+            <PickemPreview games={c.pickemGames} />
+          ) : c.squaresRow ? (
+            <SquaresPreview row={c.squaresRow} />
+          ) : (
+          <>
           {c.facts.length > 0 && (
             <div className={cardStyles.bodyFacts}>
               {c.facts.map((f) => (
@@ -93,18 +104,20 @@ export default function EventContestsList({
           {c.sides.length > 0 && (
             <div>
               {c.sides.map((s) => (
-                <Link key={s.id} href={`${detailBase}/${c.id}`} className={cardStyles.sideRow} style={{ textDecoration: "none" }}>
+                <div key={s.id} className={cardStyles.sideRow}>
                   <span className={cardStyles.sideMain}>
                     <span className={cardStyles.sideName}>{s.name}</span>
-                    <span className={cardStyles.sideMeta}>{s.meta}{s.winner ? `, ${s.winner}` : ""}</span>
+                    <span className={cardStyles.sideMeta}>{s.meta}</span>
                   </span>
-                  <svg className={cardStyles.sideAction} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M9 5l7 7-7 7" /></svg>
-                </Link>
+                  {s.right && <span className={cardStyles.sideRight}>{s.right}</span>}
+                </div>
               ))}
             </div>
           )}
           {c.facts.length === 0 && c.sides.length === 0 && c.bodyHint && (
             <p className={cardStyles.rowEmpty}>{c.bodyHint}</p>
+          )}
+          </>
           )}
         </ContestCard>
 

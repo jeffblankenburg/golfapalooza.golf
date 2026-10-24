@@ -5,6 +5,8 @@ import { v2AdminClient } from "@/lib/v2/supabase";
 import { CONTEST_SELECT, contestTypeLabel, loadBuyInCents, type Contest } from "@/lib/v2/contests";
 import { pickName } from "@/lib/v2/profile";
 import { fmtTime } from "@/lib/v2/schedule";
+import { buildPickemPreviews } from "@/lib/v2/contests/pickem-preview";
+import { loadSquaresContestRow } from "../../../contests/[contestId]/SquaresManageView";
 import AddScramble from "./AddScramble";
 import AddCompetition from "./AddCompetition";
 import EventContestsList, { type EventCard, type DayGroup, type SideRow } from "./EventContestsList";
@@ -87,6 +89,14 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
   const courses = (courseRows || []).map((c) => ({ id: c.id as string, name: c.name as string, city: (c.city as string) ?? null, state: (c.state as string) ?? null }));
   const courseNameById = new Map(courses.map((c) => [c.id, c.name]));
 
+  // Full game-table previews for event Pick'em/Squares — the SAME renderers the group
+  // lane uses, so the accordion shows the actual slate, not a summary.
+  const pickemPreviews = await buildPickemPreviews(admin, pickemIds);
+  const squaresRows = await Promise.all(
+    all.filter((c) => c.contest_type === "squares").map(async (c) => [c.id, await loadSquaresContestRow(admin, c)] as const),
+  );
+  const squaresRowById = new Map(squaresRows);
+
   const sideGamesByParent = new Map<string, Contest[]>();
   for (const c of all) {
     if (!c.parent_contest_id) continue;
@@ -98,10 +108,14 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
   function sideRow(s: Contest): SideRow {
     const hole = s.holes && s.holes.length ? s.holes[0] : null;
     const buy = buyIns.get(s.id) || 0;
-    const meta = [contestTypeLabel(s.contest_type), hole ? `hole ${hole}` : null, buy > 0 ? money(buy) : null].filter(Boolean).join(", ");
+    const players = partCount.get(s.id) || 0;
     const wid = winnerIdByContest.get(s.id);
     const winner = s.declared_no_winner ? "No winner" : wid ? `Winner: ${winnerName.get(wid) || "set"}` : null;
-    return { id: s.id, type: s.contest_type, name: s.name, meta, winner };
+    const meta = [contestTypeLabel(s.contest_type), hole ? `hole ${hole}` : null, winner].filter(Boolean).join(", ");
+    // Right side: pot total (buy-in × players), else the buy-in, else a player count.
+    const pot = buy * players;
+    const right = pot > 0 ? `${money(pot)} pot` : buy > 0 ? `${money(buy)} buy-in` : players > 0 ? `${players} player${players === 1 ? "" : "s"}` : "";
+    return { id: s.id, type: s.contest_type, name: s.name, meta, right };
   }
 
   function toCard(c: Contest): EventCard {
@@ -145,6 +159,8 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
       facts,
       sides,
       bodyHint: (c.contest_type === "pickem" || c.contest_type === "squares") && games === 0 ? "Open to set up the games." : undefined,
+      pickemGames: c.contest_type === "pickem" ? pickemPreviews.get(c.id) || [] : undefined,
+      squaresRow: c.contest_type === "squares" ? squaresRowById.get(c.id) : undefined,
       gear: {
         contestDate: c.contest_date,
         startTime: c.start_time,

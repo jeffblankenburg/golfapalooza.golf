@@ -4,38 +4,16 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Modal from "@/app/new/_components/Modal";
 import styles from "./SquaresAdmin.module.css";
-import { resolvePayouts } from "@/lib/v2/contests/squares";
-import { buildGameAllocations } from "@/lib/v2/contests/squares-alloc";
-import SquaresEditor, { money, dateLabel, isoToLocal, localToISO, type SquaresContestRow } from "./SquaresEditor";
-import ContestCard, { CardGameTable, ContestTypeIcon, cardStyles } from "@/app/new/_components/contest-card/ContestCard";
+import SquaresEditor, { money, isoToLocal, localToISO, type SquaresContestRow } from "./SquaresEditor";
+import ContestCard, { ContestTypeIcon } from "@/app/new/_components/contest-card/ContestCard";
+import { PickemPreview, SquaresPreview } from "@/app/new/_components/contest-card/previews";
 import { pickName, type NameMode } from "@/lib/v2/profile";
 import { computePickemPayouts, type PayoutSplit } from "@/lib/v2/contests/pickem";
+import type { PickemGamePreview } from "@/lib/v2/contests/pickem-preview";
 import PayoutSplitsEditor, { ordinal } from "../events/[eventId]/contests/[contestId]/PayoutSplitsEditor";
 
 // One unified list for the group Contests hub — every created pool, any type,
 // in one place (no per-type sections), with a single "Add contest" control.
-export interface PickemGamePreview {
-  awayTeam: string;
-  homeTeam: string;
-  awayAbbrev: string | null;
-  homeAbbrev: string | null;
-  spread: number | null;
-  favorite: "away" | "home" | null;
-  gameTime: string | null;
-  isTiebreaker: boolean;
-  scored: boolean;                        // both scores in → completed
-  winner: "away" | "home" | null;         // ATS covering side (null = push / unscored)
-  pctCorrect: number | null;              // % of pickers who covered, once scored
-  majoritySide: "away" | "home" | null;   // the crowd's pick before the game is scored
-  majorityPct: number | null;             // % of pickers on the majority side
-}
-
-/** Short team label for the compact admin preview: ESPN abbreviation, else full name. */
-function teamShort(g: PickemGamePreview, side: "away" | "home"): string {
-  const abbrev = side === "away" ? g.awayAbbrev : g.homeAbbrev;
-  const full = side === "away" ? g.awayTeam : g.homeTeam;
-  return (abbrev || "").trim() || full;
-}
 export type GroupContestItem =
   | { kind: "squares"; id: string; createdAt: string; box: SquaresContestRow }
   | {
@@ -65,17 +43,6 @@ function fmtMoney(cents: number): string {
   const whole = cents % 100 === 0;
   return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 })}`;
 }
-function gameWhen(iso: string | null): string {
-  if (!iso) return "TBD";
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-}
-/** Team label with the line inline — the favorite carries "-spread". */
-function teamWithLine(g: PickemGamePreview, side: "away" | "home"): string {
-  const label = teamShort(g, side);
-  if (g.isTiebreaker || g.spread == null || !g.favorite || g.favorite !== side) return label;
-  return `${label} -${g.spread}`;
-}
-
 
 export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, nameMode }: { orgId: string; slug: string; items: GroupContestItem[]; currentUserId: string; nameMode: NameMode }) {
   const router = useRouter();
@@ -258,21 +225,7 @@ function PickemRow({ it, adminBase, isOpen, onToggle, onSettings }: { it: Pickem
       isOpen={isOpen}
       onToggle={onToggle}
     >
-      <CardGameTable
-        empty="No games yet. Open the Pick'em to build the slate."
-        rows={realGames.map((g, i) => ({
-          key: String(i),
-          when: gameWhen(g.gameTime),
-          game: (
-            <>
-              <span style={{ fontWeight: g.scored && g.winner === "away" ? 800 : undefined }}>{teamWithLine(g, "away")}</span>
-              {" @ "}
-              <span style={{ fontWeight: g.scored && g.winner === "home" ? 800 : undefined }}>{teamWithLine(g, "home")}</span>
-            </>
-          ),
-          pay: g.scored ? (g.pctCorrect != null ? `${g.pctCorrect}%` : "Final") : (g.majoritySide ? `${teamShort(g, g.majoritySide)} ${g.majorityPct}%` : ""),
-        }))}
-      />
+      <PickemPreview games={it.games} />
     </ContestCard>
   );
 }
@@ -507,18 +460,6 @@ function SquaresQuickSettings({ orgId, box, currentUserId, nameMode, onClose, on
 /** One Squares pool in the list — expandable (game table) with a gear to edit. */
 function SquaresRow({ c, adminBase, isOpen, onToggle, onEdit }: { c: SquaresContestRow; adminBase: string; isOpen: boolean; onToggle: () => void; onEdit: () => void }) {
   const cPot = c.cellCostCents * 100;
-  const cAlloc = buildGameAllocations(
-    c.games.map((g) => ({ id: g.espnEventId, league: g.league, game_alloc: g.gameAlloc, period_alloc: g.periodAlloc })),
-    cPot,
-    { potAllocation: c.potAllocation, periodWeights: c.periodWeights },
-  );
-  const centsByGame = new Map(resolvePayouts(cPot, cAlloc).games.map((rg) => [rg.key, rg.cents]));
-  const restId = c.games.find((g) => g.gameAlloc?.kind === "remainder")?.espnEventId;
-  const orderedGames = [...c.games].sort((a, b) => {
-    if (!a.startTime) return 1;
-    if (!b.startTime) return -1;
-    return a.startTime.localeCompare(b.startTime);
-  });
   return (
     <ContestCard
       kind="squares"
@@ -532,20 +473,7 @@ function SquaresRow({ c, adminBase, isOpen, onToggle, onEdit }: { c: SquaresCont
       isOpen={isOpen}
       onToggle={onToggle}
     >
-      <CardGameTable
-        empty="No games yet. Tap the gear to add some."
-        rows={orderedGames.map((g) => ({
-          key: g.espnEventId,
-          when: g.startTime ? dateLabel(g.startTime) : "TBD",
-          game: g.label || "Game",
-          pay: (
-            <>
-              {money(centsByGame.get(g.espnEventId) ?? 0)}
-              {g.espnEventId === restId && <span className={cardStyles.rowRest}>rest</span>}
-            </>
-          ),
-        }))}
-      />
+      <SquaresPreview row={c} />
     </ContestCard>
   );
 }

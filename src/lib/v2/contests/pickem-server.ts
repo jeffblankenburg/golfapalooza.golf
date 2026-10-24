@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { FBS_TEAMS, getTeamLogoUrl } from "@/lib/data/fbs-teams";
 import { rankPickem, slateLockAt, gameLocked, lockModeOf, type LockMode, type PickemGame, type PickemPick } from "@/lib/v2/contests/pickem";
 import { fetchGameScore } from "@/lib/v2/sports/espn";
+import { gradeMatchups } from "@/lib/v2/contests/grade";
 import { orgNameMode } from "@/lib/v2/orgs";
 import { pickName } from "@/lib/v2/profile";
 
@@ -291,39 +292,11 @@ export async function refreshGameLine(admin: SupabaseClient, contestId: string, 
 }
 
 /**
- * Auto-grade FINAL games from ESPN (cron + manual "Update scores"). Only writes once
- * ESPN marks a game final, using the final total (overtime included); never clobbers a
- * game already scored. Pass a contestId for one contest; omit to sweep every active one.
+ * Auto-grade FINAL games from ESPN (cron + manual "Update scores"). Now a thin alias
+ * over the generalized matchup grader (#225) — identical behavior for Pick'em; kept as
+ * a named export so the "Update scores" button + routes don't change.
  */
-export async function gradePickemFinals(admin: SupabaseClient, opts: { contestId?: string } = {}): Promise<{ graded: number }> {
-  let cq = admin.from("v2_contests").select("id").eq("contest_type", "pickem");
-  cq = opts.contestId ? cq.eq("id", opts.contestId) : cq.eq("status", "active");
-  const { data: contests } = await cq;
-  const ids = (contests ?? []).map((c) => c.id as string);
-  if (ids.length === 0) return { graded: 0 };
-
-  const cushion = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-  const { data: rows } = await admin
-    .from("v2_matchups").select("id, start_time, external_ref, result").in("contest_id", ids).is("result", null);
-  const due = (rows ?? [])
-    .map((r) => ({ id: r.id as string, start_time: r.start_time as string | null, ref: (r.external_ref as { espn_event_id?: string; league?: string } | null) || {} }))
-    .filter((r) => r.ref.espn_event_id && r.ref.league && (!r.start_time || r.start_time <= cushion));
-  if (due.length === 0) return { graded: 0 };
-
-  let graded = 0;
-  for (const r of due) {
-    const score = await fetchGameScore(r.ref.league as string, r.ref.espn_event_id as string);
-    if (!score || score.state !== "post") continue;
-    const a = score.away?.total, h = score.home?.total;
-    if (a == null || h == null) continue;
-    const { error } = await admin
-      .from("v2_matchups")
-      .update({ result: { winner: a === h ? null : a > h ? "a" : "b", score_a: a, score_b: h }, status: "final", updated_at: new Date().toISOString() })
-      .eq("id", r.id);
-    if (!error) graded += 1;
-  }
-  return { graded };
-}
+export const gradePickemFinals = gradeMatchups;
 
 /** Delete one game from the slate (admin). */
 export async function deleteGame(admin: SupabaseClient, contestId: string, gameId: string | null): Promise<PickemResult<null>> {

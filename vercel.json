@@ -53,7 +53,7 @@
       "schedule": "* * * * *"
     },
     {
-      "path": "/api/cron/v2-pickem-scores",
+      "path": "/api/cron/v2-sports-grade",
       "schedule": "* * * * *"
     }
   ]

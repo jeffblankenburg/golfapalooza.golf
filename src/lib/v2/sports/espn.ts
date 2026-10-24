@@ -234,3 +234,22 @@ export async function fetchScoreboard(leagueKey: string, date?: string): Promise
     .filter((g): g is EspnGame => g !== null)
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 }
+
+/**
+ * Find the ESPN event id for a game by its two competitors' ESPN ids on a date (#225).
+ * Used by the grader to auto-match a matchup that wasn't linked at authoring time (e.g.
+ * a bracket game whose teams fill in from results). Returns null if no match.
+ */
+export async function resolveEspnEventId(
+  leagueKey: string,
+  aEspnId: string,
+  bEspnId: string,
+  startTimeIso: string,
+): Promise<string | null> {
+  const date = startTimeIso.slice(0, 10).replace(/-/g, ""); // YYYYMMDD
+  let games: EspnGame[];
+  try { games = await fetchScoreboard(leagueKey, date); } catch { return null; }
+  const wanted = new Set([aEspnId, bEspnId]);
+  const hit = games.find((g) => g.home && g.away && wanted.has(g.home.espnId) && wanted.has(g.away.espnId));
+  return hit?.espnEventId ?? null;
+}

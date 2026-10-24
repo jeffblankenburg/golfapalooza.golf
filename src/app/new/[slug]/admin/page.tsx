@@ -38,6 +38,7 @@ export default async function AdminHub({
             { label: "Schedule", href: `/new/${slug}/admin/schedule`, desc: "Group calendar (non-event dates)" },
             { label: "Features", href: `/new/${slug}/admin/features`, desc: "Turn group-wide features on & off" },
             { label: "Contests", href: `/new/${slug}/admin/contests`, desc: "Group pools (Squares, pick'em…)" },
+            { label: "Tournaments", href: `/new/${slug}/admin/tournaments`, desc: "Brackets (March Madness, playoffs)" },
             { label: "Financials", href: `/new/${slug}/admin/financials`, desc: "Who owes what, across everything" },
             { label: "Settings", href: `/new/${slug}/admin/settings`, desc: "Name, logo, colors, domains" },
             { label: "Courses", desc: "Course library" },

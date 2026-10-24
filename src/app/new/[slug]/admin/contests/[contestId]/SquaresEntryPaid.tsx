@@ -40,29 +40,34 @@ export default function SquaresEntryPaid({ orgId, contestId }: { orgId: string; 
     } finally { setBusy(null); }
   }
 
+  const unpaid = roster.filter((r) => r.owedCents > 0 && r.paidCents < r.owedCents).length;
   return (
-    <div style={{ marginTop: 20 }}>
-      <p className={styles.sectionLabel}>Who&apos;s paid for their squares</p>
-      {roster.length === 0 ? (
-        <p className={styles.dnsHint} style={{ marginTop: 4 }}>No squares claimed yet.</p>
-      ) : (
-        <div className={styles.memberList} style={{ marginTop: 4 }}>
-          {roster.map((r) => {
-            const paid = r.paidCents >= r.owedCents && r.owedCents > 0;
-            return (
-              <div key={r.userId} className={styles.finRow}>
-                <div className={styles.finRowMain} style={{ minWidth: 0 }}>
-                  <span className={styles.finRowName}>{r.name}</span>
-                  {r.owedCents > 0 && <span className={styles.cscAllMeta}>{money(r.owedCents)}</span>}
+    <details style={{ marginTop: 20, border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
+      <summary style={{ padding: "12px 14px", cursor: "pointer", fontWeight: 700 }}>
+        Who&apos;s paid for their squares{roster.length > 0 ? ` (${roster.length - unpaid}/${roster.length})` : ""}
+      </summary>
+      <div style={{ padding: "0 14px 14px" }}>
+        {roster.length === 0 ? (
+          <p className={styles.dnsHint} style={{ marginTop: 4 }}>No squares claimed yet.</p>
+        ) : (
+          <div className={styles.memberList} style={{ marginTop: 4 }}>
+            {roster.map((r) => {
+              const paid = r.paidCents >= r.owedCents && r.owedCents > 0;
+              return (
+                <div key={r.userId} className={styles.finRow}>
+                  <div className={styles.finRowMain} style={{ minWidth: 0 }}>
+                    <span className={styles.finRowName}>{r.name}</span>
+                    {r.owedCents > 0 && <span className={styles.cscAllMeta}>{money(r.owedCents)}</span>}
+                  </div>
+                  <button type="button" className={paid ? styles.paidToggleOn : styles.paidToggle} disabled={busy === r.userId} onClick={() => toggle(r)}>
+                    {busy === r.userId ? "…" : paid ? "Paid ✓" : "Mark paid"}
+                  </button>
                 </div>
-                <button type="button" className={paid ? styles.paidToggleOn : styles.paidToggle} disabled={busy === r.userId} onClick={() => toggle(r)}>
-                  {busy === r.userId ? "…" : paid ? "Paid ✓" : "Mark paid"}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </details>
   );
 }

@@ -93,12 +93,29 @@ export default async function SquaresManageView({
   const paidByGameUser = new Map<string, { cents: number; note: string | null }>();
   for (const r of paidRows ?? []) paidByGameUser.set(`${r.game_id}:${r.user_id}`, { cents: (r.paid_cents as number) ?? 0, note: (r.note as string) ?? null });
 
-  // Owner names for any claimed squares.
+  // Owner names + payout handles for any claimed squares.
   const ownerIds = [...new Set((cells ?? []).map((c) => c.user_id).filter((x): x is string => !!x))];
   const { data: profiles } = ownerIds.length
-    ? await supabase.from("v2_profiles").select("id, display_name, first_name, last_name").in("id", ownerIds)
-    : { data: [] as { id: string; display_name: string | null; first_name: string | null; last_name: string | null }[] };
+    ? await supabase.from("v2_profiles").select("id, display_name, first_name, last_name, venmo_username, paypal_username").in("id", ownerIds)
+    : { data: [] as { id: string; display_name: string | null; first_name: string | null; last_name: string | null; venmo_username: string | null; paypal_username: string | null }[] };
   const nameById = new Map((profiles ?? []).map((p) => [p.id, pickName(p, nameMode)]));
+  const venmoById = new Map((profiles ?? []).map((p) => [p.id, (p.venmo_username as string | null) ?? null]));
+  const paypalById = new Map((profiles ?? []).map((p) => [p.id, (p.paypal_username as string | null) ?? null]));
+
+  // Entry-paid per owner (squares × cost vs ledger payments) — flags winners who
+  // haven't settled their own buy-in, so you can collect before paying out.
+  const squaresByUser = new Map<string, number>();
+  for (const c of cells ?? []) if (c.user_id) squaresByUser.set(c.user_id as string, (squaresByUser.get(c.user_id as string) || 0) + 1);
+  const cellCostForEntry = ((contest.config as { cell_cost_cents?: number } | null)?.cell_cost_cents) ?? 0;
+  const { data: entryPays } = ownerIds.length
+    ? await supabase.from("v2_financial_transactions").select("user_id, amount_cents").eq("contest_id", contestId).eq("type", "payment")
+    : { data: [] as { user_id: string; amount_cents: number }[] };
+  const entryPaidByUser = new Map<string, number>();
+  for (const p of entryPays ?? []) entryPaidByUser.set(p.user_id as string, (entryPaidByUser.get(p.user_id as string) || 0) + ((p.amount_cents as number) || 0));
+  const entryPaidFor = (uid: string) => {
+    const owed = (squaresByUser.get(uid) || 0) * cellCostForEntry;
+    return owed <= 0 || (entryPaidByUser.get(uid) || 0) >= owed;
+  };
 
   const owners: Record<string, string> = {};
   for (const c of cells ?? []) if (c.user_id) owners[`${c.grid_row},${c.grid_col}`] = nameById.get(c.user_id) || "Member";
@@ -197,7 +214,7 @@ export default async function SquaresManageView({
     payoutsByGame[g.id as string] = Object.entries(per)
       .map(([uid, v]) => {
         const paid = paidByGameUser.get(`${g.id}:${uid}`);
-        return { userId: uid, name: nameById.get(uid) || "Member", totalCents: v.total, paidCents: paid?.cents ?? 0, note: paid?.note ?? null, lines: v.lines };
+        return { userId: uid, name: nameById.get(uid) || "Member", totalCents: v.total, paidCents: paid?.cents ?? 0, note: paid?.note ?? null, lines: v.lines, venmo: venmoById.get(uid) ?? null, paypal: paypalById.get(uid) ?? null, entryPaid: entryPaidFor(uid) };
       })
       .sort((a, b) => b.totalCents - a.totalCents);
   }

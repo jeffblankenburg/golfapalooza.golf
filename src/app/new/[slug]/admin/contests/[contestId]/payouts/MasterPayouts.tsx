@@ -17,6 +17,7 @@ export interface PayoutPerson {
   address: string | null;
   lines: { label: string; amountCents: number }[];
   games: { gameId: string; wonCents: number }[];
+  entryPaid: boolean; // false = this winner hasn't settled their own buy-in
 }
 
 const money = (c: number) => `$${c / 100 % 1 === 0 ? (c / 100).toFixed(0) : (c / 100).toFixed(2)}`;
@@ -101,6 +102,7 @@ export default function MasterPayouts({
               <button type="button" className={styles.head} onClick={() => openRow(p)}>
                 <span className={styles.name}>
                   {p.name}
+                  {!p.entryPaid && <span style={{ marginLeft: 6, fontSize: "0.68rem", fontWeight: 700, color: "var(--warn, #c2410c)" }}>entry unpaid</span>}
                   {paid && p.note && <span className={styles.headNote}>{p.note}</span>}
                 </span>
                 <span className={styles.amounts}>

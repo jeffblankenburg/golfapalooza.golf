@@ -7,6 +7,7 @@ import styles from "./SquaresManage.module.css";
 import SquaresGrid from "@/components/v2/contests/SquaresGrid";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import type { SquaresGridState, Cell } from "@/lib/v2/contests/squares";
+import { venmoLink, paypalLink } from "@/lib/v2/payments";
 
 export interface ManageGame {
   id: string;
@@ -36,6 +37,9 @@ export interface PayoutRow {
   paidCents: number;
   note: string | null;
   lines: { label: string; amountCents: number }[];
+  venmo: string | null;
+  paypal: string | null;
+  entryPaid: boolean; // false = this winner hasn't settled their own buy-in
 }
 
 /** A game's box score: per-period points + running totals for each team. */
@@ -58,6 +62,11 @@ const shortDate = (iso: string | null): string =>
   iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
 
 const money = (c: number) => `$${c / 100 % 1 === 0 ? (c / 100).toFixed(0) : (c / 100).toFixed(2)}`;
+
+const PAY_LINK: React.CSSProperties = {
+  padding: "4px 10px", borderRadius: 8, border: "1px solid var(--line-strong)",
+  fontSize: "0.8rem", fontWeight: 600, textDecoration: "none", color: "var(--ink)", whiteSpace: "nowrap",
+};
 
 const PHASE_LABEL: Record<string, string> = {
   setup: "Setup",
@@ -170,11 +179,15 @@ export default function SquaresManage({
     const paid = p.paidCents >= p.totalCents && p.totalCents > 0;
     const isOpen = openPay === key;
     const draft = noteDrafts[key] ?? p.note ?? "";
+    const payNote = `${name} payout`;
+    const venmo = owed > 0 ? venmoLink(p.venmo, owed, payNote) : null;
+    const paypal = owed > 0 ? paypalLink(p.paypal, owed) : null;
     return (
       <div key={p.userId} className={styles.payRow} data-paid={paid || undefined}>
         <button type="button" className={styles.payRowHead} onClick={() => setOpenPay(isOpen ? null : key)}>
           <span className={styles.payName}>
             {p.name}
+            {!p.entryPaid && <span style={{ marginLeft: 6, fontSize: "0.68rem", fontWeight: 700, color: "var(--warn, #c2410c)" }}>entry unpaid</span>}
             {paid && p.note && <span className={styles.payNoteTag}>{p.note}</span>}
           </span>
           <span className={styles.payAmt}>
@@ -210,7 +223,11 @@ export default function SquaresManage({
               {paid ? (
                 <button type="button" className={styles.unmark} disabled={busy === key} onClick={() => doAction("unmark_paid", { userId: p.userId, gameId }, key)}>Mark unpaid</button>
               ) : (
-                <button type="button" className={styles.markPaid} disabled={busy === key} onClick={() => doAction("mark_paid", { userId: p.userId, gameId, paidCents: p.totalCents, note: draft }, key)}>Mark {money(owed)} paid</button>
+                <>
+                  {venmo && <a style={PAY_LINK} href={venmo} target="_blank" rel="noopener noreferrer">Venmo</a>}
+                  {paypal && <a style={PAY_LINK} href={paypal} target="_blank" rel="noopener noreferrer">PayPal</a>}
+                  <button type="button" className={styles.markPaid} disabled={busy === key} onClick={() => doAction("mark_paid", { userId: p.userId, gameId, paidCents: p.totalCents, note: draft }, key)}>Mark {money(owed)} paid</button>
+                </>
               )}
             </div>
           </div>

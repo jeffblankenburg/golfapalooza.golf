@@ -107,47 +107,56 @@ TournamentSource (league + season/event)
 - **Manual override is always present** (swappable-layer principle, like every other
   contest's grading): import the field, then fix any seed/pairing; or skip ESPN entirely
   and enter the field by hand for a one-off/custom auction.
-- **Why this unifies things:** the same source that seeds the auction later feeds the
+- **Why this unifies things:** the same source that seeds the auction also feeds the
   **bracket pool**, the **per-team win counts** for seed-scoring, and the **champion/
-  runner-up** payout signal — so "auction entity catalog" and "bracket structure" become
-  one primitive instead of two. Resolves the earlier open decision in favor of the shared
-  substrate.
-- **Sport-agnostic payoff:** because the field is just seeded entities behind an adapter,
-  the auction runs for any bracketed event (NCAA / NFL / NHL / World Cup / CFP) with no
+  runner-up** payout signal — so "auction entity catalog" and "bracket structure" are one
+  primitive, not two. The tournament source is therefore built **in the shared substrate
+  (#226) from the start**; the auction is a consumer of it (`getField()`), not an owner of
+  a parallel importer. No throwaway, no later migration.
+- **Sport-agnostic by construction:** the field is just seeded entities behind an adapter,
+  so the auction runs for any bracketed event (NCAA / NFL / NHL / World Cup / CFP) with no
   contest-logic changes — only a new adapter.
+- **Per-league adapters, each fully correct.** One `TournamentSource` interface; a league
+  adapter is added only when its `getField()`/`getBracket()` is correct end-to-end (seeds,
+  regions/conferences, advancement). **March Madness** is the reference implementation
+  (explicit seeds + regions); NFL (14 seeds, 7/conference) and NHL (16 seeds) are added as
+  their own correct adapters. Incremental by league, never by half-built feature.
+- **Manual entry is a first-class source, not a stopgap** — the same `getField()` contract
+  backed by admin input, for a one-off/custom auction or any event we don't adapt. It
+  coexists with ESPN adapters permanently, not "until ESPN is ready."
 
-**Staging:** manual field entry works day one; ship the **March Madness adapter first**
-(highest value, cleanest data), then add NFL/NHL as independent adapters behind the same
-interface. The draft/recorder never depends on which adapter populated the field.
+## Build order (dependency-correct layering)
 
-## Build order (so it ships without waiting on brackets)
+Layered so each piece sits on a finished foundation — not sequenced to get a partial
+contest out early. The draft, the field source, and scoring are **separate concerns**, so
+they're built as clean layers, not a race.
 
-The **draft itself is the contest** and is buildable now — it doesn't need results.
-
-1. **Type + ownership + config + entity catalog** (`v2_auction_entities`, hand-entered to
-   start). Buy-in + entry-paid reuse.
-2. **The recorder**: assign/undo, budget + cap guards, draft-order rotation with
-   done-skipping, bonus ($0) handling, `auction_complete`. This is the deliverable.
-3. **Tournament source — March Madness ESPN adapter**: `getField()` auto-populates the
-   seeded entities; manual override stays. NFL/NHL adapters follow behind the same
-   interface.
-4. **The board** (realtime big-screen display) — optional polish.
-5. **Scoring + payouts** — rides ESPN ingestion (#225) for wins and the bracket (#226) for
-   champion/runner-up; manual entry fallback meanwhile.
+1. **Shared tournament/entity substrate (#226)** — the `TournamentSource` contract +
+   `v2_auction_entities` (or the substrate's entity store) + the manual-entry source +
+   the March Madness adapter, all correct. The auction depends on this; it is not stubbed.
+2. **Type + ownership + config** — `'auction'` type, `v2_auction_teams`, config; buy-in +
+   entry-paid reuse.
+3. **The recorder**: assign/undo, budget + cap guards, draft-order rotation with
+   done-skipping, bonus ($0) handling, `auction_complete`.
+4. **Scoring + payouts** — seed-based points from the substrate's per-team win counts
+   (#225) and champion/runner-up from the bracket (#226). Manual result entry is the
+   permanent fallback source, same contract.
+5. **The board** (realtime big-screen display).
 
 ## Open decisions
 
-- **Which leagues get an ESPN adapter for v1?** (March Madness first is the recommendation;
-  NFL/NHL incremental.)
-- Tournament source: does `getField()` live in the shared bracket substrate (#226) or ship
-  as an auction-owned importer first and migrate into the substrate later?
+- Which leagues get an adapter (each a correct, standalone adapter behind the shared
+  interface). March Madness is the reference; NFL/NHL are their own units of work.
 - `is_participating` + no-show handling: new flag on `v2_contest_participants` vs. status.
 - Champion/runner-up payout: extra `payout_splits` kind vs. a dedicated owner-bonus tier,
-  and where the champion signal comes from.
-- In-app live bidding: defer (admin-recorded only for v1)?
+  and exactly how the substrate exposes the champion signal.
+- In-app live bidding: build it as a real mode alongside the admin recorder, or admin-only?
+  (Decide on merit, not effort.)
 - Optional "suggest free bonus pairings" helper (auto-attach leftover low seeds): include
   or leave fully manual like bromadness?
 
-**Dependencies:** none for the draft/recorder; scoring needs #225 (results), champion/
-runner-up needs #226 (bracket). **Reference:** `~/GitHub/bromadness.com`
+**Dependencies:** the shared tournament/entity substrate (#226) is a prerequisite — the
+auction consumes its `TournamentSource`/`getField()` rather than carrying its own. Scoring
+additionally uses results ingestion (#225) and the bracket champion signal (#226).
+**Reference:** `~/GitHub/bromadness.com`
 `src/app/admin/auction/*` (recorder + board), `supabase/migrations/0000{5,6,7,8},0001{7,8},0020,0023,0048*` (schema).

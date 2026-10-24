@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { getPlatformContext } from "@/lib/v2/context";
 import { v2AdminClient } from "@/lib/v2/supabase";
 import { loadTournamentSource } from "@/lib/v2/contests/tournament-server";
+import { supportsFieldImport } from "@/lib/v2/sports/espn-tournament";
 import TournamentManager from "./TournamentManager";
 
 export default async function TournamentDetailPage({ params }: { params: Promise<{ slug: string; tournamentId: string }> }) {
@@ -24,6 +25,7 @@ export default async function TournamentDetailPage({ params }: { params: Promise
       games={src.games}
       champion={src.champion()}
       runnerUp={src.runnerUp()}
+      canImportEspn={supportsFieldImport(src.tournament.sport)}
     />
   );
 }

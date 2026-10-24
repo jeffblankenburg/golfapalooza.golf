@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import styles from "@/app/new/new.module.css";
@@ -19,18 +19,34 @@ function parseField(text: string): { seed: number; region: string; name: string 
 }
 
 export default function TournamentManager({
-  orgId, slug, tournament, teams, games, champion, runnerUp,
+  orgId, slug, tournament, teams, games, champion, runnerUp, canImportEspn,
 }: {
   orgId: string; slug: string; tournament: TournamentRow;
-  teams: TournamentTeam[]; games: TournamentGame[]; champion: string | null; runnerUp: string | null;
+  teams: TournamentTeam[]; games: TournamentGame[]; champion: string | null; runnerUp: string | null; canImportEspn: boolean;
 }) {
   const router = useRouter();
   const base = `/api/v2/orgs/${orgId}/tournaments/${tournament.id}`;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [importDate, setImportDate] = useState("");
   const [fieldText, setFieldText] = useState(
     teams.map((t) => `${t.seed}, ${t.region ?? ""}, ${t.name}`).join("\n"),
   );
+  // Re-seed the editor when the stored field actually changes (after import / save),
+  // keyed on the team ids so local typing isn't clobbered on every re-render.
+  const teamSig = teams.map((t) => t.id).join(",");
+  useEffect(() => {
+    setFieldText(teams.map((t) => `${t.seed}, ${t.region ?? ""}, ${t.name}`).join("\n"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamSig]);
+
+  async function importEspn() {
+    if (!importDate) { setErr("Pick the Round 1 start date"); return; }
+    const d = new Date(importDate + "T12:00:00");
+    const next = new Date(d); next.setDate(d.getDate() + 1);
+    const ymd = (x: Date) => `${x.getFullYear()}${String(x.getMonth() + 1).padStart(2, "0")}${String(x.getDate()).padStart(2, "0")}`;
+    await act({ action: "import_espn", dates: [ymd(d), ymd(next)] });
+  }
 
   const parsed = useMemo(() => parseField(fieldText), [fieldText]);
   const regions = useMemo(() => [...new Set(parsed.map((t) => t.region))], [parsed]);
@@ -73,9 +89,23 @@ export default function TournamentManager({
 
       {!generated ? (
         <div style={{ marginTop: 16 }}>
+          {canImportEspn && (
+            <div style={{ marginBottom: 18, padding: 12, border: "1px solid var(--line)", borderRadius: 10 }}>
+              <p className={styles.sectionLabel} style={{ marginTop: 0 }}>Import field from ESPN</p>
+              <p className={styles.roundFormHint} style={{ marginTop: 0 }}>Pulls the 64-team seeded field from the tournament&apos;s Round 1 games. Pick the Round 1 start date (the Thursday), then review + edit below before generating.</p>
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+                <label><span style={{ display: "block", fontSize: "0.78rem", fontWeight: 600, marginBottom: 4 }}>Round 1 start date</span>
+                  <input className={styles.input} type="date" value={importDate} onChange={(e) => setImportDate(e.target.value)} />
+                </label>
+                <button type="button" className={styles.createBtnGhost} disabled={busy || !importDate} onClick={() => void importEspn()}>
+                  {busy ? "Importing…" : "Import from ESPN"}
+                </button>
+              </div>
+            </div>
+          )}
           <p className={styles.sectionLabel}>Seeded field</p>
           <p className={styles.roundFormHint} style={{ marginTop: 0 }}>
-            One team per line: <code>seed, region, name</code> (comma or tab). 4 regions × 16 seeds for a standard bracket.
+            One team per line: <code>seed, region, name</code> (comma or tab). 4 regions × 16 seeds for a standard bracket. Import above to auto-fill, or paste by hand.
           </p>
           <textarea
             className={styles.input}

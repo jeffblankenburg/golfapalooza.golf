@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
 import { setTournamentField, generateStructure, setGameResult, type FieldTeamInput } from "@/lib/v2/contests/tournament-server";
+import { fetchBracketField } from "@/lib/v2/sports/espn-tournament";
 
 type Params = Promise<{ id: string; tournamentId: string }>;
 
@@ -18,13 +19,21 @@ export async function POST(request: Request, { params }: { params: Params }) {
   const admin = v2AdminClient();
   if (!(await isOrgAdmin(admin, userId, orgId))) return NextResponse.json({ error: "Admins only" }, { status: 403 });
 
-  const { data: t } = await admin.from("v2_tournaments").select("id, org_id").eq("id", tournamentId).eq("org_id", orgId).maybeSingle();
+  const { data: t } = await admin.from("v2_tournaments").select("id, org_id, sport").eq("id", tournamentId).eq("org_id", orgId).maybeSingle();
   if (!t) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  let body: { action?: string; teams?: FieldTeamInput[]; gameId?: string; winnerTeamId?: string; scoreA?: number | null; scoreB?: number | null };
+  let body: { action?: string; teams?: FieldTeamInput[]; dates?: string[]; gameId?: string; winnerTeamId?: string; scoreA?: number | null; scoreB?: number | null };
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid body" }, { status: 400 }); }
 
   try {
+    if (body.action === "import_espn") {
+      const dates = (body.dates ?? []).filter((d) => /^\d{8}$/.test(d));
+      if (!dates.length) return NextResponse.json({ error: "Round-1 date(s) required (YYYYMMDD)" }, { status: 400 });
+      const field = await fetchBracketField(t.sport as string, dates);
+      if (!field.length) return NextResponse.json({ error: "ESPN returned no Round-1 teams for those dates. Check the dates." }, { status: 422 });
+      await setTournamentField(admin, tournamentId, field);
+      return NextResponse.json({ ok: true, imported: field.length });
+    }
     if (body.action === "set_field") {
       await setTournamentField(admin, tournamentId, body.teams ?? []);
       return NextResponse.json({ ok: true });

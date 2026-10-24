@@ -94,6 +94,7 @@ export default function ContestCard({
   isOpen,
   onToggle,
   badge,
+  rightStat,
   children,
 }: {
   kind: string;
@@ -108,6 +109,7 @@ export default function ContestCard({
   isOpen: boolean;
   onToggle: () => void;
   badge?: ReactNode; // e.g. a "Needs attention" flag beside the name
+  rightStat?: ReactNode; // right-aligned value column (e.g. player count, under a header)
   children?: ReactNode; // accordion body
 }) {
   return (
@@ -120,6 +122,7 @@ export default function ContestCard({
             <span className={styles.rowMeta}>{meta}</span>
             {count != null && <span className={styles.rowCount}>{count}</span>}
           </span>
+          {rightStat != null && <span className={styles.rowStat}>{rightStat}</span>}
           <svg className={styles.rowChev} data-open={isOpen || undefined} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
         </button>
         {(onGear || detailHref) && (

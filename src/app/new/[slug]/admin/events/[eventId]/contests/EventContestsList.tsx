@@ -81,7 +81,7 @@ export default function EventContestsList({
           kind={c.type}
           name={c.name}
           meta={c.meta}
-          count={c.count}
+          rightStat={c.count}
           detailHref={c.detailHref}
           onGear={() => setGearFor(c.id)}
           isOpen={isOpen}
@@ -145,8 +145,16 @@ export default function EventContestsList({
     );
   }
 
+  const header = (
+    <div className={cardStyles.listHead}>
+      <span className={cardStyles.listHeadType}>Contest type</span>
+      <span className={cardStyles.listHeadStat}>Players</span>
+    </div>
+  );
+
   return (
     <>
+      {days.length > 0 && header}
       {days.map((d) => (
         <div key={d.day} className={styles.contestDay}>
           <div className={styles.schedDateHead}>{d.label}</div>
@@ -156,9 +164,12 @@ export default function EventContestsList({
         </div>
       ))}
       {eventWide.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
-          {eventWide.map(renderCard)}
-        </div>
+        <>
+          {header}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
+            {eventWide.map(renderCard)}
+          </div>
+        </>
       )}
     </>
   );

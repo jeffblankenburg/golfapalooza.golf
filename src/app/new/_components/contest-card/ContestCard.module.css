@@ -102,6 +102,36 @@
   font-weight: 700;
   color: var(--ink-soft, #59635b);
 }
+/* Right-aligned value column on a card header (e.g. player count under a header). */
+.rowStat {
+  flex: none;
+  min-width: 40px;
+  text-align: right;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--brand, #0a5c36);
+  font-variant-numeric: tabular-nums;
+}
+/* Column header above a list of cards: "Contest type" (left) + a right-aligned stat
+   label sitting roughly over the .rowStat column (cleared past chevron + actions). */
+.listHead {
+  display: flex;
+  align-items: center;
+  padding: 2px 0 6px 14px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--ink-soft, #59635b);
+}
+.listHeadType {
+  flex: 1;
+  min-width: 0;
+}
+.listHeadStat {
+  flex: none;
+  padding-right: 80px; /* chevron + row padding + actions column */
+}
 /* Expanded body. */
 .rowBody {
   display: flex;

@@ -111,8 +111,8 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
     const wid = winnerIdByContest.get(s.id);
     const winner = s.declared_no_winner ? "No winner" : wid ? `Winner: ${winnerName.get(wid) || "set"}` : null;
     const meta = [contestTypeLabel(s.contest_type), hole ? `hole ${hole}` : null, winner].filter(Boolean).join(", ");
-    // Right side: the participant count (consistent with the top-level card badge).
-    const right = `${players} player${players === 1 ? "" : "s"}`;
+    // Right side: the participant count (bare number, consistent with the card badge).
+    const right = String(players);
     return { id: s.id, type: s.contest_type, name: s.name, meta, right };
   }
 
@@ -149,7 +149,7 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
       : isPickSquares
         ? [buy > 0 ? `${money(buy)} buy-in` : "No buy-in"]
         : [when, buy > 0 ? `${money(buy)} buy-in` : null];
-    const count = `${players} player${players === 1 ? "" : "s"}`;
+    const count = String(players); // bare number; the "Players" column header labels it
 
     return {
       id: c.id,

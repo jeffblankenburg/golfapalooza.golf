@@ -2,17 +2,20 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getPlatformContext } from "@/lib/v2/context";
 import { v2AdminClient } from "@/lib/v2/supabase";
-import { CONTEST_SELECT, type Contest } from "@/lib/v2/contests";
+import { CONTEST_SELECT, contestTypeLabel, loadBuyInCents, type Contest } from "@/lib/v2/contests";
+import { pickName } from "@/lib/v2/profile";
 import { fmtTime } from "@/lib/v2/schedule";
 import AddScramble from "./AddScramble";
 import AddCompetition from "./AddCompetition";
+import EventContestsList, { type EventCard, type DayGroup, type SideRow } from "./EventContestsList";
 import styles from "@/app/new/new.module.css";
 
 /**
- * Event Contests hub (#209, Phase 2a). The admin home for an event's competitive
- * layer: dated activities (scrambles) grouped by day with side games nested, plus
- * event-wide aggregates (BSPITW, 100 Feet!). Contests are authored HERE; the
- * calendar derives its entries from each contest's date. Owner/admin only.
+ * Event Contests hub (#209). The admin home for an event's competitive layer: dated
+ * activities (scrambles) grouped by day with side games nested, plus event-wide
+ * aggregates (BSPITW, 100 Feet!, Pick'em, Squares). Renders the SAME shared cards as
+ * the group contests lane (accordion + gear + caret) — one card component, two lanes.
+ * Owner/admin only.
  */
 
 function dayLabel(ymd: string): string {
@@ -20,6 +23,14 @@ function dayLabel(ymd: string): string {
     weekday: "long", month: "long", day: "numeric",
   });
 }
+
+function money(cents: number): string {
+  const whole = cents % 100 === 0;
+  return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 })}`;
+}
+
+// Types that play a course (so the gear shows the course/tee picker).
+const GOLF_PLAYED = new Set(["scramble", "ryder_cup", "skins", "ctp", "long_drive", "long_putt"]);
 
 export default async function EventContestsPage({ params }: { params: Promise<{ slug: string; eventId: string }> }) {
   const { slug, eventId } = await params;
@@ -29,32 +40,52 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
   if (!org || (org.role !== "owner" && org.role !== "admin")) redirect(`/new/${slug}`);
 
   const admin = v2AdminClient();
-  const [{ data: event }, { data: contests }] = await Promise.all([
+  const [{ data: event }, { data: contests }, { data: courseRows }] = await Promise.all([
     admin.from("v2_events").select("id, name, start_date, end_date").eq("id", eventId).eq("org_id", org.id).maybeSingle(),
     admin.from("v2_contests").select(CONTEST_SELECT).eq("event_id", eventId),
+    admin.from("v2_courses").select("id, name, city, state").order("name"),
   ]);
   if (!event) redirect(`/new/${slug}/admin`);
 
   const all = (contests as Contest[]) || [];
-  const contestIds = all.map((c) => c.id);
-  const scrambleIds = all.filter((c) => c.contest_type === "scramble").map((c) => c.id);
+  const allIds = all.map((c) => c.id);
+  const scrambleIds = all.filter((c) => c.contest_type === "scramble" || c.contest_type === "ryder_cup").map((c) => c.id);
+  const pickemIds = all.filter((c) => c.contest_type === "pickem").map((c) => c.id);
+  const squaresIds = all.filter((c) => c.contest_type === "squares").map((c) => c.id);
+  const sideIds = all.filter((c) => c.parent_contest_id).map((c) => c.id);
 
-  const [{ data: parts }, { data: teams }] = await Promise.all([
-    contestIds.length
-      ? admin.from("v2_contest_participants").select("contest_id").in("contest_id", contestIds)
-      : Promise.resolve({ data: [] as { contest_id: string }[] }),
-    scrambleIds.length
-      ? admin.from("v2_scramble_teams").select("contest_id, needs_attention_at").in("contest_id", scrambleIds)
-      : Promise.resolve({ data: [] as { contest_id: string; needs_attention_at: string | null }[] }),
+  const [{ data: parts }, { data: teams }, { data: pGames }, { data: sGames }, buyIns, { data: sideWins }] = await Promise.all([
+    allIds.length ? admin.from("v2_contest_participants").select("contest_id").in("contest_id", allIds) : Promise.resolve({ data: [] as { contest_id: string }[] }),
+    scrambleIds.length ? admin.from("v2_scramble_teams").select("contest_id, needs_attention_at").in("contest_id", scrambleIds) : Promise.resolve({ data: [] as { contest_id: string; needs_attention_at: string | null }[] }),
+    pickemIds.length ? admin.from("v2_pickem_games").select("contest_id").in("contest_id", pickemIds) : Promise.resolve({ data: [] as { contest_id: string }[] }),
+    squaresIds.length ? admin.from("v2_squares_games").select("contest_id").in("contest_id", squaresIds) : Promise.resolve({ data: [] as { contest_id: string }[] }),
+    allIds.length ? loadBuyInCents(admin, allIds) : Promise.resolve(new Map<string, number>()),
+    sideIds.length ? admin.from("v2_contest_winners").select("contest_id, user_id").in("contest_id", sideIds) : Promise.resolve({ data: [] as { contest_id: string; user_id: string | null }[] }),
   ]);
+
   const partCount = new Map<string, number>();
   for (const p of parts || []) partCount.set(p.contest_id, (partCount.get(p.contest_id) || 0) + 1);
   const teamCount = new Map<string, number>();
-  const needsAttention = new Set<string>(); // contest ids with a team that lost a seat (#217)
+  const needsAttention = new Set<string>();
   for (const t of teams || []) {
     teamCount.set(t.contest_id, (teamCount.get(t.contest_id) || 0) + 1);
-    if ((t as { needs_attention_at?: string | null }).needs_attention_at) needsAttention.add(t.contest_id);
+    if (t.needs_attention_at) needsAttention.add(t.contest_id);
   }
+  const gameCount = new Map<string, number>();
+  for (const g of pGames || []) gameCount.set(g.contest_id, (gameCount.get(g.contest_id) || 0) + 1);
+  for (const g of sGames || []) gameCount.set(g.contest_id, (gameCount.get(g.contest_id) || 0) + 1);
+
+  // Resolve side-game winner names.
+  const winnerIdByContest = new Map<string, string>();
+  for (const w of sideWins || []) if (w.user_id && !winnerIdByContest.has(w.contest_id)) winnerIdByContest.set(w.contest_id, w.user_id);
+  const winnerUserIds = [...new Set([...winnerIdByContest.values()])];
+  const { data: winnerProfiles } = winnerUserIds.length
+    ? await admin.from("v2_profiles").select("id, display_name, first_name, last_name, nickname").in("id", winnerUserIds)
+    : { data: [] as { id: string; display_name: string | null; first_name: string | null; last_name: string | null; nickname: string | null }[] };
+  const winnerName = new Map((winnerProfiles || []).map((p) => [p.id as string, pickName(p, org.name_display)]));
+
+  const courses = (courseRows || []).map((c) => ({ id: c.id as string, name: c.name as string, city: (c.city as string) ?? null, state: (c.state as string) ?? null }));
+  const courseNameById = new Map(courses.map((c) => [c.id, c.name]));
 
   const sideGamesByParent = new Map<string, Contest[]>();
   for (const c of all) {
@@ -62,24 +93,81 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
     (sideGamesByParent.get(c.parent_contest_id) || sideGamesByParent.set(c.parent_contest_id, []).get(c.parent_contest_id)!).push(c);
   }
 
+  const base = `/new/${slug}/admin/events/${eventId}/contests`;
+
+  function sideRow(s: Contest): SideRow {
+    const hole = s.holes && s.holes.length ? s.holes[0] : null;
+    const buy = buyIns.get(s.id) || 0;
+    const meta = [contestTypeLabel(s.contest_type), hole ? `hole ${hole}` : null, buy > 0 ? money(buy) : null].filter(Boolean).join(", ");
+    const wid = winnerIdByContest.get(s.id);
+    const winner = s.declared_no_winner ? "No winner" : wid ? `Winner: ${winnerName.get(wid) || "set"}` : null;
+    return { id: s.id, type: s.contest_type, name: s.name, meta, winner };
+  }
+
+  function toCard(c: Contest): EventCard {
+    const players = partCount.get(c.id) || 0;
+    const nTeams = teamCount.get(c.id) || 0;
+    const buy = buyIns.get(c.id) || 0;
+    const when = fmtTime(c.start_time);
+    const isGolfTeam = c.contest_type === "scramble" || c.contest_type === "ryder_cup";
+    const games = gameCount.get(c.id) || 0;
+
+    const facts: { label: string; value: string }[] = [];
+    const sides = (sideGamesByParent.get(c.id) || []).map(sideRow);
+
+    if (isGolfTeam) {
+      facts.push({ label: "Teams", value: String(nTeams) }, { label: "Players", value: String(players) });
+      facts.push({ label: "When", value: when || "No time set" });
+      facts.push({ label: "Course", value: c.course_id ? courseNameById.get(c.course_id) || "Set" : "Not set" });
+      if (buy > 0) facts.push({ label: "Buy-in", value: money(buy) });
+    } else if (c.contest_type === "pickem" || c.contest_type === "squares") {
+      facts.push({ label: "Games", value: String(games) });
+      facts.push({ label: "Buy-in", value: buy > 0 ? money(buy) : "None" });
+    } else {
+      facts.push({ label: "Players", value: String(players) });
+      if (buy > 0) facts.push({ label: "Buy-in", value: money(buy) });
+    }
+
+    const metaParts = isGolfTeam
+      ? [when, `${nTeams} team${nTeams === 1 ? "" : "s"}`, `${players} player${players === 1 ? "" : "s"}`]
+      : (c.contest_type === "pickem" || c.contest_type === "squares")
+        ? [games ? `${games} game${games === 1 ? "" : "s"}` : "No games yet", buy > 0 ? `${money(buy)} buy-in` : null]
+        : [when, `${players} player${players === 1 ? "" : "s"}`];
+
+    return {
+      id: c.id,
+      type: c.contest_type,
+      name: c.name,
+      meta: metaParts.filter(Boolean).join(", "),
+      count: buy > 0 && isGolfTeam ? `${money(buy)} buy-in` : undefined,
+      needsAttention: needsAttention.has(c.id),
+      detailHref: `${base}/${c.id}`,
+      facts,
+      sides,
+      bodyHint: (c.contest_type === "pickem" || c.contest_type === "squares") && games === 0 ? "Open to set up the games." : undefined,
+      gear: {
+        contestDate: c.contest_date,
+        startTime: c.start_time,
+        courseId: c.course_id,
+        teeId: c.tee_id,
+        courseName: c.course_id ? courseNameById.get(c.course_id) || null : null,
+        entryAmountCents: buy || null,
+        config: c.config,
+        showCourse: GOLF_PLAYED.has(c.contest_type),
+      },
+    };
+  }
+
   const topLevel = all.filter((c) => !c.parent_contest_id);
   const dated = topLevel.filter((c) => c.contest_date);
-  const eventWide = topLevel.filter((c) => !c.contest_date).sort((a, b) => a.sort_order - b.sort_order);
+  const eventWideContests = topLevel.filter((c) => !c.contest_date).sort((a, b) => a.sort_order - b.sort_order);
 
   const byDay = new Map<string, Contest[]>();
   for (const c of dated) (byDay.get(c.contest_date!) || byDay.set(c.contest_date!, []).get(c.contest_date!)!).push(c);
-  const days = [...byDay.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-
-  const base = `/new/${slug}/admin/events/${eventId}/contests`;
-
-  function statusLine(c: Contest): string {
-    const people = partCount.get(c.id) || 0;
-    const counts = c.contest_type === "scramble"
-      ? `${teamCount.get(c.id) || 0} team${(teamCount.get(c.id) || 0) === 1 ? "" : "s"}, ${people} player${people === 1 ? "" : "s"}`
-      : `${people} player${people === 1 ? "" : "s"}`;
-    const t = fmtTime(c.start_time);
-    return t ? `${t}, ${counts}` : counts;
-  }
+  const days: DayGroup[] = [...byDay.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([day, list]) => ({ day, label: dayLabel(day), cards: list.map(toCard) }));
+  const eventWide = eventWideContests.map(toCard);
 
   return (
     <div className={styles.page}>
@@ -100,40 +188,7 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
         </p>
       ) : (
         <div className={styles.contestDays}>
-          {days.map(([day, dayContests]) => (
-            <div key={day} className={styles.contestDay}>
-              <div className={styles.schedDateHead}>{dayLabel(day)}</div>
-              {dayContests.map((c) => {
-                const sides = sideGamesByParent.get(c.id) || [];
-                return (
-                  <div key={c.id} className={styles.contestGroup}>
-                    <Link href={`${base}/${c.id}`} className={styles.contestCard} data-setup="1">
-                      <span className={styles.contestCardMain}>
-                        <span className={styles.contestCardTitle}>
-                          {c.name}
-                          {needsAttention.has(c.id) && <span className={styles.needsAttn}>Needs attention</span>}
-                        </span>
-                        <span className={styles.contestCardMeta}>{statusLine(c)}</span>
-                      </span>
-                      <svg className={styles.contestChevron} width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </Link>
-                    {sides.length > 0 && (
-                      <div className={styles.contestSides}>
-                        {sides.map((s) => (
-                          <div key={s.id} className={styles.contestSide}>
-                            <span>{s.name}</span>
-                            <span className={styles.contestSideMeta}>{partCount.get(s.id) || 0}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+          <EventContestsList slug={slug} orgId={org.id} eventId={eventId} courses={courses} days={days} eventWide={[]} />
         </div>
       )}
 
@@ -147,18 +202,8 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
             Cross-day competitions like BSPITW and 100 Feet! that span every scramble.
           </p>
         ) : (
-          <div className={styles.contestDays} style={{ marginTop: 10 }}>
-            {eventWide.map((c) => (
-              <Link key={c.id} href={`${base}/${c.id}`} className={styles.contestCard} data-setup="1">
-                <span className={styles.contestCardMain}>
-                  <span className={styles.contestCardTitle}>{c.name}</span>
-                  <span className={styles.contestCardMeta}>{c.contest_type === "pickem" ? "Tap to set up games" : c.contest_type === "squares" ? "Squares pool" : "Runs all event"}</span>
-                </span>
-                <svg className={styles.contestChevron} width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
-            ))}
+          <div style={{ marginTop: 10 }}>
+            <EventContestsList slug={slug} orgId={org.id} eventId={eventId} courses={courses} days={[]} eventWide={eventWide} />
           </div>
         )}
       </div>

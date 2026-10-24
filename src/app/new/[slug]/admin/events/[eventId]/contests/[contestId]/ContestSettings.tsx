@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Modal from "@/app/new/_components/Modal";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
@@ -39,6 +39,10 @@ export default function ContestSettings({
   entryAmountCents,
   courses,
   config,
+  showCourse = true,
+  showTrigger = true,
+  controlledOpen,
+  onControlledClose,
 }: {
   slug: string;
   orgId: string;
@@ -53,8 +57,20 @@ export default function ContestSettings({
   entryAmountCents: number | null;
   courses: CourseOption[];
   config: Record<string, unknown> | null;
+  // Non-golf types (pickem/squares/bspitw/…) don't play a course — hide that picker.
+  showCourse?: boolean;
+  // Controlled mode (no built-in pencil trigger): a parent (e.g. the card gear) drives
+  // visibility via controlledOpen/onControlledClose. Default = self-triggered on the
+  // detail page.
+  showTrigger?: boolean;
+  controlledOpen?: boolean;
+  onControlledClose?: () => void;
 }) {
   const router = useRouter();
+  const isControlled = controlledOpen !== undefined;
+  // `open` is always the internal state so the one-modal-at-a-time sub-picker flow
+  // (course/tee) can toggle it freely. In controlled mode the parent's open just seeds
+  // this, and a top-level close notifies the parent via closeTop().
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -96,7 +112,7 @@ export default function ContestSettings({
     }
   }
 
-  function openEdit() {
+  function prepare() {
     setName(initialName);
     setDay(contestDate || "");
     setTime(startTime ? startTime.slice(0, 5) : "");
@@ -107,9 +123,23 @@ export default function ContestSettings({
     setHoleTees(readHoleTees(config));
     setTees([]);
     setError(null);
-    setOpen(true);
-    if (initialCourseId) loadTees(initialCourseId, initialTeeId);
+    if (initialCourseId && showCourse) loadTees(initialCourseId, initialTeeId);
   }
+  function openEdit() {
+    prepare();
+    setOpen(true);
+  }
+  /** Top-level close: hide the modal and, in controlled mode, tell the parent. */
+  function closeTop() {
+    setOpen(false);
+    if (isControlled) onControlledClose?.();
+  }
+  // Controlled mode: seed the form + open each time the parent toggles the gear.
+  useEffect(() => {
+    if (!isControlled) return;
+    if (controlledOpen) { prepare(); setOpen(true); } else setOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [controlledOpen]);
 
   // Only one modal is visible at a time (settings / picker / lookup) — avoids the
   // z-order fight between our Modal (z-100) and CourseLookupModal (z-58).
@@ -167,7 +197,7 @@ export default function ContestSettings({
       setError((await res.json().catch(() => ({}))).error || "Could not save");
       return;
     }
-    setOpen(false);
+    closeTop();
     router.refresh();
   }
 
@@ -182,14 +212,16 @@ export default function ContestSettings({
 
   return (
     <>
-      <button type="button" className={styles.circleAdd} aria-label="Contest settings" onClick={openEdit}>
-        <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden>
-          <path d="M12 20h9" />
-          <path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z" />
-        </svg>
-      </button>
+      {showTrigger && (
+        <button type="button" className={styles.circleAdd} aria-label="Contest settings" onClick={openEdit}>
+          <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden>
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z" />
+          </svg>
+        </button>
+      )}
 
-      <Modal open={open} title="Contest settings" onClose={() => setOpen(false)}>
+      <Modal open={open} title="Contest settings" onClose={closeTop}>
         <form className={styles.form} onSubmit={save}>
           <div className={styles.field}>
             <label className={styles.label}>Name</label>
@@ -214,6 +246,7 @@ export default function ContestSettings({
             </span>
           </div>
 
+          {showCourse && (
           <div className={styles.field}>
             <label className={styles.label}>Course <span className={styles.optional}>(for scoring par)</span></label>
             {courseId ? (
@@ -225,7 +258,8 @@ export default function ContestSettings({
               <button type="button" className={styles.pickBtn} onClick={openPicker}>Choose course</button>
             )}
           </div>
-          {courseId && tees.length > 0 && (
+          )}
+          {showCourse && courseId && tees.length > 0 && (
             <div className={styles.field}>
               <label className={styles.label}>Tee</label>
               <button type="button" className={styles.teeBox} onClick={openTeePicker}>

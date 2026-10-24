@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { randomUUID } from "crypto";
 import { FBS_TEAMS, getTeamLogoUrl } from "@/lib/data/fbs-teams";
 import { isSlateLocked, rankPickem, type PickemGame, type PickemPick } from "@/lib/v2/contests/pickem";
 import { fetchGameScore } from "@/lib/v2/sports/espn";
@@ -9,180 +10,200 @@ import { pickName } from "@/lib/v2/profile";
  * Server-side Pick'em engine (#209). The single source of truth for the Pick'em
  * slate + picks, independent of contest SCOPE: it operates on a `contestId` and
  * never assumes whether the contest is event-scoped (`event_id` set) or group-
- * scoped (`event_id` NULL). Route handlers in both URL namespaces are thin
- * shells that do auth + scope (eligibility/money) and then delegate here, so the
- * engine stays identical in either case.
+ * scoped (`event_id` NULL). Route handlers in both URL namespaces are thin shells.
+ *
+ * Storage: the generic slate substrate (#224) — v2_matchups / v2_picks. This engine
+ * is the Pick'em ADAPTER over it: it maps the generic rows to/from the flat PickemGame
+ * / PickemPick shape the UI already consumes, so nothing above this file changed. The
+ * away side is competitor_a, home is competitor_b; favorite/winner map away↔'a',
+ * home↔'b'; tv + espn ids ride in external_ref; scores live in result.
  */
 
-export const GAME_SELECT =
-  "id, contest_id, away_team, home_team, away_abbrev, home_abbrev, away_logo_url, home_logo_url, away_color, home_color, spread, favorite, game_time, tv_channel, is_tiebreaker, winning_team, away_score, home_score, sort_order, espn_event_id, league";
+export const MATCHUP_SELECT =
+  "id, contest_id, slot, round, sort_order, competitor_a, competitor_b, start_time, spread, favorite, over_under, external_ref, status, result, is_tiebreaker";
 
-/** Uniform result so shells can translate to the exact HTTP status without the
- *  engine importing NextResponse. */
+type Side = "a" | "b";
+type Team = "away" | "home";
+const favToTeam = (s: unknown): Team | null => (s === "a" ? "away" : s === "b" ? "home" : null);
+const teamToFav = (t: unknown): Side | null => (t === "away" ? "a" : t === "home" ? "b" : null);
+
+interface Competitor { name?: string; abbrev?: string | null; logo?: string | null; color?: string | null }
+export interface MatchupRow {
+  id: string; contest_id: string; sort_order: number;
+  competitor_a: Competitor | null; competitor_b: Competitor | null;
+  start_time: string | null; spread: number | null; favorite: Side | null;
+  external_ref: { espn_event_id?: string | null; league?: string | null; tv?: string | null } | null;
+  status: string; result: { winner: Side | null; score_a: number | null; score_b: number | null } | null;
+  is_tiebreaker: boolean;
+}
+
+/** Map a v2_matchups row to the flat Pick'em game shape the UI + rankers expect.
+ *  Exported so preview/payout readers map identically (single source). */
+export function matchupToPickemGame(r: MatchupRow): PickemGame & { contest_id: string; espn_event_id: string | null; league: string | null; tv_channel: string | null } {
+  const a = r.competitor_a || {}, b = r.competitor_b || {}, ref = r.external_ref || {}, res = r.result;
+  return {
+    id: r.id,
+    contest_id: r.contest_id,
+    away_team: a.name || "Away",
+    home_team: b.name || "Home",
+    away_abbrev: a.abbrev ?? null,
+    home_abbrev: b.abbrev ?? null,
+    away_logo_url: a.logo ?? null,
+    home_logo_url: b.logo ?? null,
+    away_color: a.color ?? null,
+    home_color: b.color ?? null,
+    spread: r.spread,
+    favorite: favToTeam(r.favorite),
+    game_time: r.start_time,
+    tv_channel: ref.tv ?? null,
+    is_tiebreaker: !!r.is_tiebreaker,
+    winning_team: res ? favToTeam(res.winner) : null,
+    away_score: res?.score_a ?? null,
+    home_score: res?.score_b ?? null,
+    sort_order: r.sort_order,
+    espn_event_id: ref.espn_event_id ?? null,
+    league: ref.league ?? null,
+  } as PickemGame & { contest_id: string; espn_event_id: string | null; league: string | null; tv_channel: string | null };
+}
+
+const stripNull = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v != null && v !== ""));
+
+/** Build the competitor JSON for one side from a team name (resolves logo/color from
+ *  the FBS catalog, parity with the old teamFields). */
+function competitorFromName(name: string): Competitor {
+  const t = FBS_TEAMS.find((x) => x.shortName === name || x.name === name);
+  return stripNull({ name: t?.shortName || name, logo: t ? getTeamLogoUrl(t) : null, color: t?.primaryColor || null }) as Competitor;
+}
+
+/** Collapse flat score fields into the result JSONB (+ status), or null when not scored. */
+function resultFrom(awayScore: number | null, homeScore: number | null, winningTeam: Team | null) {
+  if (awayScore == null || homeScore == null) return { result: null, status: "scheduled" as const };
+  return { result: { winner: teamToFav(winningTeam), score_a: awayScore, score_b: homeScore }, status: "final" as const };
+}
+
 export type PickemResult<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
 
 export interface AddGameInput {
-  away_team?: string;
-  home_team?: string;
-  spread?: number;
-  favorite?: string;
-  game_time?: string | null;
-  tv_channel?: string | null;
-  is_tiebreaker?: boolean;
+  away_team?: string; home_team?: string; spread?: number; favorite?: string;
+  game_time?: string | null; tv_channel?: string | null; is_tiebreaker?: boolean;
 }
 
 export interface SubmitPickInput {
-  gameId?: string;
-  pickedTeam?: "away" | "home" | null;
-  tiebreakerTotal?: number | null;
+  gameId?: string; pickedTeam?: "away" | "home" | null; tiebreakerTotal?: number | null;
 }
 
-// Resolve the two team sides to stored name + logo + color from the FBS catalog.
-function teamFields(side: "away" | "home", name: string): Record<string, unknown> {
-  const t = FBS_TEAMS.find((x) => x.shortName === name || x.name === name);
-  return {
-    [`${side}_team`]: t?.shortName || name,
-    [`${side}_logo_url`]: t ? getTeamLogoUrl(t) : null,
-    [`${side}_color`]: t?.primaryColor || null,
-  };
-}
-
-/** True once anyone has picked a side on this game — its line is then frozen so
- *  it can't move out from under existing picks. */
+/** True once anyone has picked a side on this game — its line is then frozen. */
 async function isLineLocked(admin: SupabaseClient, gameId: string): Promise<boolean> {
-  const { data } = await admin
-    .from("v2_pickem_picks").select("id").eq("game_id", gameId).not("picked_team", "is", null).limit(1);
-  return (data?.length ?? 0) > 0;
+  const { data } = await admin.from("v2_picks").select("pick").eq("matchup_id", gameId);
+  return (data || []).some((p) => (p.pick as { side?: string } | null)?.side);
 }
 
-/** True once anyone has picked ANY game in the contest — the tiebreaker choice is
- *  then frozen (changing it would shift whole-contest standings). */
+/** True once anyone has picked ANY game in the contest — the tiebreaker choice freezes. */
 async function contestHasPicks(admin: SupabaseClient, contestId: string): Promise<boolean> {
-  const { data: games } = await admin.from("v2_pickem_games").select("id").eq("contest_id", contestId);
-  const ids = (games || []).map((g) => g.id as string);
-  if (ids.length === 0) return false;
-  const { data } = await admin
-    .from("v2_pickem_picks").select("id").in("game_id", ids).not("picked_team", "is", null).limit(1);
-  return (data?.length ?? 0) > 0;
+  const { data } = await admin.from("v2_picks").select("pick").eq("contest_id", contestId);
+  return (data || []).some((p) => (p.pick as { side?: string } | null)?.side);
 }
 
-/** List a contest's game slate, ordered for display, each flagged `locked` if a
- *  pick has been made on it (line can no longer change). */
+/** List a contest's slate, ordered for display, each flagged `locked` if a pick has
+ *  been made on it (line can no longer change). */
 export async function listGames(admin: SupabaseClient, contestId: string) {
   const { data } = await admin
-    .from("v2_pickem_games")
-    .select(GAME_SELECT)
-    .eq("contest_id", contestId)
-    .order("sort_order")
-    .order("game_time");
-  const games = data || [];
-  if (games.length === 0) return games;
-  const { data: picks } = await admin
-    .from("v2_pickem_picks").select("game_id").in("game_id", games.map((g) => g.id as string)).not("picked_team", "is", null);
-  const locked = new Set((picks || []).map((p) => p.game_id as string));
-  return games.map((g) => ({ ...g, locked: locked.has(g.id as string) }));
+    .from("v2_matchups").select(MATCHUP_SELECT).eq("contest_id", contestId)
+    .order("sort_order").order("start_time");
+  const rows = (data || []) as unknown as MatchupRow[];
+  if (rows.length === 0) return [];
+  const { data: picks } = await admin.from("v2_picks").select("matchup_id, pick").eq("contest_id", contestId);
+  const locked = new Set((picks || []).filter((p) => (p.pick as { side?: string } | null)?.side).map((p) => p.matchup_id as string));
+  return rows.map((r) => ({ ...matchupToPickemGame(r), locked: locked.has(r.id) }));
 }
 
 /** Add one game to the slate (admin). Enforces a single tiebreaker per contest. */
 export async function addGame(admin: SupabaseClient, contestId: string, body: AddGameInput): Promise<PickemResult<unknown>> {
   if (!body.away_team || !body.home_team) return { ok: false, status: 400, error: "Both teams are required" };
-
-  if (body.is_tiebreaker) await admin.from("v2_pickem_games").update({ is_tiebreaker: false }).eq("contest_id", contestId);
+  if (body.is_tiebreaker) await admin.from("v2_matchups").update({ is_tiebreaker: false }).eq("contest_id", contestId);
 
   const { data: last } = await admin
-    .from("v2_pickem_games")
-    .select("sort_order")
-    .eq("contest_id", contestId)
-    .order("sort_order", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .from("v2_matchups").select("sort_order").eq("contest_id", contestId)
+    .order("sort_order", { ascending: false }).limit(1).maybeSingle();
 
+  const tv = (body.tv_channel || "").trim() || null;
   const { data, error } = await admin
-    .from("v2_pickem_games")
+    .from("v2_matchups")
     .insert({
       contest_id: contestId,
-      ...teamFields("away", body.away_team),
-      ...teamFields("home", body.home_team),
+      slot: randomUUID(),
+      competitor_a: competitorFromName(body.away_team),
+      competitor_b: competitorFromName(body.home_team),
       spread: typeof body.spread === "number" ? Math.abs(body.spread) : null,
-      favorite: body.favorite === "away" || body.favorite === "home" ? body.favorite : null,
-      game_time: body.game_time || null,
-      tv_channel: (body.tv_channel || "").trim() || null,
+      favorite: body.favorite === "away" ? "a" : body.favorite === "home" ? "b" : null,
+      start_time: body.game_time || null,
+      external_ref: stripNull({ tv }),
       is_tiebreaker: !!body.is_tiebreaker,
       sort_order: (last?.sort_order ?? -1) + 1,
     })
-    .select(GAME_SELECT)
-    .single();
+    .select(MATCHUP_SELECT).single();
   if (error) return { ok: false, status: 500, error: error.message };
-  return { ok: true, data };
+  return { ok: true, data: matchupToPickemGame(data as unknown as MatchupRow) };
 }
 
 export interface EspnGameInput {
-  espnEventId: string;
-  league: string;
-  startTime?: string | null;
-  tv?: string | null;
-  spread?: number | null;
-  favorite?: "home" | "away" | null;
+  espnEventId: string; league: string; startTime?: string | null; tv?: string | null;
+  spread?: number | null; favorite?: "home" | "away" | null;
   away: { name?: string; abbrev?: string; logo?: string | null; color?: string | null } | null;
   home: { name?: string; abbrev?: string; logo?: string | null; color?: string | null } | null;
 }
 
 /**
- * Add games to the slate straight from the ESPN picker (parity with Squares). Teams,
- * kickoff, TV, and the line (spread + favorite) come from the feed; the admin can
- * tweak the line afterward. Dedups by `espn_event_id` so re-opening the picker and
- * re-confirming never duplicates a game.
+ * Add games straight from the ESPN picker. Teams/kickoff/TV/line come from the feed;
+ * dedups by external_ref.espn_event_id. Past games arrive without a line (ESPN drops
+ * it once final) — backfill line + final score from the summary's pickcenter.
  */
 export async function addEspnGames(admin: SupabaseClient, contestId: string, games: EspnGameInput[]): Promise<PickemResult<number>> {
   if (!games.length) return { ok: true, data: 0 };
-  const { data: existing } = await admin.from("v2_pickem_games").select("espn_event_id, sort_order").eq("contest_id", contestId);
-  const have = new Set((existing || []).map((r) => r.espn_event_id as string | null).filter(Boolean));
+  const { data: existing } = await admin.from("v2_matchups").select("external_ref, sort_order").eq("contest_id", contestId);
+  const have = new Set((existing || []).map((r) => (r.external_ref as { espn_event_id?: string } | null)?.espn_event_id).filter(Boolean));
   let sort = Math.max(-1, ...(existing || []).map((r) => (r.sort_order as number) ?? -1));
-  const rows = games
+
+  const base = games
     .filter((g) => g.espnEventId && !have.has(g.espnEventId))
     .map((g) => ({
       contest_id: contestId,
-      espn_event_id: g.espnEventId,
+      slot: g.espnEventId,
+      espnEventId: g.espnEventId,
       league: g.league,
-      away_team: g.away?.name || g.away?.abbrev || "Away",
-      home_team: g.home?.name || g.home?.abbrev || "Home",
-      away_abbrev: g.away?.abbrev || null,
-      home_abbrev: g.home?.abbrev || null,
-      away_logo_url: g.away?.logo ?? null,
-      home_logo_url: g.home?.logo ?? null,
-      away_color: g.away?.color ?? null,
-      home_color: g.home?.color ?? null,
+      competitor_a: stripNull({ name: g.away?.name || g.away?.abbrev || "Away", abbrev: g.away?.abbrev || null, logo: g.away?.logo ?? null, color: g.away?.color ?? null }) as Competitor,
+      competitor_b: stripNull({ name: g.home?.name || g.home?.abbrev || "Home", abbrev: g.home?.abbrev || null, logo: g.home?.logo ?? null, color: g.home?.color ?? null }) as Competitor,
       spread: typeof g.spread === "number" ? Math.abs(g.spread) : null,
-      favorite: g.favorite === "away" || g.favorite === "home" ? g.favorite : null,
-      game_time: g.startTime || null,
-      tv_channel: g.tv || null,
+      favorite: g.favorite === "away" ? "a" : g.favorite === "home" ? "b" : null,
+      start_time: g.startTime || null,
+      tv: g.tv || null,
       sort_order: ++sort,
     }));
-  if (!rows.length) return { ok: true, data: 0 };
+  if (!base.length) return { ok: true, data: 0 };
 
-  // Past games come from the scoreboard WITHOUT a line (ESPN drops it once final).
-  // For those, backfill the line (and final score, if over) from the summary's
-  // pickcenter, which persists. Upcoming games already carry their line, so skip.
-  const enriched = await Promise.all(rows.map(async (r) => {
-    if (r.spread != null) return r;
-    try {
-      const s = await fetchGameScore(r.league as string, r.espn_event_id as string);
-      if (!s) return r;
-      const extra: Record<string, unknown> = {
-        spread: typeof s.spread === "number" ? s.spread : null,
-        favorite: s.favorite ?? null,
-      };
-      if (s.state === "post" && s.away?.total != null && s.home?.total != null) {
-        extra.away_score = s.away.total;
-        extra.home_score = s.home.total;
-        extra.winning_team = s.away.total === s.home.total ? null : s.away.total > s.home.total ? "away" : "home";
-      }
-      return { ...r, ...extra };
-    } catch {
-      return r;
+  const rows = await Promise.all(base.map(async (r) => {
+    let spread = r.spread, favorite: Side | null = r.favorite as Side | null;
+    let result: MatchupRow["result"] = null, status = "scheduled";
+    if (spread == null) {
+      try {
+        const s = await fetchGameScore(r.league, r.espnEventId);
+        if (s) {
+          if (typeof s.spread === "number") { spread = s.spread; favorite = s.favorite === "away" ? "a" : s.favorite === "home" ? "b" : null; }
+          if (s.state === "post" && s.away?.total != null && s.home?.total != null) {
+            result = { winner: s.away.total === s.home.total ? null : s.away.total > s.home.total ? "a" : "b", score_a: s.away.total, score_b: s.home.total };
+            status = "final";
+          }
+        }
+      } catch { /* leave as-is */ }
     }
+    return {
+      contest_id: r.contest_id, slot: r.slot, competitor_a: r.competitor_a, competitor_b: r.competitor_b,
+      spread, favorite, start_time: r.start_time,
+      external_ref: stripNull({ espn_event_id: r.espnEventId, league: r.league, tv: r.tv }),
+      result, status, sort_order: r.sort_order,
+    };
   }));
-  const { error } = await admin.from("v2_pickem_games").insert(enriched);
+  const { error } = await admin.from("v2_matchups").insert(rows);
   if (error) return { ok: false, status: 500, error: error.message };
   return { ok: true, data: rows.length };
 }
@@ -192,93 +213,87 @@ export async function patchGame(admin: SupabaseClient, contestId: string, body: 
   const gameId = body.gameId as string | undefined;
   if (!gameId) return { ok: false, status: 400, error: "gameId required" };
 
-  // The line/teams freeze once anyone has picked this game — refuse line changes.
   const touchesLine = "spread" in body || "favorite" in body || "away_team" in body || "home_team" in body;
   if (touchesLine && (await isLineLocked(admin, gameId))) {
     return { ok: false, status: 409, error: "Picks have already been made on this game — its line is locked." };
   }
-  // The tiebreaker choice freezes once anyone has picked ANY game in the contest.
   if ("is_tiebreaker" in body && (await contestHasPicks(admin, contestId))) {
     return { ok: false, status: 409, error: "Picks have been made — the tiebreaker is locked." };
   }
 
+  // Read-modify-write: start from the current row so JSON fields (external_ref, result,
+  // competitors) merge instead of clobbering.
+  const { data: cur } = await admin.from("v2_matchups").select(MATCHUP_SELECT).eq("id", gameId).eq("contest_id", contestId).maybeSingle();
+  if (!cur) return { ok: false, status: 404, error: "Game not found" };
+  const row = cur as unknown as MatchupRow;
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (typeof body.away_team === "string") Object.assign(patch, teamFields("away", body.away_team));
-  if (typeof body.home_team === "string") Object.assign(patch, teamFields("home", body.home_team));
+
+  if (typeof body.away_team === "string") patch.competitor_a = { ...(row.competitor_a || {}), ...competitorFromName(body.away_team) };
+  if (typeof body.home_team === "string") patch.competitor_b = { ...(row.competitor_b || {}), ...competitorFromName(body.home_team) };
   if ("spread" in body) patch.spread = typeof body.spread === "number" ? Math.abs(body.spread) : null;
-  if ("favorite" in body) patch.favorite = body.favorite === "away" || body.favorite === "home" ? body.favorite : null;
-  if ("game_time" in body) patch.game_time = (body.game_time as string) || null;
-  if ("tv_channel" in body) patch.tv_channel = String(body.tv_channel || "").trim() || null;
-  if ("away_score" in body) patch.away_score = typeof body.away_score === "number" ? body.away_score : null;
-  if ("home_score" in body) patch.home_score = typeof body.home_score === "number" ? body.home_score : null;
-  if ("winning_team" in body) patch.winning_team = body.winning_team === "away" || body.winning_team === "home" ? body.winning_team : null;
+  if ("favorite" in body) patch.favorite = body.favorite === "away" ? "a" : body.favorite === "home" ? "b" : null;
+  if ("game_time" in body) patch.start_time = (body.game_time as string) || null;
+  if ("tv_channel" in body) patch.external_ref = stripNull({ ...(row.external_ref || {}), tv: String(body.tv_channel || "").trim() || null });
+
+  // Scores collapse into result + status; any of the three present recomputes all.
+  if ("away_score" in body || "home_score" in body || "winning_team" in body) {
+    const aScore = "away_score" in body ? (typeof body.away_score === "number" ? body.away_score : null) : row.result?.score_a ?? null;
+    const hScore = "home_score" in body ? (typeof body.home_score === "number" ? body.home_score : null) : row.result?.score_b ?? null;
+    const win = "winning_team" in body
+      ? (body.winning_team === "away" || body.winning_team === "home" ? (body.winning_team as Team) : null)
+      : favToTeam(row.result?.winner);
+    const { result, status } = resultFrom(aScore, hScore, win);
+    patch.result = result;
+    patch.status = status;
+  }
+
   if ("is_tiebreaker" in body && body.is_tiebreaker) {
-    await admin.from("v2_pickem_games").update({ is_tiebreaker: false }).eq("contest_id", contestId);
+    await admin.from("v2_matchups").update({ is_tiebreaker: false }).eq("contest_id", contestId);
     patch.is_tiebreaker = true;
   } else if ("is_tiebreaker" in body) {
     patch.is_tiebreaker = false;
   }
 
   const { data, error } = await admin
-    .from("v2_pickem_games")
-    .update(patch)
-    .eq("id", gameId)
-    .eq("contest_id", contestId)
-    .select(GAME_SELECT)
-    .single();
+    .from("v2_matchups").update(patch).eq("id", gameId).eq("contest_id", contestId).select(MATCHUP_SELECT).single();
   if (error) return { ok: false, status: 500, error: error.message };
-  return { ok: true, data };
+  return { ok: true, data: matchupToPickemGame(data as unknown as MatchupRow) };
 }
 
-/**
- * Re-pull one game from ESPN: always refresh the line (spread + favorite), and if
- * the game is FINAL, also pull the final score (total, overtime included). Only
- * works on ESPN-linked games. The score half is a no-op until the game is final,
- * so pressing Update early just freshens the line.
- */
+/** Re-pull one game from ESPN: refresh the line (unless locked), and the final score if over. */
 export async function refreshGameLine(admin: SupabaseClient, contestId: string, gameId: string): Promise<PickemResult<unknown>> {
-  const { data: g } = await admin
-    .from("v2_pickem_games").select("id, espn_event_id, league").eq("id", gameId).eq("contest_id", contestId).maybeSingle();
-  if (!g) return { ok: false, status: 404, error: "Game not found" };
-  if (!g.espn_event_id || !g.league) return { ok: false, status: 400, error: "This game isn't linked to ESPN — edit it manually." };
+  const { data: cur } = await admin.from("v2_matchups").select(MATCHUP_SELECT).eq("id", gameId).eq("contest_id", contestId).maybeSingle();
+  if (!cur) return { ok: false, status: 404, error: "Game not found" };
+  const row = cur as unknown as MatchupRow;
+  const espnId = row.external_ref?.espn_event_id, league = row.external_ref?.league;
+  if (!espnId || !league) return { ok: false, status: 400, error: "This game isn't linked to ESPN — edit it manually." };
 
-  // The summary endpoint (by id, no date) carries BOTH the line (pickcenter — it
-  // survives after the game is final, unlike the scoreboard) and the final score.
   let score;
-  try {
-    score = await fetchGameScore(g.league as string, g.espn_event_id as string);
-  } catch {
-    return { ok: false, status: 502, error: "Couldn't reach ESPN. Try again." };
-  }
+  try { score = await fetchGameScore(league, espnId); }
+  catch { return { ok: false, status: 502, error: "Couldn't reach ESPN. Try again." }; }
   if (!score) return { ok: false, status: 404, error: "ESPN has no data for this game yet." };
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  // Only touch the line when ESPN offers one AND no picks have locked it. Never
-  // erase a saved line (ESPN can drop it after a game, and we keep ours).
   if (typeof score.spread === "number" && !(await isLineLocked(admin, gameId))) {
-    patch.spread = score.spread; // already a magnitude
-    patch.favorite = score.favorite ?? null;
+    patch.spread = score.spread;
+    patch.favorite = score.favorite === "away" ? "a" : score.favorite === "home" ? "b" : null;
   }
-  // Scores only once final — the total includes overtime.
   if (score.state === "post" && score.away?.total != null && score.home?.total != null) {
     const a = score.away.total, h = score.home.total;
-    patch.away_score = a;
-    patch.home_score = h;
-    patch.winning_team = a === h ? null : a > h ? "away" : "home";
+    patch.result = { winner: a === h ? null : a > h ? "a" : "b", score_a: a, score_b: h };
+    patch.status = "final";
   }
 
   const { data, error } = await admin
-    .from("v2_pickem_games").update(patch).eq("id", gameId).eq("contest_id", contestId).select(GAME_SELECT).single();
+    .from("v2_matchups").update(patch).eq("id", gameId).eq("contest_id", contestId).select(MATCHUP_SELECT).single();
   if (error) return { ok: false, status: 500, error: error.message };
-  return { ok: true, data };
+  return { ok: true, data: matchupToPickemGame(data as unknown as MatchupRow) };
 }
 
 /**
- * Auto-grade FINAL games from ESPN (cron + the manual "Update scores" button).
- * Only writes a game once ESPN marks it final, and uses the FINAL TOTAL (which
- * includes overtime) — never a quarter/half checkpoint. Never clobbers a game
- * that's already scored (manual entry or a prior run wins). Pass a contestId to
- * grade one contest on demand; omit it to sweep every active Pick'em.
+ * Auto-grade FINAL games from ESPN (cron + manual "Update scores"). Only writes once
+ * ESPN marks a game final, using the final total (overtime included); never clobbers a
+ * game already scored. Pass a contestId for one contest; omit to sweep every active one.
  */
 export async function gradePickemFinals(admin: SupabaseClient, opts: { contestId?: string } = {}): Promise<{ graded: number }> {
   let cq = admin.from("v2_contests").select("id").eq("contest_type", "pickem");
@@ -287,29 +302,24 @@ export async function gradePickemFinals(admin: SupabaseClient, opts: { contestId
   const ids = (contests ?? []).map((c) => c.id as string);
   if (ids.length === 0) return { graded: 0 };
 
-  // Ungraded, ESPN-linked games whose kickoff has arrived (15m cushion).
   const cushion = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-  const { data: games } = await admin
-    .from("v2_pickem_games")
-    .select("id, league, espn_event_id, away_score, home_score, game_time")
-    .in("contest_id", ids)
-    .not("espn_event_id", "is", null)
-    .or("away_score.is.null,home_score.is.null");
-  const due = (games ?? []).filter((g) => !g.game_time || (g.game_time as string) <= cushion);
+  const { data: rows } = await admin
+    .from("v2_matchups").select("id, start_time, external_ref, result").in("contest_id", ids).is("result", null);
+  const due = (rows ?? [])
+    .map((r) => ({ id: r.id as string, start_time: r.start_time as string | null, ref: (r.external_ref as { espn_event_id?: string; league?: string } | null) || {} }))
+    .filter((r) => r.ref.espn_event_id && r.ref.league && (!r.start_time || r.start_time <= cushion));
   if (due.length === 0) return { graded: 0 };
 
   let graded = 0;
-  for (const g of due) {
-    const score = await fetchGameScore(g.league as string, g.espn_event_id as string);
-    if (!score || score.state !== "post") continue; // finals only
-    const a = score.away?.total;
-    const h = score.home?.total;
+  for (const r of due) {
+    const score = await fetchGameScore(r.ref.league as string, r.ref.espn_event_id as string);
+    if (!score || score.state !== "post") continue;
+    const a = score.away?.total, h = score.home?.total;
     if (a == null || h == null) continue;
-    const winning_team = a === h ? null : a > h ? "away" : "home";
     const { error } = await admin
-      .from("v2_pickem_games")
-      .update({ away_score: a, home_score: h, winning_team, updated_at: new Date().toISOString() })
-      .eq("id", g.id);
+      .from("v2_matchups")
+      .update({ result: { winner: a === h ? null : a > h ? "a" : "b", score_a: a, score_b: h }, status: "final", updated_at: new Date().toISOString() })
+      .eq("id", r.id);
     if (!error) graded += 1;
   }
   return { graded };
@@ -318,94 +328,62 @@ export async function gradePickemFinals(admin: SupabaseClient, opts: { contestId
 /** Delete one game from the slate (admin). */
 export async function deleteGame(admin: SupabaseClient, contestId: string, gameId: string | null): Promise<PickemResult<null>> {
   if (!gameId) return { ok: false, status: 400, error: "gameId required" };
-  const { error } = await admin.from("v2_pickem_games").delete().eq("id", gameId).eq("contest_id", contestId);
+  const { error } = await admin.from("v2_matchups").delete().eq("id", gameId).eq("contest_id", contestId);
   if (error) return { ok: false, status: 500, error: error.message };
   return { ok: true, data: null };
 }
 
 /** Reset: clear everyone's picks. Game slate + results stay. */
 export async function resetPicks(admin: SupabaseClient, contestId: string): Promise<PickemResult<null>> {
-  const { data: games } = await admin.from("v2_pickem_games").select("id").eq("contest_id", contestId);
-  const gameIds = (games || []).map((g) => g.id as string);
-  if (gameIds.length) {
-    const { error } = await admin.from("v2_pickem_picks").delete().in("game_id", gameIds);
-    if (error) return { ok: false, status: 500, error: error.message };
-  }
+  const { error } = await admin.from("v2_picks").delete().eq("contest_id", contestId);
+  if (error) return { ok: false, status: 500, error: error.message };
   return { ok: true, data: null };
 }
 
-/**
- * Save one member pick. Scope-agnostic: the caller has already verified the
- * member is eligible for this contest; here we enforce only the contest-open
- * and slate-lock rules, then upsert. Picks lock at the earliest kickoff.
- */
+/** Save one member pick. Picks lock at the earliest kickoff. */
 export async function submitPick(
-  admin: SupabaseClient,
-  contestId: string,
-  userId: string,
-  body: SubmitPickInput,
-  now: Date,
-  contestStatus: string,
+  admin: SupabaseClient, contestId: string, userId: string, body: SubmitPickInput, now: Date, contestStatus: string,
 ): Promise<PickemResult<null>> {
   if (!body.gameId) return { ok: false, status: 400, error: "gameId required" };
 
-  const { data: game } = await admin.from("v2_pickem_games").select("id, contest_id").eq("id", body.gameId).maybeSingle();
+  const { data: game } = await admin.from("v2_matchups").select("id, contest_id").eq("id", body.gameId).maybeSingle();
   if (!game || game.contest_id !== contestId) return { ok: false, status: 404, error: "Game not found" };
-
   if (contestStatus !== "active") return { ok: false, status: 403, error: "Pick'em isn't open" };
 
-  const { data: games } = await admin.from("v2_pickem_games").select("game_time").eq("contest_id", contestId);
-  if (isSlateLocked((games || []) as PickemGame[], now)) return { ok: false, status: 403, error: "Picks are locked" };
+  const { data: games } = await admin.from("v2_matchups").select("start_time").eq("contest_id", contestId);
+  const asGames = (games || []).map((g) => ({ game_time: g.start_time })) as PickemGame[];
+  if (isSlateLocked(asGames, now)) return { ok: false, status: 403, error: "Picks are locked" };
 
-  const picked = body.pickedTeam === "away" || body.pickedTeam === "home" ? body.pickedTeam : null;
+  const side = teamToFav(body.pickedTeam);
   const tb = typeof body.tiebreakerTotal === "number" && body.tiebreakerTotal >= 0 ? Math.round(body.tiebreakerTotal) : null;
-  const { error } = await admin.from("v2_pickem_picks").upsert(
-    { game_id: body.gameId, user_id: userId, picked_team: picked, tiebreaker_total: tb, updated_at: new Date().toISOString() },
-    { onConflict: "game_id,user_id" },
+  const { error } = await admin.from("v2_picks").upsert(
+    { matchup_id: body.gameId, contest_id: contestId, user_id: userId, pick: side ? { side } : null, tiebreaker: tb, updated_at: new Date().toISOString() },
+    { onConflict: "matchup_id,user_id" },
   );
   if (error) return { ok: false, status: 500, error: error.message };
   return { ok: true, data: null };
 }
 
-/**
- * Create a Pick'em contest. Scope is the single `eventId` arg: a string makes it
- * event-scoped, `null` makes it group-scoped (all members, opt-in). Everything
- * else about the contest is identical. Starts in `draft`; the admin builds the
- * slate, then opens it.
- */
+/** Create a Pick'em contest. `eventId` string = event-scoped; null = group-scoped. */
 export async function createPickem(
-  admin: SupabaseClient,
-  input: { orgId: string; eventId: string | null; name: string; createdBy: string },
+  admin: SupabaseClient, input: { orgId: string; eventId: string | null; name: string; createdBy: string },
 ): Promise<{ id: string }> {
   const { data, error } = await admin
     .from("v2_contests")
     .insert({
-      org_id: input.orgId,
-      event_id: input.eventId,
-      contest_type: "pickem",
-      name: input.name,
-      scoring_source: "derived", // graded from entered game results
-      status: "draft",
-      auto_enroll: false, // opt-in: members make picks
-      created_by: input.createdBy,
+      org_id: input.orgId, event_id: input.eventId, contest_type: "pickem", name: input.name,
+      scoring_source: "derived", status: "draft", auto_enroll: false, created_by: input.createdBy,
     })
-    .select("id")
-    .single();
+    .select("id").single();
   if (error || !data) throw new Error(error?.message ?? "Could not create the contest");
   return { id: data.id as string };
 }
 
 /** One leaderboard row — matches `PickemContent`'s `LeaderEntry` shape. */
 export interface PickemLeaderEntry {
-  userId: string;
-  name: string;
-  avatarUrl: string | null;
-  correct: number;
-  decided: number;
-  pickedCount: number;
-  tiebreakerTotal: number | null;
-  tiebreakerDiff: number | null;
-  rank: number;
+  userId: string; name: string; avatarUrl: string | null;
+  correct: number; decided: number; pickedCount: number;
+  tiebreakerTotal: number | null; tiebreakerDiff: number | null; rank: number;
   picks: { gameId: string; pickedTeam: "away" | "home" | null }[] | null;
 }
 
@@ -417,28 +395,24 @@ export interface PickemBoard {
   totalGames: number;
 }
 
-/**
- * Load everything the member Pick'em UI needs for one contest — scope-agnostic,
- * so the event page and the group contest-detail page share it (no duplicated
- * assembly). Individual picks are only revealed once the slate locks.
- */
+/** Load everything the member Pick'em UI needs for one contest. Individual picks are
+ *  revealed only once the slate locks. */
 export async function loadPickemBoard(
-  supabase: SupabaseClient,
-  input: { contestId: string; orgId: string; viewerId: string; now: Date },
+  supabase: SupabaseClient, input: { contestId: string; orgId: string; viewerId: string; now: Date },
 ): Promise<PickemBoard> {
   const { data: gameRows } = await supabase
-    .from("v2_pickem_games")
-    .select(GAME_SELECT)
-    .eq("contest_id", input.contestId)
-    .order("sort_order")
-    .order("game_time");
-  const games = (gameRows || []) as PickemGame[];
+    .from("v2_matchups").select(MATCHUP_SELECT).eq("contest_id", input.contestId)
+    .order("sort_order").order("start_time");
+  const games = ((gameRows || []) as unknown as MatchupRow[]).map(matchupToPickemGame) as PickemGame[];
   const gameIds = games.map((g) => g.id);
 
   const { data: pickRows } = gameIds.length
-    ? await supabase.from("v2_pickem_picks").select("game_id, user_id, picked_team, tiebreaker_total").in("game_id", gameIds)
-    : { data: [] as PickemPick[] };
-  const picks = (pickRows || []) as PickemPick[];
+    ? await supabase.from("v2_picks").select("matchup_id, user_id, pick, tiebreaker").in("matchup_id", gameIds)
+    : { data: [] as { matchup_id: string; user_id: string; pick: { side?: Side } | null; tiebreaker: number | null }[] };
+  const picks: PickemPick[] = (pickRows || []).map((p) => ({
+    game_id: p.matchup_id as string, user_id: p.user_id as string,
+    picked_team: favToTeam((p.pick as { side?: Side } | null)?.side), tiebreaker_total: (p.tiebreaker as number | null) ?? null,
+  }));
 
   const locked = isSlateLocked(games, input.now);
   const ranked = rankPickem(games, picks);
@@ -452,7 +426,6 @@ export async function loadPickemBoard(
   ]);
   const prof = new Map((profs || []).map((p) => [p.id as string, p]));
 
-  // Only reveal individual picks once the slate is locked (no early peeking).
   const picksByUser = new Map<string, PickemPick[]>();
   if (locked) for (const p of picks) (picksByUser.get(p.user_id) || picksByUser.set(p.user_id, []).get(p.user_id)!).push(p);
 
@@ -460,12 +433,8 @@ export async function loadPickemBoard(
     userId: r.userId,
     name: prof.has(r.userId) ? pickName(prof.get(r.userId)!, mode) : "Member",
     avatarUrl: (prof.get(r.userId)?.avatar_url as string | null) ?? null,
-    correct: r.correct,
-    decided: r.decided,
-    pickedCount: r.pickedCount,
-    tiebreakerTotal: r.tiebreakerTotal,
-    tiebreakerDiff: r.tiebreakerDiff,
-    rank: r.rank,
+    correct: r.correct, decided: r.decided, pickedCount: r.pickedCount,
+    tiebreakerTotal: r.tiebreakerTotal, tiebreakerDiff: r.tiebreakerDiff, rank: r.rank,
     picks: locked ? (picksByUser.get(r.userId) || []).map((p) => ({ gameId: p.game_id, pickedTeam: p.picked_team })) : null,
   }));
 

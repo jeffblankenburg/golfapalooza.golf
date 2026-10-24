@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { rankPickem, gameIsScored, computePickemPayouts, type PickemGame, type PickemPick, type PayoutSplit } from "@/lib/v2/contests/pickem";
+import { MATCHUP_SELECT, matchupToPickemGame, type MatchupRow } from "@/lib/v2/contests/pickem-server";
 import { splitAmongMembers } from "@/lib/v2/contests/payouts";
 import { pickName, type NameMode } from "@/lib/v2/profile";
 
@@ -40,15 +41,20 @@ export async function loadPickemPayouts(
   nameMode: NameMode,
 ): Promise<PickemPayouts> {
   const [{ data: gameRows }, { data: parts }] = await Promise.all([
-    supabase.from("v2_pickem_games").select("id, away_team, home_team, spread, favorite, away_score, home_score, winning_team, is_tiebreaker, game_time, sort_order").eq("contest_id", contestId).order("sort_order"),
+    supabase.from("v2_matchups").select(MATCHUP_SELECT).eq("contest_id", contestId).order("sort_order"),
     supabase.from("v2_contest_participants").select("user_id").eq("contest_id", contestId),
   ]);
-  const games = (gameRows ?? []) as unknown as PickemGame[];
+  const games = ((gameRows ?? []) as unknown as MatchupRow[]).map(matchupToPickemGame) as PickemGame[];
   const gameIds = games.map((g) => g.id);
   const { data: pickRows } = gameIds.length
-    ? await supabase.from("v2_pickem_picks").select("game_id, user_id, picked_team, tiebreaker_total").in("game_id", gameIds)
-    : { data: [] as PickemPick[] };
-  const picks = (pickRows ?? []) as PickemPick[];
+    ? await supabase.from("v2_picks").select("matchup_id, user_id, pick, tiebreaker").in("matchup_id", gameIds)
+    : { data: [] as { matchup_id: string; user_id: string; pick: { side?: "a" | "b" } | null; tiebreaker: number | null }[] };
+  const picks: PickemPick[] = (pickRows ?? []).map((p) => ({
+    game_id: p.matchup_id as string,
+    user_id: p.user_id as string,
+    picked_team: (p.pick as { side?: "a" | "b" } | null)?.side === "a" ? "away" : (p.pick as { side?: "a" | "b" } | null)?.side === "b" ? "home" : null,
+    tiebreaker_total: (p.tiebreaker as number | null) ?? null,
+  }));
 
   const entryCents = Number((contest.config as { entry_cents?: number } | null)?.entry_cents) || 0;
   const entrantCount = (parts ?? []).length;

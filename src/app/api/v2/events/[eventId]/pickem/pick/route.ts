@@ -22,7 +22,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ eve
   if (!body.gameId) return NextResponse.json({ error: "gameId required" }, { status: 400 });
 
   const admin = v2AdminClient();
-  const { data: game } = await admin.from("v2_pickem_games").select("id, contest_id").eq("id", body.gameId).maybeSingle();
+  const { data: game } = await admin.from("v2_matchups").select("id, contest_id").eq("id", body.gameId).maybeSingle();
   if (!game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
 
   const { data: contest } = await admin.from("v2_contests").select("id, org_id, event_id, status").eq("id", game.contest_id).maybeSingle();

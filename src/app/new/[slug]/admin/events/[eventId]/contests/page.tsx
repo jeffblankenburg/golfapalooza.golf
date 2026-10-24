@@ -59,7 +59,7 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
   const [{ data: parts }, { data: teams }, { data: pGames }, { data: sGames }, buyIns, { data: sideWins }] = await Promise.all([
     allIds.length ? admin.from("v2_contest_participants").select("contest_id").in("contest_id", allIds) : Promise.resolve({ data: [] as { contest_id: string }[] }),
     scrambleIds.length ? admin.from("v2_scramble_teams").select("contest_id, needs_attention_at").in("contest_id", scrambleIds) : Promise.resolve({ data: [] as { contest_id: string; needs_attention_at: string | null }[] }),
-    pickemIds.length ? admin.from("v2_pickem_games").select("contest_id").in("contest_id", pickemIds) : Promise.resolve({ data: [] as { contest_id: string }[] }),
+    pickemIds.length ? admin.from("v2_matchups").select("contest_id").in("contest_id", pickemIds) : Promise.resolve({ data: [] as { contest_id: string }[] }),
     squaresIds.length ? admin.from("v2_squares_games").select("contest_id").in("contest_id", squaresIds) : Promise.resolve({ data: [] as { contest_id: string }[] }),
     allIds.length ? loadBuyInCents(admin, allIds) : Promise.resolve(new Map<string, number>()),
     sideIds.length ? admin.from("v2_contest_winners").select("contest_id, user_id").in("contest_id", sideIds) : Promise.resolve({ data: [] as { contest_id: string; user_id: string | null }[] }),

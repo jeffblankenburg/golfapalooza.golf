@@ -41,13 +41,13 @@ export default async function PickemHomeCards({ orgId, userId, slug, eventId }: 
 
   const ids = contests.map((c) => c.id);
   const { data: gameRows } = await supabase
-    .from("v2_pickem_games").select("id, contest_id, game_time").in("contest_id", ids);
-  const games = gameRows ?? [];
+    .from("v2_matchups").select("id, contest_id, start_time").in("contest_id", ids);
+  const games = (gameRows ?? []).map((g) => ({ id: g.id as string, contest_id: g.contest_id as string, game_time: g.start_time as string | null }));
   const gameIds = games.map((g) => g.id);
   const { data: pickRows } = gameIds.length
-    ? await supabase.from("v2_pickem_picks").select("game_id").eq("user_id", userId).in("game_id", gameIds).not("picked_team", "is", null)
-    : { data: [] as { game_id: string }[] };
-  const myPicked = new Set((pickRows ?? []).map((p) => p.game_id));
+    ? await supabase.from("v2_picks").select("matchup_id, pick").eq("user_id", userId).in("matchup_id", gameIds)
+    : { data: [] as { matchup_id: string; pick: { side?: string } | null }[] };
+  const myPicked = new Set((pickRows ?? []).filter((p) => (p.pick as { side?: string } | null)?.side).map((p) => p.matchup_id as string));
   const now = await v2Now();
 
   const cards = contests

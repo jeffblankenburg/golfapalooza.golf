@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { coveringSide, type PickemGame } from "./pickem";
+import { MATCHUP_SELECT, matchupToPickemGame, type MatchupRow } from "./pickem-server";
 
 /** Compact per-game data for the admin contest-card accordion (both lanes). */
 export interface PickemGamePreview {
@@ -31,29 +32,28 @@ export async function buildPickemPreviews(
   const out = new Map<string, PickemGamePreview[]>();
   if (!contestIds.length) return out;
 
-  const { data: games } = await supabase
-    .from("v2_pickem_games")
-    .select("id, contest_id, away_team, home_team, away_abbrev, home_abbrev, spread, favorite, away_score, home_score, winning_team, game_time, is_tiebreaker, sort_order")
-    .in("contest_id", contestIds)
-    .order("sort_order");
-  const gameRows = games ?? [];
-  const gameIds = gameRows.map((g) => g.id as string);
+  const { data: rows } = await supabase
+    .from("v2_matchups").select(MATCHUP_SELECT).in("contest_id", contestIds).order("sort_order");
+  const gameRows = ((rows ?? []) as unknown as MatchupRow[]).map(matchupToPickemGame);
+  const gameIds = gameRows.map((g) => g.id);
 
   const { data: picks } = gameIds.length
-    ? await supabase.from("v2_pickem_picks").select("game_id, picked_team").in("game_id", gameIds).not("picked_team", "is", null)
-    : { data: [] as { game_id: string; picked_team: string }[] };
+    ? await supabase.from("v2_picks").select("matchup_id, pick").in("matchup_id", gameIds)
+    : { data: [] as { matchup_id: string; pick: { side?: "a" | "b" } | null }[] };
 
   const counts = new Map<string, { away: number; home: number }>();
   for (const p of picks ?? []) {
-    const c = counts.get(p.game_id as string) ?? { away: 0, home: 0 };
-    if (p.picked_team === "away") c.away++; else if (p.picked_team === "home") c.home++;
-    counts.set(p.game_id as string, c);
+    const side = (p.pick as { side?: "a" | "b" } | null)?.side;
+    if (!side) continue;
+    const c = counts.get(p.matchup_id as string) ?? { away: 0, home: 0 };
+    if (side === "a") c.away++; else c.home++;
+    counts.set(p.matchup_id as string, c);
   }
 
   for (const g of gameRows) {
     const scored = g.away_score != null && g.home_score != null;
     const winner = scored ? coveringSide(g as unknown as PickemGame) : null;
-    const c = counts.get(g.id as string) ?? { away: 0, home: 0 };
+    const c = counts.get(g.id) ?? { away: 0, home: 0 };
     const total = c.away + c.home;
     const covered = winner === "away" ? c.away : winner === "home" ? c.home : 0;
     const preview: PickemGamePreview = {

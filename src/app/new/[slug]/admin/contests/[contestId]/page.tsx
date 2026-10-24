@@ -7,6 +7,9 @@ import SquaresGamesButton from "./SquaresGamesButton";
 import ContestEntryPaid from "./ContestEntryPaid";
 import MasterPayouts from "./payouts/MasterPayouts";
 import { loadMasterPayouts } from "./payouts/loadMasterPayouts";
+import PickemPayouts from "./payouts/PickemPayouts";
+import { loadPickemPayouts } from "./payouts/loadPickemPayouts";
+import { type PayoutSplit } from "@/lib/v2/contests/pickem";
 // Same admin component the event lane uses — mounted here with the group API base.
 import PickemAdmin, { type Game } from "../../events/[eventId]/contests/[contestId]/PickemAdmin";
 import { listGames } from "@/lib/v2/contests/pickem-server";
@@ -23,7 +26,7 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
   const supabase = await v2ServerClient();
   const { data: contest } = await supabase
     .from("v2_contests")
-    .select("id, name, status, config, contest_type, org_id, payout_splits, collected_by")
+    .select("id, name, status, config, contest_type, org_id, payout_splits, collected_by, created_by")
     .eq("id", contestId)
     .eq("org_id", org.id)
     .maybeSingle();
@@ -32,9 +35,10 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
   // Pick'em manage view — the shared PickemAdmin, mounted with the GROUP base.
   // No players link (group Pick'em is opt-in, not a managed roster).
   if (contest.contest_type === "pickem") {
-    const [{ count: enrolled }, pickemGames] = await Promise.all([
+    const [{ count: enrolled }, pickemGames, pickemPayouts] = await Promise.all([
       supabase.from("v2_contest_participants").select("id", { count: "exact", head: true }).eq("contest_id", contestId),
       listGames(supabase, contestId),
+      loadPickemPayouts(supabase, contestId, contest as Parameters<typeof loadPickemPayouts>[2], org.name_display),
     ]);
     return (
       <div className={styles.page}>
@@ -46,11 +50,17 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
           showStatus={false}
           initialStatus={contest.status as string}
           initialFeeCents={0}
-          initialSplits={(contest.payout_splits as { place: number; kind: string; amount: number }[] | null) ?? []}
+          initialSplits={(contest.payout_splits as PayoutSplit[] | null) ?? []}
           enrolledCount={enrolled ?? 0}
           initialGames={pickemGames as Game[]}
         />
         <ContestEntryPaid orgId={org.id} contestId={contestId} title="Who's paid their entry" emptyText="No one's entered yet." />
+        <details style={{ marginTop: 20, border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
+          <summary style={{ padding: "12px 14px", cursor: "pointer", fontWeight: 700 }}>Winnings &amp; payouts</summary>
+          <div style={{ padding: "0 14px 14px" }}>
+            <PickemPayouts orgId={org.id} contestId={contestId} name={contest.name as string} ready={pickemPayouts.ready} people={pickemPayouts.people} />
+          </div>
+        </details>
       </div>
     );
   }

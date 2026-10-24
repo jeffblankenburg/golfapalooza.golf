@@ -66,7 +66,7 @@ export async function loadMasterPayouts(
   const squaresByUser = new Map<string, number>();
   for (const c of cells ?? []) if (c.user_id) squaresByUser.set(c.user_id as string, (squaresByUser.get(c.user_id as string) || 0) + 1);
   const cellCostForEntry = (config.cell_cost_cents as number) ?? 0;
-  const { data: entryPays } = await supabase.from("v2_financial_transactions").select("user_id, amount_cents").eq("contest_id", contestId).eq("type", "payment");
+  const { data: entryPays } = await supabase.from("v2_financial_transactions").select("user_id, amount_cents").eq("contest_id", contestId).eq("type", "payment").eq("source", "deposit");
   const entryPaidByUser = new Map<string, number>();
   for (const p of entryPays ?? []) entryPaidByUser.set(p.user_id as string, (entryPaidByUser.get(p.user_id as string) || 0) + ((p.amount_cents as number) || 0));
   const entryPaidFor = (uid: string) => {

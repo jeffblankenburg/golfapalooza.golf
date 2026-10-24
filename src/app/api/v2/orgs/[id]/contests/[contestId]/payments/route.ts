@@ -62,7 +62,9 @@ export async function GET(request: Request, { params }: { params: Params }) {
 
   const [owed, { data: pays }] = await Promise.all([
     owedByMember(g.admin, contestId, g.isSquares, g.entryCents, g.cellCostCents),
-    g.admin.from("v2_financial_transactions").select("user_id, amount_cents").eq("contest_id", contestId).eq("type", "payment"),
+    // Entry payments only — source='deposit'. Winnings credits (source='winnings',
+    // also type='payment') must NOT count toward a member's buy-in.
+    g.admin.from("v2_financial_transactions").select("user_id, amount_cents").eq("contest_id", contestId).eq("type", "payment").eq("source", "deposit"),
   ]);
   const paidByUser = new Map<string, number>();
   for (const p of pays || []) paidByUser.set(p.user_id as string, (paidByUser.get(p.user_id as string) || 0) + ((p.amount_cents as number) || 0));
@@ -96,7 +98,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
   const owedForUser = owed.get(body.userId) || 0;
   if (owedForUser <= 0) return NextResponse.json({ error: g.isSquares ? "They own no squares" : "This contest has no buy-in" }, { status: 400 });
 
-  const { data: pays } = await g.admin.from("v2_financial_transactions").select("amount_cents").eq("contest_id", contestId).eq("type", "payment").eq("user_id", body.userId);
+  const { data: pays } = await g.admin.from("v2_financial_transactions").select("amount_cents").eq("contest_id", contestId).eq("type", "payment").eq("source", "deposit").eq("user_id", body.userId);
   const paid = (pays || []).reduce((s, p) => s + ((p.amount_cents as number) || 0), 0);
   const outstanding = owedForUser - paid;
   if (outstanding <= 0) return NextResponse.json({ ok: true, alreadyPaid: true });
@@ -121,7 +123,7 @@ export async function DELETE(request: Request, { params }: { params: Params }) {
   if (!targetId) return NextResponse.json({ error: "userId required" }, { status: 400 });
 
   const { error } = await g.admin.from("v2_financial_transactions").delete()
-    .eq("contest_id", contestId).eq("type", "payment").eq("user_id", targetId);
+    .eq("contest_id", contestId).eq("type", "payment").eq("source", "deposit").eq("user_id", targetId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

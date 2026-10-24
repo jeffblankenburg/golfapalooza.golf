@@ -53,6 +53,8 @@ export async function POST(request: Request, { params }: { params: Params }) {
     paidCents?: number;
     note?: string | null;
     items?: { gameId: string; paidCents: number }[];
+    gameAlloc?: { kind: string; value: number } | null;
+    periodAlloc?: Record<string, { kind: string; value: number }> | null;
   };
   try {
     body = await request.json();
@@ -118,6 +120,32 @@ export async function POST(request: Request, { params }: { params: Params }) {
     if (!g) return NextResponse.json({ error: "Game not found." }, { status: 404 });
     if (g.locked_at) return NextResponse.json({ error: "That game's numbers are already revealed." }, { status: 409 });
     const { error } = await admin.from("v2_squares_games").update({ reveal_at: body.revealAt || null }).eq("id", gameId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
+  // Edit one game's payout allocation (how much of the pot it pays + period split).
+  if (action === "update_game_payout") {
+    const gameId = body.gameId;
+    if (!gameId) return NextResponse.json({ error: "Missing game." }, { status: 400 });
+    const { error } = await admin.from("v2_squares_games")
+      .update({ game_alloc: body.gameAlloc ?? null, period_alloc: body.periodAlloc ?? null })
+      .eq("id", gameId).eq("contest_id", contestId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
+  // Delete a game — only one that hasn't happened yet (not revealed, not started/final).
+  if (action === "delete_game") {
+    const gameId = body.gameId;
+    if (!gameId) return NextResponse.json({ error: "Missing game." }, { status: 400 });
+    const { data: g } = await admin.from("v2_squares_games").select("id, locked_at, status, start_time").eq("id", gameId).eq("contest_id", contestId).maybeSingle();
+    if (!g) return NextResponse.json({ error: "Game not found." }, { status: 404 });
+    const started = g.start_time ? new Date(g.start_time as string).getTime() <= Date.now() : false;
+    if (g.locked_at || g.status === "final" || started) {
+      return NextResponse.json({ error: "That game has already started or its numbers are drawn — it can't be deleted." }, { status: 409 });
+    }
+    const { error } = await admin.from("v2_squares_games").delete().eq("id", gameId).eq("contest_id", contestId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }

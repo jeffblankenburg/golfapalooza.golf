@@ -11,21 +11,21 @@ import { PERIOD_PRESETS, resolvePayouts, type Alloc, type GameAllocation } from 
 import ContestCollector from "@/components/v2/contests/ContestCollector";
 import { type NameMode } from "@/lib/v2/profile";
 
-type Structure = "quarters" | "halves";
+export type Structure = "quarters" | "halves";
 const defaultWeights = (s: Structure): Record<string, number> =>
   Object.fromEntries(PERIOD_PRESETS[s].map((p) => [p.key, p.weightPct]));
 
 // Editor allocation — like the engine's Alloc, but `amount` is held in DOLLARS for
 // the input (converted to cents at the storage/engine boundary).
-type EditorAlloc = { kind: "amount" | "percent" | "remainder"; value: number };
-const defaultGameAlloc = (): EditorAlloc => ({ kind: "remainder", value: 0 }); // all-remainder → equal split
-const defaultPeriodAlloc = (s: Structure): Record<string, EditorAlloc> =>
+export type EditorAlloc = { kind: "amount" | "percent" | "remainder"; value: number };
+export const defaultGameAlloc = (): EditorAlloc => ({ kind: "remainder", value: 0 }); // all-remainder → equal split
+export const defaultPeriodAlloc = (s: Structure): Record<string, EditorAlloc> =>
   Object.fromEntries(PERIOD_PRESETS[s].map((p) => [p.key, { kind: "percent", value: p.weightPct } as EditorAlloc]));
 const editorToEngine = (a: EditorAlloc): Alloc =>
   a.kind === "amount" ? { kind: "amount", value: Math.round(a.value * 100) } : a.kind === "percent" ? { kind: "percent", value: a.value } : { kind: "remainder", value: 0 };
-const editorToStored = (a: EditorAlloc) =>
+export const editorToStored = (a: EditorAlloc) =>
   a.kind === "amount" ? { kind: "amount", value: Math.round(a.value * 100) } : a.kind === "percent" ? { kind: "percent", value: a.value } : { kind: "remainder", value: 0 };
-const storedToEditor = (a: { kind?: unknown; value?: unknown } | null | undefined): EditorAlloc | null => {
+export const storedToEditor = (a: { kind?: unknown; value?: unknown } | null | undefined): EditorAlloc | null => {
   if (!a || typeof a !== "object") return null;
   if (a.kind === "remainder") return { kind: "remainder", value: 0 };
   if ((a.kind === "amount" || a.kind === "percent") && typeof a.value === "number") {
@@ -76,7 +76,7 @@ export const dateLabel = (iso: string | null): string =>
   iso ? new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
 
 /** A dollar/percent/remainder input: a number field + a $ | % | Rest toggle. */
-function AllocInput({ alloc, onChange, allowRemainder, restLabel, compact }: { alloc: EditorAlloc; onChange: (a: EditorAlloc) => void; allowRemainder?: boolean; restLabel?: string; compact?: boolean }) {
+export function AllocInput({ alloc, onChange, allowRemainder, restLabel, compact }: { alloc: EditorAlloc; onChange: (a: EditorAlloc) => void; allowRemainder?: boolean; restLabel?: string; compact?: boolean }) {
   return (
     <span className={styles.alloc} data-compact={compact || undefined}>
       {alloc.kind === "remainder" ? (

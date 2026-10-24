@@ -6,9 +6,9 @@ import { type NameMode } from "@/lib/v2/profile";
 import styles from "@/app/new/new.module.css";
 
 /**
- * "Edit games & payouts" trigger for the Squares detail page — opens the shared
- * editor as a MODAL in games-only mode (basics/draft live in the gear). Keeps the
- * detail page to a single on-page list (the manage/results view).
+ * "Add games" trigger for the Squares detail page — opens the shared editor as a
+ * MODAL in games-only mode to add games to the slate. Per-game payout tuning and
+ * deletion happen from each game's own gear in the manage view.
  */
 export default function SquaresGamesButton({
   row,
@@ -25,7 +25,7 @@ export default function SquaresGamesButton({
   return (
     <>
       <button type="button" className={styles.createBtnGhost} onClick={() => setOpen(true)}>
-        Edit games &amp; payouts
+        + Add games
       </button>
       {open && (
         <SquaresEditor

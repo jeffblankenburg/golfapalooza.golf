@@ -133,6 +133,8 @@ export default async function SquaresManageView({
     revealAt: (g.reveal_at as string) ?? null,
     startTime: (g.start_time as string) ?? null,
     final: (g.status as string) === "final",
+    gameAlloc: (g.game_alloc as ManageGame["gameAlloc"]) ?? null,
+    periodAlloc: (g.period_alloc as ManageGame["periodAlloc"]) ?? null,
   }));
 
   const cfg = (contest.config as Record<string, unknown>) ?? {};

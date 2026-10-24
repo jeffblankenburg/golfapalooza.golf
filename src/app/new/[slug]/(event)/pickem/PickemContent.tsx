@@ -80,6 +80,11 @@ export default function PickemContent({
     );
   };
 
+  // A tiebreaker only matters when players are tied on correct picks — count how
+  // many share each correct total so we only explain the tiebreaker where it's used.
+  const sameCorrect = new Map<number, number>();
+  for (const e of leaderboard) if (e.decided > 0) sameCorrect.set(e.correct, (sameCorrect.get(e.correct) || 0) + 1);
+
   return (
     <div className={styles.module}>
       <div className={styles.segmented} style={{ marginBottom: 14 }}>
@@ -136,8 +141,16 @@ export default function PickemContent({
                     {e.avatarUrl ? <img src={e.avatarUrl} alt="" className={styles.pickAvatar} /> : <span className={styles.pickAvatarFallback}>{e.name.charAt(0).toUpperCase()}</span>}
                     <span className={styles.pickLeaderName}>{e.name}</span>
                     <span className={styles.pickLeaderStat}>
-                      {e.decided > 0 ? `${e.correct}/${e.decided}` : `${e.pickedCount}/${totalGames} picked`}
-                      {e.tiebreakerDiff != null ? ` (off ${e.tiebreakerDiff})` : ""}
+                      {e.decided > 0 ? (
+                        <>
+                          <span className={styles.pickLeaderScore}>{e.correct}</span>
+                          {(sameCorrect.get(e.correct) ?? 0) > 1 && e.tiebreakerDiff != null && (
+                            <span className={styles.pickLeaderTb}>off {e.tiebreakerDiff}</span>
+                          )}
+                        </>
+                      ) : (
+                        `${e.pickedCount}/${totalGames} picked`
+                      )}
                     </span>
                   </button>
                   {canExpand && expanded === e.userId && (

@@ -6385,7 +6385,9 @@ select.optCellInput {
 .pickAvatar, .pickAvatarFallback { width: 28px; height: 28px; border-radius: 50%; flex: none; object-fit: cover; }
 .pickAvatarFallback { display: grid; place-items: center; background: color-mix(in srgb, var(--ink) 10%, transparent); font-weight: 700; font-size: 0.8rem; color: var(--ink); }
 .pickLeaderName { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pickLeaderStat { font-size: 0.82rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; flex: none; }
+.pickLeaderStat { font-size: 0.82rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; flex: none; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.05; }
+.pickLeaderScore { font-size: 1.35rem; font-weight: 800; color: var(--ink); }
+.pickLeaderTb { font-size: 0.7rem; color: var(--ink-soft); margin-top: 1px; }
 .pickReveal { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 10px 2px; }
 .pickRevealChip { font-size: 0.72rem; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
 .pickRevealChip[data-ok] { background: color-mix(in srgb, #15803d 18%, transparent); }

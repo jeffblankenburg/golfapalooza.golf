@@ -324,8 +324,6 @@ export default function SquaresManage({
       <div className={styles.topRow}>
         <Link href={backHref} className={styles.back}>← Contests</Link>
         <span className={styles.topActions}>
-          <Link href={payoutsHref} className={styles.edit}>Payouts</Link>
-          <Link href={playerHref} className={styles.edit}>Player view</Link>
           {editHref && <Link href={editHref} className={styles.edit}>Edit settings</Link>}
         </span>
       </div>

@@ -107,14 +107,12 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
 
   function sideRow(s: Contest): SideRow {
     const hole = s.holes && s.holes.length ? s.holes[0] : null;
-    const buy = buyIns.get(s.id) || 0;
     const players = partCount.get(s.id) || 0;
     const wid = winnerIdByContest.get(s.id);
     const winner = s.declared_no_winner ? "No winner" : wid ? `Winner: ${winnerName.get(wid) || "set"}` : null;
     const meta = [contestTypeLabel(s.contest_type), hole ? `hole ${hole}` : null, winner].filter(Boolean).join(", ");
-    // Right side: a useful stat — total pot (buy-in × players), else a player count.
-    const pot = buy * players;
-    const right = pot > 0 ? `${money(pot)} pot` : `${players} player${players === 1 ? "" : "s"}`;
+    // Right side: the participant count (consistent with the top-level card badge).
+    const right = `${players} player${players === 1 ? "" : "s"}`;
     return { id: s.id, type: s.contest_type, name: s.name, meta, right };
   }
 
@@ -142,19 +140,16 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
       if (buy > 0) facts.push({ label: "Buy-in", value: money(buy) });
     }
 
-    // Buy-in stays in the small meta line (pickem/squares) or the facts — never in the
-    // prominent count badge. The count badge carries a useful stat: total pot, or the
-    // games count for pickem/squares.
+    // The count badge is ALWAYS the participant count (consistent across every type).
+    // Buy-in stays in the small meta line / facts; the player count lives in the badge,
+    // so it's pulled out of the meta to avoid showing it twice.
     const isPickSquares = c.contest_type === "pickem" || c.contest_type === "squares";
-    const pot = buy * players;
     const metaParts = isGolfTeam
-      ? [when, `${nTeams} team${nTeams === 1 ? "" : "s"}`, `${players} player${players === 1 ? "" : "s"}`]
+      ? [when, `${nTeams} team${nTeams === 1 ? "" : "s"}`]
       : isPickSquares
         ? [buy > 0 ? `${money(buy)} buy-in` : "No buy-in"]
-        : [when, `${players} player${players === 1 ? "" : "s"}`];
-    const count = isPickSquares
-      ? (games ? `${games} game${games === 1 ? "" : "s"}` : undefined)
-      : pot > 0 ? `${money(pot)} pot` : undefined;
+        : [when, buy > 0 ? `${money(buy)} buy-in` : null];
+    const count = `${players} player${players === 1 ? "" : "s"}`;
 
     return {
       id: c.id,

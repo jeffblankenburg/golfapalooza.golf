@@ -36,7 +36,11 @@ export interface AuctionEntity {
 export interface AuctionParticipant {
   userId: string; name: string;
   spentCents: number; remainingCents: number; paidTeams: number; done: boolean; points: number;
-  teams: { entityId: string; name: string; seed: number; bidCents: number; freeName: string | null }[];
+  teams: {
+    entityId: string; name: string; seed: number; logo_url: string | null; bidCents: number;
+    freeName: string | null; // kept for the compact views; `free` carries the full rider
+    free: { name: string; seed: number; logo_url: string | null } | null;
+  }[];
 }
 export interface AuctionResults {
   championTeamId: string | null; championName: string | null; championOwnerId: string | null;
@@ -223,7 +227,9 @@ export async function loadAuction(admin: SupabaseClient, contestId: string): Pro
   const participants: AuctionParticipant[] = order.map((uid) => {
     const b = budget(ownership, uid, config.salaryCapCents);
     const lots = (lotsByOwner.get(uid) ?? []).map((e) => ({
-      entityId: e.id, name: e.name, seed: e.seed, bidCents: e.bidCents ?? 0, freeName: e.bundledThrowIn?.name ?? null,
+      entityId: e.id, name: e.name, seed: e.seed, logo_url: e.logo_url, bidCents: e.bidCents ?? 0,
+      freeName: e.bundledThrowIn?.name ?? null,
+      free: e.bundledThrowIn ? { name: e.bundledThrowIn.name, seed: e.bundledThrowIn.seed, logo_url: e.bundledThrowIn.logo_url } : null,
     })).sort((a, b2) => b2.bidCents - a.bidCents);
     return {
       userId: uid, name: nameMap.get(uid) || "Member",

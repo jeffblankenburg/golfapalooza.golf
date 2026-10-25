@@ -213,6 +213,34 @@ export function nextThrowers(
   return { currentId, onDeckId: null };
 }
 
+/**
+ * Project the next `count` nominators forward from the current rotation for the board's
+ * "up next" queue. Simulates one paid acquisition per turn and drops anyone who reaches
+ * `teamsPerPlayer`, so a player already holding all their lots is skipped in the queue
+ * exactly as they are live. Input is the draft-ordered roster with each one's current paid
+ * count; the first entry equals `nextThrowers().currentId`.
+ */
+export function upcomingThrowers(
+  order: { id: string; paidTeams: number }[], teamsPerPlayer: number, count: number,
+): string[] {
+  const n = order.length;
+  if (n === 0 || count <= 0) return [];
+  const counts = order.map((o) => o.paidTeams);
+  let totalAssigned = counts.reduce((s, c) => s + c, 0);
+  const out: string[] = [];
+  const maxGuard = n * teamsPerPlayer + n;
+  for (let guard = 0; out.length < count && guard < maxGuard; guard++) {
+    let base = totalAssigned % n;
+    let attempts = 0;
+    while (counts[base] >= teamsPerPlayer && attempts < n) { base = (base + 1) % n; attempts++; }
+    if (attempts >= n) break; // everyone done
+    out.push(order[base].id);
+    counts[base]++;
+    totalAssigned++;
+  }
+  return out;
+}
+
 /** Points for a participant: Σ over their owned entities of Σ over that team's wins of
  *  pointsForWin(mode, seed, round). `winRoundsByEntity` is the list of rounds each team won. */
 export function userPoints(

@@ -89,7 +89,7 @@ function ProjectorBoard({ state }: { state: AuctionState }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
                   {onBlock.logo_url && <img src={onBlock.logo_url} alt="" style={{ width: 150, height: 150, objectFit: "contain" }} />}
                   <div>
-                    <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--ink-soft)" }}>{onBlock.seed} seed{onBlock.region ? `, ${onBlock.region}` : ""}</div>
+                    <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--ink-soft)" }}>#{onBlock.seed}{onBlock.region ? ` ${onBlock.region}` : ""}</div>
                     <div style={{ fontSize: "4.5rem", lineHeight: 1.02, fontWeight: 900 }}>{onBlock.name}</div>
                   </div>
                 </div>

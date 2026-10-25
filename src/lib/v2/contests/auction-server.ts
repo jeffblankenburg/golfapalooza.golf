@@ -37,9 +37,9 @@ export interface AuctionParticipant {
   userId: string; name: string;
   spentCents: number; remainingCents: number; paidTeams: number; done: boolean; points: number;
   teams: {
-    entityId: string; name: string; seed: number; logo_url: string | null; bidCents: number;
+    entityId: string; name: string; short_name: string | null; seed: number; logo_url: string | null; bidCents: number;
     freeName: string | null; // kept for the compact views; `free` carries the full rider
-    free: { name: string; seed: number; logo_url: string | null } | null;
+    free: { name: string; short_name: string | null; seed: number; logo_url: string | null } | null;
   }[];
 }
 export interface AuctionResults {
@@ -90,6 +90,7 @@ interface Position {
   seed: number; region: string | null;
   teamIds: string[];     // all member team ids (1 or 2)
   name: string;          // "Duke" or "American / Mount St. Mary's" (→ winner once resolved)
+  short_name: string | null; // abbreviation for the compact cards (null for unresolved play-ins)
   record: string | null; logo_url: string | null;
   eliminated: boolean;   // the cell's run is over (all members out)
   playInSlot: boolean;   // two teams, not yet resolved
@@ -139,6 +140,7 @@ async function resolveField(
       id: members.reduce((m, t) => minId(m, t.id), members[0].id),
       seed: members[0].seed, region: members[0].region,
       teamIds: members.map((m) => m.id), name,
+      short_name: isPlayIn && !resolved ? null : face.short_name,
       record: face.record, logo_url: isPlayIn && !resolved ? null : face.logo_url,
       eliminated: members.every((m) => m.eliminated), playInSlot: isPlayIn && !resolved,
     });
@@ -201,7 +203,7 @@ export async function loadAuction(admin: SupabaseClient, contestId: string): Pro
   const toEntity = (p: Position, rider: AuctionEntity | null): AuctionEntity => {
     const o = ownerByTeam.get(p.id) || null;
     return {
-      id: p.id, name: p.name, short_name: null, seed: p.seed, region: p.region, record: p.record, logo_url: p.logo_url,
+      id: p.id, name: p.name, short_name: p.short_name, seed: p.seed, region: p.region, record: p.record, logo_url: p.logo_url,
       eliminated: p.eliminated, wins: posWins(p), playInSlot: p.playInSlot, ownerId: o?.userId ?? null, bidCents: o?.bidCents ?? null, bundledThrowIn: rider,
     };
   };
@@ -227,9 +229,9 @@ export async function loadAuction(admin: SupabaseClient, contestId: string): Pro
   const participants: AuctionParticipant[] = order.map((uid) => {
     const b = budget(ownership, uid, config.salaryCapCents);
     const lots = (lotsByOwner.get(uid) ?? []).map((e) => ({
-      entityId: e.id, name: e.name, seed: e.seed, logo_url: e.logo_url, bidCents: e.bidCents ?? 0,
+      entityId: e.id, name: e.name, short_name: e.short_name, seed: e.seed, logo_url: e.logo_url, bidCents: e.bidCents ?? 0,
       freeName: e.bundledThrowIn?.name ?? null,
-      free: e.bundledThrowIn ? { name: e.bundledThrowIn.name, seed: e.bundledThrowIn.seed, logo_url: e.bundledThrowIn.logo_url } : null,
+      free: e.bundledThrowIn ? { name: e.bundledThrowIn.name, short_name: e.bundledThrowIn.short_name, seed: e.bundledThrowIn.seed, logo_url: e.bundledThrowIn.logo_url } : null,
     })).sort((a, b2) => b2.bidCents - a.bidCents);
     return {
       userId: uid, name: nameMap.get(uid) || "Member",

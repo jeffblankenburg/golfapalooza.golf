@@ -39,6 +39,7 @@ const ADDABLE = [
 ] as const;
 
 type PickemItem = Extract<GroupContestItem, { kind: "pickem" }>;
+type AuctionItem = Extract<GroupContestItem, { kind: "auction" }>;
 
 const statusLabel = (s: string) => (s === "active" ? "Open" : s === "draft" ? "Draft" : s);
 const centsToStr = (c: number) => (c ? String(c / 100) : "");
@@ -60,6 +61,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
   const [nameKind, setNameKind] = useState<"pickem" | "auction">("pickem");
   const [pickemName, setPickemName] = useState("");
   const [settingsFor, setSettingsFor] = useState<PickemItem | null>(null);
+  const [auctionSettingsFor, setAuctionSettingsFor] = useState<AuctionItem | null>(null);
   const [squaresSettingsFor, setSquaresSettingsFor] = useState<SquaresContestRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -181,6 +183,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
               meta={[it.tournamentName || "No tournament", it.complete ? "complete" : statusLabel(it.status)].join(", ")}
               count={`${it.participantCount} player${it.participantCount === 1 ? "" : "s"}`}
               detailHref={`${adminBase}/${it.id}`} detailLabel="Open auction"
+              onGear={() => setAuctionSettingsFor(it)}
               isOpen={false} onToggle={() => router.push(`${adminBase}/${it.id}`)} />
           ) : (
             <PickemRow key={it.id} it={it} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onSettings={() => setSettingsFor(it)} />
@@ -209,7 +212,58 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
           onSaved={() => { setSquaresSettingsFor(null); router.refresh(); }}
         />
       )}
+
+      {auctionSettingsFor && (
+        <AuctionQuickSettings
+          orgId={orgId}
+          item={auctionSettingsFor}
+          onClose={() => setAuctionSettingsFor(null)}
+          onSaved={() => { setAuctionSettingsFor(null); router.refresh(); }}
+        />
+      )}
     </div>
+  );
+}
+
+/** Quick settings for an Auction — name + member visibility. The tournament binding,
+ *  buy-in, salary cap, prizes, and the draft itself live on the manage page. */
+function AuctionQuickSettings({ orgId, item, onClose, onSaved }: { orgId: string; item: AuctionItem; onClose: () => void; onSaved: () => void }) {
+  const base = `/api/v2/orgs/${orgId}/contests/${item.id}`;
+  const [name, setName] = useState(item.name);
+  const [status, setStatus] = useState(item.status);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function save() {
+    const n = name.trim();
+    if (!n || saving) return;
+    setSaving(true); setErr(null);
+    const res = await fetch(base, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n, status }) });
+    if (!res.ok) { setErr((await res.json().catch(() => ({}))).error || "Could not save"); setSaving(false); return; }
+    onSaved();
+  }
+
+  return (
+    <Modal open title="Auction settings" onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <label>
+          <span style={QS_LABEL}>Name</span>
+          <input className={styles.input} style={{ width: "100%" }} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+        </label>
+        <label>
+          <span style={QS_LABEL}>Status</span>
+          <select className={styles.selectInput} value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="draft">Draft (hidden from members)</option>
+            <option value="active">Open (shown on the home page)</option>
+            <option value="final">Final (closed)</option>
+          </select>
+        </label>
+        {err && <p className={styles.err} style={{ margin: 0 }}>{err}</p>}
+        <button type="button" className={styles.create} onClick={() => void save()} disabled={saving || !name.trim()}>
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
+    </Modal>
   );
 }
 

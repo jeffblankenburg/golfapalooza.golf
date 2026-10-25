@@ -166,6 +166,19 @@ export function teamWins(games: TournamentGame[], teamId: string): number {
   return games.filter((g) => g.result?.winner_team_id === teamId).length;
 }
 
+/** The round number of each game a team won (round-weighted auction scoring). */
+export function teamWinRounds(games: TournamentGame[], teamId: string): number[] {
+  return games.filter((g) => g.result?.winner_team_id === teamId).map((g) => g.round);
+}
+
+/** The two Final Four losers' team ids (the semifinal losers) — they tie for 3rd. */
+export function finalFourLosers(games: TournamentGame[]): string[] {
+  return games
+    .filter((g) => g.round === 5 && g.status === "final" && g.result?.winner_team_id)
+    .map((g) => (g.team_a_id === g.result!.winner_team_id ? g.team_b_id : g.team_a_id))
+    .filter((x): x is string => !!x);
+}
+
 const finalGame = (games: TournamentGame[]): TournamentGame | null => {
   if (!games.length) return null;
   const maxRound = Math.max(...games.map((g) => g.round));

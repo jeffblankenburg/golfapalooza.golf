@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { pickName, type NameMode } from "@/lib/v2/profile";
 import { orgNameMode } from "@/lib/v2/orgs";
 import { loadTournamentSource } from "./tournament-server";
+import { teamWinRounds, finalFourLosers } from "./tournament";
 import {
   auctionConfigOf, draftOrder, nextThrowers, budget, paidTeamCount, isDone, userPoints,
   auctionCapacity, auctionBundles, MIN_TEAMS_PER_PLAYER,
@@ -38,6 +39,7 @@ export interface AuctionParticipant {
 export interface AuctionResults {
   championTeamId: string | null; championName: string | null; championOwnerId: string | null;
   runnerUpTeamId: string | null; runnerUpName: string | null; runnerUpOwnerId: string | null;
+  finalFour: { teamId: string; name: string; ownerId: string | null }[]; // the two FF losers (tie for 3rd)
 }
 export interface AuctionState {
   contest: { id: string; orgId: string; name: string; status: string };
@@ -181,6 +183,7 @@ export async function loadAuction(admin: SupabaseClient, contestId: string): Pro
   // only the one that advances has wins).
   const seedByEntity = new Map((src?.teams || []).map((t) => [t.id, t.seed]));
   const winsByEntity = new Map((src?.teams || []).map((t) => [t.id, src!.teamWins(t.id)]));
+  const winRoundsByEntity = new Map((src?.teams || []).map((t) => [t.id, teamWinRounds(src!.games, t.id)]));
   const ownerByTeam = new Map(ownership.map((o) => [o.entityId, o]));
 
   const posWins = (p: Position) => p.teamIds.reduce((w, id) => w + (winsByEntity.get(id) ?? 0), 0);
@@ -218,7 +221,7 @@ export async function loadAuction(admin: SupabaseClient, contestId: string): Pro
     return {
       userId: uid, name: nameMap.get(uid) || "Member",
       spentCents: b.spent, remainingCents: b.remaining, paidTeams: paidTeamCount(ownership, uid), done: isDone(ownership, uid, teamsPerPlayer),
-      points: userPoints(ownership, uid, seedByEntity, winsByEntity), teams: lots,
+      points: userPoints(ownership, uid, seedByEntity, winRoundsByEntity, config.scoringMode), teams: lots,
     };
   });
 
@@ -229,6 +232,7 @@ export async function loadAuction(admin: SupabaseClient, contestId: string): Pro
     championOwnerId: champTeamId ? ownerByTeam.get(champTeamId)?.userId ?? null : null,
     runnerUpTeamId: runnerTeamId, runnerUpName: runnerTeamId ? src?.teamById.get(runnerTeamId)?.name ?? null : null,
     runnerUpOwnerId: runnerTeamId ? ownerByTeam.get(runnerTeamId)?.userId ?? null : null,
+    finalFour: (src ? finalFourLosers(src.games) : []).map((id) => ({ teamId: id, name: src?.teamById.get(id)?.name ?? "?", ownerId: ownerByTeam.get(id)?.userId ?? null })),
   };
   const onBlock = config.onBlockEntityId ? entities.find((e) => e.id === config.onBlockEntityId) ?? null : null;
 
@@ -246,6 +250,11 @@ export interface AuctionWinner { userId: string; name: string; wonCents: number;
 export interface AuctionPayouts { ready: boolean; potCents: number; totalCents: number; prizes: AuctionPrize[]; winners: AuctionWinner[] }
 
 const ordinal = (n: number) => `${n}${["th", "st", "nd", "rd"][(n % 100 - n % 10 === 10 ? 0 : n % 10)] ?? "th"}`;
+/** Split `total` cents into `n` even shares, distributing the remainder to the first few. */
+const splitCents = (total: number, n: number): number[] => {
+  const base = Math.floor(total / n), rem = total - base * n;
+  return Array.from({ length: n }, (_, i) => base + (i < rem ? 1 : 0));
+};
 
 /**
  * Auction payouts: resolve each admin-set prize to its winner (champion/runner-up owner
@@ -260,8 +269,20 @@ export async function loadAuctionPayouts(admin: SupabaseClient, contestId: strin
   const nameOf = (uid: string | null) => (uid ? state.participants.find((p) => p.userId === uid)?.name ?? "Member" : null);
 
   const prizes: AuctionPrize[] = [];
-  if (cfg.payoutChampionCents > 0) prizes.push({ key: "champion", label: "Champion owner", amountCents: cfg.payoutChampionCents, winnerId: state.results.championOwnerId, winnerName: nameOf(state.results.championOwnerId) });
-  if (cfg.payoutRunnerUpCents > 0) prizes.push({ key: "runner_up", label: "Runner-up owner", amountCents: cfg.payoutRunnerUpCents, winnerId: state.results.runnerUpOwnerId, winnerName: nameOf(state.results.runnerUpOwnerId) });
+  const tourney = cfg.payoutTournamentCents;
+  if ((tourney[0] ?? 0) > 0) prizes.push({ key: "tourney_1", label: "Tournament, champion", amountCents: tourney[0], winnerId: state.results.championOwnerId, winnerName: nameOf(state.results.championOwnerId) });
+  if ((tourney[1] ?? 0) > 0) prizes.push({ key: "tourney_2", label: "Tournament, runner-up", amountCents: tourney[1], winnerId: state.results.runnerUpOwnerId, winnerName: nameOf(state.results.runnerUpOwnerId) });
+  if ((tourney[2] ?? 0) > 0) {
+    const ff = state.results.finalFour;
+    if (ff.length === 0) {
+      prizes.push({ key: "tourney_3", label: "Tournament, 3rd (Final Four)", amountCents: tourney[2], winnerId: null, winnerName: null });
+    } else {
+      // The two Final Four losers tie for 3rd — split the prize evenly (cent-exact).
+      splitCents(tourney[2], ff.length).forEach((share, i) => {
+        prizes.push({ key: `tourney_3_${i}`, label: `Tournament, 3rd (${ff[i].name})`, amountCents: share, winnerId: ff[i].ownerId, winnerName: nameOf(ff[i].ownerId) });
+      });
+    }
+  }
   const standings = [...state.participants].sort((a, b) => b.points - a.points || a.spentCents - b.spentCents);
   cfg.payoutPointsCents.forEach((amt, i) => {
     if (amt > 0) { const w = standings[i] ?? null; prizes.push({ key: `points_${i + 1}`, label: `Points, ${ordinal(i + 1)}`, amountCents: amt, winnerId: w?.userId ?? null, winnerName: w?.name ?? null }); }

@@ -16,11 +16,28 @@ export interface AuctionConfig {
   complete: boolean;
   tournamentId: string | null; // entity catalog = this tournament's field
   onBlockEntityId: string | null; // the lot currently up for bids (live recorder + board)
+  scoringMode: ScoringMode;     // how a win scores (default: seed per win)
   // Payouts — admin-entered prize amounts (bromadness model). The system resolves who won
-  // each: champion/runner-up owner from the bracket, points places from the standings.
-  payoutChampionCents: number;
-  payoutRunnerUpCents: number;
-  payoutPointsCents: number[];  // [1st place, 2nd, 3rd, …]
+  // each: tournament places from the bracket, points places from the standings.
+  payoutTournamentCents: number[]; // [1st champion, 2nd runner-up, 3rd Final Four losers]
+  payoutPointsCents: number[];     // [1st, 2nd, 3rd]
+}
+
+/** How a team win scores: base (1 or its seed) × multiplier (none or the round number). */
+export type ScoringMode = "flat" | "flat_round" | "seed" | "seed_round";
+export const SCORING_MODES: { value: ScoringMode; label: string }[] = [
+  { value: "flat", label: "1 point per win" },
+  { value: "flat_round", label: "1 point per win × round" },
+  { value: "seed", label: "Seed number per win" },
+  { value: "seed_round", label: "Seed number per win × round" },
+];
+
+/** Points a single win is worth under the given mode. `round` is the bracket round (First
+ *  Four = 0, so a play-in win is worth 0 in the round-weighted modes). */
+export function pointsForWin(mode: ScoringMode, seed: number, round: number): number {
+  const base = mode === "seed" || mode === "seed_round" ? seed : 1;
+  const mult = mode === "flat_round" || mode === "seed_round" ? round : 1;
+  return base * mult;
 }
 
 export interface AuctionOwnership {
@@ -182,14 +199,18 @@ export function nextThrowers(
   return { currentId, onDeckId: null };
 }
 
-/** Seed-based points for a participant: Σ (seed × wins) over their owned entities. */
+/** Points for a participant: Σ over their owned entities of Σ over that team's wins of
+ *  pointsForWin(mode, seed, round). `winRoundsByEntity` is the list of rounds each team won. */
 export function userPoints(
   ownership: AuctionOwnership[], userId: string,
-  seedByEntity: Map<string, number>, winsByEntity: Map<string, number>,
+  seedByEntity: Map<string, number>, winRoundsByEntity: Map<string, number[]>, mode: ScoringMode,
 ): number {
   return ownership
     .filter((o) => o.userId === userId)
-    .reduce((pts, o) => pts + (seedByEntity.get(o.entityId) ?? 0) * (winsByEntity.get(o.entityId) ?? 0), 0);
+    .reduce((pts, o) => {
+      const seed = seedByEntity.get(o.entityId) ?? 0;
+      return pts + (winRoundsByEntity.get(o.entityId) ?? []).reduce((s, round) => s + pointsForWin(mode, seed, round), 0);
+    }, 0);
 }
 
 /** Read an auction config off a contest's config JSON, with bromadness defaults. */
@@ -205,8 +226,8 @@ export function auctionConfigOf(config: Record<string, unknown> | null | undefin
     complete: c.auction_complete === true,
     tournamentId: typeof c.tournament_id === "string" ? c.tournament_id : null,
     onBlockEntityId: typeof c.on_block_entity_id === "string" ? c.on_block_entity_id : null,
-    payoutChampionCents: Number(c.payout_champion_cents) || 0,
-    payoutRunnerUpCents: Number(c.payout_runner_up_cents) || 0,
+    scoringMode: ["flat", "flat_round", "seed", "seed_round"].includes(c.scoring_mode as string) ? (c.scoring_mode as ScoringMode) : "seed",
+    payoutTournamentCents: Array.isArray(c.payout_tournament_cents) ? (c.payout_tournament_cents as unknown[]).map((n) => Number(n) || 0) : [],
     payoutPointsCents: Array.isArray(c.payout_points_cents) ? (c.payout_points_cents as unknown[]).map((n) => Number(n) || 0) : [],
   };
 }

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import styles from "@/app/new/new.module.css";
 import ContestParticipants from "@/components/v2/contests/ContestParticipants";
 import ContestEntryPaid from "./ContestEntryPaid";
-import { MIN_TEAMS_PER_PLAYER } from "@/lib/v2/contests/auction";
+import { MIN_TEAMS_PER_PLAYER, SCORING_MODES } from "@/lib/v2/contests/auction";
 import { subscribeToAuction } from "@/lib/v2/realtime/auction-channel";
 import AuctionPayouts from "./AuctionPayouts";
 import type { AuctionState, AuctionPayouts as AuctionPayoutsData } from "@/lib/v2/contests/auction-server";
@@ -71,8 +71,13 @@ export default function AuctionManager({
   }
 
   const bundleCount = entities.filter((e) => e.bundledThrowIn).length;
+  const setTourney = (i: number, cents: number) => {
+    const arr = [config.payoutTournamentCents[0] ?? 0, config.payoutTournamentCents[1] ?? 0, config.payoutTournamentCents[2] ?? 0];
+    arr[i] = cents;
+    return act({ action: "settings", payout_tournament_cents: arr });
+  };
   const setPoint = (i: number, cents: number) => {
-    const arr = [config.payoutPointsCents[0] ?? 0, config.payoutPointsCents[1] ?? 0];
+    const arr = [config.payoutPointsCents[0] ?? 0, config.payoutPointsCents[1] ?? 0, config.payoutPointsCents[2] ?? 0];
     arr[i] = cents;
     return act({ action: "settings", payout_points_cents: arr });
   };
@@ -113,15 +118,30 @@ export default function AuctionManager({
             </select>
             <span style={{ display: "block", fontSize: "0.72rem", color: "var(--ink-soft)", marginTop: 4 }}>Teams per player and free-team pairings are set automatically from the headcount.</span>
           </label>
+          <label>
+            <span style={LABEL}>Scoring <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(how a team win scores)</span></span>
+            <select className={styles.selectInput} value={config.scoringMode} disabled={busy} onChange={(e) => void act({ action: "settings", scoring_mode: e.target.value })}>
+              {SCORING_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+          </label>
           <div>
-            <span style={LABEL}>Payouts <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(prize amounts, 0 = none)</span></span>
+            <span style={LABEL}>Tournament payouts <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(prize amounts, 0 = none)</span></span>
             <div className={styles.profileTwoCol}>
-              <MoneyField label="Champion owner" defaultDollars={config.payoutChampionCents / 100} disabled={busy} onCents={(c) => void act({ action: "settings", payout_champion_cents: c })} />
-              <MoneyField label="Runner-up owner" defaultDollars={config.payoutRunnerUpCents / 100} disabled={busy} onCents={(c) => void act({ action: "settings", payout_runner_up_cents: c })} />
+              <MoneyField label="Champion (1st)" defaultDollars={(config.payoutTournamentCents[0] ?? 0) / 100} disabled={busy} onCents={(c) => void setTourney(0, c)} />
+              <MoneyField label="Runner-up (2nd)" defaultDollars={(config.payoutTournamentCents[1] ?? 0) / 100} disabled={busy} onCents={(c) => void setTourney(1, c)} />
             </div>
-            <div className={styles.profileTwoCol} style={{ marginTop: 8 }}>
+            <div style={{ marginTop: 8 }}>
+              <MoneyField label="Final Four (3rd, split by the two losers)" defaultDollars={(config.payoutTournamentCents[2] ?? 0) / 100} disabled={busy} onCents={(c) => void setTourney(2, c)} />
+            </div>
+          </div>
+          <div>
+            <span style={LABEL}>Points payouts</span>
+            <div className={styles.profileTwoCol}>
               <MoneyField label="Points, 1st" defaultDollars={(config.payoutPointsCents[0] ?? 0) / 100} disabled={busy} onCents={(c) => void setPoint(0, c)} />
               <MoneyField label="Points, 2nd" defaultDollars={(config.payoutPointsCents[1] ?? 0) / 100} disabled={busy} onCents={(c) => void setPoint(1, c)} />
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <MoneyField label="Points, 3rd" defaultDollars={(config.payoutPointsCents[2] ?? 0) / 100} disabled={busy} onCents={(c) => void setPoint(2, c)} />
             </div>
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>

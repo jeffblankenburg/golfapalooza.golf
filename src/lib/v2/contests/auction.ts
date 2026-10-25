@@ -32,9 +32,10 @@ export const SCORING_MODES: { value: ScoringMode; label: string }[] = [
   { value: "seed_round", label: "Seed number per win × round" },
 ];
 
-/** Points a single win is worth under the given mode. `round` is the bracket round (First
- *  Four = 0, so a play-in win is worth 0 in the round-weighted modes). */
+/** Points a single win is worth under the given mode. `round` is the bracket round;
+ *  nothing scores before the field of 64 — a First Four win (round 0) is always 0. */
 export function pointsForWin(mode: ScoringMode, seed: number, round: number): number {
+  if (round < 1) return 0; // play-in (First Four) wins don't score in any mode
   const base = mode === "seed" || mode === "seed_round" ? seed : 1;
   const mult = mode === "flat_round" || mode === "seed_round" ? round : 1;
   return base * mult;

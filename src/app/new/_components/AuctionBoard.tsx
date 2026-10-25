@@ -77,14 +77,14 @@ function ProjectorBoard({ state }: { state: AuctionState }) {
       {/* Main — no title/status chrome; space is at a premium so everything fits one screen.
           The hero holds a flexible top region (constant size, so the layout never snaps as the
           lot changes or data refreshes); the participant grid is anchored to the bottom. */}
-      <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <main style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {!state.tournament && (
           <p style={{ padding: "28px", fontSize: "1.3rem", color: "var(--ink-soft)" }}>This auction isn&apos;t set up yet.</p>
         )}
 
         {/* Hero region — grows to fill the space above the cards; content stays centered */}
         {!complete && state.tournament && (
-          <div style={{ flex: 1, minHeight: 220, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 28px" }}>
+          <div style={{ flex: "1 1 auto", minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 28px", overflow: "hidden" }}>
             {onBlock ? (
               <div key={onBlock.id} className={styles.boardLotIn} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
@@ -107,14 +107,15 @@ function ProjectorBoard({ state }: { state: AuctionState }) {
         )}
 
         {complete && results.championName && (
-          <div style={{ flex: 1, minHeight: 140, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "16px 28px" }}>
+          <div style={{ flex: "1 1 auto", minHeight: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "16px 28px", overflow: "hidden" }}>
             <p style={{ margin: 0, fontSize: "1.9rem", fontWeight: 900 }}>🏆 {results.championName}{results.championOwnerId ? `, ${nameOf(results.championOwnerId)}` : ""}</p>
             {results.runnerUpName && <p style={{ margin: "6px 0 0", fontSize: "1.2rem", color: "var(--ink-soft)" }}>Runner-up {results.runnerUpName}{results.runnerUpOwnerId ? ` (${nameOf(results.runnerUpOwnerId)})` : ""}</p>}
           </div>
         )}
 
-        {/* Participant grid — anchored to the bottom; cells scale to the field size */}
-        <div style={{ flexShrink: 0, maxHeight: "62%", overflowY: "auto", padding: "8px 20px 16px" }}>
+        {/* Participant grid — anchored to the bottom; cells scale to the field size.
+            Bounded + minHeight:0 so it never pushes cards off-screen; scrolls only if it must. */}
+        <div style={{ flex: "0 1 auto", minHeight: 0, maxHeight: "60%", overflowY: "auto", padding: "8px 20px 16px" }}>
           <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${grid.cardMin}px, 1fr))`, gap: 14 }}>
             {ordered.map((p, i) => (
               <AuctionPlayerCard key={p.userId} p={p} teamsPerPlayer={teamsPerPlayer} tier={grid.tier} highlight={!complete && p.userId === currentId}

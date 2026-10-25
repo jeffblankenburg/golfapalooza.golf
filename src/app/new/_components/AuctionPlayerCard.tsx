@@ -19,10 +19,11 @@ export function auctionCardTier(count: number): { tier: Tier; cardMin: number } 
   return { tier: "sm", cardMin: 196 };
 }
 
-/** A badge pinned just outside a corner of a team cell (price / "free"), default ink color. */
-function CornerTag({ side, font, children }: { side: "left" | "right"; font: string; children: React.ReactNode }) {
+/** A price/"free" badge pinned just outside a top corner of a team cell, default ink color.
+ *  Board puts it top-right; the admin puts it top-left (the red ✕ owns the top-right there). */
+function CornerTag({ pos, font, children }: { pos: "tl" | "tr"; font: string; children: React.ReactNode }) {
   return (
-    <span style={{ position: "absolute", bottom: -9, [side]: -3, fontSize: font, fontWeight: 800, color: "var(--ink)", background: "var(--card)", borderRadius: 5, padding: "0 4px", lineHeight: 1.4, boxShadow: "0 0 0 1px var(--line)", whiteSpace: "nowrap", zIndex: 1 }}>{children}</span>
+    <span style={{ position: "absolute", top: -9, [pos === "tl" ? "left" : "right"]: -3, fontSize: font, fontWeight: 800, color: "var(--ink)", background: "var(--card)", borderRadius: 5, padding: "0 4px", lineHeight: 1.4, boxShadow: "0 0 0 1px var(--line)", whiteSpace: "nowrap", zIndex: 1 }}>{children}</span>
   );
 }
 
@@ -44,6 +45,7 @@ export default function AuctionPlayerCard({
   const bonus = p.teams.flatMap((t) => (t.free ? [t.free] : []));
   const reqCount = Math.max(teamsPerPlayer, p.teams.length); // hold extra real buys (4/5/6) too
   const canUndo = !!onUndo && !showPoints;
+  const pricePos: "tl" | "tr" = canUndo ? "tl" : "tr"; // admin: top-left (✕ owns top-right); board: top-right
 
   const cellBase: React.CSSProperties = { position: "relative", borderRadius: 8, minHeight: T.minH, padding: "6px 3px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 };
 
@@ -67,7 +69,7 @@ export default function AuctionPlayerCard({
               )}
               {t.logo_url ? <img src={t.logo_url} alt="" style={{ width: T.logo, height: T.logo, objectFit: "contain" }} /> : <div style={{ width: T.logo, height: T.logo }} />}
               <span style={{ fontSize: T.name, fontWeight: 700, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>({t.seed}) {t.short_name || t.name}</span>
-              <CornerTag side="left" font={T.price}>{money(t.bidCents)}</CornerTag>
+              <CornerTag pos={pricePos} font={T.price}>{money(t.bidCents)}</CornerTag>
             </div>
           ) : (
             <div key={`e${i}`} style={{ ...cellBase, border: "1px dashed var(--line)", color: "var(--ink-soft)", opacity: 0.45 }}>—</div>
@@ -77,7 +79,7 @@ export default function AuctionPlayerCard({
           <div key={`b${i}`} style={{ ...cellBase, border: "1.5px dashed var(--brand)", background: "var(--card)" }}>
             {b.logo_url ? <img src={b.logo_url} alt="" style={{ width: T.logo, height: T.logo, objectFit: "contain" }} /> : <div style={{ width: T.logo, height: T.logo }} />}
             <span style={{ fontSize: T.name, fontWeight: 700, color: "var(--brand)", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>({b.seed}) {b.short_name || b.name}</span>
-            <CornerTag side="left" font={T.price}>free</CornerTag>
+            <CornerTag pos={pricePos} font={T.price}>free</CornerTag>
           </div>
         ))}
       </div>

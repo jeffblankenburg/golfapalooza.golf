@@ -58,6 +58,17 @@ export default function AuctionManager({
     } catch { setErr("Something went wrong."); setBusy(false); return false; }
   }
 
+  async function setVisibility(next: boolean) {
+    if (busy) return;
+    setBusy(true); setErr(null);
+    try {
+      const res = await fetch(apiBase, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: next ? "active" : "draft" }) });
+      if (!res.ok) setErr((await res.json().catch(() => ({}))).error || "Could not change visibility");
+      else router.refresh();
+    } catch { setErr("Something went wrong."); }
+    setBusy(false);
+  }
+
   const nameOf = (uid: string | null) => participants.find((p) => p.userId === uid)?.name ?? "";
   const available = entities.filter((e) => !e.ownerId && !e.eliminated);
 
@@ -84,7 +95,13 @@ export default function AuctionManager({
       <p className={styles.lede} style={{ marginTop: 2, color: "var(--ink-soft)" }}>
         Auction{state.tournament ? `, ${state.tournament.name}` : ""}{config.complete ? ", complete" : ""}
       </p>
-      <Link href={`/new/${slug}/admin/contests/${state.contest.id}/board`} target="_blank" className={styles.linkAction} style={{ display: "inline-block", marginTop: 4 }}>Open projector board ↗</Link>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginTop: 6 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.9rem", cursor: busy ? "default" : "pointer" }}>
+          <input type="checkbox" checked={state.contest.status === "active"} disabled={busy} onChange={(e) => void setVisibility(e.target.checked)} />
+          <span>Visible to members {state.contest.status === "active" ? "(on the home page)" : "(draft, hidden)"}</span>
+        </label>
+        <Link href={`/new/${slug}/admin/contests/${state.contest.id}/board`} target="_blank" className={styles.linkAction}>Open projector board ↗</Link>
+      </div>
 
       {/* Settings */}
       <details style={{ marginTop: 14, border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }} open={!state.tournament}>

@@ -53,6 +53,7 @@ export default async function ContestDetailPage({ params }: { params: Promise<{ 
 
   // Auction — read-only member board (lots, budgets, points, the live lot on the block).
   if (contest.contest_type === "auction") {
+    if (contest.status !== "active") notFound(); // hidden from members until the admin opens it
     const state = await loadAuction(supabase, contestId);
     if (!state) notFound();
     return (

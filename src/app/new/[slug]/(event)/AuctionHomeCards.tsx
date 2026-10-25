@@ -35,6 +35,7 @@ export default async function AuctionHomeCards({ orgId, userId, slug, eventId }:
     .select("id, name, event_id, config")
     .eq("org_id", orgId)
     .eq("contest_type", "auction")
+    .eq("status", "active")
     .or(`event_id.is.null,event_id.eq.${eventId}`);
   const live = (contests ?? []).filter((c) => (c.config as { tournament_id?: string } | null)?.tournament_id);
   if (live.length === 0) return null;

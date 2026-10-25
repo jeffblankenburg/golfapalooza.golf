@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
 import { COST_ITEM_SELECT } from "@/lib/v2/cost-items";
+import { enrollRosterIntoContest } from "@/lib/v2/contests/enrollment";
 
 /** Edit or delete a single cost item (#213). Org admins only. */
 
@@ -39,6 +40,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .eq("id", itemId).eq("org_id", orgId).eq("event_id", eventId)
     .select(COST_ITEM_SELECT).single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // A contest's buy-in going into Trip Cost makes it an "Included" contest: everyone
+  // attending pays for it, so auto-enroll the current roster now (even mid-registration)
+  // + every future RSVP (via syncAttendanceEnrollment). Admins can still add/remove.
+  if (data.included_in_trip_cost === true && (data.source_type === "contest" || data.source_type === "side_game") && data.source_id) {
+    await admin.from("v2_contests").update({ auto_enroll: true, updated_at: new Date().toISOString() }).eq("id", data.source_id);
+    await enrollRosterIntoContest(admin, data.source_id as string, eventId).catch(() => {});
+  }
 
   // Per-choice funding links (#218 phase B): a cost_item linked to a choice-type
   // option can fund specific choice values. Unlinking / moving to Trip Cost clears them.

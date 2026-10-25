@@ -72,52 +72,54 @@ export default function AuctionSettingsModal({ slug, orgId, contestId, onClose, 
       {!d ? (
         <p className={styles.roundFormHint} style={{ margin: 0 }}>Loading…</p>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <label><span style={LABEL}>Name</span>
             <input className={styles.input} style={{ width: "100%" }} defaultValue={d.name} maxLength={80} onBlur={(e) => { const n = e.target.value.trim(); if (n && n !== d.name) void patch({ name: n }); }} />
           </label>
-          <label><span style={LABEL}>Status</span>
-            <select className={styles.selectInput} defaultValue={d.status} onChange={(e) => void patch({ status: e.target.value })}>
-              <option value="draft">Draft (hidden from members)</option>
-              <option value="active">Open (shown on the home page)</option>
-              <option value="final">Final (closed)</option>
-            </select>
-          </label>
-          <label><span style={LABEL}>Tournament <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(the team field)</span></span>
-            <select className={styles.selectInput} defaultValue={cfg.tournament_id ?? ""} onChange={(e) => void settings({ tournament_id: e.target.value })}>
-              <option value="">Choose a tournament…</option>
-              {d.tournaments.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-            <Link href={`/new/${slug}/admin/tournaments`} className={styles.linkAction} style={{ display: "inline-block", marginTop: 4 }}>Manage tournaments</Link>
-          </label>
-
-          {d.isEvent ? (
-            <p className={styles.roundFormHint} style={{ margin: 0 }}>
-              Buy-in {d.buyInCents > 0 ? `$${toD(d.buyInCents)}` : "(not set)"} — part of the event money. Set the amount below; whether it&apos;s in the trip cost or an option is managed in <Link href={`/new/${slug}/admin/events/${d.eventId}/financials`} className={styles.linkAction}>Financials</Link>.
-            </p>
-          ) : null}
-          {d.isEvent ? (
-            <Money label="Buy-in" hint="(real money)" defaultDollars={toD(d.buyInCents)} disabled={status === "saving"}
-              onCents={(c) => void save(() => fetch(`/api/v2/orgs/${orgId}/events/${d.eventId}/contests/${contestId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ entry_amount_cents: c }) }))} />
-          ) : (
-            <Money label="Buy-in" hint="(real money)" defaultDollars={toD(d.buyInCents)} disabled={status === "saving"} onCents={(c) => void settings({ entry_cents: c })} />
-          )}
 
           <div className={styles.profileTwoCol}>
-            <Money label="Salary cap" hint="(fake bidding $)" defaultDollars={toD(Number(cfg.salary_cap_cents) || 10000)} disabled={status === "saving"} onCents={(c) => void settings({ salary_cap_cents: c })} />
-            <Money label="Bid increment" defaultDollars={toD(Number(cfg.bid_increment_cents) || 500)} disabled={status === "saving"} onCents={(c) => void settings({ bid_increment_cents: c })} />
+            <label><span style={LABEL}>Tournament</span>
+              <select className={styles.selectInput} defaultValue={cfg.tournament_id ?? ""} onChange={(e) => void settings({ tournament_id: e.target.value })}>
+                <option value="">Choose…</option>
+                {d.tournaments.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </label>
+            <label><span style={LABEL}>Visible to members</span>
+              <select className={styles.selectInput} defaultValue={d.status} onChange={(e) => void patch({ status: e.target.value })}>
+                <option value="draft">Draft, hidden</option>
+                <option value="active">Open, shown</option>
+                <option value="final">Final, closed</option>
+              </select>
+            </label>
           </div>
-          <label><span style={LABEL}>Scoring <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(how a team win scores)</span></span>
+          <Link href={`/new/${slug}/admin/tournaments`} className={styles.linkAction} style={{ display: "inline-block", marginTop: -8, fontSize: "0.8rem" }}>Manage tournaments</Link>
+
+          {/* Money */}
+          <div style={{ borderTop: "1px solid var(--line)", paddingTop: 12 }}>
+            <div className={styles.profileTwoCol} style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
+              {d.isEvent
+                ? <Money label="Buy-in" defaultDollars={toD(d.buyInCents)} disabled={status === "saving"} onCents={(c) => void save(() => fetch(`/api/v2/orgs/${orgId}/events/${d.eventId}/contests/${contestId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ entry_amount_cents: c }) }))} />
+                : <Money label="Buy-in" defaultDollars={toD(d.buyInCents)} disabled={status === "saving"} onCents={(c) => void settings({ entry_cents: c })} />}
+              <Money label="Salary cap" defaultDollars={toD(Number(cfg.salary_cap_cents) || 10000)} disabled={status === "saving"} onCents={(c) => void settings({ salary_cap_cents: c })} />
+              <Money label="Increment" defaultDollars={toD(Number(cfg.bid_increment_cents) || 500)} disabled={status === "saving"} onCents={(c) => void settings({ bid_increment_cents: c })} />
+            </div>
+            <p className={styles.roundFormHint} style={{ margin: "6px 0 0" }}>
+              Buy-in is real money{d.isEvent ? <> (part of the event — trip cost or option is managed in <Link href={`/new/${slug}/admin/events/${d.eventId}/financials`} className={styles.linkAction}>Financials</Link>)</> : null}; the salary cap + increment are fake bidding budget.
+            </p>
+          </div>
+
+          <label><span style={LABEL}>Scoring</span>
             <select className={styles.selectInput} defaultValue={(cfg.scoring_mode as string) || "seed"} onChange={(e) => void settings({ scoring_mode: e.target.value })}>
               {SCORING_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
           </label>
-          <div>
-            <span style={LABEL}>Payouts <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(% of pot, flat $, or remainder)</span></span>
+
+          <div style={{ borderTop: "1px solid var(--line)", paddingTop: 12 }}>
+            <span style={LABEL}>Payouts <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(share of the pot)</span></span>
             <PayoutSplitsEditor value={d.payoutSplits} labels={AUCTION_PAYOUT_SLOTS.map((s) => s.label)} onSave={(s) => void patch({ payout_splits: s })} disabled={status === "saving"} />
           </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
             <span style={{ fontSize: "0.78rem", color: status === "error" ? "var(--err, #c0392b)" : "var(--ink-soft)" }}>
               {status === "saving" ? "Saving…" : status === "saved" ? "Saved" : status === "error" ? "Couldn't save" : ""}
             </span>

@@ -28,7 +28,7 @@ export interface AuctionConfig {
 export const AUCTION_PAYOUT_SLOTS = [
   { key: "champion", label: "Champion" },
   { key: "runner_up", label: "Runner-up" },
-  { key: "final_four", label: "Final Four (split)" },
+  { key: "final_four", label: "Final Four" },
   { key: "points_1", label: "Points, 1st" },
   { key: "points_2", label: "Points, 2nd" },
   { key: "points_3", label: "Points, 3rd" },

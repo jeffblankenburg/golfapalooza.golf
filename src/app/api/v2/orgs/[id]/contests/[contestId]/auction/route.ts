@@ -60,12 +60,6 @@ export async function POST(request: Request, { params }: { params: Params }) {
     if ("teams_per_player" in body) cfg.teams_per_player = Math.max(1, Math.round(Number(body.teams_per_player) || 1));
     if ("first_participant_id" in body) cfg.first_participant_id = (body.first_participant_id as string) || undefined;
     if ("scoring_mode" in body && ["flat", "flat_round", "seed", "seed_round"].includes(body.scoring_mode as string)) cfg.scoring_mode = body.scoring_mode;
-    for (const key of ["payout_tournament_cents", "payout_points_cents"] as const) {
-      if (key in body && Array.isArray(body[key])) {
-        const arr = (body[key] as unknown[]).map((n) => Math.max(0, Math.round(Number(n) || 0)));
-        cfg[key] = arr.some((n) => n > 0) ? arr : undefined;
-      }
-    }
   } else if (body.action === "set_block") {
     cfg.on_block_entity_id = (body.entityId as string) || undefined;
   } else if (body.action === "clear_block") {

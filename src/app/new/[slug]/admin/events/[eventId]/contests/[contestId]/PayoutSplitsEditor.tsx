@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useState } from "react";
 import styles from "@/app/new/new.module.css";
 import type { PayoutSplit } from "@/lib/v2/contests/payouts";
 
@@ -21,14 +21,24 @@ const KINDS = [
  * Shared editor for a contest's payout splits per place (v1 parity: %, flat $, remainder,
  * winner-takes-all). Self-contained: edits locally, commits on change/blur via onSave.
  * Place is the row position. `amount` is a percent for "percentage" and DOLLARS for "flat".
+ *
+ * Pass `labels` for a FIXED set of named slots (e.g. an auction's Champion / Runner-up /
+ * Points places) instead of the default add/remove ordinal places — rows are then locked
+ * to one per label, in order, and place = label index + 1.
  */
-export default function PayoutSplitsEditor({ value, onSave, disabled }: {
+export default function PayoutSplitsEditor({ value, onSave, disabled, labels }: {
   value: PayoutSplit[];
   onSave: (next: PayoutSplit[]) => void;
   disabled?: boolean;
+  labels?: string[];
 }) {
-  const [rows, setRows] = useState<PayoutSplit[]>(value);
-  useEffect(() => { setRows(value); }, [value]);
+  const fixed = !!labels;
+  // A fixed-label editor always shows one row per label (seeded from value, padded).
+  const seeded = labels ? labels.map((_, i) => value[i] ?? { place: i + 1, kind: "percentage" as const, amount: 0 }) : value;
+  const [rows, setRows] = useState<PayoutSplit[]>(seeded);
+  // Re-seed when the incoming value/labels change (sync during render, not an effect).
+  const [prev, setPrev] = useState({ value, labels });
+  if (prev.value !== value || prev.labels !== labels) { setPrev({ value, labels }); setRows(seeded); }
 
   // Always keep place = position; commit the re-numbered array.
   const commit = (next: PayoutSplit[]) => {
@@ -43,10 +53,10 @@ export default function PayoutSplitsEditor({ value, onSave, disabled }: {
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "28px minmax(0, 1fr) 96px 28px", alignItems: "center", columnGap: 8, rowGap: 6 }}>
+      <div style={{ display: "grid", gridTemplateColumns: fixed ? "minmax(0, 1fr) 110px 96px" : "28px minmax(0, 1fr) 96px 28px", alignItems: "center", columnGap: 8, rowGap: 6 }}>
         {rows.map((r, i) => (
           <Fragment key={i}>
-            <span style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>{ordinal(i + 1)}</span>
+            <span style={{ color: fixed ? "var(--ink)" : "var(--ink-soft)", fontSize: "0.85rem" }}>{labels ? labels[i] : ordinal(i + 1)}</span>
             <select className={styles.selectInput} style={{ width: "100%", minWidth: 0, ...inputSize }} value={r.kind} disabled={disabled}
               onChange={(e) => commit(rows.map((x, j) => (j === i ? { ...x, kind: e.target.value } : x)))}>
               {KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
@@ -64,15 +74,19 @@ export default function PayoutSplitsEditor({ value, onSave, disabled }: {
             ) : (
               <span style={{ justifySelf: "end", color: "var(--ink-soft)", fontSize: "0.8rem" }}>{r.kind === "remainder" ? "the rest" : "whole pot"}</span>
             )}
-            <button type="button" className={styles.iconDelBtn} aria-label="Remove place" disabled={disabled} style={{ justifySelf: "center" }}
-              onClick={() => commit(rows.filter((_, j) => j !== i))}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m2 0v14a1 1 0 01-1 1H7a1 1 0 01-1-1V6M10 11v6M14 11v6" /></svg>
-            </button>
+            {!fixed && (
+              <button type="button" className={styles.iconDelBtn} aria-label="Remove place" disabled={disabled} style={{ justifySelf: "center" }}
+                onClick={() => commit(rows.filter((_, j) => j !== i))}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m2 0v14a1 1 0 01-1 1H7a1 1 0 01-1-1V6M10 11v6M14 11v6" /></svg>
+              </button>
+            )}
           </Fragment>
         ))}
       </div>
-      <button type="button" className={styles.createBtnGhost} disabled={disabled} style={{ marginTop: 8, padding: "7px 10px", fontSize: "0.85rem" }}
-        onClick={() => commit([...rows, { place: rows.length + 1, kind: "percentage", amount: 0 }])}>+ Add place</button>
+      {!fixed && (
+        <button type="button" className={styles.createBtnGhost} disabled={disabled} style={{ marginTop: 8, padding: "7px 10px", fontSize: "0.85rem" }}
+          onClick={() => commit([...rows, { place: rows.length + 1, kind: "percentage", amount: 0 }])}>+ Add place</button>
+      )}
       {rows.some((r) => r.kind === "percentage") && !hasRemainder && pctTotal !== 100 && (
         <p className={styles.roundFormHint} style={{ color: pctTotal > 100 ? "var(--warn, #c2410c)" : undefined }}>Percentages total {pctTotal}% (add a Remainder place or reach 100%).</p>
       )}

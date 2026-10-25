@@ -17,11 +17,22 @@ export interface AuctionConfig {
   tournamentId: string | null; // entity catalog = this tournament's field
   onBlockEntityId: string | null; // the lot currently up for bids (live recorder + board)
   scoringMode: ScoringMode;     // how a win scores (default: seed per win)
-  // Payouts — admin-entered prize amounts (bromadness model). The system resolves who won
-  // each: tournament places from the bracket, points places from the standings.
-  payoutTournamentCents: number[]; // [1st champion, 2nd runner-up, 3rd Final Four losers]
-  payoutPointsCents: number[];     // [1st, 2nd, 3rd]
 }
+
+/**
+ * The auction's six payout slots, in order — stored as the shared `v2_contests.payout_splits`
+ * (place = index + 1, %/flat/remainder against the pot, exactly like every other contest).
+ * The first three are tournament finish (resolved from the bracket); the last three are the
+ * points standings. "Final Four" splits between the two semifinal losers.
+ */
+export const AUCTION_PAYOUT_SLOTS = [
+  { key: "champion", label: "Champion" },
+  { key: "runner_up", label: "Runner-up" },
+  { key: "final_four", label: "Final Four (split)" },
+  { key: "points_1", label: "Points, 1st" },
+  { key: "points_2", label: "Points, 2nd" },
+  { key: "points_3", label: "Points, 3rd" },
+] as const;
 
 /** How a team win scores: base (1 or its seed) × multiplier (none or the round number). */
 export type ScoringMode = "flat" | "flat_round" | "seed" | "seed_round";
@@ -228,7 +239,5 @@ export function auctionConfigOf(config: Record<string, unknown> | null | undefin
     tournamentId: typeof c.tournament_id === "string" ? c.tournament_id : null,
     onBlockEntityId: typeof c.on_block_entity_id === "string" ? c.on_block_entity_id : null,
     scoringMode: ["flat", "flat_round", "seed", "seed_round"].includes(c.scoring_mode as string) ? (c.scoring_mode as ScoringMode) : "seed",
-    payoutTournamentCents: Array.isArray(c.payout_tournament_cents) ? (c.payout_tournament_cents as unknown[]).map((n) => Number(n) || 0) : [],
-    payoutPointsCents: Array.isArray(c.payout_points_cents) ? (c.payout_points_cents as unknown[]).map((n) => Number(n) || 0) : [],
   };
 }

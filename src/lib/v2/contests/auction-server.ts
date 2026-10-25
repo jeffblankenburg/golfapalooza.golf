@@ -3,6 +3,7 @@ import { pickName, type NameMode } from "@/lib/v2/profile";
 import { orgNameMode } from "@/lib/v2/orgs";
 import { loadTournamentSource } from "./tournament-server";
 import { teamWinRounds, finalFourLosers } from "./tournament";
+import { computePlacePayouts, type PayoutSplit } from "./payouts";
 import {
   auctionConfigOf, draftOrder, nextThrowers, budget, paidTeamCount, isDone, userPoints,
   auctionCapacity, auctionBundles, MIN_TEAMS_PER_PLAYER,
@@ -257,39 +258,37 @@ const splitCents = (total: number, n: number): number[] => {
 };
 
 /**
- * Auction payouts: resolve each admin-set prize to its winner (champion/runner-up owner
- * from the bracket; points places from the standings), then aggregate per winner with
- * their settled total (source='winnings' ledger credits). Ready once the champion is
- * decided. Mirrors loadPickemPayouts' settlement shape.
+ * Auction payouts: the pot (entry × players) is split by the shared payout engine over the
+ * contest's `payout_splits` (place = AUCTION_PAYOUT_SLOTS order, %/flat/remainder like every
+ * other contest), then each resolved slot maps to its winner — tournament places from the
+ * bracket (Final Four splits between the two semifinal losers), points places from the
+ * standings. Aggregated per winner with their settled total (source='winnings' credits).
+ * Ready once the champion is decided. Mirrors loadPickemPayouts' settlement shape.
  */
 export async function loadAuctionPayouts(admin: SupabaseClient, contestId: string): Promise<AuctionPayouts | null> {
   const state = await loadAuction(admin, contestId);
   if (!state) return null;
-  const cfg = state.config;
   const nameOf = (uid: string | null) => (uid ? state.participants.find((p) => p.userId === uid)?.name ?? "Member" : null);
 
-  const prizes: AuctionPrize[] = [];
-  const tourney = cfg.payoutTournamentCents;
-  if ((tourney[0] ?? 0) > 0) prizes.push({ key: "tourney_1", label: "Tournament, champion", amountCents: tourney[0], winnerId: state.results.championOwnerId, winnerName: nameOf(state.results.championOwnerId) });
-  if ((tourney[1] ?? 0) > 0) prizes.push({ key: "tourney_2", label: "Tournament, runner-up", amountCents: tourney[1], winnerId: state.results.runnerUpOwnerId, winnerName: nameOf(state.results.runnerUpOwnerId) });
-  if ((tourney[2] ?? 0) > 0) {
-    const ff = state.results.finalFour;
-    if (ff.length === 0) {
-      prizes.push({ key: "tourney_3", label: "Tournament, 3rd (Final Four)", amountCents: tourney[2], winnerId: null, winnerName: null });
-    } else {
-      // The two Final Four losers tie for 3rd — split the prize evenly (cent-exact).
-      splitCents(tourney[2], ff.length).forEach((share, i) => {
-        prizes.push({ key: `tourney_3_${i}`, label: `Tournament, 3rd (${ff[i].name})`, amountCents: share, winnerId: ff[i].ownerId, winnerName: nameOf(ff[i].ownerId) });
-      });
-    }
-  }
+  const { data: c } = await admin.from("v2_contests").select("payout_splits").eq("id", contestId).maybeSingle();
+  const potCents = state.config.entryCents * state.participants.length;
+  const place = computePlacePayouts(potCents, (c?.payout_splits as PayoutSplit[] | null) ?? null);
+  const amt = (p: number) => place.find((x) => x.place === p)?.amountCents ?? 0; // 1=champ 2=runner 3=FF 4..6=points
+
   const standings = [...state.participants].sort((a, b) => b.points - a.points || a.spentCents - b.spentCents);
-  cfg.payoutPointsCents.forEach((amt, i) => {
-    if (amt > 0) { const w = standings[i] ?? null; prizes.push({ key: `points_${i + 1}`, label: `Points, ${ordinal(i + 1)}`, amountCents: amt, winnerId: w?.userId ?? null, winnerName: w?.name ?? null }); }
+  const prizes: AuctionPrize[] = [];
+  if (amt(1) > 0) prizes.push({ key: "champion", label: "Champion", amountCents: amt(1), winnerId: state.results.championOwnerId, winnerName: nameOf(state.results.championOwnerId) });
+  if (amt(2) > 0) prizes.push({ key: "runner_up", label: "Runner-up", amountCents: amt(2), winnerId: state.results.runnerUpOwnerId, winnerName: nameOf(state.results.runnerUpOwnerId) });
+  if (amt(3) > 0) {
+    const ff = state.results.finalFour;
+    if (ff.length === 0) prizes.push({ key: "final_four", label: "Final Four (3rd)", amountCents: amt(3), winnerId: null, winnerName: null });
+    else splitCents(amt(3), ff.length).forEach((share, i) => prizes.push({ key: `final_four_${i}`, label: `Final Four (${ff[i].name})`, amountCents: share, winnerId: ff[i].ownerId, winnerName: nameOf(ff[i].ownerId) }));
+  }
+  [4, 5, 6].forEach((p) => {
+    if (amt(p) > 0) { const w = standings[p - 4] ?? null; prizes.push({ key: `points_${p - 3}`, label: `Points, ${ordinal(p - 3)}`, amountCents: amt(p), winnerId: w?.userId ?? null, winnerName: w?.name ?? null }); }
   });
 
   const totalCents = prizes.reduce((s, p) => s + p.amountCents, 0);
-  const potCents = cfg.entryCents * state.participants.length;
   const ready = !!state.results.championTeamId;
 
   // Aggregate per winner.

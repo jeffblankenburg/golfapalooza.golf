@@ -82,6 +82,7 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
         state={state}
         tournaments={tournaments ?? []}
         payouts={payouts}
+        payoutSplits={(contest.payout_splits as PayoutSplit[] | null) ?? []}
       />
     );
   }

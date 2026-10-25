@@ -159,3 +159,23 @@ Whole dollars drop the cents; fractional dollars show two places.
 const money = (cents) => `$${(cents / 100).toLocaleString("en-US", {
   minimumFractionDigits: cents % 100 === 0 ? 0 : 2, maximumFractionDigits: 2 })}`;
 ```
+
+---
+
+## Contest payouts (always the shared engine)
+
+Never build a bespoke prize/payout UI (e.g. dollar-only inputs). Every contest's payouts
+go through ONE pattern:
+
+- **Storage:** the `v2_contests.payout_splits` column (`PayoutSplit[]` = `{place, kind,
+  amount}`; kinds: `percentage` / `flat` / `remainder` / `single_winner`). Saved via the
+  generic contest `PATCH` (`payout_splits` is in both routes' `EDITABLE`).
+- **Resolver:** `computePlacePayouts(potCents, splits)` in `src/lib/v2/contests/payouts.ts`
+  (pot = entry × entrants). It owns the %/flat/remainder math + cent-exactness.
+- **Editor:** the shared `PayoutSplitsEditor`. For named slots (not generic "1st/2nd/3rd"
+  places), pass `labels={[...]}` — it renders one fixed row per label and maps place =
+  label index + 1. The auction uses this for Champion / Runner-up / Final Four / Points
+  1st–3rd (`AUCTION_PAYOUT_SLOTS`), then maps each resolved place to its winner.
+
+Settlement (who's paid) is the ledger: entries = `type='payment', source='deposit'`;
+winnings = `type='payment', source='winnings'`, both attributed to the collector.

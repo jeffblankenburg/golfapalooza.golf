@@ -6,8 +6,10 @@ import { useRouter } from "next/navigation";
 import styles from "@/app/new/new.module.css";
 import ContestParticipants from "@/components/v2/contests/ContestParticipants";
 import ContestEntryPaid from "./ContestEntryPaid";
-import { MIN_TEAMS_PER_PLAYER, SCORING_MODES } from "@/lib/v2/contests/auction";
+import { MIN_TEAMS_PER_PLAYER, SCORING_MODES, AUCTION_PAYOUT_SLOTS } from "@/lib/v2/contests/auction";
 import { subscribeToAuction } from "@/lib/v2/realtime/auction-channel";
+import PayoutSplitsEditor from "../../events/[eventId]/contests/[contestId]/PayoutSplitsEditor";
+import type { PayoutSplit } from "@/lib/v2/contests/payouts";
 import AuctionPayouts from "./AuctionPayouts";
 import type { AuctionState, AuctionPayouts as AuctionPayoutsData } from "@/lib/v2/contests/auction-server";
 
@@ -28,9 +30,9 @@ function MoneyField({ label, defaultDollars, disabled, onCents }: { label: strin
 }
 
 export default function AuctionManager({
-  slug, apiBase, state, tournaments, payouts,
+  slug, apiBase, state, tournaments, payouts, payoutSplits,
 }: {
-  slug: string; apiBase: string; state: AuctionState; tournaments: { id: string; name: string }[]; payouts: AuctionPayoutsData | null;
+  slug: string; apiBase: string; state: AuctionState; tournaments: { id: string; name: string }[]; payouts: AuctionPayoutsData | null; payoutSplits: PayoutSplit[];
 }) {
   const router = useRouter();
   const { config, participants, entities, currentId, onDeckId, onBlock, capacity, fieldReady, bundlesFrozen } = state;
@@ -71,16 +73,16 @@ export default function AuctionManager({
   }
 
   const bundleCount = entities.filter((e) => e.bundledThrowIn).length;
-  const setTourney = (i: number, cents: number) => {
-    const arr = [config.payoutTournamentCents[0] ?? 0, config.payoutTournamentCents[1] ?? 0, config.payoutTournamentCents[2] ?? 0];
-    arr[i] = cents;
-    return act({ action: "settings", payout_tournament_cents: arr });
-  };
-  const setPoint = (i: number, cents: number) => {
-    const arr = [config.payoutPointsCents[0] ?? 0, config.payoutPointsCents[1] ?? 0, config.payoutPointsCents[2] ?? 0];
-    arr[i] = cents;
-    return act({ action: "settings", payout_points_cents: arr });
-  };
+  // Payouts save to the shared payout_splits column via the generic contest PATCH, same
+  // as every other contest.
+  async function savePayoutSplits(splits: PayoutSplit[]) {
+    setErr(null);
+    try {
+      const res = await fetch(apiBase, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ payout_splits: splits }) });
+      if (!res.ok) setErr((await res.json().catch(() => ({}))).error || "Could not save payouts");
+      else router.refresh();
+    } catch { setErr("Something went wrong."); }
+  }
 
   return (
     <div className={styles.page}>
@@ -125,24 +127,13 @@ export default function AuctionManager({
             </select>
           </label>
           <div>
-            <span style={LABEL}>Tournament payouts <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(prize amounts, 0 = none)</span></span>
-            <div className={styles.profileTwoCol}>
-              <MoneyField label="Champion (1st)" defaultDollars={(config.payoutTournamentCents[0] ?? 0) / 100} disabled={busy} onCents={(c) => void setTourney(0, c)} />
-              <MoneyField label="Runner-up (2nd)" defaultDollars={(config.payoutTournamentCents[1] ?? 0) / 100} disabled={busy} onCents={(c) => void setTourney(1, c)} />
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <MoneyField label="Final Four (3rd, split by the two losers)" defaultDollars={(config.payoutTournamentCents[2] ?? 0) / 100} disabled={busy} onCents={(c) => void setTourney(2, c)} />
-            </div>
-          </div>
-          <div>
-            <span style={LABEL}>Points payouts</span>
-            <div className={styles.profileTwoCol}>
-              <MoneyField label="Points, 1st" defaultDollars={(config.payoutPointsCents[0] ?? 0) / 100} disabled={busy} onCents={(c) => void setPoint(0, c)} />
-              <MoneyField label="Points, 2nd" defaultDollars={(config.payoutPointsCents[1] ?? 0) / 100} disabled={busy} onCents={(c) => void setPoint(1, c)} />
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <MoneyField label="Points, 3rd" defaultDollars={(config.payoutPointsCents[2] ?? 0) / 100} disabled={busy} onCents={(c) => void setPoint(2, c)} />
-            </div>
+            <span style={LABEL}>Payouts <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(% of pot, flat $, or remainder)</span></span>
+            <PayoutSplitsEditor value={payoutSplits} labels={AUCTION_PAYOUT_SLOTS.map((s) => s.label)} onSave={(s) => void savePayoutSplits(s)} disabled={busy} />
+            {config.entryCents > 0 && (
+              <p className={styles.roundFormHint} style={{ marginTop: 6 }}>
+                Pot: {money(config.entryCents)} × {participants.length} = <strong style={{ color: "var(--brand)" }}>{money(config.entryCents * participants.length)}</strong>
+              </p>
+            )}
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button type="button" className={styles.createBtnGhost} disabled={busy} onClick={() => void act({ action: "shuffle" })}>

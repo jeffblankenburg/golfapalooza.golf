@@ -98,6 +98,7 @@ export default async function ContestDetailPage({ params, searchParams }: { para
         state={state}
         tournaments={tournaments ?? []}
         payouts={payouts}
+        payoutSplits={(contest.payout_splits as PayoutSplit[] | null) ?? []}
       />
     );
   }

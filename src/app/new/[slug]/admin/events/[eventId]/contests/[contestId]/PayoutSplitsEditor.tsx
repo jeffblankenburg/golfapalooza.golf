@@ -88,7 +88,7 @@ export default function PayoutSplitsEditor({ value, onSave, disabled, labels }: 
           onClick={() => commit([...rows, { place: rows.length + 1, kind: "percentage", amount: 0 }])}>+ Add place</button>
       )}
       {rows.some((r) => r.kind === "percentage") && !hasRemainder && pctTotal !== 100 && (
-        <p className={styles.roundFormHint} style={{ color: pctTotal > 100 ? "var(--warn, #c2410c)" : undefined }}>Percentages total {pctTotal}% (add a Remainder place or reach 100%).</p>
+        <p className={styles.roundFormHint} style={{ marginTop: 10, color: pctTotal > 100 ? "var(--warn, #c2410c)" : undefined }}>Percentages total {pctTotal}% (add a Remainder place or reach 100%).</p>
       )}
     </div>
   );

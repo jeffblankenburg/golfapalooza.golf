@@ -7,9 +7,11 @@ import styles from "@/app/new/new.module.css";
 import ContestParticipants from "@/components/v2/contests/ContestParticipants";
 import ContestEntryPaid from "./ContestEntryPaid";
 import { ContestTypeIcon } from "@/app/new/_components/contest-card/ContestCard";
-import { MIN_TEAMS_PER_PLAYER } from "@/lib/v2/contests/auction";
+import { MIN_TEAMS_PER_PLAYER, AUCTION_PAYOUT_SLOTS } from "@/lib/v2/contests/auction";
 import { subscribeToAuction } from "@/lib/v2/realtime/auction-channel";
 import AuctionSettingsModal from "@/app/new/_components/AuctionSettingsModal";
+import PayoutSplitsEditor from "../../events/[eventId]/contests/[contestId]/PayoutSplitsEditor";
+import type { PayoutSplit } from "@/lib/v2/contests/payouts";
 import AuctionPayouts from "./AuctionPayouts";
 import type { AuctionState, AuctionPayouts as AuctionPayoutsData } from "@/lib/v2/contests/auction-server";
 
@@ -17,9 +19,9 @@ const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { max
 const LABEL = { display: "block", fontSize: "0.8125rem", fontWeight: 600, marginBottom: 4 } as const;
 
 export default function AuctionManager({
-  slug, apiBase, state, payouts, backHref,
+  slug, apiBase, state, payouts, payoutSplits, backHref,
 }: {
-  slug: string; apiBase: string; state: AuctionState; payouts: AuctionPayoutsData | null; backHref: string;
+  slug: string; apiBase: string; state: AuctionState; payouts: AuctionPayoutsData | null; payoutSplits: PayoutSplit[]; backHref: string;
 }) {
   const router = useRouter();
   const { config, participants, entities, currentId, onDeckId, onBlock, capacity, fieldReady, bundlesFrozen } = state;
@@ -61,6 +63,16 @@ export default function AuctionManager({
   }
 
   const bundleCount = entities.filter((e) => e.bundledThrowIn).length;
+  const potCents = state.buyInCents * participants.length;
+
+  async function savePayoutSplits(splits: PayoutSplit[]) {
+    setErr(null);
+    try {
+      const res = await fetch(apiBase, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ payout_splits: splits }) });
+      if (!res.ok) setErr((await res.json().catch(() => ({}))).error || "Could not save payouts");
+      else router.refresh();
+    } catch { setErr("Something went wrong."); }
+  }
 
   return (
     <div className={styles.page}>
@@ -190,7 +202,7 @@ export default function AuctionManager({
                 <label style={{ flex: "1 1 90px" }}><span style={LABEL}>Winning bid</span>
                   <input className={styles.input} inputMode="decimal" step={config.bidIncrementCents / 100} value={bid} onChange={(e) => setBid(e.target.value.replace(/[^0-9.]/g, ""))} />
                 </label>
-                <button type="button" className={styles.create} disabled={busy || !buyerId} onClick={() => void assign(onBlock.id)}>Record sale</button>
+                <button type="button" className={styles.createBtn} disabled={busy || !buyerId} onClick={() => void assign(onBlock.id)}>Record sale</button>
                 <button type="button" className={styles.createBtnGhost} disabled={busy} onClick={() => void act({ action: "clear_block" })}>Clear</button>
               </div>
             </div>
@@ -206,7 +218,7 @@ export default function AuctionManager({
                   ))}
                 </select>
               </label>
-              <button type="button" className={styles.create} disabled={busy || !entityId} onClick={() => { void act({ action: "set_block", entityId }).then((ok) => { if (ok) setEntityId(""); }); }}>Put on the block</button>
+              <button type="button" className={styles.createBtn} disabled={busy || !entityId} onClick={() => { void act({ action: "set_block", entityId }).then((ok) => { if (ok) setEntityId(""); }); }}>Put on the block</button>
             </div>
           ))}
 
@@ -243,12 +255,25 @@ export default function AuctionManager({
         </div>
       )}
 
+      {/* Payouts config — here on the detail page, where the headcount + pot are visible. */}
+      <div style={{ marginTop: 18 }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+          <p className={styles.sectionLabel} style={{ margin: 0 }}>Payouts <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(share of the pot)</span></p>
+          <span style={{ fontSize: "0.82rem", color: "var(--ink-soft)" }}>
+            {participants.length} player{participants.length === 1 ? "" : "s"}, pot <strong style={{ color: "var(--brand)" }}>{money(potCents)}</strong>
+          </span>
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <PayoutSplitsEditor value={payoutSplits} labels={AUCTION_PAYOUT_SLOTS.map((s) => s.label)} onSave={(s) => void savePayoutSplits(s)} disabled={busy} />
+        </div>
+      </div>
+
       {payouts && <AuctionPayouts apiBase={apiBase} payouts={payouts} />}
 
       {/* Complete / reopen */}
       {state.tournament && (
         <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
-          <button type="button" className={config.complete ? styles.createBtnGhost : styles.create} disabled={busy} onClick={() => void act({ action: "complete", complete: !config.complete })}>
+          <button type="button" className={config.complete ? styles.createBtnGhost : styles.createBtn} disabled={busy} onClick={() => void act({ action: "complete", complete: !config.complete })}>
             {config.complete ? "Reopen auction" : "Mark auction complete"}
           </button>
           <p className={styles.roundFormHint} style={{ marginTop: 6 }}>

@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Modal from "@/app/new/_components/Modal";
-import PayoutSplitsEditor from "@/app/new/[slug]/admin/events/[eventId]/contests/[contestId]/PayoutSplitsEditor";
-import { SCORING_MODES, AUCTION_PAYOUT_SLOTS } from "@/lib/v2/contests/auction";
+import { SCORING_MODES } from "@/lib/v2/contests/auction";
 import type { PayoutSplit } from "@/lib/v2/contests/payouts";
 import styles from "@/app/new/new.module.css";
 
@@ -77,35 +76,32 @@ export default function AuctionSettingsModal({ slug, orgId, contestId, onClose, 
             <input className={styles.input} style={{ width: "100%" }} defaultValue={d.name} maxLength={80} onBlur={(e) => { const n = e.target.value.trim(); if (n && n !== d.name) void patch({ name: n }); }} />
           </label>
 
-          <div className={styles.profileTwoCol}>
-            <label><span style={LABEL}>Tournament</span>
-              <select className={styles.selectInput} defaultValue={cfg.tournament_id ?? ""} onChange={(e) => void settings({ tournament_id: e.target.value })}>
-                <option value="">Choose…</option>
-                {d.tournaments.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
-            </label>
-            <label><span style={LABEL}>Visible to members</span>
-              <select className={styles.selectInput} defaultValue={d.status} onChange={(e) => void patch({ status: e.target.value })}>
-                <option value="draft">Draft, hidden</option>
-                <option value="active">Open, shown</option>
-                <option value="final">Final, closed</option>
-              </select>
-            </label>
-          </div>
-          <Link href={`/new/${slug}/admin/tournaments`} className={styles.linkAction} style={{ display: "inline-block", marginTop: -8, fontSize: "0.8rem" }}>Manage tournaments</Link>
+          <label><span style={LABEL}>Tournament</span>
+            <select className={styles.selectInput} defaultValue={cfg.tournament_id ?? ""} onChange={(e) => void settings({ tournament_id: e.target.value })}>
+              <option value="">Choose a tournament…</option>
+              {d.tournaments.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+            <Link href={`/new/${slug}/admin/tournaments`} className={styles.linkAction} style={{ display: "inline-block", marginTop: 4, fontSize: "0.8rem" }}>Manage tournaments</Link>
+          </label>
 
-          {/* Money */}
-          <div style={{ borderTop: "1px solid var(--line)", paddingTop: 12 }}>
-            <div className={styles.profileTwoCol} style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
-              {d.isEvent
-                ? <Money label="Buy-in" defaultDollars={toD(d.buyInCents)} disabled={status === "saving"} onCents={(c) => void save(() => fetch(`/api/v2/orgs/${orgId}/events/${d.eventId}/contests/${contestId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ entry_amount_cents: c }) }))} />
-                : <Money label="Buy-in" defaultDollars={toD(d.buyInCents)} disabled={status === "saving"} onCents={(c) => void settings({ entry_cents: c })} />}
-              <Money label="Salary cap" defaultDollars={toD(Number(cfg.salary_cap_cents) || 10000)} disabled={status === "saving"} onCents={(c) => void settings({ salary_cap_cents: c })} />
-              <Money label="Increment" defaultDollars={toD(Number(cfg.bid_increment_cents) || 500)} disabled={status === "saving"} onCents={(c) => void settings({ bid_increment_cents: c })} />
-            </div>
-            <p className={styles.roundFormHint} style={{ margin: "6px 0 0" }}>
-              Buy-in is real money{d.isEvent ? <> (part of the event — trip cost or option is managed in <Link href={`/new/${slug}/admin/events/${d.eventId}/financials`} className={styles.linkAction}>Financials</Link>)</> : null}; the salary cap + increment are fake bidding budget.
-            </p>
+          <label><span style={LABEL}>Visible to members</span>
+            <select className={styles.selectInput} defaultValue={d.status} onChange={(e) => void patch({ status: e.target.value })}>
+              <option value="draft">Draft, hidden</option>
+              <option value="active">Open, shown</option>
+              <option value="final">Final, closed</option>
+            </select>
+          </label>
+
+          <div>
+            {d.isEvent
+              ? <Money label="Buy-in" defaultDollars={toD(d.buyInCents)} disabled={status === "saving"} onCents={(c) => void save(() => fetch(`/api/v2/orgs/${orgId}/events/${d.eventId}/contests/${contestId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ entry_amount_cents: c }) }))} />
+              : <Money label="Buy-in" defaultDollars={toD(d.buyInCents)} disabled={status === "saving"} onCents={(c) => void settings({ entry_cents: c })} />}
+            {d.isEvent && <p className={styles.roundFormHint} style={{ margin: "4px 0 0" }}>Part of the event money — trip cost or option is set in <Link href={`/new/${slug}/admin/events/${d.eventId}/financials`} className={styles.linkAction}>Financials</Link>.</p>}
+          </div>
+
+          <div className={styles.profileTwoCol}>
+            <Money label="Salary cap" defaultDollars={toD(Number(cfg.salary_cap_cents) || 10000)} disabled={status === "saving"} onCents={(c) => void settings({ salary_cap_cents: c })} />
+            <Money label="Bid increment" defaultDollars={toD(Number(cfg.bid_increment_cents) || 500)} disabled={status === "saving"} onCents={(c) => void settings({ bid_increment_cents: c })} />
           </div>
 
           <label><span style={LABEL}>Scoring</span>
@@ -114,16 +110,11 @@ export default function AuctionSettingsModal({ slug, orgId, contestId, onClose, 
             </select>
           </label>
 
-          <div style={{ borderTop: "1px solid var(--line)", paddingTop: 12 }}>
-            <span style={LABEL}>Payouts <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(share of the pot)</span></span>
-            <PayoutSplitsEditor value={d.payoutSplits} labels={AUCTION_PAYOUT_SLOTS.map((s) => s.label)} onSave={(s) => void patch({ payout_splits: s })} disabled={status === "saving"} />
-          </div>
-
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
             <span style={{ fontSize: "0.78rem", color: status === "error" ? "var(--err, #c0392b)" : "var(--ink-soft)" }}>
               {status === "saving" ? "Saving…" : status === "saved" ? "Saved" : status === "error" ? "Couldn't save" : ""}
             </span>
-            <button type="button" className={styles.create} onClick={onClose}>Done</button>
+            <button type="button" className={styles.createBtn} onClick={onClose}>Done</button>
           </div>
         </div>
       )}

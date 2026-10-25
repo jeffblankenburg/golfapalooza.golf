@@ -30,10 +30,9 @@ export default function AuctionPayouts({ apiBase, payouts }: { apiBase: string; 
   const over = payouts.totalCents > payouts.potCents && payouts.potCents > 0;
   return (
     <div style={{ marginTop: 18 }}>
-      <p className={styles.sectionLabel} style={{ margin: 0 }}>Payouts</p>
+      <p className={styles.sectionLabel} style={{ margin: 0 }}>Winnings</p>
       <p className={styles.roundFormHint} style={{ marginTop: 4 }}>
-        {payouts.potCents > 0 && <>Pot {money(payouts.potCents)} (entry × players). </>}
-        Prizes {money(payouts.totalCents)} allocated{payouts.potCents > 0 ? `, ${money(payouts.potCents - payouts.totalCents)} unallocated` : ""}.
+        Prizes {money(payouts.totalCents)} allocated{payouts.potCents > 0 ? `, ${money(payouts.potCents - payouts.totalCents)} of the ${money(payouts.potCents)} pot unallocated` : ""}.
         {over && <strong style={{ color: "var(--err, #c0392b)" }}> Prizes exceed the pot.</strong>}
       </p>
       {payouts.totalCents > 0 && !payouts.ready && <p className={styles.roundFormHint} style={{ marginTop: 2 }}>Winners finalize once the champion is decided. Amounts and current leaders show below.</p>}
@@ -66,7 +65,7 @@ export default function AuctionPayouts({ apiBase, payouts }: { apiBase: string; 
                   <span style={{ fontWeight: 800, color: "var(--brand)" }}>{money(w.wonCents)}</span>
                   {paid
                     ? <button type="button" className={styles.createBtnGhost} style={{ padding: "4px 10px", fontSize: "0.78rem" }} disabled={busy} onClick={() => void act({ action: "unmark_paid", userId: w.userId })}>Paid ✓</button>
-                    : <button type="button" className={styles.create} style={{ padding: "4px 10px", fontSize: "0.78rem" }} disabled={busy} onClick={() => void act({ action: "mark_paid", userId: w.userId, amountCents: w.wonCents })}>Credit account</button>}
+                    : <button type="button" className={styles.createBtn} style={{ padding: "4px 10px", fontSize: "0.78rem" }} disabled={busy} onClick={() => void act({ action: "mark_paid", userId: w.userId, amountCents: w.wonCents })}>Credit account</button>}
                 </div>
               );
             })}

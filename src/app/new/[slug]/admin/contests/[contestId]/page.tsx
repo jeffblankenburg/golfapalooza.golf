@@ -80,6 +80,7 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
         apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`}
         state={state}
         payouts={payouts}
+        payoutSplits={(contest.payout_splits as PayoutSplit[] | null) ?? []}
         backHref={`/new/${slug}/admin/contests`}
       />
     );

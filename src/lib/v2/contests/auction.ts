@@ -32,6 +32,8 @@ export const AUCTION_PAYOUT_SLOTS = [
   { key: "points_1", label: "Points, 1st" },
   { key: "points_2", label: "Points, 2nd" },
   { key: "points_3", label: "Points, 3rd" },
+  { key: "points_4", label: "Points, 4th" },
+  { key: "points_5", label: "Points, 5th" },
 ] as const;
 
 /** How a team win scores: base (1 or its seed) × multiplier (none or the round number). */

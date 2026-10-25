@@ -65,7 +65,7 @@ export default function TournamentsAdmin({ orgId, slug, tournaments }: { orgId: 
             <input className={styles.input} style={{ width: "100%" }} value={season} onChange={(e) => setSeason(e.target.value)} placeholder="e.g. 2027" maxLength={12} />
           </label>
           {err && <p className={styles.err} style={{ margin: 0 }}>{err}</p>}
-          <button type="button" className={styles.create} onClick={() => void create()} disabled={busy || !name.trim()}>
+          <button type="button" className={styles.createBtn} onClick={() => void create()} disabled={busy || !name.trim()}>
             {busy ? "Creating…" : "Create"}
           </button>
         </div>

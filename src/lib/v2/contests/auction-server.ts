@@ -291,7 +291,7 @@ export async function loadAuctionPayouts(admin: SupabaseClient, contestId: strin
     if (ff.length === 0) prizes.push({ key: "final_four", label: "Final Four (3rd)", amountCents: amt(3), winnerId: null, winnerName: null });
     else splitCents(amt(3), ff.length).forEach((share, i) => prizes.push({ key: `final_four_${i}`, label: `Final Four (${ff[i].name})`, amountCents: share, winnerId: ff[i].ownerId, winnerName: nameOf(ff[i].ownerId) }));
   }
-  [4, 5, 6].forEach((p) => {
+  [4, 5, 6, 7, 8].forEach((p) => {
     if (amt(p) > 0) { const w = standings[p - 4] ?? null; prizes.push({ key: `points_${p - 3}`, label: `Points, ${ordinal(p - 3)}`, amountCents: amt(p), winnerId: w?.userId ?? null, winnerName: w?.name ?? null }); }
   });
 

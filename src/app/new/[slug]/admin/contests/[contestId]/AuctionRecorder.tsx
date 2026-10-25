@@ -11,14 +11,14 @@ const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { max
 const LABEL = { display: "block", fontSize: "0.8125rem", fontWeight: 600, marginBottom: 4 } as const;
 const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
 
-/** The selected team (on-block or picked), shown with its logo/seed/name. */
-function SelectedTeam({ lot, onBoard, onClear, busy }: { lot: AuctionEntity; onBoard: (() => void) | null; onClear: () => void; busy: boolean }) {
+/** The team on the block, shown with its logo/seed/name. Picking a team puts it here (and
+ *  on the projector board) immediately; "Change" clears it back to the picker. */
+function SelectedTeam({ lot, onClear, busy }: { lot: AuctionEntity; onClear: () => void; busy: boolean }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px" }}>
       {lot.logo_url && <img src={lot.logo_url} alt="" width={30} height={30} style={{ objectFit: "contain" }} />}
       <span style={{ fontSize: "1.15rem", fontWeight: 800, flex: 1, minWidth: 0 }}>({lot.seed}) {lot.name}</span>
       {lot.bundledThrowIn && <span style={{ fontSize: "0.74rem", color: "var(--ink-soft)" }}>+ ({lot.bundledThrowIn.seed}) {lot.bundledThrowIn.name} free</span>}
-      {onBoard && <button type="button" className={styles.createBtnGhost} style={{ padding: "4px 10px", fontSize: "0.78rem" }} disabled={busy} title="Show on the projector board" onClick={onBoard}>On board</button>}
       <button type="button" aria-label="Change team" title="Change team" className={styles.linkAction} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.9rem" }} disabled={busy} onClick={onClear}>Change</button>
     </div>
   );
@@ -36,7 +36,6 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
   const { config, participants, entities, currentId, onDeckId, onBlock } = state;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [entityId, setEntityId] = useState("");
   const [buyerId, setBuyerId] = useState("");
   const [bid, setBid] = useState(String(config.bidIncrementCents / 100));
   const [query, setQuery] = useState("");
@@ -57,7 +56,7 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
   const nameOf = (uid: string | null) => participants.find((p) => p.userId === uid)?.name ?? "";
   const roster: AuctionParticipant[] = [...participants].sort(byName); // columns + owner dropdown, alphabetical
   const available = [...entities].filter((e) => !e.ownerId && !e.eliminated).sort(byName);
-  const lot = onBlock ?? available.find((e) => e.id === entityId) ?? null;
+  const lot = onBlock; // the lot on the block is the single source of truth (pushes to the board)
 
   // Price options: 0 up to the most the chosen owner can spend (leave the increment for
   // each team they still need to buy). Falls back to the cap when no owner's picked.
@@ -72,7 +71,7 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
   async function assign() {
     if (!lot || !buyerId) { setErr("Pick a team and an owner."); return; }
     if (await act({ action: "assign", entityId: lot.id, userId: buyerId, bidCents: Math.round((Number(bid) || 0) * 100) })) {
-      setEntityId(""); setBuyerId(""); setBid(String(inc / 100)); setQuery("");
+      setBuyerId(""); setBid(String(inc / 100)); setQuery("");
     }
   }
 
@@ -105,9 +104,17 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
       <h1 style={{ fontSize: "1.45rem", fontWeight: 800, margin: "6px 0 0" }}>{state.contest.name}, live</h1>
 
       {!config.complete && currentId && (
-        <div style={{ display: "flex", gap: 16, alignItems: "baseline", padding: "8px 14px", borderRadius: 10, background: "var(--brand-tint, #e8f2ec)", marginTop: 10 }}>
-          <span><span style={{ fontSize: "0.7rem", textTransform: "uppercase", color: "var(--ink-soft)", fontWeight: 800 }}>Nominating</span> <strong style={{ color: "var(--brand)" }}>{nameOf(currentId)}</strong></span>
-          {onDeckId && <span style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>On deck: {nameOf(onDeckId)}</span>}
+        <div style={{ padding: "10px 14px", borderRadius: 10, background: "var(--brand-tint, #e8f2ec)", marginTop: 10, display: "flex", flexDirection: "column", gap: 3 }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+            <span style={{ fontSize: "0.66rem", textTransform: "uppercase", letterSpacing: 0.3, color: "var(--ink-soft)", fontWeight: 800, width: 74, flexShrink: 0 }}>Nominating</span>
+            <strong style={{ color: "var(--brand)", fontSize: "1.05rem" }}>{nameOf(currentId)}</strong>
+          </div>
+          {onDeckId && (
+            <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+              <span style={{ fontSize: "0.66rem", textTransform: "uppercase", letterSpacing: 0.3, color: "var(--ink-soft)", fontWeight: 800, width: 74, flexShrink: 0 }}>On deck</span>
+              <span style={{ fontSize: "0.95rem" }}>{nameOf(onDeckId)}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -117,13 +124,13 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
       {!config.complete && (
         <div style={{ marginTop: 12, border: "2px solid var(--brand)", borderRadius: 12, padding: 12, background: "var(--card)" }}>
           {lot ? (
-            <SelectedTeam lot={lot} busy={busy} onClear={() => { if (onBlock) void act({ action: "clear_block" }); else setEntityId(""); }} onBoard={onBlock ? null : () => void act({ action: "set_block", entityId })} />
+            <SelectedTeam lot={lot} busy={busy} onClear={() => void act({ action: "clear_block" })} />
           ) : (
             <>
               <input className={styles.input} style={{ width: "100%", marginBottom: 6 }} placeholder="Search teams…" value={query} onChange={(e) => setQuery(e.target.value)} />
               <div style={{ maxHeight: 300, overflowY: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
                 {filtered.map((e, i) => (
-                  <button key={e.id} type="button" onClick={() => setEntityId(e.id)}
+                  <button key={e.id} type="button" disabled={busy} onClick={() => void act({ action: "set_block", entityId: e.id })}
                     style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "8px 10px", background: "none", border: "none", borderTop: i === 0 ? "none" : "1px solid var(--line)", cursor: "pointer", fontSize: "0.92rem" }}>
                     {e.logo_url ? <img src={e.logo_url} alt="" width={22} height={22} style={{ objectFit: "contain", flexShrink: 0 }} /> : <span style={{ width: 22, flexShrink: 0 }} />}
                     <span style={{ fontWeight: 800, color: "var(--ink-soft)", width: 20, flexShrink: 0 }}>{e.seed}</span>

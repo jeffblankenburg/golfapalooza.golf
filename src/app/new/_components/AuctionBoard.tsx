@@ -50,6 +50,10 @@ export default function AuctionBoard({
         </p>
       )}
 
+      {!state.tournament && (
+        <p style={{ marginTop: 14, color: "var(--ink-soft)", fontSize: projector ? "1.1rem" : "0.9rem" }}>This auction isn&apos;t set up yet. Check back soon.</p>
+      )}
+
       {/* On the block */}
       {!complete && onBlock && (
         <div style={{ marginTop: 14, border: "2px solid var(--brand)", borderRadius: 14, padding: projector ? 24 : 14, textAlign: "center", background: "var(--card)" }}>

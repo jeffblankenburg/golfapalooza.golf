@@ -37,7 +37,9 @@ export default async function AuctionHomeCards({ orgId, userId, slug, eventId }:
     .eq("contest_type", "auction")
     .eq("status", "active")
     .or(`event_id.is.null,event_id.eq.${eventId}`);
-  const live = (contests ?? []).filter((c) => (c.config as { tournament_id?: string } | null)?.tournament_id);
+  // Visibility is the admin's status toggle — show every active auction (a tournament
+  // may not be bound yet; the board handles that).
+  const live = contests ?? [];
   if (live.length === 0) return null;
 
   const ids = live.map((c) => c.id);

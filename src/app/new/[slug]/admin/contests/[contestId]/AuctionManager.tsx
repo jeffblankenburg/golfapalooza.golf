@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import styles from "@/app/new/new.module.css";
 import ContestParticipants from "@/components/v2/contests/ContestParticipants";
+import ContestEntryPaid from "./ContestEntryPaid";
 import { MIN_TEAMS_PER_PLAYER } from "@/lib/v2/contests/auction";
 import { subscribeToAuction } from "@/lib/v2/realtime/auction-channel";
 import AuctionPayouts from "./AuctionPayouts";
@@ -97,21 +98,13 @@ export default function AuctionManager({
             </select>
             <Link href={`/new/${slug}/admin/tournaments`} className={styles.linkAction} style={{ display: "inline-block", marginTop: 4 }}>Manage tournaments</Link>
           </label>
+          <div>
+            <MoneyField label="Buy-in (real money)" defaultDollars={config.entryCents / 100} disabled={busy} onCents={(c) => void act({ action: "settings", entry_cents: c })} />
+            <span style={{ display: "block", fontSize: "0.72rem", color: "var(--ink-soft)", marginTop: 4 }}>What each player pays to enter. Tracked under &ldquo;Who&apos;s paid their entry&rdquo; below.</span>
+          </div>
           <div className={styles.profileTwoCol}>
-            <label><span style={LABEL}>Salary cap</span>
-              <span style={{ position: "relative", display: "block" }}>
-                <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--ink-soft)" }}>$</span>
-                <input className={styles.input} style={{ paddingLeft: 22 }} inputMode="decimal" defaultValue={String(config.salaryCapCents / 100)} disabled={busy}
-                  onBlur={(e) => void act({ action: "settings", salary_cap_cents: Math.round((Number(e.target.value) || 0) * 100) })} />
-              </span>
-            </label>
-            <label><span style={LABEL}>Bid increment</span>
-              <span style={{ position: "relative", display: "block" }}>
-                <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--ink-soft)" }}>$</span>
-                <input className={styles.input} style={{ paddingLeft: 22 }} inputMode="decimal" defaultValue={String(config.bidIncrementCents / 100)} disabled={busy}
-                  onBlur={(e) => void act({ action: "settings", bid_increment_cents: Math.round((Number(e.target.value) || 0) * 100) })} />
-              </span>
-            </label>
+            <MoneyField label="Salary cap (fake bidding $)" defaultDollars={config.salaryCapCents / 100} disabled={busy} onCents={(c) => void act({ action: "settings", salary_cap_cents: c })} />
+            <MoneyField label="Bid increment" defaultDollars={config.bidIncrementCents / 100} disabled={busy} onCents={(c) => void act({ action: "settings", bid_increment_cents: c })} />
           </div>
           <label><span style={LABEL}>First picker <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(optional)</span></span>
             <select className={styles.selectInput} value={config.firstParticipantId ?? ""} disabled={busy} onChange={(e) => void act({ action: "settings", first_participant_id: e.target.value })}>
@@ -146,6 +139,13 @@ export default function AuctionManager({
       <div style={{ marginTop: 14 }}>
         <ContestParticipants apiBase={apiBase} />
       </div>
+
+      {/* Entry (buy-in) collection */}
+      {config.entryCents > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <ContestEntryPaid orgId={state.contest.orgId} contestId={state.contest.id} title="Who's paid their entry" emptyText="No one's entered yet." />
+        </div>
+      )}
 
       {/* Capacity + auto-pairings */}
       {state.tournament && (

@@ -25,12 +25,18 @@ export default function AuctionPayouts({ apiBase, payouts }: { apiBase: string; 
     } catch { setErr("Something went wrong."); setBusy(false); }
   }
 
-  if (payouts.totalCents === 0) return null; // no prizes configured
+  if (payouts.totalCents === 0 && payouts.potCents === 0) return null; // no money in play
 
+  const over = payouts.totalCents > payouts.potCents && payouts.potCents > 0;
   return (
     <div style={{ marginTop: 18 }}>
-      <p className={styles.sectionLabel} style={{ margin: 0 }}>Payouts ({money(payouts.totalCents)} total)</p>
-      {!payouts.ready && <p className={styles.roundFormHint} style={{ marginTop: 4 }}>Winners finalize once the champion is decided. Amounts and current leaders show below.</p>}
+      <p className={styles.sectionLabel} style={{ margin: 0 }}>Payouts</p>
+      <p className={styles.roundFormHint} style={{ marginTop: 4 }}>
+        {payouts.potCents > 0 && <>Pot {money(payouts.potCents)} (entry × players). </>}
+        Prizes {money(payouts.totalCents)} allocated{payouts.potCents > 0 ? `, ${money(payouts.potCents - payouts.totalCents)} unallocated` : ""}.
+        {over && <strong style={{ color: "var(--err, #c0392b)" }}> Prizes exceed the pot.</strong>}
+      </p>
+      {payouts.totalCents > 0 && !payouts.ready && <p className={styles.roundFormHint} style={{ marginTop: 2 }}>Winners finalize once the champion is decided. Amounts and current leaders show below.</p>}
       {err && <p className={styles.err} style={{ margin: "6px 0 0" }}>{err}</p>}
 
       {/* Prize breakdown */}

@@ -243,7 +243,7 @@ export async function loadAuction(admin: SupabaseClient, contestId: string): Pro
 
 export interface AuctionPrize { key: string; label: string; amountCents: number; winnerId: string | null; winnerName: string | null }
 export interface AuctionWinner { userId: string; name: string; wonCents: number; prizeLabels: string[]; paidCents: number }
-export interface AuctionPayouts { ready: boolean; totalCents: number; prizes: AuctionPrize[]; winners: AuctionWinner[] }
+export interface AuctionPayouts { ready: boolean; potCents: number; totalCents: number; prizes: AuctionPrize[]; winners: AuctionWinner[] }
 
 const ordinal = (n: number) => `${n}${["th", "st", "nd", "rd"][(n % 100 - n % 10 === 10 ? 0 : n % 10)] ?? "th"}`;
 
@@ -268,6 +268,7 @@ export async function loadAuctionPayouts(admin: SupabaseClient, contestId: strin
   });
 
   const totalCents = prizes.reduce((s, p) => s + p.amountCents, 0);
+  const potCents = cfg.entryCents * state.participants.length;
   const ready = !!state.results.championTeamId;
 
   // Aggregate per winner.
@@ -288,7 +289,7 @@ export async function loadAuctionPayouts(admin: SupabaseClient, contestId: strin
     .map(([userId, v]) => ({ userId, name: nameOf(userId) || "Member", wonCents: v.won, prizeLabels: v.labels, paidCents: paidByUser.get(userId) || 0 }))
     .sort((a, b) => b.wonCents - a.wonCents);
 
-  return { ready, totalCents, prizes, winners };
+  return { ready, potCents, totalCents, prizes, winners };
 }
 
 /** The participant cap for an auction: floor(position count / 3). 0 when no field. */

@@ -54,6 +54,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
   const cfg = { ...g.config };
   if (body.action === "settings") {
     if ("tournament_id" in body) cfg.tournament_id = (body.tournament_id as string) || undefined;
+    if ("entry_cents" in body) cfg.entry_cents = Math.max(0, Math.round(Number(body.entry_cents) || 0)) || undefined;
     if ("salary_cap_cents" in body) cfg.salary_cap_cents = Math.max(0, Math.round(Number(body.salary_cap_cents) || 0)) || undefined;
     if ("bid_increment_cents" in body) cfg.bid_increment_cents = Math.max(0, Math.round(Number(body.bid_increment_cents) || 0)) || undefined;
     if ("teams_per_player" in body) cfg.teams_per_player = Math.max(1, Math.round(Number(body.teams_per_player) || 1));

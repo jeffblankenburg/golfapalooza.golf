@@ -7,7 +7,8 @@
  */
 
 export interface AuctionConfig {
-  salaryCapCents: number;    // default 10000 ($100)
+  entryCents: number;        // real-money buy-in per player (0 = free)
+  salaryCapCents: number;    // default 10000 ($100) of FAKE bidding money
   bidIncrementCents: number; // default 500 ($5)
   teamsPerPlayer: number;    // default 3
   orderSeed: string;         // deterministic throwout order
@@ -195,6 +196,7 @@ export function userPoints(
 export function auctionConfigOf(config: Record<string, unknown> | null | undefined): AuctionConfig {
   const c = config ?? {};
   return {
+    entryCents: Number(c.entry_cents) || 0,
     salaryCapCents: Number(c.salary_cap_cents) || 10000,
     bidIncrementCents: Number(c.bid_increment_cents) || 500,
     teamsPerPlayer: Number(c.teams_per_player) || 3,

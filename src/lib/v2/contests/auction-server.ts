@@ -218,7 +218,7 @@ export async function loadAuction(admin: SupabaseClient, contestId: string): Pro
 
   const { map: nameMap } = await names(admin, contest.org_id as string, participantIds);
   const order = draftOrder(participantIds, config.orderSeed, config.firstParticipantId);
-  const { currentId, onDeckId } = nextThrowers(order, ownership, teamsPerPlayer);
+  const { currentId, onDeckId } = nextThrowers(order, ownership, teamsPerPlayer, config.nominationSkips);
 
   // Each participant's lots = the biddable positions whose representative they own.
   const lotsByOwner = new Map<string, AuctionEntity[]>();

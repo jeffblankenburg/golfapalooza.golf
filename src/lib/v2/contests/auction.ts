@@ -17,6 +17,7 @@ export interface AuctionConfig {
   tournamentId: string | null; // entity catalog = this tournament's field
   onBlockEntityId: string | null; // the lot currently up for bids (live recorder + board)
   scoringMode: ScoringMode;     // how a win scores (default: seed per win)
+  nominationSkips: number;      // manual "skip this nominator" offset into the rotation
 }
 
 /**
@@ -189,12 +190,13 @@ export function isDone(ownership: AuctionOwnership[], userId: string, teamsPerPl
  * a round-robin keyed off total teams assigned so far, skipping anyone already done.
  */
 export function nextThrowers(
-  order: string[], ownership: AuctionOwnership[], teamsPerPlayer: number,
+  order: string[], ownership: AuctionOwnership[], teamsPerPlayer: number, skips = 0,
 ): { currentId: string | null; onDeckId: string | null } {
   const n = order.length;
   if (n === 0) return { currentId: null, onDeckId: null };
   // Rotation advances per LOT thrown (a paid bid); free $0 throw-ins/bonus don't count.
-  const totalAssigned = ownership.filter((o) => o.bidCents > 0).length;
+  // Manual skips add a fixed offset, wrapping around the list (modular) just like picks do.
+  const totalAssigned = ownership.filter((o) => o.bidCents > 0).length + skips;
   const done = (id: string) => isDone(ownership, id, teamsPerPlayer);
 
   let base = totalAssigned % n;
@@ -221,12 +223,12 @@ export function nextThrowers(
  * count; the first entry equals `nextThrowers().currentId`.
  */
 export function upcomingThrowers(
-  order: { id: string; paidTeams: number }[], teamsPerPlayer: number, count: number,
+  order: { id: string; paidTeams: number }[], teamsPerPlayer: number, count: number, skips = 0,
 ): string[] {
   const n = order.length;
   if (n === 0 || count <= 0) return [];
   const counts = order.map((o) => o.paidTeams);
-  let totalAssigned = counts.reduce((s, c) => s + c, 0);
+  let totalAssigned = counts.reduce((s, c) => s + c, 0) + skips;
   const out: string[] = [];
   const maxGuard = n * teamsPerPlayer + n;
   for (let guard = 0; out.length < count && guard < maxGuard; guard++) {
@@ -269,5 +271,6 @@ export function auctionConfigOf(config: Record<string, unknown> | null | undefin
     tournamentId: typeof c.tournament_id === "string" ? c.tournament_id : null,
     onBlockEntityId: typeof c.on_block_entity_id === "string" ? c.on_block_entity_id : null,
     scoringMode: ["flat", "flat_round", "seed", "seed_round"].includes(c.scoring_mode as string) ? (c.scoring_mode as ScoringMode) : "seed",
+    nominationSkips: Math.max(0, Math.floor(Number(c.nomination_skips) || 0)),
   };
 }

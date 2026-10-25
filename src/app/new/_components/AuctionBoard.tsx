@@ -4,7 +4,9 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { subscribeToAuction } from "@/lib/v2/realtime/auction-channel";
 import { upcomingThrowers } from "@/lib/v2/contests/auction";
-import type { AuctionState, AuctionParticipant } from "@/lib/v2/contests/auction-server";
+import type { AuctionState } from "@/lib/v2/contests/auction-server";
+import styles from "@/app/new/new.module.css";
+import AuctionPlayerCard from "./AuctionPlayerCard";
 
 const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { maximumFractionDigits: cents % 100 === 0 ? 0 : 2 })}`;
 
@@ -38,7 +40,7 @@ function ProjectorBoard({ state }: { state: AuctionState }) {
   // Up-next queue: draft order projected forward, skipping anyone who already holds all
   // their lots (and will keep skipping them as the auction plays out). The current
   // nominator is always first, so the rail "advances" on its own as picks land.
-  const queueIds = complete ? [] : upcomingThrowers(participants.map((p) => ({ id: p.userId, paidTeams: p.paidTeams })), teamsPerPlayer, 18);
+  const queueIds = complete ? [] : upcomingThrowers(participants.map((p) => ({ id: p.userId, paidTeams: p.paidTeams })), teamsPerPlayer, 18, config.nominationSkips);
 
   // Standings order when complete (points, then fewest spent); draft order while live.
   const ordered = complete
@@ -71,28 +73,30 @@ function ProjectorBoard({ state }: { state: AuctionState }) {
         </aside>
       )}
 
-      {/* Main — no title/status chrome; space is at a premium so everything fits one screen */}
+      {/* Main — no title/status chrome; space is at a premium so everything fits one screen.
+          The hero holds a flexible top region (constant size, so the layout never snaps as the
+          lot changes or data refreshes); the participant grid is anchored to the bottom. */}
       <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {!state.tournament && (
           <p style={{ padding: "28px", fontSize: "1.3rem", color: "var(--ink-soft)" }}>This auction isn&apos;t set up yet.</p>
         )}
 
-        {/* On-block hero (or waiting on a nomination) — stays big; the grid shrinks instead */}
+        {/* Hero region — grows to fill the space above the cards; content stays centered */}
         {!complete && state.tournament && (
-          <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "16px 28px 10px" }}>
+          <div style={{ flex: 1, minHeight: 220, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 28px" }}>
             {onBlock ? (
-              <>
+              <div key={onBlock.id} className={styles.boardLotIn} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
                   {onBlock.logo_url && <img src={onBlock.logo_url} alt="" style={{ width: 150, height: 150, objectFit: "contain" }} />}
                   <div>
-                    <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--ink-soft)" }}>No. {onBlock.seed}</div>
+                    <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--ink-soft)" }}>{onBlock.seed} seed{onBlock.region ? `, ${onBlock.region}` : ""}</div>
                     <div style={{ fontSize: "4.5rem", lineHeight: 1.02, fontWeight: 900 }}>{onBlock.name}</div>
                   </div>
                 </div>
                 {onBlock.bundledThrowIn && <p style={{ margin: "12px 0 0", fontSize: "1.3rem", color: "var(--ink-soft)" }}>comes with ({onBlock.bundledThrowIn.seed}) {onBlock.bundledThrowIn.name} free</p>}
-              </>
+              </div>
             ) : (
-              <div style={{ textAlign: "center" }}>
+              <div key={currentId ?? "none"} className={styles.boardLotIn} style={{ textAlign: "center" }}>
                 <p style={{ margin: 0, fontSize: "1rem", textTransform: "uppercase", letterSpacing: 1, fontWeight: 800, color: "var(--ink-soft)" }}>Nominating</p>
                 <p style={{ margin: "6px 0 0", fontSize: "3.4rem", fontWeight: 900, color: "var(--brand)" }}>{currentId ? nameOf(currentId) : "—"}</p>
                 <p style={{ margin: "8px 0 0", fontSize: "1.1rem", color: "var(--ink-soft)" }}>naming the next team up</p>
@@ -102,63 +106,22 @@ function ProjectorBoard({ state }: { state: AuctionState }) {
         )}
 
         {complete && results.championName && (
-          <div style={{ flexShrink: 0, textAlign: "center", padding: "16px 28px 6px" }}>
-            <p style={{ margin: 0, fontSize: "1.7rem", fontWeight: 900 }}>🏆 {results.championName}{results.championOwnerId ? `, ${nameOf(results.championOwnerId)}` : ""}</p>
-            {results.runnerUpName && <p style={{ margin: "4px 0 0", fontSize: "1.1rem", color: "var(--ink-soft)" }}>Runner-up {results.runnerUpName}{results.runnerUpOwnerId ? ` (${nameOf(results.runnerUpOwnerId)})` : ""}</p>}
+          <div style={{ flex: 1, minHeight: 140, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "16px 28px" }}>
+            <p style={{ margin: 0, fontSize: "1.9rem", fontWeight: 900 }}>🏆 {results.championName}{results.championOwnerId ? `, ${nameOf(results.championOwnerId)}` : ""}</p>
+            {results.runnerUpName && <p style={{ margin: "6px 0 0", fontSize: "1.2rem", color: "var(--ink-soft)" }}>Runner-up {results.runnerUpName}{results.runnerUpOwnerId ? ` (${nameOf(results.runnerUpOwnerId)})` : ""}</p>}
           </div>
         )}
 
-        {/* Participant grid — fills the rest of the screen, compact enough to fit everyone */}
-        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "8px 20px 16px" }}>
+        {/* Participant grid — anchored to the bottom, compact enough to fit everyone */}
+        <div style={{ flexShrink: 0, maxHeight: "62%", overflowY: "auto", padding: "8px 20px 16px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(196px, 1fr))", gap: 10 }}>
             {ordered.map((p, i) => (
-              <BoardParticipant key={p.userId} p={p} rank={complete ? i + 1 : null} isNow={!complete && p.userId === currentId} teamsPerPlayer={teamsPerPlayer} complete={complete} champ={p.userId === results.championOwnerId} />
+              <AuctionPlayerCard key={p.userId} p={p} teamsPerPlayer={teamsPerPlayer} highlight={!complete && p.userId === currentId}
+                rank={complete ? i + 1 : null} champ={p.userId === results.championOwnerId} showPoints={complete} />
             ))}
           </div>
         </div>
       </main>
-    </div>
-  );
-}
-
-/** One participant card on the projector grid: name + balance, `teamsPerPlayer` permanent
- *  bordered slots filled only by real buys, then any free bonus teams flowing after. */
-function BoardParticipant({ p, rank, isNow, teamsPerPlayer, complete, champ }: {
-  p: AuctionParticipant; rank: number | null; isNow: boolean; teamsPerPlayer: number; complete: boolean; champ: boolean;
-}) {
-  const bonus = p.teams.flatMap((t) => (t.free ? [t.free] : []));
-  return (
-    <div style={{ border: `2px solid ${isNow ? "var(--brand)" : "var(--line)"}`, borderRadius: 12, padding: 10, background: "var(--card)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6, marginBottom: 7 }}>
-        <strong style={{ fontSize: "1rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rank ? `${rank}. ` : ""}{p.name}{champ ? " 🏆" : ""}</strong>
-        <span style={{ fontSize: "1rem", fontWeight: 900, color: "var(--brand)", flexShrink: 0 }}>{complete ? `${p.points} pts` : money(p.remainingCents)}</span>
-      </div>
-      {/* Permanent slots — one per required lot, filled by real buys in order */}
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${teamsPerPlayer}, 1fr)`, gap: 6 }}>
-        {Array.from({ length: teamsPerPlayer }).map((_, i) => {
-          const t = p.teams[i];
-          return t ? (
-            <div key={i} style={{ border: "1px solid var(--line)", borderRadius: 8, padding: "6px 3px", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "var(--bg, #f6f7f5)" }}>
-              {t.logo_url ? <img src={t.logo_url} alt="" style={{ width: 30, height: 30, objectFit: "contain" }} /> : <div style={{ width: 30, height: 30 }} />}
-              <span style={{ fontSize: "0.66rem", fontWeight: 700, textAlign: "center", lineHeight: 1.05, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>({t.seed}) {t.name}</span>
-              <span style={{ fontSize: "0.64rem", color: "var(--ink-soft)" }}>{money(t.bidCents)}</span>
-            </div>
-          ) : (
-            <div key={i} style={{ border: "1px dashed var(--line)", borderRadius: 8, minHeight: 68, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink-soft)", opacity: 0.45 }}>—</div>
-          );
-        })}
-      </div>
-      {/* Bonus (free) teams flow after the permanent slots, visually distinct */}
-      {bonus.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 6 }}>
-          {bonus.map((b, i) => (
-            <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4, border: "1.5px dashed var(--brand)", borderRadius: 999, padding: "2px 7px", fontSize: "0.68rem", color: "var(--brand)", fontWeight: 700 }}>
-              {b.logo_url && <img src={b.logo_url} alt="" style={{ width: 14, height: 14, objectFit: "contain" }} />}
-              ({b.seed}) {b.name} free
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

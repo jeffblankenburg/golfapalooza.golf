@@ -7315,3 +7315,12 @@ select.optCellInput {
   padding: 1px 7px;
   border-radius: 999px;
 }
+
+/* Auction projector board — the on-block team animates in as it changes (keyed remount). */
+@keyframes boardLotIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.boardLotIn {
+  animation: boardLotIn 0.3s ease-out;
+}

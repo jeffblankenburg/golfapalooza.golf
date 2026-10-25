@@ -92,6 +92,10 @@ export async function POST(request: Request, { params }: { params: Params }) {
     cfg.on_block_entity_id = undefined;
   } else if (body.action === "shuffle") {
     cfg.order_seed = randomUUID();
+  } else if (body.action === "skip") {
+    // Advance the nominator by one (wraps around the list); clear any lot on the block.
+    cfg.nomination_skips = Math.max(0, Math.floor(Number(cfg.nomination_skips) || 0)) + 1;
+    cfg.on_block_entity_id = undefined;
   } else if (body.action === "complete") {
     cfg.auction_complete = body.complete === true;
   } else {

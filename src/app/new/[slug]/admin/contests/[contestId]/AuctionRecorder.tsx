@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import styles from "@/app/new/new.module.css";
 import { subscribeToAuction } from "@/lib/v2/realtime/auction-channel";
 import type { AuctionState, AuctionEntity, AuctionParticipant } from "@/lib/v2/contests/auction-server";
+import AuctionPlayerCard from "@/app/new/_components/AuctionPlayerCard";
+import ConfirmModal from "@/app/new/_components/ConfirmModal";
 
 const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { maximumFractionDigits: cents % 100 === 0 ? 0 : 2 })}`;
 const LABEL = { display: "block", fontSize: "0.8125rem", fontWeight: 600, marginBottom: 4 } as const;
@@ -39,6 +41,7 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
   const [buyerId, setBuyerId] = useState("");
   const [bid, setBid] = useState(String(config.bidIncrementCents / 100));
   const [query, setQuery] = useState("");
+  const [confirmSkip, setConfirmSkip] = useState(false);
 
   useEffect(() => subscribeToAuction(state.contest.id, config.tournamentId, () => router.refresh()), [state.contest.id, config.tournamentId, router]);
 
@@ -104,17 +107,20 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
       <h1 style={{ fontSize: "1.45rem", fontWeight: 800, margin: "6px 0 0" }}>{state.contest.name}, live</h1>
 
       {!config.complete && currentId && (
-        <div style={{ padding: "10px 14px", borderRadius: 10, background: "var(--brand-tint, #e8f2ec)", marginTop: 10, display: "flex", flexDirection: "column", gap: 3 }}>
-          <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
-            <span style={{ fontSize: "0.66rem", textTransform: "uppercase", letterSpacing: 0.3, color: "var(--ink-soft)", fontWeight: 800, width: 74, flexShrink: 0 }}>Nominating</span>
-            <strong style={{ color: "var(--brand)", fontSize: "1.05rem" }}>{nameOf(currentId)}</strong>
-          </div>
-          {onDeckId && (
+        <div style={{ padding: "10px 14px", borderRadius: 10, background: "var(--brand-tint, #e8f2ec)", marginTop: 10, display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
             <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
-              <span style={{ fontSize: "0.66rem", textTransform: "uppercase", letterSpacing: 0.3, color: "var(--ink-soft)", fontWeight: 800, width: 74, flexShrink: 0 }}>On deck</span>
-              <span style={{ fontSize: "0.95rem" }}>{nameOf(onDeckId)}</span>
+              <span style={{ fontSize: "0.66rem", textTransform: "uppercase", letterSpacing: 0.3, color: "var(--ink-soft)", fontWeight: 800, width: 74, flexShrink: 0 }}>Nominating</span>
+              <strong style={{ color: "var(--brand)", fontSize: "1.05rem" }}>{nameOf(currentId)}</strong>
             </div>
-          )}
+            {onDeckId && (
+              <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                <span style={{ fontSize: "0.66rem", textTransform: "uppercase", letterSpacing: 0.3, color: "var(--ink-soft)", fontWeight: 800, width: 74, flexShrink: 0 }}>On deck</span>
+                <span style={{ fontSize: "0.95rem" }}>{nameOf(onDeckId)}</span>
+              </div>
+            )}
+          </div>
+          <button type="button" className={styles.createBtnGhost} style={{ flexShrink: 0, padding: "6px 12px", fontSize: "0.82rem" }} disabled={busy} onClick={() => setConfirmSkip(true)}>Skip</button>
         </div>
       )}
 
@@ -161,35 +167,11 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
         </div>
       )}
 
-      {/* Buyer columns (alphabetical) */}
+      {/* Buyer cards (alphabetical) — the same card the projector board shows */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10, marginTop: 16 }}>
         {roster.map((p) => (
-          <div key={p.userId} style={{ border: `1px solid ${p.userId === currentId ? "var(--brand)" : "var(--line)"}`, borderRadius: 10, padding: 10, background: p.done ? "var(--brand-tint, #e8f2ec)" : "var(--card)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <strong style={{ fontSize: "0.9rem" }}>{p.name}</strong>
-              <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "var(--brand)" }}>{money(p.remainingCents)}</span>
-            </div>
-            <div style={{ fontSize: "0.7rem", color: "var(--ink-soft)", marginBottom: 6 }}>
-              {p.paidTeams}/{config.teamsPerPlayer} lots{p.done ? ", done" : ""}{config.complete ? `, ${p.points} pts` : ""}
-            </div>
-            {p.teams.length === 0 ? <p style={{ fontSize: "0.78rem", color: "var(--ink-soft)", margin: 0 }}>No lots yet</p> : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                {p.teams.map((t) => (
-                  <div key={t.entityId} style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.8rem" }}>
-                      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>({t.seed}) {t.name}</span>
-                      <span style={{ fontWeight: 700 }}>{money(t.bidCents)}</span>
-                      {!config.complete && (
-                        <button type="button" aria-label="Undo" title="Undo (releases any free team too)" disabled={busy} onClick={() => void act({ action: "unassign", entityId: t.entityId })}
-                          style={{ border: "none", background: "none", color: "var(--ink-soft)", cursor: "pointer", padding: 0, lineHeight: 1 }}>✕</button>
-                      )}
-                    </div>
-                    {t.freeName && <span style={{ fontSize: "0.7rem", color: "var(--ink-soft)" }}>+ {t.freeName} free</span>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <AuctionPlayerCard key={p.userId} p={p} teamsPerPlayer={config.teamsPerPlayer} highlight={!config.complete && p.userId === currentId}
+            showPoints={config.complete} busy={busy} onUndo={config.complete ? undefined : (entityId) => void act({ action: "unassign", entityId })} />
         ))}
       </div>
 
@@ -199,6 +181,15 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
           {config.complete ? "Reopen auction" : "Mark auction complete"}
         </button>
       </div>
+
+      <ConfirmModal
+        open={confirmSkip}
+        title={`Skip ${nameOf(currentId)}?`}
+        message="Their turn to nominate passes to the next player. They keep their place in the rotation and come back around on the next pass. Any team on the block is cleared."
+        confirmLabel="Skip turn"
+        onConfirm={() => { setConfirmSkip(false); void act({ action: "skip" }); }}
+        onCancel={() => setConfirmSkip(false)}
+      />
     </div>
   );
 }

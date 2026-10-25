@@ -113,10 +113,16 @@ export default function AuctionManager({
             </select>
             <Link href={`/new/${slug}/admin/tournaments`} className={styles.linkAction} style={{ display: "inline-block", marginTop: 4 }}>Manage tournaments</Link>
           </label>
-          <div>
-            <MoneyField label="Buy-in (real money)" defaultDollars={config.entryCents / 100} disabled={busy} onCents={(c) => void act({ action: "settings", entry_cents: c })} />
-            <span style={{ display: "block", fontSize: "0.72rem", color: "var(--ink-soft)", marginTop: 4 }}>What each player pays to enter. Tracked under &ldquo;Who&apos;s paid their entry&rdquo; below.</span>
-          </div>
+          {state.isEvent ? (
+            <p className={styles.roundFormHint} style={{ margin: 0 }}>
+              Buy-in {state.buyInCents > 0 ? money(state.buyInCents) : "(not set)"} — managed with the event&apos;s money (set it in the card gear; payments live in <Link href={`/new/${slug}/admin/events/${state.eventId}/financials`} className={styles.linkAction}>Financials</Link>).
+            </p>
+          ) : (
+            <div>
+              <MoneyField label="Buy-in (real money)" defaultDollars={config.entryCents / 100} disabled={busy} onCents={(c) => void act({ action: "settings", entry_cents: c })} />
+              <span style={{ display: "block", fontSize: "0.72rem", color: "var(--ink-soft)", marginTop: 4 }}>What each player pays to enter. Tracked under &ldquo;Who&apos;s paid their entry&rdquo; below.</span>
+            </div>
+          )}
           <div className={styles.profileTwoCol}>
             <MoneyField label="Salary cap (fake bidding $)" defaultDollars={config.salaryCapCents / 100} disabled={busy} onCents={(c) => void act({ action: "settings", salary_cap_cents: c })} />
             <MoneyField label="Bid increment" defaultDollars={config.bidIncrementCents / 100} disabled={busy} onCents={(c) => void act({ action: "settings", bid_increment_cents: c })} />
@@ -130,9 +136,9 @@ export default function AuctionManager({
           <div>
             <span style={LABEL}>Payouts <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(% of pot, flat $, or remainder)</span></span>
             <PayoutSplitsEditor value={payoutSplits} labels={AUCTION_PAYOUT_SLOTS.map((s) => s.label)} onSave={(s) => void savePayoutSplits(s)} disabled={busy} />
-            {config.entryCents > 0 && (
+            {state.buyInCents > 0 && (
               <p className={styles.roundFormHint} style={{ marginTop: 6 }}>
-                Pot: {money(config.entryCents)} × {participants.length} = <strong style={{ color: "var(--brand)" }}>{money(config.entryCents * participants.length)}</strong>
+                Pot: {money(state.buyInCents)} × {participants.length} = <strong style={{ color: "var(--brand)" }}>{money(state.buyInCents * participants.length)}</strong>
               </p>
             )}
           </div>
@@ -161,8 +167,9 @@ export default function AuctionManager({
         </p>
       </div>
 
-      {/* Entry (buy-in) collection */}
-      {config.entryCents > 0 && (
+      {/* Entry (buy-in) collection — group auctions track it here; event auctions track
+          payment in the event's Financials (the buy-in is part of the trip money). */}
+      {!state.isEvent && config.entryCents > 0 && (
         <div style={{ marginTop: 14 }}>
           <ContestEntryPaid orgId={state.contest.orgId} contestId={state.contest.id} title="Who's paid their entry" emptyText="No one's entered yet." />
         </div>

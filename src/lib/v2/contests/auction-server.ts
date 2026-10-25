@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { pickName, type NameMode } from "@/lib/v2/profile";
 import { orgNameMode } from "@/lib/v2/orgs";
 import { loadTournamentSource } from "./tournament-server";
+import { loadBuyInCents } from "@/lib/v2/contests";
 import { teamWinRounds, finalFourLosers } from "./tournament";
 import { computePlacePayouts, type PayoutSplit } from "./payouts";
 import {
@@ -47,6 +48,9 @@ export interface AuctionState {
   config: AuctionConfig;
   tournament: { id: string; name: string } | null;
   capacity: AuctionCapacity;
+  isEvent: boolean;         // event-scoped (buy-in = cost_items / trip cost, not config)
+  eventId: string | null;
+  buyInCents: number;       // effective buy-in: cost_item for events, config for groups
   fieldReady: boolean;      // a full 64-position bracket is loaded
   bundlesFrozen: boolean;   // locked in (a lot has sold or an override is set)
   entities: AuctionEntity[];        // biddable lots (singles + hosts), seed order
@@ -165,9 +169,11 @@ async function resolveField(
 }
 
 export async function loadAuction(admin: SupabaseClient, contestId: string): Promise<AuctionState | null> {
-  const { data: contest } = await admin.from("v2_contests").select("id, org_id, name, status, config, contest_type").eq("id", contestId).maybeSingle();
+  const { data: contest } = await admin.from("v2_contests").select("id, org_id, name, status, config, contest_type, event_id").eq("id", contestId).maybeSingle();
   if (!contest || contest.contest_type !== "auction") return null;
   const config = auctionConfigOf(contest.config as Record<string, unknown> | null);
+  const isEvent = !!contest.event_id;
+  const buyInCents = isEvent ? (await loadBuyInCents(admin, [contestId])).get(contestId) ?? 0 : config.entryCents;
 
   const [{ data: parts }, { data: ownRows }] = await Promise.all([
     admin.from("v2_contest_participants").select("user_id").eq("contest_id", contestId),
@@ -241,7 +247,8 @@ export async function loadAuction(admin: SupabaseClient, contestId: string): Pro
     contest: { id: contest.id as string, orgId: contest.org_id as string, name: contest.name as string, status: contest.status as string },
     config: { ...config, teamsPerPlayer },
     tournament: src ? { id: src.tournament.id, name: src.tournament.name } : null,
-    capacity: field.capacity, fieldReady: field.fieldReady, bundlesFrozen: field.frozen || ownership.length > 0,
+    capacity: field.capacity, isEvent, eventId: (contest.event_id as string | null) ?? null, buyInCents,
+    fieldReady: field.fieldReady, bundlesFrozen: field.frozen || ownership.length > 0,
     entities, participants, currentId, onDeckId, onBlock, results,
   };
 }
@@ -271,7 +278,7 @@ export async function loadAuctionPayouts(admin: SupabaseClient, contestId: strin
   const nameOf = (uid: string | null) => (uid ? state.participants.find((p) => p.userId === uid)?.name ?? "Member" : null);
 
   const { data: c } = await admin.from("v2_contests").select("payout_splits").eq("id", contestId).maybeSingle();
-  const potCents = state.config.entryCents * state.participants.length;
+  const potCents = state.buyInCents * state.participants.length;
   const place = computePlacePayouts(potCents, (c?.payout_splits as PayoutSplit[] | null) ?? null);
   const amt = (p: number) => place.find((x) => x.place === p)?.amountCents ?? 0; // 1=champ 2=runner 3=FF 4..6=points
 

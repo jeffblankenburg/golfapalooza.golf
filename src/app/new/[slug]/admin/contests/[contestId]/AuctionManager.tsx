@@ -56,17 +56,14 @@ export default function AuctionManager({
   }
 
   return (
-    <div className={styles.page}>
+    <div className={styles.page} style={{ paddingTop: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
         <Link href={backHref} className={styles.back} style={{ margin: 0 }}>← Contests</Link>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.85rem", fontWeight: 700, color: "var(--ink-soft)" }}>
           <ContestTypeIcon kind="auction" size={16} /> Auction
         </span>
       </div>
-      <div className={styles.titleRow} style={{ justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-        <h1 className={styles.title} style={{ minWidth: 0 }}>{state.contest.name}</h1>
-        <Link href={`/new/${slug}/admin/contests/${state.contest.id}/live`} className={styles.createBtn} style={{ whiteSpace: "nowrap" }}>Run live auction →</Link>
-      </div>
+      <div className={styles.titleRow}><h1 className={styles.title}>{state.contest.name}</h1></div>
 
       {/* Participants */}
       <div style={{ marginTop: 14 }}>
@@ -149,6 +146,8 @@ export default function AuctionManager({
       </div>
 
       {payouts && <AuctionPayouts apiBase={apiBase} payouts={payouts} />}
+
+      <Link href={`/new/${slug}/admin/contests/${state.contest.id}/live`} className={styles.createBtn} style={{ display: "block", textAlign: "center", marginTop: 28, fontSize: "0.9rem" }}>Run live auction →</Link>
     </div>
   );
 }

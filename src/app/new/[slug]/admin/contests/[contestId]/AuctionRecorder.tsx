@@ -5,15 +5,29 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import styles from "@/app/new/new.module.css";
 import { subscribeToAuction } from "@/lib/v2/realtime/auction-channel";
-import type { AuctionState } from "@/lib/v2/contests/auction-server";
+import type { AuctionState, AuctionEntity, AuctionParticipant } from "@/lib/v2/contests/auction-server";
 
 const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { maximumFractionDigits: cents % 100 === 0 ? 0 : 2 })}`;
 const LABEL = { display: "block", fontSize: "0.8125rem", fontWeight: 600, marginBottom: 4 } as const;
+const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
+
+/** The selected team (on-block or picked), shown with its logo/seed/name. */
+function SelectedTeam({ lot, onBoard, onClear, busy }: { lot: AuctionEntity; onBoard: (() => void) | null; onClear: () => void; busy: boolean }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px" }}>
+      {lot.logo_url && <img src={lot.logo_url} alt="" width={30} height={30} style={{ objectFit: "contain" }} />}
+      <span style={{ fontSize: "1.15rem", fontWeight: 800, flex: 1, minWidth: 0 }}>({lot.seed}) {lot.name}</span>
+      {lot.bundledThrowIn && <span style={{ fontSize: "0.74rem", color: "var(--ink-soft)" }}>+ ({lot.bundledThrowIn.seed}) {lot.bundledThrowIn.name} free</span>}
+      {onBoard && <button type="button" className={styles.createBtnGhost} style={{ padding: "4px 10px", fontSize: "0.78rem" }} disabled={busy} title="Show on the projector board" onClick={onBoard}>On board</button>}
+      <button type="button" aria-label="Change team" title="Change team" className={styles.linkAction} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.9rem" }} disabled={busy} onClick={onClear}>Change</button>
+    </div>
+  );
+}
 
 /**
- * Live auction administration — the fast draft runner on its own screen. One assign bar
- * (team → owner → price → Assign), an optional "put on the block" that lights the
- * projector board, and the buyer columns. Realtime; the detail page owns setup.
+ * Live auction administration — the fast draft runner. Pick a team (alphabetical, with
+ * logos), pick an owner, pick a price (increments up to what the owner can spend), Assign.
+ * Realtime; the detail page owns setup.
  */
 export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
   slug: string; apiBase: string; state: AuctionState; backHref: string;
@@ -22,9 +36,10 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
   const { config, participants, entities, currentId, onDeckId, onBlock } = state;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [entityId, setEntityId] = useState(onBlock?.id ?? "");
+  const [entityId, setEntityId] = useState("");
   const [buyerId, setBuyerId] = useState("");
   const [bid, setBid] = useState(String(config.bidIncrementCents / 100));
+  const [query, setQuery] = useState("");
 
   useEffect(() => subscribeToAuction(state.contest.id, config.tournamentId, () => router.refresh()), [state.contest.id, config.tournamentId, router]);
 
@@ -40,19 +55,46 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
   }
 
   const nameOf = (uid: string | null) => participants.find((p) => p.userId === uid)?.name ?? "";
-  const available = entities.filter((e) => !e.ownerId && !e.eliminated);
-  const lot = onBlock ?? available.find((e) => e.id === entityId) ?? null; // the team being recorded
+  const roster: AuctionParticipant[] = [...participants].sort(byName); // columns + owner dropdown, alphabetical
+  const available = [...entities].filter((e) => !e.ownerId && !e.eliminated).sort(byName);
+  const lot = onBlock ?? available.find((e) => e.id === entityId) ?? null;
+
+  // Price options: 0 up to the most the chosen owner can spend (leave the increment for
+  // each team they still need to buy). Falls back to the cap when no owner's picked.
+  const inc = config.bidIncrementCents;
+  const buyer = participants.find((p) => p.userId === buyerId) ?? null;
+  const needs = buyer ? Math.max(1, config.teamsPerPlayer - buyer.paidTeams) : config.teamsPerPlayer;
+  const budget = buyer ? buyer.remainingCents : config.salaryCapCents;
+  const maxBid = Math.max(0, budget - (needs - 1) * inc);
+  const priceOptions: number[] = [];
+  for (let c = 0; c <= maxBid && inc > 0; c += inc) priceOptions.push(c);
 
   async function assign() {
-    const id = lot?.id;
-    if (!id || !buyerId) { setErr("Pick a team and an owner."); return; }
-    if (await act({ action: "assign", entityId: id, userId: buyerId, bidCents: Math.round((Number(bid) || 0) * 100) })) {
-      setEntityId(""); setBuyerId(""); setBid(String(config.bidIncrementCents / 100));
+    if (!lot || !buyerId) { setErr("Pick a team and an owner."); return; }
+    if (await act({ action: "assign", entityId: lot.id, userId: buyerId, bidCents: Math.round((Number(bid) || 0) * 100) })) {
+      setEntityId(""); setBuyerId(""); setBid(String(inc / 100)); setQuery("");
     }
   }
 
-  const header = (
-    <>
+  const filtered = query ? available.filter((e) => e.name.toLowerCase().includes(query.toLowerCase())) : available;
+
+  if (!state.tournament || entities.length === 0 || participants.length === 0) {
+    return (
+      <div className={styles.page} style={{ paddingTop: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Link href={backHref} className={styles.back} style={{ margin: 0 }}>← Auction</Link>
+        </div>
+        <p className={styles.dnsHint} style={{ marginTop: 16 }}>
+          {!state.tournament ? "Bind a tournament in the auction settings first."
+            : entities.length === 0 ? "That tournament has no teams yet — build its field under Manage tournaments."
+            : "Add participants on the auction page before starting the draft."}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.page} style={{ paddingTop: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
         <Link href={backHref} className={styles.back} style={{ margin: 0 }}>← Auction</Link>
         <Link href={`/new/${slug}/admin/contests/${state.contest.id}/board`} target="_blank" className={styles.linkAction} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -60,38 +102,10 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
           Board
         </Link>
       </div>
-      <div className={styles.titleRow}><h1 className={styles.title}>{state.contest.name}, live</h1></div>
-    </>
-  );
-
-  if (!state.tournament || entities.length === 0 || participants.length === 0) {
-    return (
-      <div className={styles.page}>
-        {header}
-        <p className={styles.dnsHint} style={{ marginTop: 16 }}>
-          {!state.tournament ? "Bind a tournament in the auction settings first."
-            : entities.length === 0 ? "That tournament has no teams yet — build its field under Manage tournaments."
-            : "Add participants on the auction page before starting the draft."}
-        </p>
-        <Link href={backHref} className={styles.linkAction} style={{ marginTop: 10, display: "inline-block" }}>Back to the auction</Link>
-      </div>
-    );
-  }
-
-  const owners = (
-    <select className={styles.selectInput} value={buyerId} onChange={(e) => setBuyerId(e.target.value)}>
-      <option value="">Owner…</option>
-      {participants.map((p) => <option key={p.userId} value={p.userId} disabled={p.done}>{p.name} ({money(p.remainingCents)} left{p.done ? ", done" : ""})</option>)}
-    </select>
-  );
-  const priceInput = <input className={styles.input} inputMode="decimal" step={config.bidIncrementCents / 100} value={bid} onChange={(e) => setBid(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="Price" />;
-
-  return (
-    <div className={styles.page}>
-      {header}
+      <h1 style={{ fontSize: "1.45rem", fontWeight: 800, margin: "6px 0 0" }}>{state.contest.name}, live</h1>
 
       {!config.complete && currentId && (
-        <div style={{ display: "flex", gap: 16, alignItems: "baseline", padding: "8px 14px", borderRadius: 10, background: "var(--brand-tint, #e8f2ec)", marginTop: 12 }}>
+        <div style={{ display: "flex", gap: 16, alignItems: "baseline", padding: "8px 14px", borderRadius: 10, background: "var(--brand-tint, #e8f2ec)", marginTop: 10 }}>
           <span><span style={{ fontSize: "0.7rem", textTransform: "uppercase", color: "var(--ink-soft)", fontWeight: 800 }}>Nominating</span> <strong style={{ color: "var(--brand)" }}>{nameOf(currentId)}</strong></span>
           {onDeckId && <span style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>On deck: {nameOf(onDeckId)}</span>}
         </div>
@@ -99,39 +113,50 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
 
       {err && <p className={styles.err} style={{ marginTop: 10, marginBottom: 0 }}>{err}</p>}
 
-      {/* Assign bar — team, owner, price, Assign. */}
+      {/* Assign */}
       {!config.complete && (
-        <div style={{ marginTop: 14, border: "2px solid var(--brand)", borderRadius: 12, padding: 14, background: "var(--card)" }}>
-          {onBlock ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <span style={{ fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 800, color: "var(--brand)" }}>On the block</span>
-              {onBlock.logo_url && <img src={onBlock.logo_url} alt="" width={26} height={26} style={{ objectFit: "contain" }} />}
-              <span style={{ fontSize: "1.15rem", fontWeight: 800 }}>({onBlock.seed}) {onBlock.name}</span>
-              {onBlock.bundledThrowIn && <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>+ ({onBlock.bundledThrowIn.seed}) {onBlock.bundledThrowIn.name} free</span>}
-              <button type="button" className={styles.linkAction} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer" }} disabled={busy} onClick={() => void act({ action: "clear_block" })}>Clear</button>
-            </div>
+        <div style={{ marginTop: 12, border: "2px solid var(--brand)", borderRadius: 12, padding: 12, background: "var(--card)" }}>
+          {lot ? (
+            <SelectedTeam lot={lot} busy={busy} onClear={() => { if (onBlock) void act({ action: "clear_block" }); else setEntityId(""); }} onBoard={onBlock ? null : () => void act({ action: "set_block", entityId })} />
           ) : (
-            <label style={{ display: "block", marginBottom: 10 }}><span style={LABEL}>Team</span>
-              <div style={{ display: "flex", gap: 8 }}>
-                <select className={styles.selectInput} style={{ flex: 1 }} value={entityId} onChange={(e) => setEntityId(e.target.value)}>
-                  <option value="">Pick a team…</option>
-                  {available.map((e) => <option key={e.id} value={e.id}>({e.seed}) {e.name}{e.region ? `, ${e.region}` : ""}{e.bundledThrowIn ? ` (+ ${e.bundledThrowIn.name} free)` : ""}</option>)}
-                </select>
-                <button type="button" className={styles.createBtnGhost} style={{ whiteSpace: "nowrap" }} disabled={busy || !entityId} title="Show this team on the projector board" onClick={() => void act({ action: "set_block", entityId })}>On board</button>
+            <>
+              <input className={styles.input} style={{ width: "100%", marginBottom: 6 }} placeholder="Search teams…" value={query} onChange={(e) => setQuery(e.target.value)} />
+              <div style={{ maxHeight: 300, overflowY: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
+                {filtered.map((e, i) => (
+                  <button key={e.id} type="button" onClick={() => setEntityId(e.id)}
+                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "8px 10px", background: "none", border: "none", borderTop: i === 0 ? "none" : "1px solid var(--line)", cursor: "pointer", fontSize: "0.92rem" }}>
+                    {e.logo_url ? <img src={e.logo_url} alt="" width={22} height={22} style={{ objectFit: "contain", flexShrink: 0 }} /> : <span style={{ width: 22, flexShrink: 0 }} />}
+                    <span style={{ fontWeight: 800, color: "var(--ink-soft)", width: 20, flexShrink: 0 }}>{e.seed}</span>
+                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.name}{e.bundledThrowIn ? ` (+ ${e.bundledThrowIn.name} free)` : ""}</span>
+                  </button>
+                ))}
+                {filtered.length === 0 && <p className={styles.roundFormHint} style={{ margin: 0, padding: 10 }}>No teams match.</p>}
               </div>
-            </label>
+            </>
           )}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "flex-end" }}>
-            <label style={{ flex: "2 1 160px" }}><span style={LABEL}>Owner</span>{owners}</label>
-            <label style={{ flex: "1 1 90px" }}><span style={LABEL}>Price</span>{priceInput}</label>
-            <button type="button" className={styles.createBtn} disabled={busy || !lot || !buyerId} onClick={() => void assign()}>Assign</button>
-          </div>
+
+          {lot && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "flex-end", marginTop: 8 }}>
+              <label style={{ flex: "2 1 150px" }}><span style={LABEL}>Owner</span>
+                <select className={styles.selectInput} value={buyerId} onChange={(e) => setBuyerId(e.target.value)}>
+                  <option value="">Owner…</option>
+                  {roster.map((p) => <option key={p.userId} value={p.userId} disabled={p.done}>{p.name} ({money(p.remainingCents)} left{p.done ? ", done" : ""})</option>)}
+                </select>
+              </label>
+              <label style={{ flex: "1 1 90px" }}><span style={LABEL}>Price</span>
+                <select className={styles.selectInput} value={bid} onChange={(e) => setBid(e.target.value)}>
+                  {priceOptions.map((c) => <option key={c} value={String(c / 100)}>{money(c)}</option>)}
+                </select>
+              </label>
+              <button type="button" className={styles.createBtn} disabled={busy || !buyerId} onClick={() => void assign()}>Assign</button>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Buyer columns */}
+      {/* Buyer columns (alphabetical) */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10, marginTop: 16 }}>
-        {participants.map((p) => (
+        {roster.map((p) => (
           <div key={p.userId} style={{ border: `1px solid ${p.userId === currentId ? "var(--brand)" : "var(--line)"}`, borderRadius: 10, padding: 10, background: p.done ? "var(--brand-tint, #e8f2ec)" : "var(--card)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <strong style={{ fontSize: "0.9rem" }}>{p.name}</strong>
@@ -166,9 +191,6 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
         <button type="button" className={config.complete ? styles.createBtnGhost : styles.createBtn} disabled={busy} onClick={() => void act({ action: "complete", complete: !config.complete })}>
           {config.complete ? "Reopen auction" : "Mark auction complete"}
         </button>
-        <p className={styles.roundFormHint} style={{ marginTop: 6 }}>
-          {config.complete ? "The auction is closed. Reopen it to keep assigning teams." : "Closes the draft and switches the board to final standings. You can reopen it later."}
-        </p>
       </div>
     </div>
   );

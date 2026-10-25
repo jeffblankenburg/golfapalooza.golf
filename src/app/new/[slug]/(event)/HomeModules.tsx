@@ -7,6 +7,7 @@ import { v2Now } from "@/lib/v2/simulator";
 import BirthdayBanner, { type BirthdayPerson } from "./BirthdayBanner";
 import SquaresHomeCards from "./SquaresHomeCards";
 import PickemHomeCards from "./PickemHomeCards";
+import AuctionHomeCards from "./AuctionHomeCards";
 import RsvpModule, { type Likelihood } from "./RsvpModule";
 import OptionsReminder from "./OptionsReminder";
 import AdCarousel, { type Ad } from "./AdCarousel";
@@ -220,6 +221,7 @@ export default async function HomeModules({
       <BirthdayBanner birthdays={birthdays} slug={slug} />
       <SquaresHomeCards orgId={orgId} userId={userId} slug={slug} />
       <PickemHomeCards orgId={orgId} userId={userId} slug={slug} eventId={eventId} />
+      <AuctionHomeCards orgId={orgId} userId={userId} slug={slug} eventId={eventId} />
       {articlesVisible && article && <ArticleModule article={article} slug={slug} />}
       <RsvpModule
         eventId={eventId}

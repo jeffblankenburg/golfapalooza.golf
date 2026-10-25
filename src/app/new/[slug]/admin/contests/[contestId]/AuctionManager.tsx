@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import styles from "@/app/new/new.module.css";
 import ContestParticipants from "@/components/v2/contests/ContestParticipants";
 import ContestEntryPaid from "./ContestEntryPaid";
+import { ContestTypeIcon } from "@/app/new/_components/contest-card/ContestCard";
 import { MIN_TEAMS_PER_PLAYER, SCORING_MODES, AUCTION_PAYOUT_SLOTS } from "@/lib/v2/contests/auction";
 import { subscribeToAuction } from "@/lib/v2/realtime/auction-channel";
 import PayoutSplitsEditor from "../../events/[eventId]/contests/[contestId]/PayoutSplitsEditor";
@@ -30,9 +31,9 @@ function MoneyField({ label, defaultDollars, disabled, onCents }: { label: strin
 }
 
 export default function AuctionManager({
-  slug, apiBase, state, tournaments, payouts, payoutSplits,
+  slug, apiBase, state, tournaments, payouts, payoutSplits, backHref,
 }: {
-  slug: string; apiBase: string; state: AuctionState; tournaments: { id: string; name: string }[]; payouts: AuctionPayoutsData | null; payoutSplits: PayoutSplit[];
+  slug: string; apiBase: string; state: AuctionState; tournaments: { id: string; name: string }[]; payouts: AuctionPayoutsData | null; payoutSplits: PayoutSplit[]; backHref: string;
 }) {
   const router = useRouter();
   const { config, participants, entities, currentId, onDeckId, onBlock, capacity, fieldReady, bundlesFrozen } = state;
@@ -86,12 +87,19 @@ export default function AuctionManager({
 
   return (
     <div className={styles.page}>
-      <Link href={`/new/${slug}/admin/contests`} className={styles.back}>← Contests</Link>
-      <div className={styles.titleRow}><h1 className={styles.title}>{state.contest.name}</h1></div>
-      <p className={styles.lede} style={{ marginTop: 2, color: "var(--ink-soft)" }}>
-        Auction{state.tournament ? `, ${state.tournament.name}` : ""}{config.complete ? ", complete" : ""}
-      </p>
-      <Link href={`/new/${slug}/admin/contests/${state.contest.id}/board`} target="_blank" className={styles.linkAction} style={{ display: "inline-block", marginTop: 4 }}>Open projector board ↗</Link>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+        <Link href={backHref} className={styles.back} style={{ margin: 0 }}>← Contests</Link>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.85rem", fontWeight: 700, color: "var(--ink-soft)" }}>
+          <ContestTypeIcon kind="auction" size={16} /> Auction
+        </span>
+      </div>
+      <div className={styles.titleRow} style={{ justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+        <h1 className={styles.title} style={{ minWidth: 0 }}>{state.contest.name}</h1>
+        <Link href={`/new/${slug}/admin/contests/${state.contest.id}/board`} target="_blank" className={styles.linkAction} style={{ whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="2" y="4" width="20" height="13" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
+          Board
+        </Link>
+      </div>
 
       {/* Settings */}
       <details style={{ marginTop: 14, border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }} open={!state.tournament}>
@@ -113,13 +121,6 @@ export default function AuctionManager({
             <MoneyField label="Salary cap (fake bidding $)" defaultDollars={config.salaryCapCents / 100} disabled={busy} onCents={(c) => void act({ action: "settings", salary_cap_cents: c })} />
             <MoneyField label="Bid increment" defaultDollars={config.bidIncrementCents / 100} disabled={busy} onCents={(c) => void act({ action: "settings", bid_increment_cents: c })} />
           </div>
-          <label><span style={LABEL}>First picker <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(optional)</span></span>
-            <select className={styles.selectInput} value={config.firstParticipantId ?? ""} disabled={busy} onChange={(e) => void act({ action: "settings", first_participant_id: e.target.value })}>
-              <option value="">Random</option>
-              {participants.map((p) => <option key={p.userId} value={p.userId}>{p.name}</option>)}
-            </select>
-            <span style={{ display: "block", fontSize: "0.72rem", color: "var(--ink-soft)", marginTop: 4 }}>Teams per player and free-team pairings are set automatically from the headcount.</span>
-          </label>
           <label>
             <span style={LABEL}>Scoring <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(how a team win scores)</span></span>
             <select className={styles.selectInput} value={config.scoringMode} disabled={busy} onChange={(e) => void act({ action: "settings", scoring_mode: e.target.value })}>
@@ -135,20 +136,29 @@ export default function AuctionManager({
               </p>
             )}
           </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button type="button" className={styles.createBtnGhost} disabled={busy} onClick={() => void act({ action: "shuffle" })}>
-              {config.orderSeed ? "Re-roll order" : "Roll throwout order"}
-            </button>
-            <button type="button" className={config.complete ? styles.createBtnGhost : styles.create} disabled={busy} onClick={() => void act({ action: "complete", complete: !config.complete })}>
-              {config.complete ? "Reopen auction" : "Mark complete"}
-            </button>
-          </div>
         </div>
       </details>
 
       {/* Participants */}
       <div style={{ marginTop: 14 }}>
         <ContestParticipants apiBase={apiBase} />
+      </div>
+
+      {/* Draft order */}
+      <div style={{ marginTop: 14 }}>
+        <p className={styles.sectionLabel} style={{ margin: 0 }}>Draft order</p>
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap", marginTop: 6 }}>
+          <label style={{ flex: "1 1 180px" }}><span style={LABEL}>First picker <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(optional)</span></span>
+            <select className={styles.selectInput} value={config.firstParticipantId ?? ""} disabled={busy} onChange={(e) => void act({ action: "settings", first_participant_id: e.target.value })}>
+              <option value="">None (all randomized)</option>
+              {participants.map((p) => <option key={p.userId} value={p.userId}>{p.name}</option>)}
+            </select>
+          </label>
+          <button type="button" className={styles.createBtnGhost} disabled={busy} onClick={() => void act({ action: "shuffle" })}>Randomize throwout order</button>
+        </div>
+        <p className={styles.roundFormHint} style={{ marginTop: 6 }}>
+          Randomize as often as you like. The first picker (if set) always throws first; everyone else is shuffled.
+        </p>
       </div>
 
       {/* Entry (buy-in) collection */}
@@ -284,6 +294,20 @@ export default function AuctionManager({
       )}
 
       {payouts && <AuctionPayouts apiBase={apiBase} payouts={payouts} />}
+
+      {/* Complete / reopen */}
+      {state.tournament && (
+        <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
+          <button type="button" className={config.complete ? styles.createBtnGhost : styles.create} disabled={busy} onClick={() => void act({ action: "complete", complete: !config.complete })}>
+            {config.complete ? "Reopen auction" : "Mark auction complete"}
+          </button>
+          <p className={styles.roundFormHint} style={{ marginTop: 6 }}>
+            {config.complete
+              ? "The auction is closed. Reopen it to keep assigning teams."
+              : "Closes the draft and switches the board to final standings. You can reopen it later."}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

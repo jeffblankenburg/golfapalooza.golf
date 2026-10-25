@@ -99,6 +99,7 @@ export default async function ContestDetailPage({ params, searchParams }: { para
         tournaments={tournaments ?? []}
         payouts={payouts}
         payoutSplits={(contest.payout_splits as PayoutSplit[] | null) ?? []}
+        backHref={`/new/${slug}/admin/events/${eventId}/contests`}
       />
     );
   }

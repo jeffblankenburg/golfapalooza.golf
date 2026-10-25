@@ -83,6 +83,7 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
         tournaments={tournaments ?? []}
         payouts={payouts}
         payoutSplits={(contest.payout_splits as PayoutSplit[] | null) ?? []}
+        backHref={`/new/${slug}/admin/contests`}
       />
     );
   }

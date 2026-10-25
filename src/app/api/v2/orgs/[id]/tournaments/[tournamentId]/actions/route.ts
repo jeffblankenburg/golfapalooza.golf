@@ -36,11 +36,13 @@ export async function POST(request: Request, { params }: { params: Params }) {
     if (body.action === "import_espn") {
       const dates = (body.dates ?? []).filter((d) => /^\d{8}$/.test(d));
       if (!dates.length) return NextResponse.json({ error: "Round-1 date(s) required (YYYYMMDD)" }, { status: 400 });
-      const field = await fetchBracketField(t.sport as string, dates);
-      if (!field.length) return NextResponse.json({ error: "ESPN returned no Round-1 teams for those dates. Check the dates." }, { status: 422 });
-      await setTournamentField(admin, tournamentId, field);
-      await resyncBracket();
-      return NextResponse.json({ ok: true, imported: field.length });
+      const { teams, regionOrder } = await fetchBracketField(t.sport as string, dates);
+      if (!teams.length) return NextResponse.json({ error: "ESPN returned no Round-1 teams for those dates. Check the dates." }, { status: 422 });
+      await setTournamentField(admin, tournamentId, teams, regionOrder);
+      // Build the bracket straight away — import is the one-and-done action; there's no
+      // separate "generate" step in the UI anymore.
+      const built = await generateStructure(admin, tournamentId);
+      return NextResponse.json({ ok: true, imported: teams.length, regionOrder, games: built.games });
     }
     if (body.action === "set_field") {
       await setTournamentField(admin, tournamentId, body.teams ?? []);

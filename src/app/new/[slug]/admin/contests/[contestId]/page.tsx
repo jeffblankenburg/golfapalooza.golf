@@ -13,7 +13,7 @@ import { type PayoutSplit } from "@/lib/v2/contests/pickem";
 // Same admin component the event lane uses — mounted here with the group API base.
 import PickemAdmin, { type Game } from "../../events/[eventId]/contests/[contestId]/PickemAdmin";
 import { listGames } from "@/lib/v2/contests/pickem-server";
-import { loadAuction } from "@/lib/v2/contests/auction-server";
+import { loadAuction, loadAuctionPayouts } from "@/lib/v2/contests/auction-server";
 import AuctionManager from "./AuctionManager";
 import styles from "@/app/new/new.module.css";
 
@@ -69,9 +69,10 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
 
   // Auction manage view — the recorder + settings + participant enrollment.
   if (contest.contest_type === "auction") {
-    const [state, { data: tournaments }] = await Promise.all([
+    const [state, { data: tournaments }, payouts] = await Promise.all([
       loadAuction(supabase, contestId),
       supabase.from("v2_tournaments").select("id, name").eq("org_id", org.id).order("created_at", { ascending: false }),
+      loadAuctionPayouts(supabase, contestId),
     ]);
     if (!state) notFound();
     return (
@@ -80,6 +81,7 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
         apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`}
         state={state}
         tournaments={tournaments ?? []}
+        payouts={payouts}
       />
     );
   }

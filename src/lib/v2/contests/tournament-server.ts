@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   generateBracket, advanceWinner, teamWins, champion, runnerUp,
+  round1Position, firstFourSlot, type PlayInSlot,
   type TournamentTeam, type TournamentGame,
 } from "./tournament";
 
@@ -11,7 +12,7 @@ import {
  * tournament.ts; this is the DB layer every consumer (bracket pool, auction) reads.
  */
 
-const TEAM_SELECT = "id, espn_id, name, short_name, seed, region, logo_url, color, eliminated, play_in_slot";
+const TEAM_SELECT = "id, espn_id, name, short_name, seed, region, logo_url, color, record, eliminated, play_in_slot";
 const GAME_SELECT = "id, slot, round, region, game_number, team_a_id, team_b_id, next_game_id, advances_to_slot, start_time, external_ref, status, result";
 
 export interface TournamentRow {
@@ -65,20 +66,34 @@ export async function createTournament(
 
 export interface FieldTeamInput {
   name: string; seed: number; region: string;
-  espn_id?: string | null; short_name?: string | null; logo_url?: string | null; color?: string | null; play_in_slot?: string | null;
+  espn_id?: string | null; short_name?: string | null; logo_url?: string | null; color?: string | null; record?: string | null; play_in_slot?: string | null;
 }
 
-/** Replace the field (only before the structure is generated). */
-export async function setTournamentField(admin: SupabaseClient, tournamentId: string, teams: FieldTeamInput[]): Promise<void> {
+/**
+ * Replace the field (only before the structure is generated). When `regionOrder` is given
+ * (the bracket's top-to-bottom region arrangement, e.g. from ESPN), it's stored on the
+ * tournament's config so the Final Four pairing survives into generateStructure — this is
+ * the one piece that can't be guessed from the field alone.
+ */
+export async function setTournamentField(
+  admin: SupabaseClient, tournamentId: string, teams: FieldTeamInput[], regionOrder?: string[],
+): Promise<void> {
   await admin.from("v2_tournament_teams").delete().eq("tournament_id", tournamentId);
-  if (!teams.length) return;
-  const { error } = await admin.from("v2_tournament_teams").insert(
-    teams.map((t) => ({
-      tournament_id: tournamentId, name: t.name, seed: t.seed, region: t.region,
-      espn_id: t.espn_id ?? null, short_name: t.short_name ?? null, logo_url: t.logo_url ?? null, color: t.color ?? null, play_in_slot: t.play_in_slot ?? null,
-    })),
-  );
-  if (error) throw new Error(error.message);
+  if (teams.length) {
+    const { error } = await admin.from("v2_tournament_teams").insert(
+      teams.map((t) => ({
+        tournament_id: tournamentId, name: t.name, seed: t.seed, region: t.region,
+        espn_id: t.espn_id ?? null, short_name: t.short_name ?? null, logo_url: t.logo_url ?? null,
+        color: t.color ?? null, record: t.record ?? null, play_in_slot: t.play_in_slot ?? null,
+      })),
+    );
+    if (error) throw new Error(error.message);
+  }
+  if (regionOrder && regionOrder.length) {
+    const { data: t } = await admin.from("v2_tournaments").select("config").eq("id", tournamentId).maybeSingle();
+    const config = { ...((t?.config as Record<string, unknown>) ?? {}), regions: regionOrder };
+    await admin.from("v2_tournaments").update({ config, updated_at: new Date().toISOString() }).eq("id", tournamentId);
+  }
 }
 
 /**
@@ -87,22 +102,64 @@ export async function setTournamentField(admin: SupabaseClient, tournamentId: st
  * slot. Locks the tournament. Requires exactly 4 regions (March Madness shape).
  */
 export async function generateStructure(admin: SupabaseClient, tournamentId: string): Promise<{ games: number }> {
-  const { data: teamRows } = await admin.from("v2_tournament_teams").select("id, seed, region").eq("tournament_id", tournamentId).order("region").order("seed");
-  const teams = (teamRows ?? []) as { id: string; seed: number; region: string | null }[];
-  const regions = [...new Set(teams.map((t) => t.region).filter((r): r is string => !!r))];
-  if (regions.length !== 4) throw new Error(`A standard bracket needs exactly 4 regions (found ${regions.length}).`);
+  const [{ data: teamRows }, { data: tRow }] = await Promise.all([
+    admin.from("v2_tournament_teams").select("id, seed, region, play_in_slot").eq("tournament_id", tournamentId).order("region").order("seed"),
+    admin.from("v2_tournaments").select("config").eq("id", tournamentId).maybeSingle(),
+  ]);
+  const teams = (teamRows ?? []) as { id: string; seed: number; region: string | null; play_in_slot: string | null }[];
+  const fieldRegions = new Set(teams.map((t) => t.region).filter((r): r is string => !!r));
+  if (fieldRegions.size !== 4) throw new Error(`A standard bracket needs exactly 4 regions (found ${fieldRegions.size}).`);
 
-  const teamIdByRegionSeed = new Map(teams.map((t) => [`${t.region}:${t.seed}`, t.id]));
-  const gen = generateBracket(regions);
+  // Honor the stored bracket arrangement (config.regions, e.g. from ESPN) so the Final
+  // Four pairing is correct. Only trust it when it exactly covers the field's regions;
+  // otherwise fall back to the field's own order.
+  const stored = (tRow?.config as { regions?: unknown } | null)?.regions;
+  const storedOrder = Array.isArray(stored) ? (stored.filter((r): r is string => typeof r === "string")) : [];
+  const regions = storedOrder.length === 4 && storedOrder.every((r) => fieldRegions.has(r))
+    ? storedOrder
+    : [...fieldRegions];
+
+  // First Four: a (region, seed) with two+ teams is a play-in. Its R1 side is left empty
+  // (filled by the winner), and we assign the contestants to a round-0 game by id since
+  // they share a seed. A regular seed maps straight to its single team for R1.
+  const bySeedKey = new Map<string, typeof teams>();
+  for (const t of teams) {
+    const key = `${t.region}:${t.seed}`;
+    (bySeedKey.get(key) ?? bySeedKey.set(key, []).get(key)!).push(t);
+  }
+  const playIns: PlayInSlot[] = [];
+  const playInTeamIdsBySlot = new Map<string, string[]>();
+  const teamIdByRegionSeed = new Map<string, string>();
+  for (const [key, group] of bySeedKey) {
+    const isPlayIn = group.length > 1 || group.some((t) => t.play_in_slot);
+    const region = group[0].region, seed = group[0].seed;
+    const pos = region ? round1Position(seed) : null;
+    if (isPlayIn && region && pos) {
+      playIns.push({ region, gameNumber: pos.gameNumber, side: pos.side });
+      playInTeamIdsBySlot.set(firstFourSlot(region, pos.gameNumber), group.map((t) => t.id));
+    } else {
+      teamIdByRegionSeed.set(key, group[0].id); // single team → its R1 slot
+    }
+  }
+  const gen = generateBracket(regions, playIns);
 
   // Wipe any prior structure, then insert fresh.
   await admin.from("v2_tournament_games").delete().eq("tournament_id", tournamentId);
-  const rows = gen.map((g) => ({
-    tournament_id: tournamentId, slot: g.slot, round: g.round, region: g.region, game_number: g.game_number,
-    team_a_id: g.team_a_seed != null && g.region ? teamIdByRegionSeed.get(`${g.region}:${g.team_a_seed}`) ?? null : null,
-    team_b_id: g.team_b_seed != null && g.region ? teamIdByRegionSeed.get(`${g.region}:${g.team_b_seed}`) ?? null : null,
-    advances_to_slot: g.advances_to_slot,
-  }));
+  const rows = gen.map((g) => {
+    if (g.round === 0) {
+      const ids = playInTeamIdsBySlot.get(g.slot) ?? [];
+      return {
+        tournament_id: tournamentId, slot: g.slot, round: g.round, region: g.region, game_number: g.game_number,
+        team_a_id: ids[0] ?? null, team_b_id: ids[1] ?? null, advances_to_slot: g.advances_to_slot,
+      };
+    }
+    return {
+      tournament_id: tournamentId, slot: g.slot, round: g.round, region: g.region, game_number: g.game_number,
+      team_a_id: g.team_a_seed != null && g.region ? teamIdByRegionSeed.get(`${g.region}:${g.team_a_seed}`) ?? null : null,
+      team_b_id: g.team_b_seed != null && g.region ? teamIdByRegionSeed.get(`${g.region}:${g.team_b_seed}`) ?? null : null,
+      advances_to_slot: g.advances_to_slot,
+    };
+  });
   const { data: inserted, error } = await admin.from("v2_tournament_games").insert(rows).select("id, slot");
   if (error) throw new Error(error.message);
 
@@ -111,7 +168,8 @@ export async function generateStructure(admin: SupabaseClient, tournamentId: str
   const links = gen.filter((g) => g.next_slot).map((g) => ({ id: idBySlot.get(g.slot)!, next_game_id: idBySlot.get(g.next_slot!)! }));
   for (const l of links) await admin.from("v2_tournament_games").update({ next_game_id: l.next_game_id }).eq("id", l.id);
 
-  await admin.from("v2_tournaments").update({ status: "locked", config: { regions }, updated_at: new Date().toISOString() }).eq("id", tournamentId);
+  const mergedConfig = { ...((tRow?.config as Record<string, unknown>) ?? {}), regions };
+  await admin.from("v2_tournaments").update({ status: "locked", config: mergedConfig, updated_at: new Date().toISOString() }).eq("id", tournamentId);
   return { games: rows.length };
 }
 

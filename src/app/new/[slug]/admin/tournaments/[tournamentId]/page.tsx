@@ -22,7 +22,6 @@ export default async function TournamentDetailPage({ params }: { params: Promise
       slug={slug}
       tournament={src.tournament}
       teams={src.teams}
-      games={src.games}
       champion={src.champion()}
       runnerUp={src.runnerUp()}
       canImportEspn={supportsFieldImport(src.tournament.sport)}

@@ -14,12 +14,105 @@ export interface AuctionConfig {
   firstParticipantId: string | null; // optional pinned first picker
   complete: boolean;
   tournamentId: string | null; // entity catalog = this tournament's field
+  onBlockEntityId: string | null; // the lot currently up for bids (live recorder + board)
+  // Payouts — admin-entered prize amounts (bromadness model). The system resolves who won
+  // each: champion/runner-up owner from the bracket, points places from the standings.
+  payoutChampionCents: number;
+  payoutRunnerUpCents: number;
+  payoutPointsCents: number[];  // [1st place, 2nd, 3rd, …]
 }
 
 export interface AuctionOwnership {
   userId: string;
   entityId: string;
   bidCents: number; // 0 = bonus/free
+}
+
+// ----- Capacity + auto-pairing (free team bundles) -------------------------------------
+//
+// The field is 64 teams (after the First Four resolves). Each player buys K teams, where
+// K = floor(64 / players) so the field divides as evenly as possible and K is never below
+// 3 (so the max is floor(64/3) = 21 players). The B = 64 − K·players leftover teams are
+// bundled onto other lots as free "throw-ins": a weak bottom seed rides along with a
+// host in its own region, so no hopeless team is a standalone lot. The buyer bids on the
+// host and the throw-in comes free (a $0 row), counting as one of their K.
+
+/** Minimum teams per player — sets the participant cap at floor(teamCount / 3). */
+export const MIN_TEAMS_PER_PLAYER = 3;
+
+/** Throw-in seed + the host seed it rides with, weakest tier first. Both are in the same
+ *  region; throw-in seeds (13–16) and host seeds (9–12) never overlap. */
+export const BUNDLE_TIERS: { throwIn: number; host: number }[] = [
+  { throwIn: 16, host: 12 }, { throwIn: 15, host: 11 }, { throwIn: 14, host: 10 }, { throwIn: 13, host: 9 },
+];
+
+export interface CapacityTeam { id: string; seed: number; region: string | null; record: string | null; isPlayIn: boolean }
+export interface AuctionBundle { hostId: string; throwInId: string }
+
+export interface AuctionCapacity {
+  teamCount: number;
+  participantCount: number;
+  teamsPerPlayer: number;   // K = floor(teamCount / participants), >= MIN when within cap
+  bundleCount: number;      // B = teamCount − K·participants
+  lotCount: number;         // biddable lots = teamCount − B = K·participants
+  maxParticipants: number;  // floor(teamCount / MIN_TEAMS_PER_PLAYER)
+  overCapacity: boolean;    // participants beyond the max (can't give everyone MIN teams)
+}
+
+/** Derive the auction's capacity math from the team + participant counts. */
+export function auctionCapacity(teamCount: number, participantCount: number): AuctionCapacity {
+  const maxParticipants = Math.floor(teamCount / MIN_TEAMS_PER_PLAYER);
+  const p = Math.max(0, participantCount);
+  const k = p > 0 ? Math.floor(teamCount / p) : 0;
+  const b = p > 0 ? teamCount - k * p : 0;
+  return { teamCount, participantCount: p, teamsPerPlayer: k, bundleCount: b, lotCount: k * p, maxParticipants, overCapacity: p > maxParticipants };
+}
+
+/** Wins from a "19-17" record string (the weakness tiebreak); 0 when unknown. */
+function winsOf(record: string | null): number {
+  const n = parseInt((record ?? "").split("-")[0], 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Same-seed teams ordered weakest first: First Four teams (the committee's weakest at a
+ *  seed line) lead, then fewest wins. */
+function weakestFirst(teams: CapacityTeam[]): CapacityTeam[] {
+  return [...teams].sort((a, b) => {
+    if (a.isPlayIn !== b.isPlayIn) return a.isPlayIn ? -1 : 1;
+    return winsOf(a.record) - winsOf(b.record);
+  });
+}
+
+/**
+ * Auto-pair the leftover teams into free-throw-in bundles for the given participant count.
+ * Fills each tier (16+12, 15+11, …) across all four regions, weakest region first, until
+ * B bundles exist. Returns host→throw-in pairs (the throw-in is the free rider). Expects a
+ * clean 64-team field (one team per region per seed); returns [] when no bundles are needed.
+ */
+export function auctionBundles(teams: CapacityTeam[], participantCount: number): AuctionBundle[] {
+  let remaining = auctionCapacity(teams.length, participantCount).bundleCount;
+  if (remaining <= 0) return [];
+
+  const byRegionSeed = new Map<string, CapacityTeam>();
+  const bySeed = new Map<number, CapacityTeam[]>();
+  for (const t of teams) {
+    if (t.region) byRegionSeed.set(`${t.region}:${t.seed}`, t);
+    (bySeed.get(t.seed) ?? bySeed.set(t.seed, []).get(t.seed)!).push(t);
+  }
+
+  const bundles: AuctionBundle[] = [];
+  for (const tier of BUNDLE_TIERS) {
+    if (remaining <= 0) break;
+    for (const ti of weakestFirst(bySeed.get(tier.throwIn) ?? [])) {
+      if (remaining <= 0) break;
+      if (!ti.region) continue;
+      const host = byRegionSeed.get(`${ti.region}:${tier.host}`);
+      if (!host) continue;
+      bundles.push({ hostId: host.id, throwInId: ti.id });
+      remaining -= 1;
+    }
+  }
+  return bundles;
 }
 
 /** Deterministic shuffle from a string seed (bromadness parity — same order every load). */
@@ -68,7 +161,8 @@ export function nextThrowers(
 ): { currentId: string | null; onDeckId: string | null } {
   const n = order.length;
   if (n === 0) return { currentId: null, onDeckId: null };
-  const totalAssigned = ownership.length;
+  // Rotation advances per LOT thrown (a paid bid); free $0 throw-ins/bonus don't count.
+  const totalAssigned = ownership.filter((o) => o.bidCents > 0).length;
   const done = (id: string) => isDone(ownership, id, teamsPerPlayer);
 
   let base = totalAssigned % n;
@@ -108,5 +202,9 @@ export function auctionConfigOf(config: Record<string, unknown> | null | undefin
     firstParticipantId: typeof c.first_participant_id === "string" ? c.first_participant_id : null,
     complete: c.auction_complete === true,
     tournamentId: typeof c.tournament_id === "string" ? c.tournament_id : null,
+    onBlockEntityId: typeof c.on_block_entity_id === "string" ? c.on_block_entity_id : null,
+    payoutChampionCents: Number(c.payout_champion_cents) || 0,
+    payoutRunnerUpCents: Number(c.payout_runner_up_cents) || 0,
+    payoutPointsCents: Array.isArray(c.payout_points_cents) ? (c.payout_points_cents as unknown[]).map((n) => Number(n) || 0) : [],
   };
 }

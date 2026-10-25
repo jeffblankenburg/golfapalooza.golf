@@ -36,7 +36,13 @@ export async function POST(request: Request, { params }: { params: Params }) {
   if (body.action === "assign") {
     if (!body.entityId || !body.userId) return NextResponse.json({ error: "entityId + userId required" }, { status: 400 });
     const r = await assignTeam(g.admin, contestId, { entityId: body.entityId as string, userId: body.userId as string, bidCents: Number(body.bidCents) || 0, assignedBy: g.userId });
-    return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: r.error }, { status: r.status });
+    if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+    // Clear the block if we just sold the lot that was up.
+    if (g.config.on_block_entity_id) {
+      const cfg = { ...g.config }; delete cfg.on_block_entity_id;
+      await g.admin.from("v2_contests").update({ config: cfg, updated_at: new Date().toISOString() }).eq("id", contestId);
+    }
+    return NextResponse.json({ ok: true });
   }
   if (body.action === "unassign") {
     if (!body.entityId) return NextResponse.json({ error: "entityId required" }, { status: 400 });
@@ -52,6 +58,16 @@ export async function POST(request: Request, { params }: { params: Params }) {
     if ("bid_increment_cents" in body) cfg.bid_increment_cents = Math.max(0, Math.round(Number(body.bid_increment_cents) || 0)) || undefined;
     if ("teams_per_player" in body) cfg.teams_per_player = Math.max(1, Math.round(Number(body.teams_per_player) || 1));
     if ("first_participant_id" in body) cfg.first_participant_id = (body.first_participant_id as string) || undefined;
+    if ("payout_champion_cents" in body) cfg.payout_champion_cents = Math.max(0, Math.round(Number(body.payout_champion_cents) || 0)) || undefined;
+    if ("payout_runner_up_cents" in body) cfg.payout_runner_up_cents = Math.max(0, Math.round(Number(body.payout_runner_up_cents) || 0)) || undefined;
+    if ("payout_points_cents" in body && Array.isArray(body.payout_points_cents)) {
+      const arr = (body.payout_points_cents as unknown[]).map((n) => Math.max(0, Math.round(Number(n) || 0)));
+      cfg.payout_points_cents = arr.some((n) => n > 0) ? arr : undefined;
+    }
+  } else if (body.action === "set_block") {
+    cfg.on_block_entity_id = (body.entityId as string) || undefined;
+  } else if (body.action === "clear_block") {
+    cfg.on_block_entity_id = undefined;
   } else if (body.action === "shuffle") {
     cfg.order_seed = randomUUID();
   } else if (body.action === "complete") {

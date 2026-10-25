@@ -5,10 +5,12 @@ import { v2Now } from "@/lib/v2/simulator";
 import { resolvePayouts } from "@/lib/v2/contests/squares";
 import { buildGameAllocations } from "@/lib/v2/contests/squares-alloc";
 import { loadPickemBoard } from "@/lib/v2/contests/pickem-server";
+import { loadAuction } from "@/lib/v2/contests/auction-server";
 import { pickName } from "@/lib/v2/profile";
 import SquaresPlay, { type PlayGame } from "./SquaresPlay";
 // Same member component the event lane uses — mounted here with the group pick URL.
 import PickemContent from "../../pickem/PickemContent";
+import AuctionBoard from "@/app/new/_components/AuctionBoard";
 import styles from "@/app/new/new.module.css";
 
 /** Member-facing contest detail — branches by contest_type (Squares board, Pick'em slate). */
@@ -45,6 +47,17 @@ export default async function ContestDetailPage({ params }: { params: Promise<{ 
           meId={ctx.userId}
           totalGames={board.totalGames}
         />
+      </div>
+    );
+  }
+
+  // Auction — read-only member board (lots, budgets, points, the live lot on the block).
+  if (contest.contest_type === "auction") {
+    const state = await loadAuction(supabase, contestId);
+    if (!state) notFound();
+    return (
+      <div className={`${styles.page} ${styles.orgPage}`}>
+        <AuctionBoard state={state} viewerId={ctx.userId} />
       </div>
     );
   }

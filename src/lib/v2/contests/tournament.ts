@@ -18,6 +18,7 @@ export interface TournamentTeam {
   region: string | null;
   logo_url: string | null;
   color: string | null;
+  record: string | null;
   eliminated: boolean;
   play_in_slot: string | null;
 }
@@ -63,16 +64,35 @@ export const ROUND1_MATCHUPS: [number, number][] = [
   [1, 16], [8, 9], [5, 12], [4, 13], [6, 11], [3, 14], [7, 10], [2, 15],
 ];
 
+/** Where a seed sits in Round 1: its game (1–8) and which side (a/b). Play-in seeds
+ *  (11, 16, …) resolve to the 'b' side; the committee always pairs the contested seed
+ *  against the higher-ranked side. Returns null for a seed that isn't in the bracket. */
+export function round1Position(seed: number): { gameNumber: number; side: "a" | "b" } | null {
+  for (let i = 0; i < ROUND1_MATCHUPS.length; i++) {
+    const [a, b] = ROUND1_MATCHUPS[i];
+    if (a === seed) return { gameNumber: i + 1, side: "a" };
+    if (b === seed) return { gameNumber: i + 1, side: "b" };
+  }
+  return null;
+}
+
+/** A First Four (play-in) game: two same-seed teams in `region` competing for one R1
+ *  slot. `gameNumber`/`side` identify the R1 game + side the winner fills. */
+export interface PlayInSlot { region: string; gameNumber: number; side: "a" | "b" }
+
 const regionalSlot = (round: number, region: string, gameNum: number) => `r${round}:${region}:${gameNum}`;
+export const firstFourSlot = (region: string, gameNum: number) => `r0:${region}:${gameNum}`;
 const FF1 = "r5:ff1", FF2 = "r5:ff2", FINAL = "r6:final";
 
 /**
  * Generate the full single-elim structure for a 4-region × 16-seed bracket (March
  * Madness shape). `regions` is the ordered list of 4 region names (order sets the Final
- * Four pairing: regions 1&2 meet in FF game 1, 3&4 in FF game 2). Returns all 63 games
+ * Four pairing: regions 1&2 meet in FF game 1, 3&4 in FF game 2). `playIns` adds round-0
+ * First Four games: for each, the fed R1 side is left empty (team assigned by id, since
+ * both play-in teams share a seed) and the winner advances into it. Returns all games
  * with deterministic slots + their feeder links; R1 games carry the seed pairing.
  */
-export function generateBracket(regions: string[]): GeneratedGame[] {
+export function generateBracket(regions: string[], playIns: PlayInSlot[] = []): GeneratedGame[] {
   if (regions.length !== 4) throw new Error("generateBracket expects exactly 4 regions");
   const games: GeneratedGame[] = [];
   const g = (slot: string, round: number, region: string | null, gameNumber: number, aSeed: number | null, bSeed: number | null): GeneratedGame =>
@@ -87,6 +107,16 @@ export function generateBracket(regions: string[]): GeneratedGame[] {
   }
   // Final Four + Championship.
   games.push(g(FF1, 5, null, 1, null, null), g(FF2, 5, null, 2, null, null), g(FINAL, 6, null, 1, null, null));
+
+  // First Four (round 0): one game per contested slot. The R1 side it feeds is cleared
+  // (its two teams share a seed, so they're assigned by id downstream) and the play-in
+  // winner advances into that side.
+  const bySlotEarly = new Map(games.map((x) => [x.slot, x]));
+  for (const p of playIns) {
+    const r1 = bySlotEarly.get(regionalSlot(1, p.region, p.gameNumber));
+    if (r1) { if (p.side === "a") r1.team_a_seed = null; else r1.team_b_seed = null; }
+    games.push(g(firstFourSlot(p.region, p.gameNumber), 0, p.region, p.gameNumber, null, null));
+  }
 
   // Wire feeders: each game's winner advances into next_slot's 'a' or 'b'.
   const bySlot = new Map(games.map((x) => [x.slot, x]));
@@ -108,6 +138,8 @@ export function generateBracket(regions: string[]): GeneratedGame[] {
   link(regionalSlot(4, regions[3], 1), FF2, "b");
   link(FF1, FINAL, "a");
   link(FF2, FINAL, "b");
+  // First Four winners advance into their R1 slot.
+  for (const p of playIns) link(firstFourSlot(p.region, p.gameNumber), regionalSlot(1, p.region, p.gameNumber), p.side);
   return games;
 }
 

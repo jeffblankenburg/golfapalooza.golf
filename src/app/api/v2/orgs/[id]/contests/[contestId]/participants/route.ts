@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
 import { loadContestRoster, addContestParticipants, removeContestParticipants } from "@/lib/v2/contests/enrollment";
+import { auctionMaxParticipants } from "@/lib/v2/contests/auction-server";
 
 type Params = Promise<{ id: string; contestId: string }>;
 
@@ -17,9 +18,9 @@ async function gate(request: Request, orgId: string, contestId: string) {
   const admin = v2AdminClient();
   if (!(await isOrgAdmin(admin, userId, orgId))) return { error: NextResponse.json({ error: "Admins only" }, { status: 403 }) };
   const { data: contest } = await admin
-    .from("v2_contests").select("id, org_id, event_id").eq("id", contestId).eq("org_id", orgId).maybeSingle();
+    .from("v2_contests").select("id, org_id, event_id, contest_type").eq("id", contestId).eq("org_id", orgId).maybeSingle();
   if (!contest) return { error: NextResponse.json({ error: "Contest not found" }, { status: 404 }) };
-  return { admin, userId, contest: contest as { id: string; org_id: string; event_id: string | null } };
+  return { admin, userId, contest: contest as { id: string; org_id: string; event_id: string | null; contest_type: string } };
 }
 
 export async function GET(request: Request, { params }: { params: Params }) {
@@ -44,6 +45,21 @@ export async function POST(request: Request, { params }: { params: Params }) {
     .from("v2_memberships").select("user_id").eq("org_id", orgId).eq("status", "active").is("archived_at", null).in("user_id", requested);
   const valid = (members || []).map((m) => m.user_id as string);
   if (valid.length === 0) return NextResponse.json({ error: "No valid members" }, { status: 400 });
+
+  // Auctions are capped at floor(field / 3) players so everyone can get their minimum teams.
+  if (g.contest.contest_type === "auction") {
+    const max = await auctionMaxParticipants(g.admin, contestId);
+    if (max > 0) {
+      const [{ count: current }, { data: already }] = await Promise.all([
+        g.admin.from("v2_contest_participants").select("user_id", { count: "exact", head: true }).eq("contest_id", contestId),
+        g.admin.from("v2_contest_participants").select("user_id").eq("contest_id", contestId).in("user_id", valid),
+      ]);
+      const net = valid.length - (already?.length ?? 0); // only members not already in count toward the cap
+      if ((current ?? 0) + net > max) {
+        return NextResponse.json({ error: `This auction is capped at ${max} players (64 teams ÷ 3). Remove someone first.` }, { status: 400 });
+      }
+    }
+  }
 
   try {
     const added = await addContestParticipants(g.admin, contestId, valid);

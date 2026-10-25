@@ -6,7 +6,7 @@ import { subscribeToAuction } from "@/lib/v2/realtime/auction-channel";
 import { upcomingThrowers } from "@/lib/v2/contests/auction";
 import type { AuctionState } from "@/lib/v2/contests/auction-server";
 import styles from "@/app/new/new.module.css";
-import AuctionPlayerCard from "./AuctionPlayerCard";
+import AuctionPlayerCard, { auctionCardTier } from "./AuctionPlayerCard";
 
 const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { maximumFractionDigits: cents % 100 === 0 ? 0 : 2 })}`;
 
@@ -46,6 +46,7 @@ function ProjectorBoard({ state }: { state: AuctionState }) {
   const ordered = complete
     ? [...participants].sort((a, b) => b.points - a.points || a.spentCents - b.spentCents)
     : participants;
+  const grid = auctionCardTier(participants.length);
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 70, background: "var(--bg, #f6f7f5)", color: "var(--ink)", display: "flex", overflow: "hidden" }}>
@@ -112,11 +113,11 @@ function ProjectorBoard({ state }: { state: AuctionState }) {
           </div>
         )}
 
-        {/* Participant grid — anchored to the bottom, compact enough to fit everyone */}
+        {/* Participant grid — anchored to the bottom; cells scale to the field size */}
         <div style={{ flexShrink: 0, maxHeight: "62%", overflowY: "auto", padding: "8px 20px 16px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(196px, 1fr))", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${grid.cardMin}px, 1fr))`, gap: 14 }}>
             {ordered.map((p, i) => (
-              <AuctionPlayerCard key={p.userId} p={p} teamsPerPlayer={teamsPerPlayer} highlight={!complete && p.userId === currentId}
+              <AuctionPlayerCard key={p.userId} p={p} teamsPerPlayer={teamsPerPlayer} tier={grid.tier} highlight={!complete && p.userId === currentId}
                 rank={complete ? i + 1 : null} champ={p.userId === results.championOwnerId} showPoints={complete} />
             ))}
           </div>

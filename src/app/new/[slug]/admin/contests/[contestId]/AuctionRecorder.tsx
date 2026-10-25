@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import styles from "@/app/new/new.module.css";
 import { subscribeToAuction } from "@/lib/v2/realtime/auction-channel";
 import type { AuctionState, AuctionEntity, AuctionParticipant } from "@/lib/v2/contests/auction-server";
-import AuctionPlayerCard from "@/app/new/_components/AuctionPlayerCard";
+import AuctionPlayerCard, { auctionCardTier } from "@/app/new/_components/AuctionPlayerCard";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
 
 const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { maximumFractionDigits: cents % 100 === 0 ? 0 : 2 })}`;
@@ -58,6 +58,7 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
 
   const nameOf = (uid: string | null) => participants.find((p) => p.userId === uid)?.name ?? "";
   const roster: AuctionParticipant[] = [...participants].sort(byName); // columns + owner dropdown, alphabetical
+  const grid = auctionCardTier(roster.length);
   const available = [...entities].filter((e) => !e.ownerId && !e.eliminated).sort(byName);
   const lot = onBlock; // the lot on the block is the single source of truth (pushes to the board)
 
@@ -107,20 +108,19 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
       <h1 style={{ fontSize: "1.45rem", fontWeight: 800, margin: "6px 0 0" }}>{state.contest.name}, live</h1>
 
       {!config.complete && currentId && (
-        <div style={{ padding: "10px 14px", borderRadius: 10, background: "var(--brand-tint, #e8f2ec)", marginTop: 10, display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
-            <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
-              <span style={{ fontSize: "0.66rem", textTransform: "uppercase", letterSpacing: 0.3, color: "var(--ink-soft)", fontWeight: 800, width: 74, flexShrink: 0 }}>Nominating</span>
-              <strong style={{ color: "var(--brand)", fontSize: "1.05rem" }}>{nameOf(currentId)}</strong>
-            </div>
-            {onDeckId && (
-              <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
-                <span style={{ fontSize: "0.66rem", textTransform: "uppercase", letterSpacing: 0.3, color: "var(--ink-soft)", fontWeight: 800, width: 74, flexShrink: 0 }}>On deck</span>
-                <span style={{ fontSize: "0.95rem" }}>{nameOf(onDeckId)}</span>
-              </div>
-            )}
+        <div style={{ padding: "10px 14px", borderRadius: 10, background: "var(--brand-tint, #e8f2ec)", marginTop: 10, display: "flex", flexDirection: "column", gap: 3 }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+            <span style={{ fontSize: "0.66rem", textTransform: "uppercase", letterSpacing: 0.3, color: "var(--ink-soft)", fontWeight: 800, width: 74, flexShrink: 0 }}>Nominating</span>
+            <strong style={{ color: "var(--brand)", fontSize: "1.05rem" }}>{nameOf(currentId)}</strong>
+            <button type="button" disabled={busy} onClick={() => setConfirmSkip(true)}
+              style={{ background: "none", border: "none", color: "var(--ink-soft)", textDecoration: "underline", fontSize: "0.78rem", cursor: "pointer", padding: 0 }}>skip</button>
           </div>
-          <button type="button" className={styles.createBtnGhost} style={{ flexShrink: 0, padding: "6px 12px", fontSize: "0.82rem" }} disabled={busy} onClick={() => setConfirmSkip(true)}>Skip</button>
+          {onDeckId && (
+            <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+              <span style={{ fontSize: "0.66rem", textTransform: "uppercase", letterSpacing: 0.3, color: "var(--ink-soft)", fontWeight: 800, width: 74, flexShrink: 0 }}>On deck</span>
+              <span style={{ fontSize: "0.95rem" }}>{nameOf(onDeckId)}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -168,9 +168,9 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
       )}
 
       {/* Buyer cards (alphabetical) — the same card the projector board shows */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10, marginTop: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${grid.cardMin}px, 1fr))`, gap: 14, marginTop: 16 }}>
         {roster.map((p) => (
-          <AuctionPlayerCard key={p.userId} p={p} teamsPerPlayer={config.teamsPerPlayer} highlight={!config.complete && p.userId === currentId}
+          <AuctionPlayerCard key={p.userId} p={p} teamsPerPlayer={config.teamsPerPlayer} tier={grid.tier} highlight={!config.complete && p.userId === currentId}
             showPoints={config.complete} busy={busy} onUndo={config.complete ? undefined : (entityId) => void act({ action: "unassign", entityId })} />
         ))}
       </div>

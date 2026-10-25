@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import ContestCard, { cardStyles } from "@/app/new/_components/contest-card/ContestCard";
 import { PickemPreview, SquaresPreview } from "@/app/new/_components/contest-card/previews";
 import type { PickemGamePreview } from "@/lib/v2/contests/pickem-preview";
 import type { SquaresContestRow } from "@/app/new/[slug]/admin/contests/SquaresEditor";
 import ContestSettings, { type CourseOption } from "./[contestId]/ContestSettings";
+import AuctionSettingsModal from "@/app/new/_components/AuctionSettingsModal";
 import styles from "@/app/new/new.module.css";
 
 /** A nested side game shown (read-only) inside a parent scramble's accordion —
@@ -67,6 +69,7 @@ export default function EventContestsList({
   days: DayGroup[];
   eventWide: EventCard[];
 }) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [gearFor, setGearFor] = useState<string | null>(null);
 
@@ -131,30 +134,37 @@ export default function EventContestsList({
           )}
         </ContestCard>
 
-        {/* Controlled gear modal for this card (quick settings). */}
-        <ContestSettings
-          slug={slug}
-          orgId={orgId}
-          eventId={eventId}
-          contestId={c.id}
-          name={c.name}
-          contestDate={c.gear.contestDate}
-          startTime={c.gear.startTime}
-          courseId={c.gear.courseId}
-          teeId={c.gear.teeId}
-          courseName={c.gear.courseName}
-          entryAmountCents={c.gear.entryAmountCents}
-          courses={courses}
-          config={c.gear.config}
-          showCourse={c.gear.showCourse}
-          showLockMode={c.gear.showLockMode}
-          initialLockMode={c.gear.lockMode}
-          showVisibility={c.type === "auction"}
-          initialStatus={c.gear.status}
-          showTrigger={false}
-          controlledOpen={gearFor === c.id}
-          onControlledClose={() => setGearFor(null)}
-        />
+        {/* Controlled gear modal for this card. Auctions use the shared auction gear
+            (all its setup config); everything else uses the generic contest settings. */}
+        {c.type === "auction" ? (
+          gearFor === c.id && (
+            <AuctionSettingsModal slug={slug} orgId={orgId} contestId={c.id} onClose={() => { setGearFor(null); router.refresh(); }} onSaved={() => router.refresh()} />
+          )
+        ) : (
+          <ContestSettings
+            slug={slug}
+            orgId={orgId}
+            eventId={eventId}
+            contestId={c.id}
+            name={c.name}
+            contestDate={c.gear.contestDate}
+            startTime={c.gear.startTime}
+            courseId={c.gear.courseId}
+            teeId={c.gear.teeId}
+            courseName={c.gear.courseName}
+            entryAmountCents={c.gear.entryAmountCents}
+            courses={courses}
+            config={c.gear.config}
+            showCourse={c.gear.showCourse}
+            showLockMode={c.gear.showLockMode}
+            initialLockMode={c.gear.lockMode}
+            showVisibility={false}
+            initialStatus={c.gear.status}
+            showTrigger={false}
+            controlledOpen={gearFor === c.id}
+            onControlledClose={() => setGearFor(null)}
+          />
+        )}
       </div>
     );
   }

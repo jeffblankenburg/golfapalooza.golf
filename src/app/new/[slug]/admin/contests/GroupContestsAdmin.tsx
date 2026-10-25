@@ -6,6 +6,7 @@ import Modal from "@/app/new/_components/Modal";
 import styles from "./SquaresAdmin.module.css";
 import SquaresEditor, { money, isoToLocal, localToISO, type SquaresContestRow } from "./SquaresEditor";
 import ContestCard, { ContestTypeIcon } from "@/app/new/_components/contest-card/ContestCard";
+import AuctionSettingsModal from "@/app/new/_components/AuctionSettingsModal";
 import { PickemPreview, SquaresPreview } from "@/app/new/_components/contest-card/previews";
 import { pickName, type NameMode } from "@/lib/v2/profile";
 import { computePickemPayouts, type PayoutSplit } from "@/lib/v2/contests/pickem";
@@ -214,56 +215,15 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
       )}
 
       {auctionSettingsFor && (
-        <AuctionQuickSettings
+        <AuctionSettingsModal
+          slug={slug}
           orgId={orgId}
-          item={auctionSettingsFor}
-          onClose={() => setAuctionSettingsFor(null)}
-          onSaved={() => { setAuctionSettingsFor(null); router.refresh(); }}
+          contestId={auctionSettingsFor.id}
+          onClose={() => { setAuctionSettingsFor(null); router.refresh(); }}
+          onSaved={() => router.refresh()}
         />
       )}
     </div>
-  );
-}
-
-/** Quick settings for an Auction — name + member visibility. The tournament binding,
- *  buy-in, salary cap, prizes, and the draft itself live on the manage page. */
-function AuctionQuickSettings({ orgId, item, onClose, onSaved }: { orgId: string; item: AuctionItem; onClose: () => void; onSaved: () => void }) {
-  const base = `/api/v2/orgs/${orgId}/contests/${item.id}`;
-  const [name, setName] = useState(item.name);
-  const [status, setStatus] = useState(item.status);
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  async function save() {
-    const n = name.trim();
-    if (!n || saving) return;
-    setSaving(true); setErr(null);
-    const res = await fetch(base, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: n, status }) });
-    if (!res.ok) { setErr((await res.json().catch(() => ({}))).error || "Could not save"); setSaving(false); return; }
-    onSaved();
-  }
-
-  return (
-    <Modal open title="Auction settings" onClose={onClose}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <label>
-          <span style={QS_LABEL}>Name</span>
-          <input className={styles.input} style={{ width: "100%" }} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
-        </label>
-        <label>
-          <span style={QS_LABEL}>Status</span>
-          <select className={styles.selectInput} value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="draft">Draft (hidden from members)</option>
-            <option value="active">Open (shown on the home page)</option>
-            <option value="final">Final (closed)</option>
-          </select>
-        </label>
-        {err && <p className={styles.err} style={{ margin: 0 }}>{err}</p>}
-        <button type="button" className={styles.create} onClick={() => void save()} disabled={saving || !name.trim()}>
-          {saving ? "Saving…" : "Save"}
-        </button>
-      </div>
-    </Modal>
   );
 }
 

@@ -7,38 +7,25 @@ import styles from "@/app/new/new.module.css";
 import ContestParticipants from "@/components/v2/contests/ContestParticipants";
 import ContestEntryPaid from "./ContestEntryPaid";
 import { ContestTypeIcon } from "@/app/new/_components/contest-card/ContestCard";
-import { MIN_TEAMS_PER_PLAYER, SCORING_MODES, AUCTION_PAYOUT_SLOTS } from "@/lib/v2/contests/auction";
+import { MIN_TEAMS_PER_PLAYER } from "@/lib/v2/contests/auction";
 import { subscribeToAuction } from "@/lib/v2/realtime/auction-channel";
-import PayoutSplitsEditor from "../../events/[eventId]/contests/[contestId]/PayoutSplitsEditor";
-import type { PayoutSplit } from "@/lib/v2/contests/payouts";
+import AuctionSettingsModal from "@/app/new/_components/AuctionSettingsModal";
 import AuctionPayouts from "./AuctionPayouts";
 import type { AuctionState, AuctionPayouts as AuctionPayoutsData } from "@/lib/v2/contests/auction-server";
 
 const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { maximumFractionDigits: cents % 100 === 0 ? 0 : 2 })}`;
 const LABEL = { display: "block", fontSize: "0.8125rem", fontWeight: 600, marginBottom: 4 } as const;
 
-/** A $-prefixed money input that reports whole cents on blur. */
-function MoneyField({ label, defaultDollars, disabled, onCents }: { label: string; defaultDollars: number; disabled: boolean; onCents: (cents: number) => void }) {
-  return (
-    <label><span style={LABEL}>{label}</span>
-      <span style={{ position: "relative", display: "block" }}>
-        <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--ink-soft)" }}>$</span>
-        <input className={styles.input} style={{ paddingLeft: 22 }} inputMode="decimal" defaultValue={String(defaultDollars)} disabled={disabled}
-          onBlur={(e) => onCents(Math.round((Number(e.target.value) || 0) * 100))} />
-      </span>
-    </label>
-  );
-}
-
 export default function AuctionManager({
-  slug, apiBase, state, tournaments, payouts, payoutSplits, backHref,
+  slug, apiBase, state, payouts, backHref,
 }: {
-  slug: string; apiBase: string; state: AuctionState; tournaments: { id: string; name: string }[]; payouts: AuctionPayoutsData | null; payoutSplits: PayoutSplit[]; backHref: string;
+  slug: string; apiBase: string; state: AuctionState; payouts: AuctionPayoutsData | null; backHref: string;
 }) {
   const router = useRouter();
   const { config, participants, entities, currentId, onDeckId, onBlock, capacity, fieldReady, bundlesFrozen } = state;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Recorder form.
   const [entityId, setEntityId] = useState("");
@@ -74,16 +61,6 @@ export default function AuctionManager({
   }
 
   const bundleCount = entities.filter((e) => e.bundledThrowIn).length;
-  // Payouts save to the shared payout_splits column via the generic contest PATCH, same
-  // as every other contest.
-  async function savePayoutSplits(splits: PayoutSplit[]) {
-    setErr(null);
-    try {
-      const res = await fetch(apiBase, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ payout_splits: splits }) });
-      if (!res.ok) setErr((await res.json().catch(() => ({}))).error || "Could not save payouts");
-      else router.refresh();
-    } catch { setErr("Something went wrong."); }
-  }
 
   return (
     <div className={styles.page}>
@@ -95,55 +72,21 @@ export default function AuctionManager({
       </div>
       <div className={styles.titleRow} style={{ justifyContent: "space-between", alignItems: "center", gap: 12 }}>
         <h1 className={styles.title} style={{ minWidth: 0 }}>{state.contest.name}</h1>
-        <Link href={`/new/${slug}/admin/contests/${state.contest.id}/board`} target="_blank" className={styles.linkAction} style={{ whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 4 }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="2" y="4" width="20" height="13" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
-          Board
-        </Link>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 14, whiteSpace: "nowrap" }}>
+          <button type="button" onClick={() => setSettingsOpen(true)} className={styles.linkAction} style={{ background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, padding: 0 }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+            Settings
+          </button>
+          <Link href={`/new/${slug}/admin/contests/${state.contest.id}/board`} target="_blank" className={styles.linkAction} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="2" y="4" width="20" height="13" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
+            Board
+          </Link>
+        </span>
       </div>
 
-      {/* Settings */}
-      <details style={{ marginTop: 14, border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }} open={!state.tournament}>
-        <summary style={{ padding: "12px 14px", cursor: "pointer", fontWeight: 700 }}>Settings</summary>
-        <div style={{ padding: "0 14px 14px", display: "flex", flexDirection: "column", gap: 12 }}>
-          <label>
-            <span style={LABEL}>Tournament (the team field)</span>
-            <select className={styles.selectInput} value={config.tournamentId ?? ""} disabled={busy} onChange={(e) => void act({ action: "settings", tournament_id: e.target.value })}>
-              <option value="">Choose a tournament…</option>
-              {tournaments.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-            <Link href={`/new/${slug}/admin/tournaments`} className={styles.linkAction} style={{ display: "inline-block", marginTop: 4 }}>Manage tournaments</Link>
-          </label>
-          {state.isEvent ? (
-            <p className={styles.roundFormHint} style={{ margin: 0 }}>
-              Buy-in {state.buyInCents > 0 ? money(state.buyInCents) : "(not set)"} — managed with the event&apos;s money (set it in the card gear; payments live in <Link href={`/new/${slug}/admin/events/${state.eventId}/financials`} className={styles.linkAction}>Financials</Link>).
-            </p>
-          ) : (
-            <div>
-              <MoneyField label="Buy-in (real money)" defaultDollars={config.entryCents / 100} disabled={busy} onCents={(c) => void act({ action: "settings", entry_cents: c })} />
-              <span style={{ display: "block", fontSize: "0.72rem", color: "var(--ink-soft)", marginTop: 4 }}>What each player pays to enter. Tracked under &ldquo;Who&apos;s paid their entry&rdquo; below.</span>
-            </div>
-          )}
-          <div className={styles.profileTwoCol}>
-            <MoneyField label="Salary cap (fake bidding $)" defaultDollars={config.salaryCapCents / 100} disabled={busy} onCents={(c) => void act({ action: "settings", salary_cap_cents: c })} />
-            <MoneyField label="Bid increment" defaultDollars={config.bidIncrementCents / 100} disabled={busy} onCents={(c) => void act({ action: "settings", bid_increment_cents: c })} />
-          </div>
-          <label>
-            <span style={LABEL}>Scoring <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(how a team win scores)</span></span>
-            <select className={styles.selectInput} value={config.scoringMode} disabled={busy} onChange={(e) => void act({ action: "settings", scoring_mode: e.target.value })}>
-              {SCORING_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-            </select>
-          </label>
-          <div>
-            <span style={LABEL}>Payouts <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(% of pot, flat $, or remainder)</span></span>
-            <PayoutSplitsEditor value={payoutSplits} labels={AUCTION_PAYOUT_SLOTS.map((s) => s.label)} onSave={(s) => void savePayoutSplits(s)} disabled={busy} />
-            {state.buyInCents > 0 && (
-              <p className={styles.roundFormHint} style={{ marginTop: 6 }}>
-                Pot: {money(state.buyInCents)} × {participants.length} = <strong style={{ color: "var(--brand)" }}>{money(state.buyInCents * participants.length)}</strong>
-              </p>
-            )}
-          </div>
-        </div>
-      </details>
+      {settingsOpen && (
+        <AuctionSettingsModal slug={slug} orgId={state.contest.orgId} contestId={state.contest.id} onClose={() => { setSettingsOpen(false); router.refresh(); }} onSaved={() => router.refresh()} />
+      )}
 
       {/* Participants */}
       <div style={{ marginTop: 14 }}>

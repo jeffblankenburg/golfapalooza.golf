@@ -69,9 +69,8 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
 
   // Auction manage view — the recorder + settings + participant enrollment.
   if (contest.contest_type === "auction") {
-    const [state, { data: tournaments }, payouts] = await Promise.all([
+    const [state, payouts] = await Promise.all([
       loadAuction(supabase, contestId),
-      supabase.from("v2_tournaments").select("id, name").eq("org_id", org.id).order("created_at", { ascending: false }),
       loadAuctionPayouts(supabase, contestId),
     ]);
     if (!state) notFound();
@@ -80,9 +79,7 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
         slug={slug}
         apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`}
         state={state}
-        tournaments={tournaments ?? []}
         payouts={payouts}
-        payoutSplits={(contest.payout_splits as PayoutSplit[] | null) ?? []}
         backHref={`/new/${slug}/admin/contests`}
       />
     );

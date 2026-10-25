@@ -85,9 +85,8 @@ export default async function ContestDetailPage({ params, searchParams }: { para
   // Auction reuses the scope-agnostic recorder + routes (keyed by contestId), so an
   // event-scoped auction drives off the same /contests/{id}/... base as a group one.
   if (contest.contest_type === "auction") {
-    const [state, { data: tournaments }, payouts] = await Promise.all([
+    const [state, payouts] = await Promise.all([
       loadAuction(admin, contestId),
-      admin.from("v2_tournaments").select("id, name").eq("org_id", org.id).order("created_at", { ascending: false }),
       loadAuctionPayouts(admin, contestId),
     ]);
     if (!state) redirect(`/new/${slug}/admin/events/${eventId}/contests`);
@@ -96,9 +95,7 @@ export default async function ContestDetailPage({ params, searchParams }: { para
         slug={slug}
         apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`}
         state={state}
-        tournaments={tournaments ?? []}
         payouts={payouts}
-        payoutSplits={(contest.payout_splits as PayoutSplit[] | null) ?? []}
         backHref={`/new/${slug}/admin/events/${eventId}/contests`}
       />
     );

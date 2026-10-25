@@ -3,8 +3,34 @@ import { randomUUID } from "crypto";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
 import { assignTeam, unassignTeam } from "@/lib/v2/contests/auction-server";
+import { loadBuyInCents } from "@/lib/v2/contests";
 
 type Params = Promise<{ id: string; contestId: string }>;
+
+/** Settings payload for the shared auction gear (name/status/config/payouts/buy-in +
+ *  the org's tournaments for the field dropdown). Admins only. */
+export async function GET(request: Request, { params }: { params: Params }) {
+  const { id: orgId, contestId } = await params;
+  const { userId } = await v2GetUser(request);
+  if (!userId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const admin = v2AdminClient();
+  if (!(await isOrgAdmin(admin, userId, orgId))) return NextResponse.json({ error: "Admins only" }, { status: 403 });
+
+  const { data: contest } = await admin
+    .from("v2_contests").select("id, name, status, config, payout_splits, event_id")
+    .eq("id", contestId).eq("org_id", orgId).eq("contest_type", "auction").maybeSingle();
+  if (!contest) return NextResponse.json({ error: "Auction not found" }, { status: 404 });
+
+  const isEvent = !!contest.event_id;
+  const cfg = (contest.config as Record<string, unknown> | null) ?? {};
+  const buyInCents = isEvent ? (await loadBuyInCents(admin, [contestId])).get(contestId) ?? 0 : (Number(cfg.entry_cents) || 0);
+  const { data: tournaments } = await admin.from("v2_tournaments").select("id, name").eq("org_id", orgId).order("created_at", { ascending: false });
+
+  return NextResponse.json({
+    name: contest.name, status: contest.status, config: cfg, payoutSplits: contest.payout_splits ?? [],
+    buyInCents, isEvent, eventId: contest.event_id ?? null, tournaments: tournaments ?? [],
+  });
+}
 
 async function gate(request: Request, orgId: string, contestId: string) {
   const { userId } = await v2GetUser(request);

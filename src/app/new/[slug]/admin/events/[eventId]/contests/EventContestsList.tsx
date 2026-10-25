@@ -46,6 +46,7 @@ export interface EventCard {
     showCourse: boolean;
     showLockMode: boolean;
     lockMode: "slate" | "per_game";
+    status: string;
   };
 }
 
@@ -148,6 +149,8 @@ export default function EventContestsList({
           showCourse={c.gear.showCourse}
           showLockMode={c.gear.showLockMode}
           initialLockMode={c.gear.lockMode}
+          showVisibility={c.type === "auction"}
+          initialStatus={c.gear.status}
           showTrigger={false}
           controlledOpen={gearFor === c.id}
           onControlledClose={() => setGearFor(null)}

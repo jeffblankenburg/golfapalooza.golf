@@ -175,6 +175,7 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
         showCourse: GOLF_PLAYED.has(c.contest_type),
         showLockMode: c.contest_type === "pickem",
         lockMode: (c.config as { lock_mode?: string } | null)?.lock_mode === "per_game" ? "per_game" : "slate",
+        status: (c.status as string) ?? "draft",
       },
     };
   }

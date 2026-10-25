@@ -42,6 +42,8 @@ export default function ContestSettings({
   showCourse = true,
   showLockMode = false,
   initialLockMode = "slate",
+  showVisibility = false,
+  initialStatus = "draft",
   showTrigger = true,
   controlledOpen,
   onControlledClose,
@@ -64,6 +66,10 @@ export default function ContestSettings({
   // Pick'em only: the pick-lock behavior (config.lock_mode).
   showLockMode?: boolean;
   initialLockMode?: "slate" | "per_game";
+  // Member-visibility (status draft/active/final) — shown for types whose home card
+  // gates on status='active' (e.g. auction).
+  showVisibility?: boolean;
+  initialStatus?: string;
   // Controlled mode (no built-in pencil trigger): a parent (e.g. the card gear) drives
   // visibility via controlledOpen/onControlledClose. Default = self-triggered on the
   // detail page.
@@ -87,6 +93,7 @@ export default function ContestSettings({
   const [time, setTime] = useState(startTime ? startTime.slice(0, 5) : "");
   const [buyin, setBuyin] = useState(entryAmountCents != null ? (entryAmountCents / 100).toString() : "");
   const [lockMode, setLockMode] = useState<"slate" | "per_game">(initialLockMode);
+  const [status, setStatus] = useState(initialStatus);
   const [courseId, setCourseId] = useState<string | null>(initialCourseId);
   const [teeId, setTeeId] = useState<string | null>(initialTeeId);
   const [courseName, setCourseName] = useState<string | null>(initialCourseName);
@@ -197,7 +204,7 @@ export default function ContestSettings({
     const res = await fetch(base, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), contest_date: day || null, start_time: time || null, course_id: courseId, tee_id: teeId, config: nextConfig, entry_amount_cents: Number.isFinite(cents as number) ? cents : null, ...(showLockMode ? { lock_mode: lockMode } : {}) }),
+      body: JSON.stringify({ name: name.trim(), contest_date: day || null, start_time: time || null, course_id: courseId, tee_id: teeId, config: nextConfig, entry_amount_cents: Number.isFinite(cents as number) ? cents : null, ...(showLockMode ? { lock_mode: lockMode } : {}), ...(showVisibility ? { status } : {}) }),
     });
     setBusy(false);
     if (!res.ok) {
@@ -234,6 +241,16 @@ export default function ContestSettings({
             <label className={styles.label}>Name</label>
             <input className={styles.input} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoFocus />
           </div>
+          {showVisibility && (
+            <div className={styles.field}>
+              <label className={styles.label}>Status</label>
+              <select className={styles.selectInput} value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="draft">Draft (hidden from members)</option>
+                <option value="active">Open (shown on the home page)</option>
+                <option value="final">Final (closed)</option>
+              </select>
+            </div>
+          )}
           <div className={styles.profileTwoCol}>
             <div className={styles.field}>
               <label className={styles.label}>Date</label>

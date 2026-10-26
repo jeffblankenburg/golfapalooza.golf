@@ -79,11 +79,12 @@ function ProjectorBoard({ state }: { state: AuctionState }) {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  // Reserve height for the tallest card (bonus/free teams add cells) so nobody overflows.
-  const maxCells = ordered.reduce((m, p) => Math.max(m, Math.max(teamsPerPlayer, p.teams.length) + p.teams.filter((t) => t.free).length), teamsPerPlayer);
+  // Cards are a single row of cells, so the tallest is the base (teamsPerPlayer) card — bonus
+  // teams only add cells and shrink them. Reserve for the most required slots in the field.
+  const maxReq = ordered.reduce((m, p) => Math.max(m, p.teams.length), teamsPerPlayer);
   const measured = area.w > 40 && area.h > 40;
   const layout = measured
-    ? fitLayout(area.w, area.h, ordered.length, maxCells)
+    ? fitLayout(area.w, area.h, ordered.length, maxReq)
     : { cols: Math.min(ordered.length || 1, 4), cardW: 240 };
 
   return (

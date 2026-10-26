@@ -30,7 +30,7 @@ export interface AuctionEntity {
   id: string; name: string; short_name: string | null; seed: number; region: string | null;
   record: string | null; logo_url: string | null; eliminated: boolean; wins: number;
   playInSlot: boolean;              // an unresolved First Four cell ("winner of A/B")
-  memberLogos: string[];            // logos of every team in the cell (two for a play-in)
+  cellTeams: { name: string; shortName: string | null; logo: string | null }[]; // every team in the cell (two for a play-in)
   ownerId: string | null; bidCents: number | null;
   bundledThrowIn: AuctionEntity | null; // free rider position that comes with this host
 }
@@ -92,7 +92,7 @@ interface Position {
   teamIds: string[];     // all member team ids (1 or 2)
   name: string;          // "Duke" or "American / Mount St. Mary's" (→ winner once resolved)
   short_name: string | null; // abbreviation for the compact cards (null for unresolved play-ins)
-  memberLogos: (string | null)[]; // logos of every team in the cell (two for a play-in)
+  cellTeams: { name: string; shortName: string | null; logo: string | null }[]; // every team in the cell
   record: string | null; logo_url: string | null;
   eliminated: boolean;   // the cell's run is over (all members out)
   playInSlot: boolean;   // two teams, not yet resolved
@@ -143,7 +143,7 @@ async function resolveField(
       seed: members[0].seed, region: members[0].region,
       teamIds: members.map((m) => m.id), name,
       short_name: isPlayIn && !resolved ? null : face.short_name,
-      memberLogos: members.map((m) => m.logo_url),
+      cellTeams: members.map((m) => ({ name: m.name, shortName: m.short_name, logo: m.logo_url })),
       record: face.record, logo_url: isPlayIn && !resolved ? null : face.logo_url,
       eliminated: members.every((m) => m.eliminated), playInSlot: isPlayIn && !resolved,
     });
@@ -207,7 +207,7 @@ export async function loadAuction(admin: SupabaseClient, contestId: string): Pro
     const o = ownerByTeam.get(p.id) || null;
     return {
       id: p.id, name: p.name, short_name: p.short_name, seed: p.seed, region: p.region, record: p.record, logo_url: p.logo_url,
-      memberLogos: p.memberLogos.filter((l): l is string => !!l),
+      cellTeams: p.cellTeams,
       eliminated: p.eliminated, wins: posWins(p), playInSlot: p.playInSlot, ownerId: o?.userId ?? null, bidCents: o?.bidCents ?? null, bundledThrowIn: rider,
     };
   };
@@ -382,10 +382,29 @@ export async function assignTeam(
   ]);
   if (!parts) return { ok: false, status: 400, error: "That member isn't in this auction" };
 
-  // Cap check: their other spend (exclude this lot's teams if a reassignment) + this bid.
+  // Budget check: their other paid lots (exclude this lot's teams if a reassignment), plus
+  // this bid, plus the MINIMUM ($inc) reserved for every team they still have to buy, must
+  // fit under the cap. This stops a player blowing their whole cap on one team and being
+  // unable to afford the minimum roster. Mirrors the recorder's price dropdown.
+  const inc = config.bidIncrementCents;
+  const teamsPerPlayer = field.capacity.teamsPerPlayer || config.teamsPerPlayer;
+  const dollars = (c: number) => `$${(c / 100).toLocaleString("en-US", { maximumFractionDigits: c % 100 === 0 ? 0 : 2 })}`;
   const lotSet = new Set(teamIds);
-  const otherSpend = (own || []).filter((o) => !lotSet.has(o.entity_id as string)).reduce((s, o) => s + ((o.bid_cents as number) || 0), 0);
-  if (bid > 0 && otherSpend + bid > config.salaryCapCents) return { ok: false, status: 400, error: "Over the salary cap" };
+  const others = (own || []).filter((o) => !lotSet.has(o.entity_id as string));
+  const otherSpend = others.reduce((s, o) => s + ((o.bid_cents as number) || 0), 0);
+  const paidCount = others.filter((o) => ((o.bid_cents as number) || 0) > 0).length;
+  if (bid > 0) {
+    const stillNeed = teamsPerPlayer - paidCount; // teams to buy, including this one
+    if (stillNeed <= 0) return { ok: false, status: 400, error: "That player already has all their teams." };
+    if (bid < inc) return { ok: false, status: 400, error: `Minimum bid is ${dollars(inc)}.` };
+    const maxAllowed = config.salaryCapCents - otherSpend - (stillNeed - 1) * inc;
+    if (bid > maxAllowed) {
+      const rem = stillNeed - 1;
+      return { ok: false, status: 400, error: rem > 0
+        ? `Too high. They must keep ${dollars(inc)} for each of their ${rem} remaining team${rem === 1 ? "" : "s"}, so the max is ${dollars(maxAllowed)}.`
+        : `Over the salary cap. Max is ${dollars(maxAllowed)}.` };
+    }
+  }
 
   // One priced row (the representative), the rest free.
   const rows = teamIds.map((tid) => ({ contest_id: contestId, user_id: input.userId, entity_id: tid, bid_cents: tid === input.entityId ? bid : 0, assigned_by: input.assignedBy }));

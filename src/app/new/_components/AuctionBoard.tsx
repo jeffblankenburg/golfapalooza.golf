@@ -148,12 +148,18 @@ function ProjectorBoard({ state }: { state: AuctionState }) {
                 </div>
                 {onBlock.bundledThrowIn && (() => {
                   const ti = onBlock.bundledThrowIn;
-                  const logos = ti.logo_url ? [ti.logo_url] : ti.memberLogos; // resolved → one; play-in → both
+                  // Resolved/normal cell → the one face team; unresolved play-in → both teams.
+                  const teams = ti.playInSlot ? ti.cellTeams : [{ name: ti.name, shortName: ti.short_name, logo: ti.logo_url }];
                   return (
-                    <div style={{ margin: "14px 0 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, fontSize: "1.3rem", color: "var(--ink-soft)" }}>
-                      <span>includes ({ti.seed})</span>
-                      {logos.map((l, i) => <img key={i} src={l} alt="" style={{ width: 34, height: 34, objectFit: "contain" }} />)}
-                      <span>{ti.name}</span>
+                    <div style={{ margin: "14px 0 0", display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 8, fontSize: "1.3rem", color: "var(--ink-soft)" }}>
+                      <span>includes ({ti.seed}){ti.playInSlot ? " Winner of" : ""}</span>
+                      {teams.map((t, i) => (
+                        <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+                          {t.logo && <img src={t.logo} alt="" style={{ width: 32, height: 32, objectFit: "contain" }} />}
+                          <span>{t.shortName || t.name}</span>
+                          {i < teams.length - 1 && <span style={{ margin: "0 2px" }}>/</span>}
+                        </span>
+                      ))}
                     </div>
                   );
                 })()}

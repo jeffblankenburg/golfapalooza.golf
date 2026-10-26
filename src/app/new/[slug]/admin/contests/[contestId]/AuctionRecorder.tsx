@@ -17,11 +17,15 @@ const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompar
  *  on the projector board) immediately; "Change" clears it back to the picker. */
 function SelectedTeam({ lot, onClear, busy }: { lot: AuctionEntity; onClear: () => void; busy: boolean }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px" }}>
-      {lot.logo_url && <img src={lot.logo_url} alt="" width={30} height={30} style={{ objectFit: "contain" }} />}
-      <span style={{ fontSize: "1.15rem", fontWeight: 800, flex: 1, minWidth: 0 }}>({lot.seed}) {lot.name}</span>
-      {lot.bundledThrowIn && <span style={{ fontSize: "0.74rem", color: "var(--ink-soft)" }}>+ ({lot.bundledThrowIn.seed}) {lot.bundledThrowIn.name} free</span>}
-      <button type="button" aria-label="Change team" title="Change team" className={styles.linkAction} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.9rem" }} disabled={busy} onClick={onClear}>Change</button>
+    <div style={{ padding: "4px 2px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {lot.logo_url && <img src={lot.logo_url} alt="" width={32} height={32} style={{ objectFit: "contain", flexShrink: 0 }} />}
+        <span style={{ fontSize: "1.15rem", fontWeight: 800, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>({lot.seed}) {lot.name}</span>
+        <button type="button" aria-label="Change team" title="Change team" className={styles.linkAction} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.9rem", flexShrink: 0 }} disabled={busy} onClick={onClear}>Change</button>
+      </div>
+      {lot.bundledThrowIn && (
+        <p style={{ margin: "4px 0 0 42px", fontSize: "0.8rem", color: "var(--ink-soft)" }}>includes ({lot.bundledThrowIn.seed}) {lot.bundledThrowIn.name}</p>
+      )}
     </div>
   );
 }
@@ -68,19 +72,24 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
   const available = [...entities].filter((e) => !e.ownerId && !e.eliminated).sort(byName);
   const lot = onBlock; // the lot on the block is the single source of truth (pushes to the board)
 
-  // Price options: 0 up to the most the chosen owner can spend (leave the increment for
-  // each team they still need to buy). Falls back to the cap when no owner's picked.
+  // Price options run from the minimum (one increment) up to the most the chosen owner can
+  // spend while still affording the minimum ($inc each) for every team they still need. So a
+  // $100 cap / 3 teams / $5 min → first bid tops out at $90, never $100.
   const inc = config.bidIncrementCents;
   const buyer = participants.find((p) => p.userId === buyerId) ?? null;
   const needs = buyer ? Math.max(1, config.teamsPerPlayer - buyer.paidTeams) : config.teamsPerPlayer;
   const budget = buyer ? buyer.remainingCents : config.salaryCapCents;
-  const maxBid = Math.max(0, budget - (needs - 1) * inc);
+  const maxBid = budget - (needs - 1) * inc;
   const priceOptions: number[] = [];
-  for (let c = 0; c <= maxBid && inc > 0; c += inc) priceOptions.push(c);
+  for (let c = inc; c <= maxBid && inc > 0; c += inc) priceOptions.push(c);
+  // Keep the chosen price valid for the current buyer (clamp to their options).
+  const bidCents = Math.round((Number(bid) || 0) * 100);
+  const selBid = priceOptions.includes(bidCents) ? bidCents : (priceOptions[0] ?? inc);
 
   async function assign() {
     if (!lot || !buyerId) { setErr("Pick a team and an owner."); return; }
-    if (await act({ action: "assign", entityId: lot.id, userId: buyerId, bidCents: Math.round((Number(bid) || 0) * 100) })) {
+    if (priceOptions.length === 0) { setErr("That player can't afford another team at the minimum price."); return; }
+    if (await act({ action: "assign", entityId: lot.id, userId: buyerId, bidCents: selBid })) {
       setBuyerId(""); setBid(String(inc / 100)); setQuery("");
     }
   }
@@ -163,11 +172,12 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
                 </select>
               </label>
               <label style={{ flex: "1 1 90px" }}><span style={LABEL}>Price</span>
-                <select className={styles.selectInput} value={bid} onChange={(e) => setBid(e.target.value)}>
+                <select className={styles.selectInput} value={String(selBid / 100)} disabled={priceOptions.length === 0} onChange={(e) => setBid(e.target.value)}>
+                  {priceOptions.length === 0 && <option value="">—</option>}
                   {priceOptions.map((c) => <option key={c} value={String(c / 100)}>{money(c)}</option>)}
                 </select>
               </label>
-              <button type="button" className={styles.createBtn} disabled={busy || !buyerId} onClick={() => void assign()}>Assign</button>
+              <button type="button" className={styles.createBtn} disabled={busy || !buyerId || priceOptions.length === 0} onClick={() => void assign()}>Assign</button>
             </div>
           )}
         </div>

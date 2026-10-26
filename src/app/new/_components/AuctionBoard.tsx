@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { subscribeToAuction } from "@/lib/v2/realtime/auction-channel";
-import { upcomingThrowers } from "@/lib/v2/contests/auction";
 import type { AuctionState } from "@/lib/v2/contests/auction-server";
 import styles from "@/app/new/new.module.css";
 import AuctionPlayerCard, { estimateAuctionCardHeight } from "./AuctionPlayerCard";
@@ -57,15 +56,17 @@ export default function AuctionBoard({
 /* ------------------------------------------------------------------ projector */
 
 function ProjectorBoard({ state }: { state: AuctionState }) {
-  const { participants, onBlock, currentId, results, config } = state;
+  const { participants, onBlock, currentId, onDeckId, results, config } = state;
   const nameOf = (uid: string | null) => participants.find((p) => p.userId === uid)?.name ?? "";
   const complete = config.complete;
   const teamsPerPlayer = config.teamsPerPlayer;
 
-  // Up-next queue: draft order projected forward, skipping anyone who already holds all
-  // their lots (and will keep skipping them as the auction plays out). The current
-  // nominator is always first, so the rail "advances" on its own as picks land.
-  const queueIds = complete ? [] : upcomingThrowers(participants.map((p) => ({ id: p.userId, paidTeams: p.paidTeams })), teamsPerPlayer, 18, config.nominationSkips);
+  // The nomination order is the (static) draft order. The highlight moves down it as picks
+  // land; auto-scroll keeps the current nominator centered (mirrors the v1 calcutta board).
+  const activeRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [currentId]);
 
   // Standings order when complete (points, then fewest spent); draft order while live.
   const ordered = complete
@@ -102,19 +103,24 @@ function ProjectorBoard({ state }: { state: AuctionState }) {
             <p style={{ margin: 0, fontSize: "0.8rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, color: "var(--ink-soft)" }}>Up next</p>
           </div>
           <div style={{ flex: 1, overflowY: "auto", padding: "0 12px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
-            {queueIds.map((uid, i) => {
-              const p = participants.find((x) => x.userId === uid);
-              if (!p) return null;
-              const now = i === 0;
+            {ordered.map((p, i) => {
+              const now = p.userId === currentId;
+              const deck = p.userId === onDeckId;
+              const done = p.done;
               return (
-                <div key={`${uid}-${i}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: now ? "14px 16px" : "9px 16px", borderRadius: 12, background: now ? "var(--brand)" : "transparent", color: now ? "#fff" : "var(--ink)", border: now ? "none" : "1px solid var(--line)" }}>
+                <div key={p.userId} ref={now ? activeRef : undefined}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12, padding: now ? "14px 16px" : "9px 16px", borderRadius: 12,
+                    background: now ? "var(--brand)" : "transparent", color: now ? "#fff" : "var(--ink)",
+                    border: now ? "none" : `1px solid ${deck ? "var(--brand)" : "var(--line)"}`,
+                    opacity: done && !now ? 0.4 : 1, transition: "background 0.3s, padding 0.3s",
+                  }}>
                   <span style={{ fontSize: now ? "1rem" : "0.82rem", fontWeight: 800, opacity: now ? 0.9 : 0.45, width: 20, textAlign: "center" }}>{now ? "▶" : i + 1}</span>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: now ? "1.35rem" : "1.05rem", fontWeight: now ? 800 : 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: now ? "1.35rem" : "1.05rem", fontWeight: now ? 800 : 600, textDecoration: done && !now ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
                   <span style={{ fontSize: "0.78rem", opacity: 0.7 }}>{p.paidTeams}/{teamsPerPlayer}</span>
                 </div>
               );
             })}
-            {queueIds.length === 0 && <p style={{ color: "var(--ink-soft)", padding: "0 4px" }}>Everyone&apos;s full.</p>}
           </div>
         </aside>
       )}
@@ -140,7 +146,17 @@ function ProjectorBoard({ state }: { state: AuctionState }) {
                     <div style={{ fontSize: "4.5rem", lineHeight: 1.02, fontWeight: 900 }}>{onBlock.name}</div>
                   </div>
                 </div>
-                {onBlock.bundledThrowIn && <p style={{ margin: "12px 0 0", fontSize: "1.3rem", color: "var(--ink-soft)" }}>comes with ({onBlock.bundledThrowIn.seed}) {onBlock.bundledThrowIn.name} free</p>}
+                {onBlock.bundledThrowIn && (() => {
+                  const ti = onBlock.bundledThrowIn;
+                  const logos = ti.logo_url ? [ti.logo_url] : ti.memberLogos; // resolved → one; play-in → both
+                  return (
+                    <div style={{ margin: "14px 0 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, fontSize: "1.3rem", color: "var(--ink-soft)" }}>
+                      <span>includes ({ti.seed})</span>
+                      {logos.map((l, i) => <img key={i} src={l} alt="" style={{ width: 34, height: 34, objectFit: "contain" }} />)}
+                      <span>{ti.name}</span>
+                    </div>
+                  );
+                })()}
               </div>
             ) : (
               <div key={currentId ?? "none"} className={styles.boardLotIn} style={{ textAlign: "center" }}>
@@ -211,7 +227,9 @@ function MemberBoard({ state, viewerId }: { state: AuctionState; viewerId: strin
             {onBlock.logo_url && <img src={onBlock.logo_url} alt="" width={32} height={32} style={{ objectFit: "contain" }} />}
             <span style={{ fontSize: "1.4rem", fontWeight: 800 }}>({onBlock.seed}) {onBlock.name}</span>
           </div>
-          {onBlock.bundledThrowIn && <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", margin: "6px 0 0" }}>+ ({onBlock.bundledThrowIn.seed}) {onBlock.bundledThrowIn.name} free</p>}
+          {onBlock.bundledThrowIn && (
+            <p style={{ fontSize: "0.8rem", color: "var(--ink-soft)", margin: "6px 0 0" }}>includes ({onBlock.bundledThrowIn.seed}) {onBlock.bundledThrowIn.name}</p>
+          )}
         </div>
       )}
 

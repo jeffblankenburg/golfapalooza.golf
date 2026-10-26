@@ -30,6 +30,7 @@ export interface AuctionEntity {
   id: string; name: string; short_name: string | null; seed: number; region: string | null;
   record: string | null; logo_url: string | null; eliminated: boolean; wins: number;
   playInSlot: boolean;              // an unresolved First Four cell ("winner of A/B")
+  memberLogos: string[];            // logos of every team in the cell (two for a play-in)
   ownerId: string | null; bidCents: number | null;
   bundledThrowIn: AuctionEntity | null; // free rider position that comes with this host
 }
@@ -91,6 +92,7 @@ interface Position {
   teamIds: string[];     // all member team ids (1 or 2)
   name: string;          // "Duke" or "American / Mount St. Mary's" (→ winner once resolved)
   short_name: string | null; // abbreviation for the compact cards (null for unresolved play-ins)
+  memberLogos: (string | null)[]; // logos of every team in the cell (two for a play-in)
   record: string | null; logo_url: string | null;
   eliminated: boolean;   // the cell's run is over (all members out)
   playInSlot: boolean;   // two teams, not yet resolved
@@ -141,6 +143,7 @@ async function resolveField(
       seed: members[0].seed, region: members[0].region,
       teamIds: members.map((m) => m.id), name,
       short_name: isPlayIn && !resolved ? null : face.short_name,
+      memberLogos: members.map((m) => m.logo_url),
       record: face.record, logo_url: isPlayIn && !resolved ? null : face.logo_url,
       eliminated: members.every((m) => m.eliminated), playInSlot: isPlayIn && !resolved,
     });
@@ -204,6 +207,7 @@ export async function loadAuction(admin: SupabaseClient, contestId: string): Pro
     const o = ownerByTeam.get(p.id) || null;
     return {
       id: p.id, name: p.name, short_name: p.short_name, seed: p.seed, region: p.region, record: p.record, logo_url: p.logo_url,
+      memberLogos: p.memberLogos.filter((l): l is string => !!l),
       eliminated: p.eliminated, wins: posWins(p), playInSlot: p.playInSlot, ownerId: o?.userId ?? null, bidCents: o?.bidCents ?? null, bundledThrowIn: rider,
     };
   };

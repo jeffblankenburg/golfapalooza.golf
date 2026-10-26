@@ -43,7 +43,13 @@ export default function AuctionBoard({
   state: AuctionState; viewerId: string | null; projector?: boolean;
 }) {
   const router = useRouter();
-  useEffect(() => subscribeToAuction(state.contest.id, state.config.tournamentId, () => router.refresh()), [state.contest.id, state.config.tournamentId, router]);
+  // Realtime for instant updates, plus a slow poll as a safety net so the board never goes
+  // stale if a realtime event is dropped (connection blip, tab backgrounded, etc.).
+  useEffect(() => {
+    const unsub = subscribeToAuction(state.contest.id, state.config.tournamentId, () => router.refresh());
+    const iv = setInterval(() => router.refresh(), 4000);
+    return () => { unsub(); clearInterval(iv); };
+  }, [state.contest.id, state.config.tournamentId, router]);
 
   return projector ? <ProjectorBoard state={state} /> : <MemberBoard state={state} viewerId={viewerId} />;
 }

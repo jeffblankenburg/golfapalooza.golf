@@ -43,7 +43,13 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
   const [query, setQuery] = useState("");
   const [confirmSkip, setConfirmSkip] = useState(false);
 
-  useEffect(() => subscribeToAuction(state.contest.id, config.tournamentId, () => router.refresh()), [state.contest.id, config.tournamentId, router]);
+  // Realtime for instant updates, plus a slow poll as a safety net (keeps this device in sync
+  // if another admin/device changes things and a realtime event is dropped).
+  useEffect(() => {
+    const unsub = subscribeToAuction(state.contest.id, config.tournamentId, () => router.refresh());
+    const iv = setInterval(() => router.refresh(), 5000);
+    return () => { unsub(); clearInterval(iv); };
+  }, [state.contest.id, config.tournamentId, router]);
 
   async function act(body: Record<string, unknown>): Promise<boolean> {
     if (busy) return false;

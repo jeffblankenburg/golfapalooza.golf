@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import styles from "@/app/new/new.module.css";
 import { subscribeToAuction } from "@/lib/v2/realtime/auction-channel";
 import type { AuctionState, AuctionEntity, AuctionParticipant } from "@/lib/v2/contests/auction-server";
-import AuctionPlayerCard, { auctionCardTier } from "@/app/new/_components/AuctionPlayerCard";
+import AuctionPlayerCard, { auctionAdminCardWidth } from "@/app/new/_components/AuctionPlayerCard";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
 
 const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { maximumFractionDigits: cents % 100 === 0 ? 0 : 2 })}`;
@@ -58,7 +58,7 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
 
   const nameOf = (uid: string | null) => participants.find((p) => p.userId === uid)?.name ?? "";
   const roster: AuctionParticipant[] = [...participants].sort(byName); // columns + owner dropdown, alphabetical
-  const grid = auctionCardTier(roster.length);
+  const cardW = auctionAdminCardWidth(roster.length);
   const available = [...entities].filter((e) => !e.ownerId && !e.eliminated).sort(byName);
   const lot = onBlock; // the lot on the block is the single source of truth (pushes to the board)
 
@@ -168,9 +168,9 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
       )}
 
       {/* Buyer cards (alphabetical) — the same card the projector board shows */}
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${grid.cardMin}px, 1fr))`, gap: 14, marginTop: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${cardW}px, 1fr))`, gap: 16, marginTop: 16 }}>
         {roster.map((p) => (
-          <AuctionPlayerCard key={p.userId} p={p} teamsPerPlayer={config.teamsPerPlayer} tier={grid.tier} highlight={!config.complete && p.userId === currentId}
+          <AuctionPlayerCard key={p.userId} p={p} teamsPerPlayer={config.teamsPerPlayer} width={cardW} highlight={!config.complete && p.userId === currentId}
             showPoints={config.complete} busy={busy} onUndo={config.complete ? undefined : (entityId) => void act({ action: "unassign", entityId })} />
         ))}
       </div>

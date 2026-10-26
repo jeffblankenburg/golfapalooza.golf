@@ -93,13 +93,24 @@ export default function AuctionPlayerCard({
             <div key={`e${i}`} style={{ ...cellBase, border: "1px dashed var(--line)", color: "var(--ink-soft)", opacity: 0.45 }}>—</div>
           );
         })}
-        {bonus.map((b, i) => (
-          <div key={`b${i}`} style={{ ...cellBase, border: "1.5px dashed var(--brand)", background: "var(--card)" }}>
-            {b.logo_url ? <img src={b.logo_url} alt="" style={{ width: S.logo, height: S.logo, objectFit: "contain" }} /> : <div style={{ width: S.logo, height: S.logo }} />}
-            <span style={label("var(--brand)")}>({b.seed}) {b.short_name || b.name}</span>
-            <CornerTag pos={pricePos} font={S.pricePx}>free</CornerTag>
-          </div>
-        ))}
+        {bonus.map((b, i) => {
+          // Resolved/normal rider → one team; unresolved play-in → both, shown as two small
+          // logos + joined abbreviations (e.g. "(16) HOW/UMBC") so it fits the small cell.
+          const teams = b.logo_url
+            ? [{ logo: b.logo_url, short: b.short_name || b.name }]
+            : b.cellTeams.map((t) => ({ logo: t.logo, short: t.shortName || t.name }));
+          const multi = teams.length > 1;
+          const logoSz = multi ? Math.round(S.logo * 0.6) : S.logo;
+          return (
+            <div key={`b${i}`} style={{ ...cellBase, border: "1.5px dashed var(--brand)", background: "var(--card)" }}>
+              <div style={{ display: "flex", gap: 2, alignItems: "center", justifyContent: "center", maxWidth: "100%" }}>
+                {teams.map((t, j) => (t.logo ? <img key={j} src={t.logo} alt="" style={{ width: logoSz, height: logoSz, objectFit: "contain" }} /> : <div key={j} style={{ width: logoSz, height: logoSz }} />))}
+              </div>
+              <span style={label("var(--brand)")}>({b.seed}) {teams.map((t) => t.short).join("/")}</span>
+              <CornerTag pos={pricePos} font={S.pricePx}>free</CornerTag>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

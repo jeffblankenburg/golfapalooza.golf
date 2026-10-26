@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
-import { assignTeam, unassignTeam } from "@/lib/v2/contests/auction-server";
+import { assignTeam, unassignTeam, effectiveTeamsPerPlayer } from "@/lib/v2/contests/auction-server";
 import { loadBuyInCents } from "@/lib/v2/contests";
 
 type Params = Promise<{ id: string; contestId: string }>;
@@ -86,6 +86,18 @@ export async function POST(request: Request, { params }: { params: Params }) {
     if ("teams_per_player" in body) cfg.teams_per_player = Math.max(1, Math.round(Number(body.teams_per_player) || 1));
     if ("first_participant_id" in body) cfg.first_participant_id = (body.first_participant_id as string) || undefined;
     if ("scoring_mode" in body && ["flat", "flat_round", "seed", "seed_round"].includes(body.scoring_mode as string)) cfg.scoring_mode = body.scoring_mode;
+    // Guard: the cap must cover the minimum roster (teamsPerPlayer × the minimum price), or
+    // players couldn't afford their required teams.
+    if ("salary_cap_cents" in body || "bid_increment_cents" in body) {
+      const cap = Number(cfg.salary_cap_cents) || 10000;
+      const inc = Number(cfg.bid_increment_cents) || 500;
+      const tpp = await effectiveTeamsPerPlayer(g.admin, contestId, cfg);
+      const floor = tpp * inc;
+      if (cap < floor) {
+        const money = (c: number) => `$${(c / 100).toLocaleString("en-US", { maximumFractionDigits: c % 100 === 0 ? 0 : 2 })}`;
+        return NextResponse.json({ error: `The salary cap must be at least ${money(floor)} so every player can afford all ${tpp} teams at the ${money(inc)} minimum.` }, { status: 400 });
+      }
+    }
   } else if (body.action === "set_block") {
     cfg.on_block_entity_id = (body.entityId as string) || undefined;
   } else if (body.action === "clear_block") {

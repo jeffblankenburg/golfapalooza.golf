@@ -40,7 +40,10 @@ export interface AuctionParticipant {
   teams: {
     entityId: string; name: string; short_name: string | null; seed: number; logo_url: string | null; bidCents: number;
     freeName: string | null; // kept for the compact views; `free` carries the full rider
-    free: { name: string; short_name: string | null; seed: number; logo_url: string | null } | null;
+    free: {
+      name: string; short_name: string | null; seed: number; logo_url: string | null;
+      cellTeams: { name: string; shortName: string | null; logo: string | null }[]; // both teams for a play-in rider
+    } | null;
   }[];
 }
 export interface AuctionResults {
@@ -235,7 +238,7 @@ export async function loadAuction(admin: SupabaseClient, contestId: string): Pro
     const lots = (lotsByOwner.get(uid) ?? []).map((e) => ({
       entityId: e.id, name: e.name, short_name: e.short_name, seed: e.seed, logo_url: e.logo_url, bidCents: e.bidCents ?? 0,
       freeName: e.bundledThrowIn?.name ?? null,
-      free: e.bundledThrowIn ? { name: e.bundledThrowIn.name, short_name: e.bundledThrowIn.short_name, seed: e.bundledThrowIn.seed, logo_url: e.bundledThrowIn.logo_url } : null,
+      free: e.bundledThrowIn ? { name: e.bundledThrowIn.name, short_name: e.bundledThrowIn.short_name, seed: e.bundledThrowIn.seed, logo_url: e.bundledThrowIn.logo_url, cellTeams: e.bundledThrowIn.cellTeams } : null,
     })).sort((a, b2) => b2.bidCents - a.bidCents);
     return {
       userId: uid, name: nameMap.get(uid) || "Member",
@@ -341,6 +344,15 @@ export async function auctionMaxParticipants(admin: SupabaseClient, contestId: s
   if (!src) return 0;
   const cells = new Set(src.teams.filter((t) => t.region).map((t) => `${t.region}:${t.seed}`));
   return Math.floor(cells.size / MIN_TEAMS_PER_PLAYER);
+}
+
+/** The effective teams-per-player for a contest (capacity-derived, floored at the minimum).
+ *  Used to guard settings: the cap must cover teamsPerPlayer × the minimum price. */
+export async function effectiveTeamsPerPlayer(admin: SupabaseClient, contestId: string, rawConfig: Record<string, unknown> | null): Promise<number> {
+  const config = auctionConfigOf(rawConfig);
+  const { count } = await admin.from("v2_contest_participants").select("user_id", { count: "exact", head: true }).eq("contest_id", contestId);
+  const field = await resolveField(admin, config, count ?? 0, storedBundlesOf(rawConfig));
+  return Math.max(MIN_TEAMS_PER_PLAYER, field.capacity.teamsPerPlayer || config.teamsPerPlayer);
 }
 
 /** Freeze the current live bundles into config the first time a lot is recorded, so the

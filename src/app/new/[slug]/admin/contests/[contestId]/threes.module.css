@@ -278,8 +278,10 @@
   text-decoration: none;
 }
 
-/* Two team halves, split down the middle. The hot team's half brightens. */
-.sides { flex: 1; display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+/* Two team halves, split down the middle. The hot team's half brightens.
+   position:relative so the scoreboard centers on the color divider (the midline
+   of this box), not the whole board — the ticker shortens the board below it. */
+.sides { position: relative; flex: 1; display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
 .half {
   --half-color: #334155;
   position: relative;
@@ -359,7 +361,9 @@
   background: #0b1220; border: 2px solid rgba(255, 255, 255, 0.2); border-top: none;
   box-shadow: 0 10px 34px rgba(0, 0, 0, 0.55);
 }
-.sbScore { font-size: clamp(3.2rem, 8vw, 7rem); font-weight: 900; color: #fff; line-height: 1; min-width: 1.5em; text-align: center; }
+.sbScore { font-size: clamp(3.2rem, 8vw, 7rem); font-weight: 900; color: #fff; line-height: 1; min-width: 1.5em; text-align: center; padding-bottom: 7px; border-bottom: 4px solid transparent; }
+.sbScore[data-team="a"] { border-bottom-color: var(--team-a, #1d4ed8); }
+.sbScore[data-team="b"] { border-bottom-color: var(--team-b, #b91c1c); }
 .sbClock { font-size: clamp(1.1rem, 2.6vw, 2.3rem); font-weight: 700; color: #fff; opacity: 0.78; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
 /* Absolutely positioned at the bottom so the logo + name/score stay put. */
 .halfStreak {
@@ -377,8 +381,11 @@
   flex: 0 0 auto;
   display: flex; align-items: center; gap: 26px;
   padding: 14px 26px; background: rgba(0, 0, 0, 0.4);
-  overflow: hidden; white-space: nowrap;
+  overflow-x: auto; overflow-y: hidden; white-space: nowrap;
+  scroll-behavior: smooth; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
 }
+.ticker::-webkit-scrollbar { display: none; } /* WebKit */
 .tickerItem {
   display: inline-flex; align-items: center; gap: 9px; flex: 0 0 auto;
   font-size: clamp(0.95rem, 1.6vw, 1.4rem); font-weight: 600; opacity: 0.9;
@@ -392,3 +399,62 @@
 @keyframes r-pop { 0% { transform: scale(0); } 70% { transform: scale(1.1); } 100% { transform: scale(1); } }
 @keyframes r-shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-24px) rotate(-3deg); } 40% { transform: translateX(24px) rotate(3deg); } 60% { transform: translateX(-16px); } 80% { transform: translateX(16px); } }
 @keyframes r-groan { 0% { transform: translateY(-30px); opacity: 0; } 40% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(14px); opacity: 0.9; filter: saturate(0.6); } }
+
+/* ── Portrait phones: stacked halves, streaks at the outer edges, logos
+      hugging the divider, scoreboard + slider bar + dollars through the middle ── */
+@media (orientation: portrait) {
+  .sides { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+
+  /* Scoreboard sits dead-center on the divider, above the dollars. */
+  .scoreboard {
+    top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 8;
+    border-radius: 14px; border: 2px solid rgba(255, 255, 255, 0.22);
+    gap: clamp(10px, 4vw, 24px); padding: clamp(6px, 1.1vh, 12px) clamp(12px, 4vw, 26px);
+  }
+  .sbScore { font-size: clamp(1.7rem, 7.5vw, 3rem); min-width: 1.4em; }
+  .sbClock { font-size: clamp(0.68rem, 2.6vw, 1.1rem); }
+
+  /* Each team's logo + name hugs the divider; top team at the bottom of its box,
+     bottom team at the top of its box. */
+  .half { padding: clamp(12px, 3vh, 30px) 18px; }
+  .half[data-side="a"] { justify-content: flex-end; }
+  .half[data-side="b"] { justify-content: flex-start; }
+  /* Mirror the top team: name above, logo below (logo hugs the divider). */
+  .half[data-side="a"] .halfTop { flex-direction: column-reverse; }
+  /* Keep the logos clear of the middle channel (scoreboard + swipe bar). */
+  .half[data-side="a"] .halfTop { margin-bottom: clamp(44px, 7vh, 72px); }
+  .half[data-side="b"] .halfTop { margin-top: clamp(44px, 7vh, 72px); }
+  .halfLogo { width: min(26vw, 15vh); height: min(26vw, 15vh); }
+  /* Names become floating labels in the gap between each logo and the scoreboard,
+     so the logos (and everything else) stay exactly where they are. */
+  .halfName {
+    position: absolute; left: 0; right: 0; margin: 0;
+    font-size: clamp(0.98rem, 4.4vw, 2rem);
+  }
+  .half[data-side="a"] .halfName { bottom: clamp(34px, 6vh, 56px); top: auto; }
+  .half[data-side="b"] .halfName { top: clamp(34px, 6vh, 56px); bottom: auto; }
+
+  /* Streaks pinned to the outer edges (very top / very bottom). */
+  .halfStreak { bottom: auto; top: auto; margin: 0; }
+  .half[data-side="a"] .halfStreak { top: clamp(10px, 2.6vh, 28px); }
+  .half[data-side="b"] .halfStreak { bottom: clamp(10px, 2.6vh, 28px); }
+  .halfStreakMain { font-size: clamp(1.8rem, 9vw, 3.4rem); }
+  .halfStreakSub { font-size: clamp(0.72rem, 2.6vw, 1.2rem); }
+
+  /* Slider bar + dollars swipe FULL width across the executing team's half, in the
+     open band between that team's logo and its outer-edge streak. The left/right
+     here must override the landscape half-width rules (same specificity, later). */
+  .stripe, .dollars { transform: translateY(-50%); height: clamp(76px, 13vh, 144px); }
+  .stripe[data-side="a"], .dollars[data-side="a"] { left: 0; right: 0; top: 17%; }
+  .stripe[data-side="b"], .dollars[data-side="b"] { left: 0; right: 0; top: 83%; }
+  /* left/right:0 must sit on the per-side selectors to override the landscape
+     half-width rules (same specificity, later) so the streak stays centered. */
+  .fadeStreak[data-side="a"] { left: 0; right: 0; top: clamp(10px, 2.6vh, 28px); bottom: auto; }
+  .fadeStreak[data-side="b"] { left: 0; right: 0; bottom: clamp(10px, 2.6vh, 28px); top: auto; }
+  .stripeContent { padding: 0 clamp(12px, 4vw, 36px); gap: clamp(10px, 3vw, 24px); }
+  .stripeLabel { font-size: clamp(1.3rem, 6vw, 2.8rem); }
+  .stripeGif { max-height: 9vh; }
+
+  .ticker { padding: 9px 14px; }
+  .tickerItem { font-size: clamp(0.8rem, 3.2vw, 1.1rem); gap: 6px; }
+}

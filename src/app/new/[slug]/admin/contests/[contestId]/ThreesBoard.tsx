@@ -25,9 +25,10 @@ const GAP = 550; // ms between cash-register rings
 const SWIPE_OUT = 420; // ms: stripe swipe-out
 const HOLD_AFTER_SOUNDS = 1000; // ms: linger fully extended after the last ring, for reading
 
-/** Scale the bills so N of them always fit across the team's half (50vw). */
+/** Scale the bills so N of them always fit across the team's half, and stay
+ *  small on phones (vmin cap) so they don't swamp the layout. */
 function billFont(n: number): string {
-  return `clamp(1.2rem, ${(40 / n).toFixed(2)}vw, 10rem)`;
+  return `clamp(1rem, ${(40 / n).toFixed(2)}vw, min(10rem, 16vmin))`;
 }
 interface Reaction {
   key: number;
@@ -53,6 +54,7 @@ export default function ThreesBoard({ state, score, exitHref }: { state: ThreesS
   const [landed, setLanded] = useState(0); // bumps when a stripe lands → streak pops
   const lastIdRef = useRef<string | null>(events.length ? events[events.length - 1].id : null);
   const billsRef = useRef<{ side: "a" | "b"; count: number } | null>(null);
+  const tickerRef = useRef<HTMLDivElement>(null);
   const reactionKey = useRef(0);
   useEffect(() => {
     billsRef.current = bills;
@@ -124,6 +126,8 @@ export default function ThreesBoard({ state, score, exitHref }: { state: ThreesS
     }
 
     setReaction({ key: myKey, side: newest.team, color, gif, label, value, broke: brokeText, phase: "in" });
+    // Snap the ticker back to the newest play (newest is on the left).
+    if (tickerRef.current) tickerRef.current.scrollLeft = 0;
     // Dollars go to the side that COLLECTS (the favored side) — the executing
     // team on a win, the opponent on an owe (airball / missed dunk).
     const billSide = favoredSide(newest);
@@ -165,17 +169,16 @@ export default function ThreesBoard({ state, score, exitHref }: { state: ThreesS
       {exitHref && (
         <Link href={exitHref} className={styles.boardExit} aria-label="Close board">×</Link>
       )}
-      {liveOn && (
-        <div className={styles.scoreboard}>
-          <span className={styles.sbScore}>{liveA ?? "–"}</span>
-          {statusText && <span className={styles.sbClock}>{statusText}</span>}
-          <span className={styles.sbScore}>{liveB ?? "–"}</span>
-        </div>
-      )}
       <div className={styles.sides}>
+        {liveOn && (
+          <div className={styles.scoreboard}>
+            <span className={styles.sbScore} data-team="a">{liveA ?? "–"}</span>
+            {statusText && <span className={styles.sbClock}>{statusText}</span>}
+            <span className={styles.sbScore} data-team="b">{liveB ?? "–"}</span>
+          </div>
+        )}
         <TeamHalf team={game.teamA} side="a" hot={streak.side === "a"} value={streak.value} count={streak.count} bump={landed} />
         <TeamHalf team={game.teamB} side="b" hot={streak.side === "b"} value={streak.value} count={streak.count} bump={landed} />
-      </div>
 
       {bills && bills.count > 0 && (
         <div className={styles.dollars} data-side={bills.side} style={{ fontSize: billFont(bills.count) }}>
@@ -219,9 +222,10 @@ export default function ThreesBoard({ state, score, exitHref }: { state: ThreesS
           </div>
         </div>
       )}
+      </div>
 
       {recentPlays.length > 0 && (
-        <div className={styles.ticker}>
+        <div className={styles.ticker} ref={tickerRef}>
           {recentPlays.map((e) => {
             const def = THREES_EVENT_BY_KEY[e.event_type];
             const tm = e.team === "a" ? game.teamA : game.teamB;

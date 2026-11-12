@@ -1,0 +1,147 @@
+/**
+ * "3s and Ds" server helpers. The activity reuses the contest spine (one no-fee
+ * manual row), a single v2_matchups row for the current ESPN game (teams/logos +
+ * the live-score hook), and v2_3s_events for the manual event log.
+ */
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { addEspnGames, type EspnGameInput } from "@/lib/v2/contests/pickem-server";
+import { defaultReactions, type ThreesReactions, type ThreesEventRow } from "@/lib/v2/contests/threes";
+
+export interface ThreesCompetitor {
+  name: string;
+  shortName: string; // school/location, no mascot (falls back to name on older games)
+  abbrev: string | null;
+  logo: string | null;
+  color: string | null;
+  espn_id?: string | null;
+}
+
+export interface ThreesGame {
+  matchupId: string;
+  league: string | null;
+  espnEventId: string | null;
+  teamA: ThreesCompetitor; // ESPN away
+  teamB: ThreesCompetitor; // ESPN home
+  startTime: string | null;
+  status: string;
+}
+
+export interface ThreesState {
+  contest: { id: string; name: string; status: string; org_id: string; event_id: string | null };
+  reactions: ThreesReactions;
+  streakCap: number | null;
+  game: ThreesGame | null;
+  events: ThreesEventRow[];
+}
+
+function competitorOf(raw: unknown): ThreesCompetitor {
+  const c = (raw as Record<string, unknown> | null) ?? {};
+  const name = (c.name as string) || (c.abbrev as string) || "Team";
+  return {
+    name,
+    shortName: (c.short_name as string) || name,
+    abbrev: (c.abbrev as string) ?? null,
+    logo: (c.logo as string) ?? null,
+    color: (c.color as string) ?? null,
+    espn_id: (c.espn_id as string) ?? null,
+  };
+}
+
+export function reactionsOf(config: Record<string, unknown> | null): ThreesReactions {
+  const r = config?.reactions as ThreesReactions | undefined;
+  return r && typeof r === "object" ? { ...defaultReactions(), ...r } : defaultReactions();
+}
+
+/** Admin's max-streak cap: a positive integer, or null for no cap. Default 5. */
+export function streakCapOf(config: Record<string, unknown> | null): number | null {
+  const v = config?.streakCap;
+  if (v === null) return null;
+  if (typeof v === "number" && v > 0) return Math.floor(v);
+  return 5;
+}
+
+/** Load everything the manage view / scorer / board needs for a 3s-and-Ds activity. */
+export async function loadThreesState(
+  supabase: SupabaseClient,
+  contestId: string,
+): Promise<ThreesState | null> {
+  const { data: contest } = await supabase
+    .from("v2_contests")
+    .select("id, name, status, org_id, event_id, config, contest_type")
+    .eq("id", contestId)
+    .maybeSingle();
+  if (!contest || contest.contest_type !== "3s_and_ds") return null;
+
+  const [{ data: matchup }, { data: events }] = await Promise.all([
+    supabase
+      .from("v2_matchups")
+      .select("id, competitor_a, competitor_b, external_ref, start_time, status")
+      .eq("contest_id", contestId)
+      .order("sort_order", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("v2_3s_events")
+      .select("id, team, event_type, points, result, created_at")
+      .eq("contest_id", contestId)
+      .order("created_at", { ascending: true }),
+  ]);
+
+  const ext = (matchup?.external_ref as Record<string, unknown> | null) ?? null;
+  const game: ThreesGame | null = matchup
+    ? {
+        matchupId: matchup.id,
+        league: (ext?.espn_league as string) ?? (ext?.league as string) ?? null,
+        espnEventId: (ext?.espn_event_id as string) ?? null,
+        teamA: competitorOf(matchup.competitor_a),
+        teamB: competitorOf(matchup.competitor_b),
+        startTime: (matchup.start_time as string) ?? null,
+        status: (matchup.status as string) ?? "scheduled",
+      }
+    : null;
+
+  return {
+    contest: {
+      id: contest.id,
+      name: contest.name,
+      status: contest.status,
+      org_id: contest.org_id,
+      event_id: contest.event_id,
+    },
+    reactions: reactionsOf(contest.config as Record<string, unknown> | null),
+    streakCap: streakCapOf(contest.config as Record<string, unknown> | null),
+    game,
+    events: (events ?? []) as ThreesEventRow[],
+  };
+}
+
+/** The activity's display name = the matchup, e.g. "NIU vs. BGSU". */
+export function matchupName(game: EspnGameInput): string {
+  const a = game.away?.abbrev || game.away?.name || "Away";
+  const b = game.home?.abbrev || game.home?.name || "Home";
+  return `${a} vs. ${b}`;
+}
+
+/**
+ * Set (replace) the current ESPN game: clears the old game + its events, adds the
+ * new one, and renames the activity to the matchup. The reaction config is kept.
+ */
+export async function setThreesGame(
+  admin: SupabaseClient,
+  contestId: string,
+  game: EspnGameInput,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await admin.from("v2_3s_events").delete().eq("contest_id", contestId);
+  await admin.from("v2_matchups").delete().eq("contest_id", contestId);
+  const r = await addEspnGames(admin, contestId, [game]);
+  if (!r.ok) return { ok: false, error: r.error };
+  await admin.from("v2_contests").update({ name: matchupName(game) }).eq("id", contestId);
+  return { ok: true };
+}
+
+/** Clear the game + events entirely (back to the empty "waiting for a game" state). */
+export async function clearThreesGame(admin: SupabaseClient, contestId: string): Promise<void> {
+  await admin.from("v2_3s_events").delete().eq("contest_id", contestId);
+  await admin.from("v2_matchups").delete().eq("contest_id", contestId);
+}

@@ -151,8 +151,8 @@ export async function addGame(admin: SupabaseClient, contestId: string, body: Ad
 export interface EspnGameInput {
   espnEventId: string; league: string; startTime?: string | null; tv?: string | null;
   spread?: number | null; favorite?: "home" | "away" | null;
-  away: { name?: string; abbrev?: string; logo?: string | null; color?: string | null } | null;
-  home: { name?: string; abbrev?: string; logo?: string | null; color?: string | null } | null;
+  away: { name?: string; shortName?: string; abbrev?: string; logo?: string | null; color?: string | null } | null;
+  home: { name?: string; shortName?: string; abbrev?: string; logo?: string | null; color?: string | null } | null;
 }
 
 /**
@@ -173,8 +173,8 @@ export async function addEspnGames(admin: SupabaseClient, contestId: string, gam
       slot: g.espnEventId,
       espnEventId: g.espnEventId,
       league: g.league,
-      competitor_a: stripNull({ name: g.away?.name || g.away?.abbrev || "Away", abbrev: g.away?.abbrev || null, logo: g.away?.logo ?? null, color: g.away?.color ?? null }) as Competitor,
-      competitor_b: stripNull({ name: g.home?.name || g.home?.abbrev || "Home", abbrev: g.home?.abbrev || null, logo: g.home?.logo ?? null, color: g.home?.color ?? null }) as Competitor,
+      competitor_a: stripNull({ name: g.away?.name || g.away?.abbrev || "Away", short_name: g.away?.shortName ?? null, abbrev: g.away?.abbrev || null, logo: g.away?.logo ?? null, color: g.away?.color ?? null }) as Competitor,
+      competitor_b: stripNull({ name: g.home?.name || g.home?.abbrev || "Home", short_name: g.home?.shortName ?? null, abbrev: g.home?.abbrev || null, logo: g.home?.logo ?? null, color: g.home?.color ?? null }) as Competitor,
       spread: typeof g.spread === "number" ? Math.abs(g.spread) : null,
       favorite: g.favorite === "away" ? "a" : g.favorite === "home" ? "b" : null,
       start_time: g.startTime || null,

@@ -99,6 +99,8 @@ export default function ContestCard({
   detailLabel = "Open details",
   gearLabel = "Quick settings",
   onGear,
+  onDelete,
+  deleteLabel = "Delete",
   isOpen,
   onToggle,
   badge,
@@ -113,6 +115,8 @@ export default function ContestCard({
   detailLabel?: string;
   gearLabel?: string;
   onGear?: () => void;
+  onDelete?: () => void;
+  deleteLabel?: string;
   isOpen: boolean;
   onToggle: () => void;
   badge?: ReactNode; // e.g. a "Needs attention" flag beside the name
@@ -130,8 +134,15 @@ export default function ContestCard({
           </span>
           <svg className={styles.rowChev} data-open={isOpen || undefined} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
         </button>
-        {(onGear || detailHref) && (
+        {(onGear || detailHref || onDelete) && (
           <div className={styles.rowActions}>
+            {onDelete && (
+              <button type="button" onClick={onDelete} aria-label={deleteLabel} title={deleteLabel} style={{ color: "#c0392b" }}>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                </svg>
+              </button>
+            )}
             {onGear && (
               <button type="button" onClick={onGear} aria-label={gearLabel} title={gearLabel}>
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">

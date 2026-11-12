@@ -26,8 +26,15 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
     .select("id, name, status, config, contest_type, created_at, collected_by, payout_splits")
     .eq("org_id", org.id)
     .is("event_id", null)
-    .in("contest_type", ["squares", "pickem", "auction", "props"])
+    .in("contest_type", ["squares", "pickem", "auction", "props", "3s_and_ds"])
     .order("created_at", { ascending: false });
+
+  // 3s and Ds enrichment: whether a game is set (for the list meta).
+  const threesIds = (contests ?? []).filter((c) => c.contest_type === "3s_and_ds").map((c) => c.id);
+  const { data: threesMatchups } = threesIds.length
+    ? await supabase.from("v2_matchups").select("contest_id").in("contest_id", threesIds)
+    : { data: [] as { contest_id: string }[] };
+  const threesHasGame = new Set((threesMatchups ?? []).map((m) => m.contest_id as string));
 
   const squaresIds = (contests ?? []).filter((c) => c.contest_type === "squares").map((c) => c.id);
   const { data: games } = squaresIds.length
@@ -72,6 +79,12 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
   for (const p of propParts ?? []) propPartCount.set(p.contest_id as string, (propPartCount.get(p.contest_id as string) || 0) + 1);
 
   const items: GroupContestItem[] = (contests ?? []).map((c) => {
+    if (c.contest_type === "3s_and_ds") {
+      return {
+        kind: "3s_and_ds", id: c.id as string, createdAt: c.created_at as string, name: c.name as string,
+        status: c.status as string, hasGame: threesHasGame.has(c.id as string),
+      };
+    }
     if (c.contest_type === "auction") {
       const tid = (c.config as { tournament_id?: string } | null)?.tournament_id;
       return {

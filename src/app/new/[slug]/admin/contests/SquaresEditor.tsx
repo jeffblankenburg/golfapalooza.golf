@@ -123,7 +123,7 @@ const teamRef = (c: EspnGame["home"]): TeamRef =>
 // Rebuild a picker-ready EspnGame from a stored game (teamRow = away, teamCol = home).
 function toEspnGame(g: StoredGame): EspnGame {
   const comp = (r: TeamRef, homeAway: "home" | "away"): EspnGame["home"] =>
-    r ? { espnId: r.espn_id ?? "", name: r.name ?? r.abbrev ?? "", abbrev: r.abbrev ?? "", logo: r.logo ?? null, color: r.color ?? null, homeAway, score: null } : null;
+    r ? { espnId: r.espn_id ?? "", name: r.name ?? r.abbrev ?? "", shortName: r.name ?? r.abbrev ?? "", abbrev: r.abbrev ?? "", logo: r.logo ?? null, color: r.color ?? null, homeAway, score: null } : null;
   return {
     espnEventId: g.espnEventId,
     league: g.league,

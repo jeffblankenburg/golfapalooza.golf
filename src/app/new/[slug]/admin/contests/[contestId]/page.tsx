@@ -18,6 +18,8 @@ import AuctionManager from "./AuctionManager";
 import { listQuestions, loadPropsPayouts } from "@/lib/v2/contests/props-server";
 import { propsConfigOf } from "@/lib/v2/contests/props";
 import PropsAdmin from "./PropsAdmin";
+import { loadThreesState } from "@/lib/v2/contests/threes-server";
+import ThreesManager from "./ThreesManager";
 import styles from "@/app/new/new.module.css";
 
 export default async function SquaresDetailPage({ params }: { params: Promise<{ slug: string; contestId: string }> }) {
@@ -113,6 +115,24 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
         participantCount={enrolled ?? 0}
         payouts={propsPayouts}
       />
+    );
+  }
+
+  // 3s and Ds manage view — the ESPN game picker + reactions editor + links to
+  // the scorer console and the big board.
+  if (contest.contest_type === "3s_and_ds") {
+    const threes = await loadThreesState(supabase, contestId);
+    if (!threes) notFound();
+    return (
+      <div className={styles.page}>
+        <ThreesManager
+          slug={slug}
+          orgId={org.id}
+          apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`}
+          state={threes}
+          backHref={`/new/${slug}/admin/contests`}
+        />
+      </div>
     );
   }
 

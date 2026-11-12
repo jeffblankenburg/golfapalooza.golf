@@ -162,7 +162,9 @@ export default function SoundboardProvider({
 
   const playLocal = useCallback(
     (sound: Sound) => {
-      void playSound(sound.audio_url);
+      // When blasting, the clip plays on everyone ELSE's device, not the
+      // blaster's — they're casting to the room. Otherwise it plays locally.
+      if (!blastOn) void playSound(sound.audio_url);
       // Optimistic count bump.
       setData((d) =>
         d

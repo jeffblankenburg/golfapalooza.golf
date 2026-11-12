@@ -4,6 +4,9 @@ import { isOrgAdmin } from "@/lib/v2/orgs";
 import { createSquaresContest, type SquaresGameInput } from "@/lib/v2/contests/squares-server";
 import { createPickem } from "@/lib/v2/contests/pickem-server";
 import { createProps } from "@/lib/v2/contests/props-server";
+import { defaultReactions } from "@/lib/v2/contests/threes";
+import { setThreesGame, matchupName } from "@/lib/v2/contests/threes-server";
+import type { EspnGameInput } from "@/lib/v2/contests/pickem-server";
 
 type Params = Promise<{ id: string }>;
 
@@ -33,6 +36,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
     secondary_ends_at?: string | null;
     games?: SquaresGameInput[];
     collected_by?: string | null;
+    game?: EspnGameInput; // 3s and Ds: the chosen ESPN game
   };
   try {
     body = await request.json();
@@ -79,8 +83,27 @@ export async function POST(request: Request, { params }: { params: Params }) {
     }
   }
 
+  // 3s and Ds: a live activity (no fee, no enrollment). Created BY picking the
+  // game — the name is the matchup ("NIU vs. BGSU"). Seeded with default reactions.
+  if (body.contest_type === "3s_and_ds") {
+    const game = body.game as EspnGameInput | undefined;
+    if (!game?.espnEventId) return NextResponse.json({ error: "Pick a game" }, { status: 400 });
+    const { data, error } = await admin.from("v2_contests").insert({
+      org_id: orgId,
+      event_id: typeof body.event_id === "string" ? body.event_id : null,
+      contest_type: "3s_and_ds", name: matchupName(game),
+      scoring_source: "manual", status: "active", auto_enroll: false,
+      config: { reactions: defaultReactions() },
+      created_by: userId,
+    }).select("id").single();
+    if (error || !data) return NextResponse.json({ error: error?.message ?? "Create failed" }, { status: 500 });
+    const r = await setThreesGame(admin, data.id, game);
+    if (!r.ok) return NextResponse.json({ error: r.error }, { status: 500 });
+    return NextResponse.json({ id: data.id });
+  }
+
   if (body.contest_type !== "squares") {
-    return NextResponse.json({ error: "Only squares, pickem, auction, and props contests are supported here for now" }, { status: 400 });
+    return NextResponse.json({ error: "Only squares, pickem, auction, props, and 3s and Ds contests are supported here for now" }, { status: 400 });
   }
   const name = (body.name || "").trim();
   if (!name) return NextResponse.json({ error: "Name is required" }, { status: 400 });

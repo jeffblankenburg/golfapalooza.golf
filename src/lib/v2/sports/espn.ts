@@ -35,7 +35,8 @@ export function getLeague(key: string): League | undefined {
 
 export interface EspnCompetitor {
   espnId: string;
-  name: string; // display name
+  name: string; // display name (with mascot, e.g. "Kansas City Roos")
+  shortName: string; // school/location, no mascot (e.g. "Kansas City")
   abbrev: string;
   logo: string | null;
   color: string | null; // "#RRGGBB"
@@ -57,7 +58,7 @@ export interface EspnGame {
   favorite?: "home" | "away" | null;
 }
 
-type RawTeam = { id?: string | number; displayName?: string; name?: string; abbreviation?: string; logo?: string; color?: string };
+type RawTeam = { id?: string | number; displayName?: string; shortDisplayName?: string; location?: string; name?: string; abbreviation?: string; logo?: string; color?: string };
 type RawCompetitor = { homeAway?: string; score?: string | number; team?: RawTeam };
 type RawStatus = { type?: { state?: string; shortDetail?: string } };
 type RawOdds = {
@@ -105,6 +106,7 @@ function competitor(c: RawCompetitor): EspnCompetitor {
   return {
     espnId: String(t.id ?? ""),
     name: t.displayName ?? t.name ?? t.abbreviation ?? "TBD",
+    shortName: t.location ?? t.shortDisplayName ?? t.displayName ?? t.name ?? t.abbreviation ?? "TBD",
     abbrev: t.abbreviation ?? "",
     logo: t.logo ?? null,
     color: t.color ? `#${t.color}` : null,

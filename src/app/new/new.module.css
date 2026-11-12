@@ -497,6 +497,27 @@
   background: rgba(23, 33, 29, 0.03);
 }
 
+/* Compact top-of-page "+ New/Add X" toggle (tournaments, contests index). Auto-width filled
+   brand button — the primary create action on an index page, including its empty state. */
+.add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 15px;
+  border-radius: 10px;
+  border: none;
+  background: var(--brand);
+  color: #fff;
+  font-family: var(--font-libre), sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+.add:hover { filter: brightness(1.06); }
+.add:active { transform: translateY(1px); }
+
 .form {
   display: flex;
   flex-direction: column;
@@ -6367,6 +6388,27 @@ select.optCellInput {
 .pickMark[data-ok] { background: #15803d; }
 .pickMark[data-bad] { background: var(--warn, #c2410c); }
 
+/* ---- Props member UI — choice buttons + numeric input, styled to match Pick'em ---- */
+.propChoices { display: flex; flex-wrap: wrap; gap: 8px; }
+.propChoice {
+  position: relative; flex: 1 1 calc(50% - 4px); min-width: 108px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--ink) 2%, var(--card)); color: var(--ink);
+  font: inherit; font-weight: 600; font-size: 0.9rem; cursor: pointer; text-align: center;
+}
+.propChoice[data-on] { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 10%, var(--card)); }
+.propChoice[data-win] { border-color: #15803d; background: color-mix(in srgb, #15803d 8%, var(--card)); color: #15803d; font-weight: 800; }
+.propChoice:disabled { cursor: default; opacity: 0.9; }
+.propChoiceSub { font-size: 0.72rem; color: var(--ink-soft); font-weight: 600; }
+.propChoice[data-win] .propChoiceSub { color: #15803d; }
+.propAnswerLine { margin-top: 8px; font-size: 0.78rem; color: var(--ink-soft); }
+.propAnswerLine strong { color: var(--ink); font-weight: 700; }
+.propPts { font-weight: 700; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.propVoid { font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.3px; color: var(--ink-soft); }
+.propImage { display: block; width: 100%; max-height: 220px; object-fit: contain; border-radius: 10px; background: color-mix(in srgb, var(--ink) 4%, var(--card)); margin: 0 0 10px; }
+.propImageThumb { display: block; width: 100%; max-height: 150px; object-fit: contain; border-radius: 8px; background: color-mix(in srgb, var(--ink) 4%, var(--card)); }
+
 .pickLeaderRow {
   width: 100%;
   display: flex;
@@ -6383,7 +6425,7 @@ select.optCellInput {
 }
 .pickLeaderRow:disabled { cursor: default; }
 .pickLeaderRow[data-me] { border-color: color-mix(in srgb, var(--brand) 40%, var(--line)); background: color-mix(in srgb, var(--brand) 7%, var(--card)); }
-.pickRank { width: 22px; text-align: center; font-weight: 800; color: var(--ink-soft); font-variant-numeric: tabular-nums; flex: none; }
+.pickRank { width: 26px; text-align: center; font-weight: 800; color: var(--ink-soft); font-variant-numeric: tabular-nums; flex: none; }
 .pickAvatar, .pickAvatarFallback { width: 28px; height: 28px; border-radius: 50%; flex: none; object-fit: cover; }
 .pickAvatarFallback { display: grid; place-items: center; background: color-mix(in srgb, var(--ink) 10%, transparent); font-weight: 700; font-size: 0.8rem; color: var(--ink); }
 .pickLeaderName { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -6394,6 +6436,46 @@ select.optCellInput {
 .pickRevealChip { font-size: 0.72rem; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
 .pickRevealChip[data-ok] { background: color-mix(in srgb, #15803d 18%, transparent); }
 .pickRevealChip[data-bad] { background: color-mix(in srgb, var(--warn, #c2410c) 18%, transparent); }
+
+/* Pick'em money: prize banner, per-row winnings, the payout line + personal strip. */
+.pickPot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 10px 14px; margin-bottom: 4px;
+  border: 1px solid color-mix(in srgb, #15803d 28%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, #15803d 7%, var(--card));
+}
+.pickPotTotal { font-weight: 800; font-size: 1.05rem; color: #15803d; font-variant-numeric: tabular-nums; }
+.pickPotPlaces { display: flex; gap: 14px; }
+.pickPotPlace { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.pickPotAmt { font-weight: 800; font-size: 0.95rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+.pickPotLbl { font-size: 0.68rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.03em; }
+
+.pickYouMoney {
+  margin: 0 2px 2px; padding: 7px 12px; border-radius: 10px;
+  font-size: 0.85rem; color: var(--ink-soft);
+  background: color-mix(in srgb, var(--ink) 4%, var(--card));
+}
+.pickYouMoney[data-in] { color: #15803d; background: color-mix(in srgb, #15803d 10%, var(--card)); }
+.pickYouMoney strong { font-weight: 800; font-variant-numeric: tabular-nums; }
+
+.pickMoneyNote { margin: 0 2px 4px; font-size: 0.72rem; color: var(--ink-soft); }
+
+.pickMoney {
+  flex: none; font-weight: 800; font-size: 0.95rem; color: #15803d;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 8px; border-radius: 999px;
+  background: color-mix(in srgb, #15803d 12%, transparent);
+}
+
+.pickCutLine {
+  display: flex; align-items: center; gap: 8px; margin: 6px 2px 2px;
+  font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft);
+}
+.pickCutLine::before, .pickCutLine::after {
+  content: ""; flex: 1; height: 1px;
+  background: repeating-linear-gradient(to right, color-mix(in srgb, #15803d 45%, transparent) 0 6px, transparent 6px 11px);
+}
 
 /* Member option controls: switch (binary), radio (select), checkbox (multi) — v1 parity. */
 .optChoiceList { display: flex; flex-direction: column; gap: 8px; }
@@ -7324,3 +7406,91 @@ select.optCellInput {
 .boardLotIn {
   animation: boardLotIn 0.3s ease-out;
 }
+
+/* Dramatic team-on-the-block reveal: bold color stripes sweep in from the left behind a white
+   logo plate + the team name, then sweep back out when the lot leaves. Colors come from the
+   team (--team primary, --team2 a derived support shade, --teamText the readable text color). */
+.boardReveal { position: relative; width: 100%; height: 100%; overflow: hidden; display: flex; align-items: center; }
+.revealStripe { position: absolute; left: 0; right: 0; transform: translateX(-112%); will-change: transform; }
+.revealStripeMain { top: 50%; height: 56%; transform: translate(-112%, -50%); background: var(--team); box-shadow: 0 14px 40px -18px rgba(0, 0, 0, 0.5); }
+.revealStripeSub { height: 9%; background: var(--team2); }
+.revealStripeSub.s1 { top: 12%; }
+.revealStripeSub.s2 { bottom: 12%; }
+
+.boardReveal[data-phase="in"] .revealStripe { animation: revealStripeIn 0.62s cubic-bezier(0.18, 0.85, 0.2, 1) both; }
+.boardReveal[data-phase="in"] .revealStripeMain { animation: revealStripeMainIn 0.62s cubic-bezier(0.18, 0.85, 0.2, 1) both; animation-delay: 0.05s; }
+.boardReveal[data-phase="in"] .revealStripeSub.s1 { animation-delay: 0.16s; }
+.boardReveal[data-phase="in"] .revealStripeSub.s2 { animation-delay: 0.23s; }
+.boardReveal[data-phase="out"] .revealStripe { animation: revealStripeOut 0.4s ease-in both; }
+.boardReveal[data-phase="out"] .revealStripeMain { animation: revealStripeMainOut 0.4s ease-in both; }
+
+.revealContent { position: relative; z-index: 2; display: flex; align-items: center; gap: 40px; padding: 0 clamp(32px, 6vw, 96px); opacity: 0; }
+.boardReveal[data-phase="in"] .revealContent { animation: revealContentIn 0.6s cubic-bezier(0.18, 0.85, 0.2, 1) both; animation-delay: 0.14s; }
+.boardReveal[data-phase="out"] .revealContent { animation: revealContentOut 0.36s ease-in both; }
+.revealPlate { display: flex; align-items: center; gap: 10px; background: #fff; border-radius: 22px; padding: 16px 20px; box-shadow: 0 16px 40px -14px rgba(0, 0, 0, 0.45); flex: none; }
+.revealSeed { font-size: clamp(1.1rem, 1.6vw, 1.7rem); font-weight: 800; color: var(--teamText); opacity: 0.88; letter-spacing: 0.5px; }
+.revealName { font-size: clamp(3rem, 6.5vw, 6rem); line-height: 0.98; font-weight: 900; color: var(--teamText); }
+.revealRider { margin-top: 10px; font-size: clamp(0.9rem, 1.4vw, 1.4rem); font-weight: 700; color: var(--teamText); opacity: 0.85; }
+
+@keyframes revealStripeIn { from { transform: translateX(-112%); } to { transform: translateX(0); } }
+@keyframes revealStripeOut { from { transform: translateX(0); } to { transform: translateX(-112%); } }
+@keyframes revealStripeMainIn { from { transform: translate(-112%, -50%); } to { transform: translate(0, -50%); } }
+@keyframes revealStripeMainOut { from { transform: translate(0, -50%); } to { transform: translate(-112%, -50%); } }
+@keyframes revealContentIn { from { opacity: 0; transform: translateX(-48px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes revealContentOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(-32px); } }
+
+/* Nominating interstitial — deliberately NOT the team reveal: a brand band with slowly panning
+   diagonal stripes + a pulsing avatar, and the content RISES in (rather than sweeping from the
+   left). Generous vertical centering keeps the label/subtitle off the band edges. */
+.nomBand {
+  position: relative; width: 100%; height: 100%; overflow: hidden;
+  display: flex; align-items: center; gap: clamp(24px, 4vw, 56px);
+  padding: clamp(14px, 3vh, 34px) clamp(36px, 6vw, 110px);
+  background: var(--brand); box-sizing: border-box;
+}
+.nomBand::before {
+  content: ""; position: absolute; inset: -30% -45%;
+  background: repeating-linear-gradient(115deg,
+    var(--brand) 0 44px,
+    color-mix(in srgb, var(--brand) 80%, #000) 44px 88px);
+  animation: nomPan 9s linear infinite;
+}
+@keyframes nomPan { from { transform: translateX(0); } to { transform: translateX(88px); } }
+
+.nomContent { position: relative; z-index: 2; display: flex; align-items: center; gap: clamp(24px, 4vw, 56px); min-width: 0; animation: nomRise 0.6s cubic-bezier(0.18, 0.85, 0.2, 1) both; }
+@keyframes nomRise { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: translateY(0); } }
+
+.nomAvatarWrap { flex: none; border-radius: 50%; animation: nomPulse 2.3s ease-in-out infinite; }
+@keyframes nomPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.5); }
+  50% { box-shadow: 0 0 0 18px rgba(255, 255, 255, 0); }
+}
+.nomAvatar, .nomFallback { display: block; width: clamp(92px, 12vw, 164px); height: clamp(92px, 12vw, 164px); border-radius: 50%; border: 5px solid #fff; background: #fff; box-sizing: border-box; }
+.nomAvatar { object-fit: cover; }
+.nomFallback { display: grid; place-items: center; color: var(--brand); font-weight: 800; font-size: clamp(2.6rem, 5vw, 5rem); line-height: 1; }
+
+.nomText { min-width: 0; color: #fff; }
+.nomLabel { font-size: clamp(0.9rem, 1.45vw, 1.6rem); font-weight: 800; letter-spacing: 2.5px; text-transform: uppercase; opacity: 0.92; }
+.nomName { font-size: clamp(2.6rem, 5.4vw, 5.2rem); line-height: 1; font-weight: 900; margin: 6px 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nomSub { font-size: clamp(0.85rem, 1.35vw, 1.35rem); font-weight: 700; opacity: 0.86; }
+
+/* ---- Member (phone) auction banner — compact variants of the projector reveal. The stripe
+   sweep + nominating band (geometry/percent based) are reused as-is; only the content scales
+   down so it reads in a ~150px banner inside the 400px member column. ---- */
+.mBanner { position: relative; height: 150px; border-radius: 14px; overflow: hidden; }
+.mBanner .nomBand { border-radius: 14px; }
+.mRevealContent { position: relative; z-index: 2; display: flex; align-items: center; gap: 16px; padding: 0 18px; height: 100%; opacity: 0; }
+.boardReveal[data-phase="in"] .mRevealContent { animation: revealContentIn 0.6s cubic-bezier(0.18, 0.85, 0.2, 1) both; animation-delay: 0.14s; }
+.boardReveal[data-phase="out"] .mRevealContent { animation: revealContentOut 0.36s ease-in both; }
+.mRevealPlate { display: flex; align-items: center; gap: 6px; background: #fff; border-radius: 14px; padding: 8px 10px; box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.45); flex: none; }
+.mRevealSeed { font-size: 0.82rem; font-weight: 800; color: var(--teamText); opacity: 0.88; letter-spacing: 0.4px; }
+.mRevealName { font-size: 1.55rem; line-height: 1.02; font-weight: 900; color: var(--teamText); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.mRevealRider { margin-top: 4px; font-size: 0.72rem; font-weight: 700; color: var(--teamText); opacity: 0.85; }
+.mNomContent { position: relative; z-index: 2; display: flex; align-items: center; gap: 16px; min-width: 0; animation: nomRise 0.6s cubic-bezier(0.18, 0.85, 0.2, 1) both; }
+.mNomAvatar, .mNomFallback { display: block; width: 78px; height: 78px; border-radius: 50%; border: 4px solid #fff; background: #fff; box-sizing: border-box; flex: none; }
+.mNomAvatar { object-fit: cover; }
+.mNomFallback { display: grid; place-items: center; color: var(--brand); font-weight: 800; font-size: 2rem; line-height: 1; }
+.mNomText { min-width: 0; color: #fff; }
+.mNomLabel { font-size: 0.7rem; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; opacity: 0.92; }
+.mNomName { font-size: 1.55rem; line-height: 1.05; font-weight: 900; margin: 2px 0 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mNomSub { font-size: 0.74rem; font-weight: 700; opacity: 0.86; }

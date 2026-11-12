@@ -26,7 +26,7 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
     .select("id, name, status, config, contest_type, created_at, collected_by, payout_splits")
     .eq("org_id", org.id)
     .is("event_id", null)
-    .in("contest_type", ["squares", "pickem"])
+    .in("contest_type", ["squares", "pickem", "auction", "props"])
     .order("created_at", { ascending: false });
 
   const squaresIds = (contests ?? []).filter((c) => c.contest_type === "squares").map((c) => c.id);
@@ -60,6 +60,17 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
   for (const p of auctionParts ?? []) auctionPartCount.set(p.contest_id as string, (auctionPartCount.get(p.contest_id as string) || 0) + 1);
   const tournamentName = new Map((tourneys ?? []).map((t) => [t.id as string, t.name as string]));
 
+  // Props enrichment: question count + participant (entrant) count.
+  const propsIds = (contests ?? []).filter((c) => c.contest_type === "props").map((c) => c.id);
+  const [{ data: propQs }, { data: propParts }] = await Promise.all([
+    propsIds.length ? supabase.from("v2_prop_questions").select("contest_id").in("contest_id", propsIds) : Promise.resolve({ data: [] as { contest_id: string }[] }),
+    propsIds.length ? supabase.from("v2_contest_participants").select("contest_id").in("contest_id", propsIds) : Promise.resolve({ data: [] as { contest_id: string }[] }),
+  ]);
+  const propQCount = new Map<string, number>();
+  for (const q of propQs ?? []) propQCount.set(q.contest_id as string, (propQCount.get(q.contest_id as string) || 0) + 1);
+  const propPartCount = new Map<string, number>();
+  for (const p of propParts ?? []) propPartCount.set(p.contest_id as string, (propPartCount.get(p.contest_id as string) || 0) + 1);
+
   const items: GroupContestItem[] = (contests ?? []).map((c) => {
     if (c.contest_type === "auction") {
       const tid = (c.config as { tournament_id?: string } | null)?.tournament_id;
@@ -68,6 +79,15 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
         tournamentName: tid ? tournamentName.get(tid) ?? null : null,
         participantCount: auctionPartCount.get(c.id as string) || 0,
         complete: (c.config as { auction_complete?: boolean } | null)?.auction_complete === true,
+      };
+    }
+    if (c.contest_type === "props") {
+      return {
+        kind: "props", id: c.id as string, createdAt: c.created_at as string, name: c.name as string, status: c.status as string,
+        entryCents: Number((c.config as { entry_cents?: number } | null)?.entry_cents) || 0,
+        locksAt: (c.config as { locks_at?: string } | null)?.locks_at ?? null,
+        questionCount: propQCount.get(c.id as string) || 0,
+        participantCount: propPartCount.get(c.id as string) || 0,
       };
     }
     if (c.contest_type === "pickem") {

@@ -123,7 +123,7 @@ export const FEATURE_CATALOG: FeatureDef[] = [
 
   // ── You (personal) ───────────────────────────────────────────────────────
   { key: "profile", label: "Profile", bucket: "you", scope: "group", icon: "user", status: "available", surface: "drawer", blurb: "Your account & preferences.", topbar: true, alwaysOn: true },
-  { key: "my_rounds", label: "My Rounds", bucket: "you", scope: "group", icon: "flag", status: "planned", surface: "route", blurb: "Your rounds & handicap." },
+  { key: "my_rounds", label: "My Rounds", bucket: "you", scope: "group", icon: "flag", status: "available", surface: "drawer", blurb: "Your rounds & handicap.", topbar: true, defaultEnabled: true },
   { key: "my_money", label: "My Money", bucket: "you", scope: "group", icon: "wallet", status: "available", surface: "route", blurb: "What you owe and are owed, across everything." },
   { key: "financials", label: "Financials", bucket: "you", scope: "event", icon: "wallet", status: "planned", surface: "route", blurb: "Your buy-ins & payouts." },
 ];
@@ -315,7 +315,7 @@ const FEATURE_ROUTES: Record<string, (slug: string) => string> = {
   announcements: (slug) => `/new/${slug}/announcements`,
   birthdays: (slug) => `/new/${slug}/birthdays`,
   courses: (slug) => `/new/${slug}/courses`,
-  loozers: (slug) => `/new/${slug}/loozers`,
+  loozers: (slug) => `/new/${slug}/members`,
   schedule: (slug) => `/new/${slug}/schedule`,
   options: (slug) => `/new/${slug}/options`,
   balance: (slug) => `/new/${slug}/balance`,

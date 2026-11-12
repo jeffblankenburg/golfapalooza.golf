@@ -32,6 +32,7 @@ export async function PATCH(
     system_name?: string;
     member_noun?: string;
     member_noun_plural?: string;
+    founded_year?: number | null;
     onboarding_dismissed?: boolean;
   };
   try {
@@ -40,7 +41,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
-  const patch: Record<string, string | null | boolean> = {};
+  const patch: Record<string, string | number | null | boolean> = {};
   if (typeof body.name === "string") {
     const name = body.name.trim();
     if (!name) return NextResponse.json({ error: "Name can't be empty" }, { status: 400 });
@@ -90,6 +91,17 @@ export async function PATCH(
     if (!n) return NextResponse.json({ error: "Member label can't be empty" }, { status: 400 });
     if (n.length > 30) return NextResponse.json({ error: "Member label is too long" }, { status: 400 });
     patch.member_noun_plural = n;
+  }
+  if (body.founded_year !== undefined) {
+    if (body.founded_year === null) {
+      patch.founded_year = null; // cleared → home falls back to created_at's year
+    } else {
+      const yr = Number(body.founded_year);
+      if (!Number.isInteger(yr) || yr < 1800 || yr > 2200) {
+        return NextResponse.json({ error: "Founded year must be between 1800 and 2200" }, { status: 400 });
+      }
+      patch.founded_year = yr;
+    }
   }
   if (typeof body.onboarding_dismissed === "boolean") {
     patch.onboarding_dismissed_at = body.onboarding_dismissed ? new Date().toISOString() : null;

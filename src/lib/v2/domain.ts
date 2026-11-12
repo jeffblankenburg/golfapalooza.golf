@@ -26,6 +26,13 @@ const DEFAULT_HOSTS = new Set([
   "127.0.0.1:3000",
 ]);
 
+/**
+ * The platform's canonical origin — the multi-tenant host where path-based org
+ * selection (and the group switcher) lives. Used to out-link a locked custom
+ * domain back to another group's home without leaking branding across hosts.
+ */
+export const PLATFORM_ORIGIN = "https://golfapalooza.golf";
+
 export function isDefaultHost(host: string | null | undefined): boolean {
   if (!host) return true;
   const h = host.toLowerCase();

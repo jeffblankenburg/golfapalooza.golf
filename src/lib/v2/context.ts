@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { v2ServerClient, v2AdminClient } from "@/lib/v2/supabase";
 import { resolveEffectiveUser } from "@/lib/v2/simulator";
 import type { NameMode } from "@/lib/v2/profile";
@@ -25,6 +26,10 @@ export interface PlatformOrg {
   member_noun: string;
   member_noun_plural: string;
   show_birthdays: boolean;
+  /** Admin-set founding year; falls back to created_at's year when null. */
+  founded_year: number | null;
+  /** Org creation timestamp (the founded_year fallback). */
+  created_at: string;
   role: OrgRole;
 }
 
@@ -47,7 +52,10 @@ export interface PlatformContext {
  * authenticated. Uses the RLS-respecting cookie client so the v2 policies are
  * exercised end-to-end (a user only sees their own memberships/orgs).
  */
-export async function getPlatformContext(): Promise<PlatformContext | null> {
+// Wrapped in React cache() so the 3+ calls in a single render pass (the [slug]
+// layout, the event layout, and the page) dedupe to ONE auth round-trip + one
+// memberships query instead of repeating the work per segment.
+export const getPlatformContext = cache(async (): Promise<PlatformContext | null> => {
   const supabase = await v2ServerClient();
   const {
     data: { user },
@@ -63,7 +71,7 @@ export async function getPlatformContext(): Promise<PlatformContext | null> {
   const { data: memberships } = await client
     .from("v2_memberships")
     .select(
-      "role, org:v2_organizations(id, name, slug, logo_url, primary_color, secondary_color, store_url, store_label, store_enabled, name_display, system_name, system_avatar_url, member_noun, member_noun_plural, show_birthdays)"
+      "role, org:v2_organizations(id, name, slug, logo_url, primary_color, secondary_color, store_url, store_label, store_enabled, name_display, system_name, system_avatar_url, member_noun, member_noun_plural, show_birthdays, founded_year, created_at)"
     )
     .eq("user_id", effUserId)
     .eq("status", "active")
@@ -99,4 +107,4 @@ export async function getPlatformContext(): Promise<PlatformContext | null> {
   }
 
   return { userId: effUserId, realUserId: user.id, simulating: eff.simulating, simName, isSystemAdmin, orgs };
-}
+});

@@ -13,6 +13,7 @@ export interface AuctionConfig {
   teamsPerPlayer: number;    // default 3
   orderSeed: string;         // deterministic throwout order
   firstParticipantId: string | null; // optional pinned first picker
+  live: boolean;             // admin opened the live board to spectators (lobby → live)
   complete: boolean;
   tournamentId: string | null; // entity catalog = this tournament's field
   onBlockEntityId: string | null; // the lot currently up for bids (live recorder + board)
@@ -267,6 +268,7 @@ export function auctionConfigOf(config: Record<string, unknown> | null | undefin
     teamsPerPlayer: Number(c.teams_per_player) || 3,
     orderSeed: typeof c.order_seed === "string" && c.order_seed ? c.order_seed : "",
     firstParticipantId: typeof c.first_participant_id === "string" ? c.first_participant_id : null,
+    live: c.auction_live === true,
     complete: c.auction_complete === true,
     tournamentId: typeof c.tournament_id === "string" ? c.tournament_id : null,
     onBlockEntityId: typeof c.on_block_entity_id === "string" ? c.on_block_entity_id : null,

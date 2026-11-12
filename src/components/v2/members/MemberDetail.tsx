@@ -145,7 +145,7 @@ export default function MemberDetail({
 
   return (
     <div className={styles.wrap}>
-      <button type="button" className={styles.back} onClick={() => router.push(`/new/${slug}/loozers`)} aria-label="Back">
+      <button type="button" className={styles.back} onClick={() => router.push(`/new/${slug}/members`)} aria-label="Back">
         <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" /></svg>
       </button>
 
@@ -201,7 +201,7 @@ export default function MemberDetail({
       {d.sponsor && (
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Sponsored by</h2>
-          <Link href={`/new/${slug}/loozers/${d.sponsor.id}`} className={styles.personRow}>
+          <Link href={`/new/${slug}/members/${d.sponsor.id}`} className={styles.personRow}>
             {d.sponsor.avatar_url ? <img src={d.sponsor.avatar_url} alt="" className={styles.personAvatar} /> : <span className={styles.personFallback}>{initials(pickName(d.sponsor, mode))}</span>}
             <span>{pickName(d.sponsor, mode)}</span>
           </Link>
@@ -212,7 +212,7 @@ export default function MemberDetail({
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>Sponsored ({d.descendants.length})</h2>
           {d.descendants.map((s) => (
-            <Link key={s.id} href={`/new/${slug}/loozers/${s.id}`} className={styles.personRow}>
+            <Link key={s.id} href={`/new/${slug}/members/${s.id}`} className={styles.personRow}>
               {s.avatar_url ? <img src={s.avatar_url} alt="" className={styles.personAvatar} /> : <span className={styles.personFallback}>{initials(pickName(s, mode))}</span>}
               <span>{pickName(s, mode)}</span>
             </Link>

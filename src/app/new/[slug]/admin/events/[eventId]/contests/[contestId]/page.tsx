@@ -15,6 +15,9 @@ import ContestPayouts from "./ContestPayouts";
 import SquaresManageView, { loadSquaresContestRow } from "../../../../contests/[contestId]/SquaresManageView";
 import AuctionManager from "../../../../contests/[contestId]/AuctionManager";
 import { loadAuction, loadAuctionPayouts } from "@/lib/v2/contests/auction-server";
+import PropsAdmin from "../../../../contests/[contestId]/PropsAdmin";
+import { listQuestions, loadPropsPayouts } from "@/lib/v2/contests/props-server";
+import { propsConfigOf } from "@/lib/v2/contests/props";
 import SquaresEditLauncher from "../../../../contests/[contestId]/SquaresEditLauncher";
 import ContestParticipants from "@/components/v2/contests/ContestParticipants";
 import ContestCollector from "@/components/v2/contests/ContestCollector";
@@ -98,6 +101,34 @@ export default async function ContestDetailPage({ params, searchParams }: { para
         payouts={payouts}
         payoutSplits={(contest.payout_splits as PayoutSplit[] | null) ?? []}
         backHref={`/new/${slug}/admin/events/${eventId}/contests`}
+      />
+    );
+  }
+
+  // Props reuses the scope-agnostic authoring/settlement surface (keyed by contestId), so an
+  // event-scoped Props contest drives off the same /contests/{id}/props base as a group one.
+  if (contest.contest_type === "props") {
+    const cfg = propsConfigOf(contest.config as Record<string, unknown> | null);
+    const [questions, propsPayouts, { count: enrolled }] = await Promise.all([
+      listQuestions(admin, contestId),
+      loadPropsPayouts(admin, contestId, org.name_display),
+      admin.from("v2_contest_participants").select("id", { count: "exact", head: true }).eq("contest_id", contestId),
+    ]);
+    return (
+      <PropsAdmin
+        slug={slug}
+        contestId={contestId}
+        apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`}
+        backHref={`/new/${slug}/admin/events/${eventId}/contests`}
+        initialName={contest.name}
+        initialStatus={contest.status}
+        initialLocksAt={cfg.locksAt}
+        initialNumericRule={cfg.numericRule}
+        initialEntryCents={cfg.entryCents}
+        initialSplits={(contest.payout_splits as PayoutSplit[] | null) ?? []}
+        initialQuestions={questions}
+        participantCount={enrolled ?? 0}
+        payouts={propsPayouts}
       />
     );
   }

@@ -51,7 +51,8 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
     //  - entry_cents: group-contest buy-in (event contests fund via cost_items).
     //  - lock_mode: Pick'em pick-lock behavior ('slate' = all lock at first kickoff,
     //    the default; 'per_game' = each game locks at its own start time).
-    if ("entry_cents" in body || "lock_mode" in body) {
+    //  - locks_at / numeric_rule: Props — the single set lock time + the default numeric rule.
+    if ("entry_cents" in body || "lock_mode" in body || "locks_at" in body || "numeric_rule" in body) {
       const { data: cur } = await g.admin.from("v2_contests").select("config").eq("id", contestId).maybeSingle();
       const cfg = { ...((cur?.config as Record<string, unknown>) ?? {}) };
       if ("entry_cents" in body) {
@@ -60,6 +61,13 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
       }
       if ("lock_mode" in body) {
         if (body.lock_mode === "per_game") cfg.lock_mode = "per_game"; else delete cfg.lock_mode;
+      }
+      if ("locks_at" in body) {
+        const v = body.locks_at;
+        if (typeof v === "string" && v) cfg.locks_at = v; else delete cfg.locks_at;
+      }
+      if ("numeric_rule" in body) {
+        cfg.numeric_rule = ["absolute", "no_over", "exact"].includes(body.numeric_rule as string) ? body.numeric_rule : "absolute";
       }
       patch.config = cfg;
     }

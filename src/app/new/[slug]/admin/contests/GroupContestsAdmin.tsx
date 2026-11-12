@@ -10,8 +10,9 @@ import AuctionSettingsModal from "@/app/new/_components/AuctionSettingsModal";
 import { PickemPreview, SquaresPreview } from "@/app/new/_components/contest-card/previews";
 import { pickName, type NameMode } from "@/lib/v2/profile";
 import { computePickemPayouts, type PayoutSplit } from "@/lib/v2/contests/pickem";
+import { placeLabel } from "@/lib/v2/contests/payouts";
 import type { PickemGamePreview } from "@/lib/v2/contests/pickem-preview";
-import PayoutSplitsEditor, { ordinal } from "../events/[eventId]/contests/[contestId]/PayoutSplitsEditor";
+import PayoutSplitsEditor from "../events/[eventId]/contests/[contestId]/PayoutSplitsEditor";
 
 // One unified list for the group Contests hub — every created pool, any type,
 // in one place (no per-type sections), with a single "Add contest" control.
@@ -30,13 +31,15 @@ export type GroupContestItem =
       participantCount: number;
       games: PickemGamePreview[];
     }
-  | { kind: "auction"; id: string; createdAt: string; name: string; status: string; tournamentName: string | null; participantCount: number; complete: boolean };
+  | { kind: "auction"; id: string; createdAt: string; name: string; status: string; tournamentName: string | null; participantCount: number; complete: boolean }
+  | { kind: "props"; id: string; createdAt: string; name: string; status: string; entryCents: number; locksAt: string | null; questionCount: number; participantCount: number };
 
 // Contest types an admin can create at the group level today.
 const ADDABLE = [
   { key: "squares", label: "Squares pool", blurb: "Squares grid for any games" },
   { key: "pickem", label: "Pick'em", blurb: "Pick games vs. the spread" },
   { key: "auction", label: "Auction", blurb: "Bid on a tournament's teams" },
+  { key: "props", label: "Props", blurb: "Proposition questions you settle by hand" },
 ] as const;
 
 type PickemItem = Extract<GroupContestItem, { kind: "pickem" }>;
@@ -59,7 +62,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
   // undefined = Squares editor closed; null = creating; a row = editing that pool.
   const [editing, setEditing] = useState<SquaresContestRow | null | undefined>(undefined);
   const [pickemOpen, setPickemOpen] = useState(false);
-  const [nameKind, setNameKind] = useState<"pickem" | "auction">("pickem");
+  const [nameKind, setNameKind] = useState<"pickem" | "auction" | "props">("pickem");
   const [pickemName, setPickemName] = useState("");
   const [settingsFor, setSettingsFor] = useState<PickemItem | null>(null);
   const [auctionSettingsFor, setAuctionSettingsFor] = useState<AuctionItem | null>(null);
@@ -86,7 +89,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
   function pick(kind: string) {
     setMenuOpen(false);
     if (kind === "squares") setEditing(null);
-    else if (kind === "pickem" || kind === "auction") { setNameKind(kind); setPickemName(""); setErr(null); setPickemOpen(true); }
+    else if (kind === "pickem" || kind === "auction" || kind === "props") { setNameKind(kind); setPickemName(""); setErr(null); setPickemOpen(true); }
   }
 
   async function createPickem() {
@@ -156,7 +159,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
         <SquaresEditor collectionBase={collectionBase} editing={null} nameMode={nameMode} currentUserId={currentUserId} onClose={() => setEditing(undefined)} />
       )}
 
-      <Modal open={pickemOpen} title={nameKind === "auction" ? "New Auction" : "New Pick'em"} onClose={() => setPickemOpen(false)}>
+      <Modal open={pickemOpen} title={nameKind === "auction" ? "New Auction" : nameKind === "props" ? "New Props" : "New Pick'em"} onClose={() => setPickemOpen(false)}>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <input
             className={styles.input}
@@ -165,7 +168,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
             autoFocus
             onChange={(e) => setPickemName(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") void createPickem(); }}
-            placeholder={nameKind === "auction" ? "e.g. March Madness Auction" : "e.g. Bowl Week Pick'em"}
+            placeholder={nameKind === "auction" ? "e.g. March Madness Auction" : nameKind === "props" ? "e.g. Super Bowl Props" : "e.g. Bowl Week Pick'em"}
           />
           {err && <p className={styles.err} style={{ margin: 0 }}>{err}</p>}
           <button type="button" className={styles.create} onClick={() => void createPickem()} disabled={saving || !pickemName.trim()}>
@@ -185,6 +188,16 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
               count={`${it.participantCount} player${it.participantCount === 1 ? "" : "s"}`}
               detailHref={`${adminBase}/${it.id}`} detailLabel="Open auction"
               onGear={() => setAuctionSettingsFor(it)}
+              isOpen={false} onToggle={() => router.push(`${adminBase}/${it.id}`)} />
+          ) : it.kind === "props" ? (
+            <ContestCard key={it.id} kind="props" name={it.name}
+              meta={[
+                it.entryCents > 0 ? `${fmtMoney(it.entryCents)} buy-in` : "no buy-in",
+                it.locksAt ? `locks ${new Date(it.locksAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "no lock set",
+                statusLabel(it.status),
+              ].join(", ")}
+              count={`${it.questionCount} question${it.questionCount === 1 ? "" : "s"}`}
+              detailHref={`${adminBase}/${it.id}`} detailLabel="Open Props details"
               isOpen={false} onToggle={() => router.push(`${adminBase}/${it.id}`)} />
           ) : (
             <PickemRow key={it.id} it={it} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onSettings={() => setSettingsFor(it)} />
@@ -336,7 +349,7 @@ function PickemQuickSettings({ orgId, item, currentUserId, nameMode, onClose, on
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
               {payouts.map((p) => (
                 <span key={p.place} style={{ fontSize: "0.75rem", fontWeight: 700, padding: "3px 8px", borderRadius: 999, background: "var(--brand-tint, #e8f2ec)", color: "var(--brand, #0a5c36)" }}>
-                  {ordinal(p.place)}: {money(p.amountCents)}
+                  {placeLabel(p.place)}: {money(p.amountCents)}
                 </span>
               ))}
             </div>

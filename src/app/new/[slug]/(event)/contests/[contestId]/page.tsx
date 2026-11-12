@@ -5,7 +5,9 @@ import { v2Now } from "@/lib/v2/simulator";
 import { resolvePayouts } from "@/lib/v2/contests/squares";
 import { buildGameAllocations } from "@/lib/v2/contests/squares-alloc";
 import { loadPickemBoard } from "@/lib/v2/contests/pickem-server";
-import { loadAuction } from "@/lib/v2/contests/auction-server";
+import { loadPropsBoard } from "@/lib/v2/contests/props-server";
+import { loadAuction, loadAuctionPayouts } from "@/lib/v2/contests/auction-server";
+import PropsContent from "../../props/PropsContent";
 import { pickName } from "@/lib/v2/profile";
 import SquaresPlay, { type PlayGame } from "./SquaresPlay";
 // Same member component the event lane uses — mounted here with the group pick URL.
@@ -38,6 +40,7 @@ export default async function ContestDetailPage({ params }: { params: Promise<{ 
       <div className={`${styles.page} ${styles.orgPage}`}>
         <h1 className={styles.title}>{contest.name || "Pick'em"}</h1>
         <PickemContent
+          contestId={contestId}
           pickUrl={`/api/v2/orgs/${org.id}/contests/${contestId}/pickem/pick`}
           games={board.games}
           initialPicks={board.myPicks}
@@ -46,19 +49,51 @@ export default async function ContestDetailPage({ params }: { params: Promise<{ 
           allLocked={board.locked}
           meId={ctx.userId}
           totalGames={board.totalGames}
+          potCents={board.potCents}
+          placePayouts={board.placePayouts}
         />
       </div>
     );
   }
 
-  // Auction — read-only member board (lots, budgets, points, the live lot on the block).
+  // Props — admin-authored proposition questions; same member answer + leaderboard shape as
+  // Pick'em, scope-agnostic endpoint. Hidden from members until the admin opens it (active).
+  if (contest.contest_type === "props") {
+    if (contest.status !== "active") notFound();
+    const board = await loadPropsBoard(supabase, { contestId, orgId: org.id, viewerId: ctx.userId, now: await v2Now() });
+    return (
+      <div className={`${styles.page} ${styles.orgPage}`}>
+        <h1 className={styles.title}>{contest.name || "Props"}</h1>
+        <PropsContent
+          contestId={contestId}
+          answerUrl={`/api/v2/orgs/${org.id}/contests/${contestId}/props/answer`}
+          questions={board.questions}
+          initialAnswers={board.myAnswers}
+          leaderboard={board.leaderboard}
+          locked={board.locked}
+          locksAt={board.locksAt}
+          numericRule={board.numericRule}
+          settled={board.settled}
+          meId={ctx.userId}
+          totalQuestions={board.totalQuestions}
+          maxPoints={board.maxPoints}
+          potCents={board.potCents}
+          placePayouts={board.placePayouts}
+        />
+      </div>
+    );
+  }
+
+  // Auction — read-only member board. Phase-aware (lobby → live → results); the results
+  // phase needs the resolved prize board, so load payouts once the auction is complete.
   if (contest.contest_type === "auction") {
     if (contest.status !== "active") notFound(); // hidden from members until the admin opens it
     const state = await loadAuction(supabase, contestId);
     if (!state) notFound();
+    const payouts = state.config.complete ? await loadAuctionPayouts(supabase, contestId) : null;
     return (
       <div className={`${styles.page} ${styles.orgPage}`}>
-        <AuctionBoard state={state} viewerId={ctx.userId} />
+        <AuctionBoard state={state} viewerId={ctx.userId} payouts={payouts} />
       </div>
     );
   }

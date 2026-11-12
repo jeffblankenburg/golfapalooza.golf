@@ -4,7 +4,8 @@ import { isOrgMember, isOrgAdmin } from "@/lib/v2/orgs";
 import { v2Now } from "@/lib/v2/simulator";
 import { loadResolvedFeatures } from "@/lib/v2/features-server";
 import { isFeatureActive } from "@/lib/v2/features";
-import { syncOptionContestEnrollment, cascadeDeselectDependents, loadOptionSettings, selectionsStillOpen } from "@/lib/v2/options";
+import { loadOptionSettings, selectionsStillOpen } from "@/lib/v2/options";
+import { syncOptionContestEnrollment, cascadeDeselectDependents } from "@/lib/v2/options-enrollment";
 
 type Params = Promise<{ eventId: string; optionId: string }>;
 

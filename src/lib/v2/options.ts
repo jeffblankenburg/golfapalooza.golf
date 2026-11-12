@@ -9,6 +9,9 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+// NOTE: keep this module client-safe (it exports pure helpers like `priceForValue` that
+// client components import). Server-only contest enrollment that reaches web-push lives in
+// `options-enrollment.ts` — do NOT import `./contests/enrollment` here.
 
 export const OPTION_SELECT =
   "id, org_id, event_id, group_id, name, description, option_type, choices, is_required, max_total, icon, depends_on_option_id, allow_none, none_label, sort_order, created_at, updated_at";
@@ -195,29 +198,8 @@ export async function tripCostCents(admin: SupabaseClient, eventId: string): Pro
   return (data || []).reduce((s, r) => s + ((r.amount_cents as number) || 0), 0);
 }
 
-/**
- * When a member deselects an option, clear every option that DEPENDS on it (and their
- * dependents, recursively) — removing those selections + their contest enrollment.
- * Mirrors v1's dependency cascade (#218 phase C).
- */
-export async function cascadeDeselectDependents(admin: SupabaseClient, eventId: string, userId: string, parentOptionId: string): Promise<void> {
-  const queue = [parentOptionId];
-  const guard = new Set<string>();
-  while (queue.length) {
-    const pid = queue.shift()!;
-    if (guard.has(pid)) continue;
-    guard.add(pid);
-    const { data: deps } = await admin.from("v2_options").select("id").eq("event_id", eventId).eq("depends_on_option_id", pid);
-    for (const d of deps || []) {
-      const did = d.id as string;
-      const { data: removed } = await admin.from("v2_user_option_selections").delete().eq("option_id", did).eq("user_id", userId).select("option_id");
-      if (removed && removed.length) {
-        await syncOptionContestEnrollment(admin, did, userId, null);
-        queue.push(did);
-      }
-    }
-  }
-}
+// `cascadeDeselectDependents` moved to `options-enrollment.ts` (server-only) — it drives
+// `syncOptionContestEnrollment`, which reaches web-push. Keep this module client-safe.
 
 export interface OptionSettings {
   selection_deadline: string | null;  // read-only cutoff (visible-but-frozen); null = no cutoff
@@ -293,53 +275,5 @@ export function selectedChoiceValues(type: OptionType, v: unknown): Set<string> 
   return new Set();
 }
 
-/**
- * Enroll a member into the contests their option SELECTION funds (#218 phase B). A
- * contest's funding cost_item applies when it has no choice link (whole-option) OR a
- * choice link matching the member's selection. Non-applicable option contests are
- * removed. An empty value removes the member from every contest the option bundles.
- * Idempotent. Options are the only enrollment path for opt-in contests, so removal is safe.
- */
-export async function syncOptionContestEnrollment(
-  admin: SupabaseClient,
-  optionId: string,
-  userId: string,
-  value: unknown,
-): Promise<void> {
-  const { data: opt } = await admin.from("v2_options").select("option_type").eq("id", optionId).maybeSingle();
-  const type = (opt?.option_type as OptionType) || "checkbox";
-
-  // All cost_items funding this option that point at a contest/side game.
-  const { data: items } = await admin
-    .from("v2_cost_items").select("id, source_id, source_type").eq("linked_option_id", optionId).in("source_type", ["contest", "side_game"]);
-  const costItems = (items || []).filter((i) => i.source_id);
-  if (costItems.length === 0) return;
-
-  const allContestIds = [...new Set(costItems.map((i) => i.source_id as string))];
-  const empty = optionValueIsEmpty(type, value);
-  if (empty) {
-    await admin.from("v2_contest_participants").delete().eq("user_id", userId).in("contest_id", allContestIds);
-    return;
-  }
-
-  // Which cost_items apply to this selection (no choice link, or a matching one)?
-  const { data: links } = await admin
-    .from("v2_cost_item_option_choices").select("cost_item_id, choice_value").in("cost_item_id", costItems.map((i) => i.id as string));
-  const choiceLinks = new Map<string, string[]>();
-  for (const l of links || []) (choiceLinks.get(l.cost_item_id as string) || choiceLinks.set(l.cost_item_id as string, []).get(l.cost_item_id as string)!).push(l.choice_value as string);
-
-  const chosen = selectedChoiceValues(type, value);
-  const applies = (itemId: string) => {
-    const cv = choiceLinks.get(itemId);
-    return !cv || cv.length === 0 || cv.some((v) => chosen.has(v));
-  };
-  const enrollIds = [...new Set(costItems.filter((i) => applies(i.id as string)).map((i) => i.source_id as string))];
-  const removeIds = allContestIds.filter((id) => !enrollIds.includes(id));
-
-  if (enrollIds.length) {
-    await admin.from("v2_contest_participants").upsert(enrollIds.map((contest_id) => ({ contest_id, user_id: userId })), { onConflict: "contest_id,user_id", ignoreDuplicates: true });
-  }
-  if (removeIds.length) {
-    await admin.from("v2_contest_participants").delete().eq("user_id", userId).in("contest_id", removeIds);
-  }
-}
+// `syncOptionContestEnrollment` moved to `options-enrollment.ts` (server-only) so this
+// module stays client-safe — see the note on the enrollment import above.

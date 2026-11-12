@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
 import { FBS_TEAMS, getTeamLogoUrl } from "@/lib/data/fbs-teams";
-import { rankPickem, slateLockAt, gameLocked, lockModeOf, type LockMode, type PickemGame, type PickemPick } from "@/lib/v2/contests/pickem";
+import { rankPickem, slateLockAt, gameLocked, lockModeOf, provisionalWinnings, type LockMode, type PickemGame, type PickemPick } from "@/lib/v2/contests/pickem";
+import { computePlacePayouts, type PlacePayout, type PayoutSplit } from "@/lib/v2/contests/payouts";
 import { fetchGameScore } from "@/lib/v2/sports/espn";
 import { gradeMatchups } from "@/lib/v2/contests/grade";
 import { orgNameMode } from "@/lib/v2/orgs";
@@ -361,6 +362,7 @@ export interface PickemLeaderEntry {
   userId: string; name: string; avatarUrl: string | null;
   correct: number; decided: number; pickedCount: number;
   tiebreakerTotal: number | null; tiebreakerDiff: number | null; rank: number;
+  provisionalCents: number; // "if it ends now" winnings (0 = not in the money / no result yet)
   picks: { gameId: string; pickedTeam: "away" | "home" | null }[] | null;
 }
 
@@ -372,6 +374,8 @@ export interface PickemBoard {
   lockedGameIds: string[];  // games whose picking is closed (per lock_mode)
   lockMode: LockMode;
   totalGames: number;
+  potCents: number;             // entry × entrants (0 = free pool, no money UI)
+  placePayouts: PlacePayout[];  // the prize structure resolved over the current pot
 }
 
 /** Load everything the member Pick'em UI needs for one contest. Individual picks are
@@ -393,12 +397,23 @@ export async function loadPickemBoard(
     picked_team: favToTeam((p.pick as { side?: Side } | null)?.side), tiebreaker_total: (p.tiebreaker as number | null) ?? null,
   }));
 
-  const { data: contest } = await supabase.from("v2_contests").select("config").eq("id", input.contestId).maybeSingle();
+  const [{ data: contest }, { count: entrantCount }] = await Promise.all([
+    supabase.from("v2_contests").select("config, payout_splits").eq("id", input.contestId).maybeSingle(),
+    supabase.from("v2_contest_participants").select("user_id", { count: "exact", head: true }).eq("contest_id", input.contestId),
+  ]);
   const lockMode = lockModeOf(contest?.config as Record<string, unknown> | null);
   const slateLock = slateLockAt(games);
   const lockedSet = new Set(games.filter((g) => gameLocked(g, lockMode, slateLock, input.now)).map((g) => g.id));
   const locked = games.length > 0 && games.every((g) => lockedSet.has(g.id));
   const ranked = rankPickem(games, picks);
+
+  // Money, resolved over the CURRENT pot (entry × entrants). provisionalWinnings holds the
+  // tie-pooling + "wait for a result" gate, so the board and the admin sheet never diverge.
+  const entryCents = Number((contest?.config as { entry_cents?: number } | null)?.entry_cents) || 0;
+  const splits = (contest?.payout_splits as PayoutSplit[] | null) ?? null;
+  const potCents = entryCents * (entrantCount ?? 0);
+  const placePayouts = computePlacePayouts(potCents, splits);
+  const provisional = provisionalWinnings(games, picks, potCents, splits);
 
   const userIds = [...new Set(picks.map((p) => p.user_id))];
   const [{ data: profs }, mode] = await Promise.all([
@@ -420,11 +435,12 @@ export async function loadPickemBoard(
     avatarUrl: (prof.get(r.userId)?.avatar_url as string | null) ?? null,
     correct: r.correct, decided: r.decided, pickedCount: r.pickedCount,
     tiebreakerTotal: r.tiebreakerTotal, tiebreakerDiff: r.tiebreakerDiff, rank: r.rank,
+    provisionalCents: provisional.get(r.userId) ?? 0,
     picks: (picksByUser.get(r.userId) || []).map((p) => ({ gameId: p.game_id, pickedTeam: p.picked_team })),
   }));
 
   const myPicks: Record<string, { picked: "away" | "home" | null; tiebreaker: number | null }> = {};
   for (const p of picks) if (p.user_id === input.viewerId) myPicks[p.game_id] = { picked: p.picked_team, tiebreaker: p.tiebreaker_total };
 
-  return { games, leaderboard, myPicks, locked, lockedGameIds: [...lockedSet], lockMode, totalGames: games.length };
+  return { games, leaderboard, myPicks, locked, lockedGameIds: [...lockedSet], lockMode, totalGames: games.length, potCents, placePayouts };
 }

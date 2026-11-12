@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { getPlatformContext } from "@/lib/v2/context";
 import { v2ServerClient } from "@/lib/v2/supabase";
+import { resolveOrgByHost, PLATFORM_ORIGIN } from "@/lib/v2/domain";
 import EventShell from "./EventShell";
 import { buildEventNav, isFeatureVisible, resolveFeatures, type FeatureRow } from "@/lib/v2/features";
 import { v2Now } from "@/lib/v2/simulator";
@@ -23,6 +25,15 @@ export default async function EventLayout({
   const org = ctx.orgs.find((o) => o.slug === slug);
   if (!org) redirect("/new");
   const isAdmin = org.role === "owner" || org.role === "admin";
+
+  // Group switcher: the full set of groups this member belongs to, sorted with the
+  // current one first. On a custom domain (a verified tenant host), switching to
+  // another group must leave this host — so those links point at the platform
+  // origin, keeping the custom domain single-org (see #241).
+  const onCustomDomain = !!(await resolveOrgByHost((await headers()).get("host")));
+  const groups = ctx.orgs
+    .map((o) => ({ slug: o.slug, name: o.name, logoUrl: o.logo_url, role: o.role }))
+    .sort((a, b) => (a.slug === slug ? -1 : b.slug === slug ? 1 : a.name.localeCompare(b.name)));
 
   const supabase = await v2ServerClient();
   const [meRes, unreadRes, chatMineRes, activeEventRes] = await Promise.all([
@@ -54,6 +65,7 @@ export default async function EventLayout({
   let musicEnabled = true;
   let chatEnabled = true;
   let photosEnabled = true;
+  let roundsEnabled = true;
   const activeEventId = (activeEventRes.data?.id as string | undefined) ?? null;
   const featFilter = activeEventId
     ? `event_id.is.null,event_id.eq.${activeEventId}`
@@ -81,6 +93,7 @@ export default async function EventLayout({
   musicEnabled = isFeatureVisible(resolved, "music", isAdmin);
   chatEnabled = isFeatureVisible(resolved, "chat", isAdmin);
   photosEnabled = isFeatureVisible(resolved, "photos", isAdmin);
+  roundsEnabled = isFeatureVisible(resolved, "my_rounds", isAdmin);
 
   // Initial chat unread across my rooms (bounded recent window, like the badge API).
   let initialChatUnread = 0;
@@ -116,6 +129,9 @@ export default async function EventLayout({
       isAdmin={isAdmin}
       orgName={org.name}
       logoUrl={org.logo_url}
+      groups={groups}
+      onCustomDomain={onCustomDomain}
+      platformOrigin={PLATFORM_ORIGIN}
       userAvatarUrl={meRes.data?.avatar_url ?? null}
       initialUnreadCount={unreadRes.count ?? 0}
       initialChatUnread={initialChatUnread}
@@ -124,6 +140,7 @@ export default async function EventLayout({
       musicEnabled={musicEnabled}
       chatEnabled={chatEnabled}
       photosEnabled={photosEnabled}
+      roundsEnabled={roundsEnabled}
     >
       {children}
     </EventShell>

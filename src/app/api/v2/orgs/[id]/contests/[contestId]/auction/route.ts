@@ -49,6 +49,7 @@ async function gate(request: Request, orgId: string, contestId: string) {
  *   { action:"settings", tournament_id?, salary_cap_cents?, bid_increment_cents?,
  *                        teams_per_player?, first_participant_id? }  — merge config.
  *   { action:"shuffle" }                             — (re)roll the throwout order seed.
+ *   { action:"go_live", live:boolean }               — open the live board to spectators / return to the lobby.
  *   { action:"complete", complete:boolean }          — open/close the auction.
  */
 export async function POST(request: Request, { params }: { params: Params }) {
@@ -108,6 +109,12 @@ export async function POST(request: Request, { params }: { params: Params }) {
     // Advance the nominator by one (wraps around the list); clear any lot on the block.
     cfg.nomination_skips = Math.max(0, Math.floor(Number(cfg.nomination_skips) || 0)) + 1;
     cfg.on_block_entity_id = undefined;
+  } else if (body.action === "go_live") {
+    // Flip the public lobby → live board. Going live reveals the throwout order + animated
+    // board to spectators; returning to the lobby hides it again (and clears any lot on the
+    // block so the lobby reads clean).
+    if (body.live === true) cfg.auction_live = true;
+    else { cfg.auction_live = undefined; cfg.on_block_entity_id = undefined; }
   } else if (body.action === "complete") {
     cfg.auction_complete = body.complete === true;
   } else {

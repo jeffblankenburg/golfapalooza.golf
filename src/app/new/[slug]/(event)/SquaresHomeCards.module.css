@@ -47,6 +47,18 @@
   color: var(--ink, #17211c);
   font-weight: 800;
 }
+/* "In the money" marker — green, pushed to the right edge of the stats row. */
+.moneyTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  color: #15803d;
+}
+.moneyTag strong {
+  color: #15803d;
+  font-variant-numeric: tabular-nums;
+}
 .matchup {
   display: flex;
   align-items: center;

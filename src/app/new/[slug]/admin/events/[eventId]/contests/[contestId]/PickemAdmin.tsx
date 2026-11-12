@@ -9,7 +9,8 @@ import { FBS_TEAMS, getTeamLogoUrl } from "@/lib/data/fbs-teams";
 import { computePickemPayouts, type PayoutSplit } from "@/lib/v2/contests/pickem";
 import GameSelectModal from "@/components/v2/sports/GameSelectModal";
 import type { EspnGame } from "@/lib/v2/sports/espn";
-import PayoutSplitsEditor, { ordinal } from "./PayoutSplitsEditor";
+import PayoutSplitsEditor from "./PayoutSplitsEditor";
+import { placeLabel } from "@/lib/v2/contests/payouts";
 /* eslint-disable @next/next/no-img-element */
 
 const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: cents % 100 === 0 ? 0 : 2, maximumFractionDigits: 2 })}`;
@@ -280,7 +281,7 @@ export default function PickemAdmin({ base, playersHref, showMoney = true, showS
                 <p className={styles.roundFormHint} style={{ marginTop: 0 }}>Pot: {money(feeCents)} × {enrolledCount} in = <strong style={{ color: "var(--brand)" }}>{money(potCents)}</strong></p>
                 {payouts.length > 0 && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-                    {payouts.map((p) => <span key={p.place} className={styles.roleBadge}>{ordinal(p.place)}: {money(p.amountCents)}</span>)}
+                    {payouts.map((p) => <span key={p.place} className={styles.roleBadge}>{placeLabel(p.place)}: {money(p.amountCents)}</span>)}
                   </div>
                 )}
               </div>

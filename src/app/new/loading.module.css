@@ -1,0 +1,78 @@
+/* Instant navigation fallback for the /new app (shown while the [slug] + event
+   layouts and home page resolve — notably a group switch). Full-viewport, centered,
+   tinted with the current --brand so it reads on-brand on a custom domain. */
+.wrap {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--paper, #f4f3ee);
+}
+.spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--brand, #0a5c36) 22%, transparent);
+  border-top-color: var(--brand, #0a5c36);
+  animation: routeSpin 0.7s linear infinite;
+}
+/* Destination greeting — the group you're switching to: logo, name, then a
+   smaller spinner beneath. */
+.dest {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  animation: destIn 0.2s ease-out both;
+}
+.destLogo {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--brand, #0a5c36) 10%, var(--paper, #f4f3ee));
+}
+.destLogo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.destMono {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--brand, #0a5c36);
+  color: #fff;
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  font-size: 2.2rem;
+}
+.destName {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--ink, #17211d);
+}
+.dest .spinner {
+  width: 24px;
+  height: 24px;
+  border-width: 2.5px;
+}
+@keyframes destIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes routeSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}

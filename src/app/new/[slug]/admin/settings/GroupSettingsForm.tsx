@@ -21,6 +21,8 @@ export default function GroupSettingsForm({
   initialSystemAvatar,
   initialMemberNoun,
   initialMemberNounPlural,
+  initialFoundedYear,
+  createdYear,
 }: {
   orgId: string;
   slug: string;
@@ -35,6 +37,8 @@ export default function GroupSettingsForm({
   initialSystemAvatar: string | null;
   initialMemberNoun: string;
   initialMemberNounPlural: string;
+  initialFoundedYear: number | null;
+  createdYear: number;
 }) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
@@ -48,6 +52,7 @@ export default function GroupSettingsForm({
   const [systemName, setSystemName] = useState(initialSystemName);
   const [memberNoun, setMemberNoun] = useState(initialMemberNoun);
   const [memberNounPlural, setMemberNounPlural] = useState(initialMemberNounPlural);
+  const [foundedYear, setFoundedYear] = useState(initialFoundedYear != null ? String(initialFoundedYear) : "");
   const [systemAvatar, setSystemAvatar] = useState<File | null>(null);
   const [systemAvatarPreview, setSystemAvatarPreview] = useState<string | null>(initialSystemAvatar);
   const [saving, setSaving] = useState(false);
@@ -70,6 +75,18 @@ export default function GroupSettingsForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || saving) return;
+    // Founded year: blank clears it (home falls back to the created year); otherwise
+    // it must be a sane 4-digit year.
+    const yrTrim = foundedYear.trim();
+    let foundedPayload: number | null = null;
+    if (yrTrim) {
+      const yr = Number(yrTrim);
+      if (!Number.isInteger(yr) || yr < 1800 || yr > 2200) {
+        setError("Founded year must be between 1800 and 2200");
+        return;
+      }
+      foundedPayload = yr;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -86,6 +103,7 @@ export default function GroupSettingsForm({
           system_name: systemName.trim() || "System",
           member_noun: memberNoun.trim() || "Member",
           member_noun_plural: memberNounPlural.trim() || "Members",
+          founded_year: foundedPayload,
         }),
       });
       if (!res.ok) {
@@ -217,6 +235,24 @@ export default function GroupSettingsForm({
                 />
                 <span className={styles.swatchHint}>Tints your group&apos;s accents.</span>
               </div>
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="foundedYear">
+                Founded
+              </label>
+              <input
+                id="foundedYear"
+                className={styles.input}
+                value={foundedYear}
+                onChange={(e) => setFoundedYear(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
+                inputMode="numeric"
+                placeholder={String(createdYear)}
+              />
+              <p className={styles.swatchHint}>
+                The year your group started, shown as &ldquo;Since {foundedYear || createdYear}&rdquo; on the home
+                page when no event is running. Leave blank to use the year the group was created.
+              </p>
             </div>
           </div>
         </details>

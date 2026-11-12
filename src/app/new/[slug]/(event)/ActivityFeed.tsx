@@ -29,6 +29,21 @@ function toParLabel(n: number): string {
   return n > 0 ? `+${n}` : `−${Math.abs(n)}`; // proper minus sign
 }
 
+/** Natural-language join: "rounds" / "rounds and photos" / "rounds, photos, and songs". */
+function joinList(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+/** The empty-state hint names only the activity producers that are enabled, so we
+ *  never promise content from a feature the group has turned off. */
+function emptyHint(producers: string[]): string {
+  return producers.length === 0
+    ? "New activity will show up here."
+    : `New ${joinList(producers)} will show up here.`;
+}
+
 /** Per-kind glyph for the leading badge when there's no image or avatar. */
 function KindIcon({ kind }: { kind: string }) {
   const paths: Record<string, React.ReactNode> = {
@@ -165,11 +180,13 @@ export default function ActivityFeed({
   orgId,
   systemName,
   systemAvatar,
+  producers,
 }: {
   initialItems: ActivityRow[];
   orgId: string;
   systemName: string;
   systemAvatar: string | null;
+  producers: string[];
 }) {
   const [items, setItems] = useState<ActivityRow[]>(initialItems);
 
@@ -237,7 +254,7 @@ export default function ActivityFeed({
           </span>
           <span className={styles.feedEmptyText}>
             <span className={styles.feedEmptyTitle}>No activity yet</span>
-            <span className={styles.feedEmptySub}>New rounds, photos, RSVPs, and songs will show up here.</span>
+            <span className={styles.feedEmptySub}>{emptyHint(producers)}</span>
           </span>
         </div>
       </section>

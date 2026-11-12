@@ -46,6 +46,7 @@ export default async function PickemPage({ params }: { params: Promise<{ slug: s
     <div className={`${styles.page} ${styles.orgPage}`}>
       <h1 className={styles.title}>{contest.name || "Pick'em"}</h1>
       <PickemContent
+        contestId={contest.id as string}
         pickUrl={`/api/v2/events/${ev.id}/pickem/pick`}
         games={board.games}
         initialPicks={board.myPicks}
@@ -54,6 +55,8 @@ export default async function PickemPage({ params }: { params: Promise<{ slug: s
         allLocked={board.locked}
         meId={ctx.userId}
         totalGames={board.totalGames}
+        potCents={board.potCents}
+        placePayouts={board.placePayouts}
       />
     </div>
   );

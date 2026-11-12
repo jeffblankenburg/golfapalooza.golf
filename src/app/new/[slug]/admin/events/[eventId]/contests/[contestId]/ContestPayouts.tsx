@@ -5,8 +5,8 @@ import Modal from "@/app/new/_components/Modal";
 import SaveStatus from "@/app/new/_components/SaveStatus";
 import { useAutoSave } from "@/app/new/_components/useAutoSave";
 import styles from "@/app/new/new.module.css";
-import PayoutSplitsEditor, { ordinal } from "./PayoutSplitsEditor";
-import { computePlacePayouts, isTeamContest, splitAmongMembers, type PayoutSplit } from "@/lib/v2/contests/payouts";
+import PayoutSplitsEditor from "./PayoutSplitsEditor";
+import { computePlacePayouts, isTeamContest, splitAmongMembers, placeLabel, type PayoutSplit } from "@/lib/v2/contests/payouts";
 import type { ContestType } from "@/lib/v2/contests";
 
 const money = (c: number) => `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: c % 100 === 0 ? 0 : 2, maximumFractionDigits: 2 })}`;
@@ -61,7 +61,7 @@ export default function ContestPayouts({ base, contestType, initialSplits, feeCe
                   const perMember = team && teamSize && teamSize > 1 ? splitAmongMembers(p.amountCents, teamSize)[0] : null;
                   return (
                     <tr key={p.place}>
-                      <td style={{ padding: "3px 0", color: "var(--ink-soft)" }}>{ordinal(p.place)}</td>
+                      <td style={{ padding: "3px 0", color: "var(--ink-soft)" }}>{placeLabel(p.place)}</td>
                       <td style={{ padding: "3px 0", textAlign: "right", fontWeight: 600 }}>{money(p.amountCents)}</td>
                       <td style={{ padding: "3px 0 3px 12px", textAlign: "right", color: "var(--ink-soft)" }}>
                         {perMember != null ? `${money(perMember)} each` : team ? "split among team" : ""}

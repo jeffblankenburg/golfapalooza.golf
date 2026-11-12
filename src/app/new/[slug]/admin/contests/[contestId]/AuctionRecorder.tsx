@@ -122,6 +122,22 @@ export default function AuctionRecorder({ slug, apiBase, state, backHref }: {
       </div>
       <h1 style={{ fontSize: "1.45rem", fontWeight: 800, margin: "6px 0 0" }}>{state.contest.name}, live</h1>
 
+      {/* Public visibility: the lobby (spectators see the roster) vs. the live board (animated,
+          throwout order + the lot on the block). Complete supersedes both — the results board
+          is public once the auction is closed. */}
+      {!config.complete && (
+        <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "10px 14px", borderRadius: 10, border: `1px solid ${config.live ? "var(--brand)" : "var(--line)"}`, background: config.live ? "var(--brand-tint, #e8f2ec)" : "var(--card)" }}>
+          <span aria-hidden style={{ width: 9, height: 9, borderRadius: "50%", flexShrink: 0, background: config.live ? "var(--brand)" : "var(--ink-soft)", boxShadow: config.live ? "0 0 0 3px color-mix(in srgb, var(--brand) 25%, transparent)" : "none" }} />
+          <span style={{ flex: 1, minWidth: 0, fontSize: "0.85rem" }}>
+            <strong>{config.live ? "Live" : "In the lobby"}</strong>
+            <span style={{ color: "var(--ink-soft)" }}> — {config.live ? "spectators see the animated board." : "spectators see who's in; the board stays hidden."}</span>
+          </span>
+          <button type="button" className={config.live ? styles.createBtnGhost : styles.createBtn} style={{ padding: "6px 12px", fontSize: "0.82rem" }} disabled={busy} onClick={() => void act({ action: "go_live", live: !config.live })}>
+            {config.live ? "Return to lobby" : "Go live"}
+          </button>
+        </div>
+      )}
+
       {!config.complete && currentId && (
         <div style={{ padding: "10px 14px", borderRadius: 10, background: "var(--brand-tint, #e8f2ec)", marginTop: 10, display: "flex", flexDirection: "column", gap: 3 }}>
           <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>

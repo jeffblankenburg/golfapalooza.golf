@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
-import {
-  syncOptionContestEnrollment, cascadeDeselectDependents, optionValueIsEmpty, type OptionType,
-} from "@/lib/v2/options";
+import { optionValueIsEmpty, type OptionType } from "@/lib/v2/options";
+import { syncOptionContestEnrollment, cascadeDeselectDependents } from "@/lib/v2/options-enrollment";
 
 type Params = Promise<{ id: string; eventId: string; optionId: string }>;
 

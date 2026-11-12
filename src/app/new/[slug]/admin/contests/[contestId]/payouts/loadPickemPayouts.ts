@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { rankPickem, gameIsScored, computePickemPayouts, type PickemGame, type PickemPick, type PayoutSplit } from "@/lib/v2/contests/pickem";
 import { MATCHUP_SELECT, matchupToPickemGame, type MatchupRow } from "@/lib/v2/contests/pickem-server";
-import { splitAmongMembers } from "@/lib/v2/contests/payouts";
+import { distributePlacePayouts } from "@/lib/v2/contests/payouts";
 import { pickName, type NameMode } from "@/lib/v2/profile";
 
 /**
@@ -62,7 +62,6 @@ export async function loadPickemPayouts(
 
   const ready = games.length > 0 && games.every(gameIsScored);
   const placePayouts = computePickemPayouts(potCents, contest.payout_splits);
-  const amountForPlace = new Map(placePayouts.map((p) => [p.place, p.amountCents]));
 
   // Won cents per user: group the ranked board by rank; a rank held by k players
   // occupies places [rank, rank+k-1] — pool those place amounts and split evenly.
@@ -72,20 +71,7 @@ export async function loadPickemPayouts(
   if (ready && potCents > 0 && placePayouts.length > 0) {
     const ranked = rankPickem(games, picks);
     for (const r of ranked) { placeByUser.set(r.userId, r.rank); correctByUser.set(r.userId, r.correct); }
-    // Walk distinct rank groups in board order.
-    let i = 0;
-    while (i < ranked.length) {
-      const rank = ranked[i].rank;
-      const group: string[] = [];
-      let j = i;
-      while (j < ranked.length && ranked[j].rank === rank) { group.push(ranked[j].userId); j++; }
-      const total = group.reduce((s, _u, k) => s + (amountForPlace.get(rank + k) ?? 0), 0);
-      if (total > 0) {
-        const shares = splitAmongMembers(total, group.length);
-        group.forEach((uid, k) => wonByUser.set(uid, shares[k]));
-      }
-      i = j;
-    }
+    for (const [uid, cents] of distributePlacePayouts(ranked, placePayouts)) wonByUser.set(uid, cents);
   }
 
   const winnerIds = [...wonByUser.keys()].filter((uid) => (wonByUser.get(uid) || 0) > 0);

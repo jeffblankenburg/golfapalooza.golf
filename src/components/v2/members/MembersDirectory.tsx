@@ -128,7 +128,7 @@ export default function MembersDirectory({
     const isF = following.has(m.id);
     const self = m.id === viewerId;
     return (
-      <Link key={m.id} href={`/new/${slug}/loozers/${m.id}`} className={styles.card}>
+      <Link key={m.id} href={`/new/${slug}/members/${m.id}`} className={styles.card}>
         {!self && (
           <button
             type="button"
@@ -234,7 +234,7 @@ export default function MembersDirectory({
               events_attended: m.eventsAttended,
             }))}
             currentUserId={viewerId}
-            basePath={`/new/${slug}/loozers`}
+            basePath={`/new/${slug}/members`}
             heightStyle="70dvh"
           />
         ) : (
@@ -245,7 +245,7 @@ export default function MembersDirectory({
       {view === "map" && (
         <div className={styles.mapWrap}>
           <LoozerMap
-            basePath={`/new/${slug}/loozers`}
+            basePath={`/new/${slug}/members`}
             currentUserId={viewerId}
             locationsUrl={`/api/v2/members/locations?orgId=${orgId}`}
           />

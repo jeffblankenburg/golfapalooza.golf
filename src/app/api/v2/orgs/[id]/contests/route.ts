@@ -3,6 +3,7 @@ import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
 import { createSquaresContest, type SquaresGameInput } from "@/lib/v2/contests/squares-server";
 import { createPickem } from "@/lib/v2/contests/pickem-server";
+import { createProps } from "@/lib/v2/contests/props-server";
 
 type Params = Promise<{ id: string }>;
 
@@ -64,8 +65,21 @@ export async function POST(request: Request, { params }: { params: Params }) {
     return NextResponse.json({ id: data.id });
   }
 
+  // Props: a bare draft; the admin authors questions + sets the lock/rules/payouts on the
+  // manage page afterward, so create needs only a name.
+  if (body.contest_type === "props") {
+    const propsName = (body.name || "").trim();
+    if (!propsName) return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    try {
+      const { id } = await createProps(admin, { orgId, eventId: null, name: propsName, createdBy: userId });
+      return NextResponse.json({ id });
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "Create failed" }, { status: 500 });
+    }
+  }
+
   if (body.contest_type !== "squares") {
-    return NextResponse.json({ error: "Only squares, pickem, and auction contests are supported here for now" }, { status: 400 });
+    return NextResponse.json({ error: "Only squares, pickem, auction, and props contests are supported here for now" }, { status: 400 });
   }
   const name = (body.name || "").trim();
   if (!name) return NextResponse.json({ error: "Name is required" }, { status: 400 });

@@ -8,6 +8,7 @@
  */
 
 import { rankStraight, type Matchup, type Pick as SlatePick } from "./slate";
+import { computePlacePayouts, distributePlacePayouts, type PayoutSplit } from "./payouts";
 
 export interface PickemGame {
   id: string;
@@ -142,4 +143,20 @@ export function rankPickem(games: PickemGame[], picks: PickemPick[]): PickemLead
     userId: r.userId, correct: r.correct, decided: r.decided, pickedCount: r.pickedCount,
     tiebreakerTotal: r.tiebreaker, tiebreakerDiff: r.tiebreakerDiff, rank: r.rank,
   }));
+}
+
+/**
+ * Provisional ("if it ends now") winnings per user: rank the board as it stands, resolve
+ * the pot into place amounts, and distribute with tie-pooling — the SAME math the admin
+ * settlement uses, but without the all-games-scored gate. Returns cents-won per userId
+ * (winners only). Empty until at least one game is scored: before any result everyone is
+ * tied at 0, so "who's in the money" is meaningless (and would read as "everyone").
+ */
+export function provisionalWinnings(
+  games: PickemGame[], picks: PickemPick[], potCents: number, splits: PayoutSplit[] | null | undefined,
+): Map<string, number> {
+  if (potCents <= 0 || !games.some(gameIsScored)) return new Map();
+  const placePayouts = computePlacePayouts(potCents, splits);
+  if (placePayouts.length === 0) return new Map();
+  return distributePlacePayouts(rankPickem(games, picks), placePayouts);
 }

@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from "react";
 import styles from "@/app/new/new.module.css";
-import type { PayoutSplit } from "@/lib/v2/contests/payouts";
+import { LAST_PLACE, placeLabel, type PayoutSplit } from "@/lib/v2/contests/payouts";
 
 export function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
@@ -40,12 +40,19 @@ export default function PayoutSplitsEditor({ value, onSave, disabled, labels }: 
   const [prev, setPrev] = useState({ value, labels });
   if (prev.value !== value || prev.labels !== labels) { setPrev({ value, labels }); setRows(seeded); }
 
-  // Always keep place = position; commit the re-numbered array.
+  // Keep top places = position, but hold the optional LAST_PLACE row aside (it's not an
+  // ordinal counted from the top) and always keep it at the end.
   const commit = (next: PayoutSplit[]) => {
-    const numbered = next.map((r, i) => ({ ...r, place: i + 1 }));
+    const tops = next.filter((r) => r.place !== LAST_PLACE);
+    const last = next.find((r) => r.place === LAST_PLACE);
+    const numbered = [
+      ...tops.map((r, i) => ({ ...r, place: i + 1 })),
+      ...(last ? [{ ...last, place: LAST_PLACE }] : []),
+    ];
     setRows(numbered);
     onSave(numbered);
   };
+  const hasLast = rows.some((r) => r.place === LAST_PLACE);
   const pctTotal = rows.filter((r) => r.kind === "percentage").reduce((s, r) => s + (Number(r.amount) || 0), 0);
   const hasRemainder = rows.some((r) => r.kind === "remainder");
 
@@ -53,10 +60,10 @@ export default function PayoutSplitsEditor({ value, onSave, disabled, labels }: 
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: fixed ? "minmax(0, 1fr) 110px 96px" : "28px minmax(0, 1fr) 96px 28px", alignItems: "center", columnGap: 8, rowGap: 6 }}>
+      <div style={{ display: "grid", gridTemplateColumns: fixed ? "minmax(0, 1fr) 110px 96px" : "42px minmax(0, 1fr) 96px 28px", alignItems: "center", columnGap: 8, rowGap: 6 }}>
         {rows.map((r, i) => (
           <Fragment key={i}>
-            <span style={{ color: fixed ? "var(--ink)" : "var(--ink-soft)", fontSize: "0.85rem" }}>{labels ? labels[i] : ordinal(i + 1)}</span>
+            <span style={{ color: fixed ? "var(--ink)" : "var(--ink-soft)", fontSize: "0.85rem" }}>{labels ? labels[i] : placeLabel(r.place)}</span>
             <select className={styles.selectInput} style={{ width: "100%", minWidth: 0, ...inputSize }} value={r.kind} disabled={disabled}
               onChange={(e) => commit(rows.map((x, j) => (j === i ? { ...x, kind: e.target.value } : x)))}>
               {KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
@@ -84,8 +91,18 @@ export default function PayoutSplitsEditor({ value, onSave, disabled, labels }: 
         ))}
       </div>
       {!fixed && (
-        <button type="button" className={styles.createBtnGhost} disabled={disabled} style={{ marginTop: 8, padding: "7px 10px", fontSize: "0.85rem" }}
-          onClick={() => commit([...rows, { place: rows.length + 1, kind: "percentage", amount: 0 }])}>+ Add place</button>
+        <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+          <button type="button" className={styles.createBtnGhost} disabled={disabled} style={{ width: "auto", padding: "7px 10px", fontSize: "0.85rem" }}
+            onClick={() => {
+              const tops = rows.filter((r) => r.place !== LAST_PLACE);
+              const last = rows.find((r) => r.place === LAST_PLACE);
+              commit([...tops, { place: tops.length + 1, kind: "percentage", amount: 0 }, ...(last ? [last] : [])]);
+            }}>+ Add place</button>
+          {!hasLast && (
+            <button type="button" className={styles.createBtnGhost} disabled={disabled} style={{ width: "auto", padding: "7px 10px", fontSize: "0.85rem" }}
+              onClick={() => commit([...rows, { place: LAST_PLACE, kind: "flat", amount: 0 }])}>+ Last-place prize</button>
+          )}
+        </div>
       )}
       {rows.some((r) => r.kind === "percentage") && !hasRemainder && pctTotal !== 100 && (
         <p className={styles.roundFormHint} style={{ marginTop: 10, color: pctTotal > 100 ? "var(--warn, #c2410c)" : undefined }}>Percentages total {pctTotal}% (add a Remainder place or reach 100%).</p>

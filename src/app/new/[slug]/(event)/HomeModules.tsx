@@ -8,6 +8,7 @@ import BirthdayBanner, { type BirthdayPerson } from "./BirthdayBanner";
 import SquaresHomeCards from "./SquaresHomeCards";
 import PickemHomeCards from "./PickemHomeCards";
 import AuctionHomeCards from "./AuctionHomeCards";
+import PropsHomeCards from "./PropsHomeCards";
 import RsvpModule, { type Likelihood } from "./RsvpModule";
 import OptionsReminder from "./OptionsReminder";
 import AdCarousel, { type Ad } from "./AdCarousel";
@@ -73,9 +74,10 @@ export default async function HomeModules({
   articlesVisible,
   optionsOpen,
   moneyVisible,
+  activityProducers,
 }: {
   orgId: string;
-  eventId: string;
+  eventId: string | null;
   userId: string;
   slug: string;
   eventName: string;
@@ -86,6 +88,7 @@ export default async function HomeModules({
   articlesVisible: boolean;
   optionsOpen: boolean;
   moneyVisible: boolean;
+  activityProducers: string[];
 }) {
   const supabase = await v2ServerClient();
 
@@ -96,9 +99,9 @@ export default async function HomeModules({
   const now = await v2Now();
   const nowIso = now.toISOString();
 
-  // Birthdays + article + RSVP + attending count + ads + activity, in parallel.
-  const [membersRes, articleRes, myRsvpRes, goingRes, attendingRes, adsRes, activityRes, orgSysRes, optionsRes, selectionsRes] =
-    await Promise.all([
+  // Group-scoped home data (members/birthdays, article, ads, activity, system entity).
+  // These render whether or not there's an active event.
+  const [membersRes, articleRes, adsRes, activityRes, orgSysRes] = await Promise.all([
     supabase
       .from("v2_memberships")
       .select("user_id, v2_profiles(id, display_name, first_name, last_name, birthdate, avatar_url)")
@@ -119,21 +122,6 @@ export default async function HomeModules({
       .limit(1)
       .maybeSingle(),
     supabase
-      .from("v2_event_participants")
-      .select("likelihood")
-      .eq("event_id", eventId)
-      .eq("user_id", userId)
-      .maybeSingle(),
-    supabase
-      .from("v2_event_participants")
-      .select("id", { count: "exact", head: true })
-      .eq("event_id", eventId),
-    supabase
-      .from("v2_event_participants")
-      .select("id", { count: "exact", head: true })
-      .eq("event_id", eventId)
-      .eq("on_roster", true),
-    supabase
       .from("v2_ads")
       .select("id, image_url, alt_text")
       .eq("org_id", orgId)
@@ -149,14 +137,35 @@ export default async function HomeModules({
       .select("system_name, system_avatar_url")
       .eq("id", orgId)
       .maybeSingle(),
-    // Opt-in options for this event + the member's current selections (for the nudge).
-    supabase.from("v2_options").select(OPTION_SELECT).eq("event_id", eventId).order("sort_order"),
-    supabase.from("v2_user_option_selections").select("option_id, value").eq("event_id", eventId).eq("user_id", userId),
   ]);
 
-  const myLikelihood = (myRsvpRes.data?.likelihood as Likelihood | undefined) ?? null;
-  const responseCount = goingRes.count ?? 0;
-  const attendingCount = attendingRes.count ?? 0;
+  // Event-scoped home data (RSVP, attendance counts, opt-in options). Only fetched
+  // when there's an active event — a group with no event skips all of it.
+  const [myRsvpRes, goingRes, attendingRes, optionsRes, selectionsRes] = eventId
+    ? await Promise.all([
+        supabase
+          .from("v2_event_participants")
+          .select("likelihood")
+          .eq("event_id", eventId)
+          .eq("user_id", userId)
+          .maybeSingle(),
+        supabase
+          .from("v2_event_participants")
+          .select("id", { count: "exact", head: true })
+          .eq("event_id", eventId),
+        supabase
+          .from("v2_event_participants")
+          .select("id", { count: "exact", head: true })
+          .eq("event_id", eventId)
+          .eq("on_roster", true),
+        supabase.from("v2_options").select(OPTION_SELECT).eq("event_id", eventId).order("sort_order"),
+        supabase.from("v2_user_option_selections").select("option_id, value").eq("event_id", eventId).eq("user_id", userId),
+      ])
+    : [null, null, null, null, null];
+
+  const myLikelihood = (myRsvpRes?.data?.likelihood as Likelihood | undefined) ?? null;
+  const responseCount = goingRes?.count ?? 0;
+  const attendingCount = attendingRes?.count ?? 0;
   const ads = (adsRes.data as Ad[] | null) ?? [];
   const activity = ((activityRes.data as unknown as (Omit<ActivityRow, "actor"> & {
     actor: ActivityRow["actor"] | ActivityRow["actor"][];
@@ -170,12 +179,15 @@ export default async function HomeModules({
   const systemAvatar = orgSys?.system_avatar_url ?? null;
 
   // Options the member can opt into + their current picks + the derived Trip Cost.
-  const optionRows = (optionsRes.data as Option[] | null) ?? [];
+  // Options are event-scoped, so skip them entirely when there's no active event.
+  const optionRows = (optionsRes?.data as Option[] | null) ?? [];
   const optionIds = optionRows.map((o) => o.id);
-  const [optionPriceInfo, tripCost] = await Promise.all([
-    loadOptionChoicePrices(supabase, optionIds),
-    tripCostCents(supabase, eventId),
-  ]);
+  const [optionPriceInfo, tripCost] = eventId
+    ? await Promise.all([
+        loadOptionChoicePrices(supabase, optionIds),
+        tripCostCents(supabase, eventId),
+      ])
+    : [new Map<string, { whole: number; byChoice: Record<string, number> }>(), 0];
   // Trip Cost is a normal selectable option (v1 parity) — render it as a checkbox whose
   // price is the derived tripCostCents; drop it only when it's $0 (nothing in it yet).
   const memberOptions = optionRows
@@ -191,7 +203,7 @@ export default async function HomeModules({
       };
     });
   const selections: Record<string, unknown> = {};
-  for (const s of ((selectionsRes.data as { option_id: string; value: unknown }[] | null) ?? [])) selections[s.option_id] = s.value;
+  for (const s of ((selectionsRes?.data as { option_id: string; value: unknown }[] | null) ?? [])) selections[s.option_id] = s.value;
 
   const birthdays = birthdaysToday(
     (membersRes.data as unknown as { v2_profiles: MemberProfile | null }[]) || [],
@@ -222,14 +234,17 @@ export default async function HomeModules({
       <SquaresHomeCards orgId={orgId} userId={userId} slug={slug} />
       <PickemHomeCards orgId={orgId} userId={userId} slug={slug} eventId={eventId} />
       <AuctionHomeCards orgId={orgId} userId={userId} slug={slug} eventId={eventId} />
+      <PropsHomeCards orgId={orgId} userId={userId} slug={slug} eventId={eventId} />
       {articlesVisible && article && <ArticleModule article={article} slug={slug} />}
-      <RsvpModule
-        eventId={eventId}
-        eventName={eventName}
-        initialLikelihood={myLikelihood}
-        initialResponseCount={responseCount}
-        initialAttendingCount={attendingCount}
-      />
+      {eventId && (
+        <RsvpModule
+          eventId={eventId}
+          eventName={eventName}
+          initialLikelihood={myLikelihood}
+          initialResponseCount={responseCount}
+          initialAttendingCount={attendingCount}
+        />
+      )}
       {optionsOpen && (
         <OptionsReminder
           slug={slug}
@@ -239,7 +254,7 @@ export default async function HomeModules({
       )}
       {moneyVisible && <BalanceModule slug={slug} balanceCents={balanceCents} />}
       <StoreModule storeUrl={storeEnabled ? storeUrl : null} storeLabel={storeLabel} />
-      <ActivityFeed initialItems={activity} orgId={orgId} systemName={systemName} systemAvatar={systemAvatar} />
+      <ActivityFeed initialItems={activity} orgId={orgId} systemName={systemName} systemAvatar={systemAvatar} producers={activityProducers} />
       <AdCarousel ads={ads} />
     </>
   );

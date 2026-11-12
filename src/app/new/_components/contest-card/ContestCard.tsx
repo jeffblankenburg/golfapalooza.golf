@@ -7,11 +7,11 @@ import styles from "./ContestCard.module.css";
  *  same classes as the shell. */
 export { styles as cardStyles };
 
-type IconKind = "squares" | "pickem" | "calcutta" | "cornhole" | "other" | "golf";
+type IconKind = "squares" | "pickem" | "calcutta" | "cornhole" | "props" | "other" | "golf";
 
 /** Golf-round contests all share the flag glyph; the label text disambiguates them. */
 function iconKindFor(kind: string): IconKind {
-  if (kind === "squares" || kind === "pickem" || kind === "calcutta" || kind === "cornhole") return kind;
+  if (kind === "squares" || kind === "pickem" || kind === "calcutta" || kind === "cornhole" || kind === "props") return kind;
   if (kind === "other") return "other";
   return "golf"; // scramble, ryder_cup, skins, ctp, long_drive, long_putt, bspitw, hundred_feet
 }
@@ -44,6 +44,14 @@ export function ContestTypeIcon({ kind, size = 13 }: { kind: string; size?: numb
         <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
           <circle cx="12" cy="12" r="9" />
           <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    case "props":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <rect x="4" y="3" width="16" height="18" rx="2" />
+          <path d="M9.2 9a2.5 2.5 0 1 1 3.3 2.4c-.8.3-1.2.9-1.2 1.7" />
+          <path d="M11.3 16.3h.01" />
         </svg>
       );
     case "other":

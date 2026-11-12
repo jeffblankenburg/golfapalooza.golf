@@ -91,7 +91,7 @@ function renderContent(content: string, slug?: string): React.ReactNode[] {
       // plain chip if we don't have a slug to build the link.
       nodes.push(
         slug ? (
-          <Link key={key++} href={`/new/${slug}/loozers/${m[2]}`} className={styles.mention} onClick={(e) => e.stopPropagation()}>
+          <Link key={key++} href={`/new/${slug}/members/${m[2]}`} className={styles.mention} onClick={(e) => e.stopPropagation()}>
             @{m[1]}
           </Link>
         ) : (
@@ -471,7 +471,7 @@ function RoomSettings({
               const canRemove = self || iAmCreator;
               return (
                 <div key={m.userId} className={styles.settingsMember}>
-                  <Link href={`/new/${slug}/loozers/${m.userId}`} className={styles.settingsMemberInfo} onClick={onClose}>
+                  <Link href={`/new/${slug}/members/${m.userId}`} className={styles.settingsMemberInfo} onClick={onClose}>
                     {m.avatarUrl ? (
                       <img src={m.avatarUrl} alt="" className={styles.mentionAvatar} />
                     ) : (

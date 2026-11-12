@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { v2ServerClient } from "@/lib/v2/supabase";
+import { loadAuction } from "@/lib/v2/contests/auction-server";
+import HomeCardsLive from "./HomeCardsLive";
 import styles from "./SquaresHomeCards.module.css";
 
 /** Small "this is an Auction" marker (gavel glyph + label), matching the admin type badge. */
@@ -22,36 +24,47 @@ const money = (cents: number) => {
   const whole = cents % 100 === 0;
   return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 })}`;
 };
+const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
 
 /**
- * Home-page Auction cards — one per set-up pool (group-scoped or on the active event),
- * showing the viewer's lots and a status badge. Mirrors the Pick'em/Squares home card;
- * links to the shared contest detail (the member board).
+ * Home-page Auction cards — one per set-up pool (group-scoped or on the active event).
+ * The card follows the auction's phase: the lobby shows the headcount + entry, a live auction
+ * shows the viewer's lots + remaining balance, and a finished auction becomes a mini scoreboard
+ * (point total, standings place, teams). Links to the shared contest detail (the member board).
  */
-export default async function AuctionHomeCards({ orgId, userId, slug, eventId }: { orgId: string; userId: string; slug: string; eventId: string }) {
+export default async function AuctionHomeCards({ orgId, userId, slug, eventId }: { orgId: string; userId: string; slug: string; eventId: string | null }) {
   const supabase = await v2ServerClient();
-  const { data: contests } = await supabase
+  // With an active event: group-scoped auctions (event_id NULL) plus this event's own.
+  // With no active event: only the group-scoped auctions exist to show.
+  let query = supabase
     .from("v2_contests")
-    .select("id, name, event_id, config")
+    .select("id, name, event_id")
     .eq("org_id", orgId)
     .eq("contest_type", "auction")
-    .eq("status", "active")
-    .or(`event_id.is.null,event_id.eq.${eventId}`);
-  // Visibility is the admin's status toggle — show every active auction (a tournament
-  // may not be bound yet; the board handles that).
+    .eq("status", "active");
+  query = eventId ? query.or(`event_id.is.null,event_id.eq.${eventId}`) : query.is("event_id", null);
+  const { data: contests } = await query;
   const live = contests ?? [];
   if (live.length === 0) return null;
 
-  const ids = live.map((c) => c.id);
-  const { data: ownRows } = await supabase
-    .from("v2_auction_teams").select("contest_id, user_id, bid_cents").in("contest_id", ids);
-  const rows = ownRows ?? [];
+  // Full state per auction — gives the viewer's points/place/lots without a second query shape.
+  const states = await Promise.all(live.map((c) => loadAuction(supabase, c.id)));
 
-  const cards = live.map((c) => {
-    const cfg = (c.config as { entry_cents?: number; on_block_entity_id?: string; auction_complete?: boolean } | null) ?? {};
-    const mine = rows.filter((r) => r.contest_id === c.id && r.user_id === userId && ((r.bid_cents as number) || 0) > 0).length;
-    const badge = cfg.auction_complete ? "Final" : cfg.on_block_entity_id ? "Live" : "View";
-    const entry = Number(cfg.entry_cents) || 0;
+  const cards = live.map((c, idx) => {
+    const state = states[idx];
+    if (!state) return null;
+    const { config, participants } = state;
+    const complete = config.complete;
+    const isLive = config.live;
+    const badge = complete ? "Final" : isLive ? "Live" : "View";
+
+    const standings = [...participants].sort((a, b) => b.points - a.points || a.spentCents - b.spentCents);
+    const me = participants.find((p) => p.userId === userId) ?? null;
+    const myPlace = me ? standings.indexOf(me) + 1 : null;
+    const myLots = me ? me.teams.length : 0;
+    const n = participants.length;
+    const entry = state.buyInCents;
+
     return (
       <Link key={c.id} href={`/new/${slug}/contests/${c.id}`} className={styles.draftCard}>
         <div className={styles.draftTop}>
@@ -60,12 +73,36 @@ export default async function AuctionHomeCards({ orgId, userId, slug, eventId }:
         </div>
         <AuctionTag />
         <div className={styles.draftStats}>
-          <span><strong>{mine}</strong> {mine === 1 ? "lot" : "lots"}</span>
-          {entry > 0 && <span><strong>{money(entry)}</strong> entry</span>}
+          {complete ? (
+            <>
+              <span><strong>{me ? me.points : 0}</strong> pts</span>
+              {myPlace && <span><strong>{ordinal(myPlace)}</strong> of {n}</span>}
+              <span><strong>{myLots}</strong> {myLots === 1 ? "team" : "teams"}</span>
+            </>
+          ) : isLive ? (
+            <>
+              <span><strong>{myLots}</strong> {myLots === 1 ? "lot" : "lots"}</span>
+              {me && <span><strong>{money(me.remainingCents)}</strong> left</span>}
+            </>
+          ) : (
+            <>
+              <span><strong>{n}</strong> {n === 1 ? "player" : "players"}</span>
+              {entry > 0 && <span><strong>{money(entry)}</strong> entry</span>}
+            </>
+          )}
         </div>
       </Link>
     );
   });
 
-  return <>{cards}</>;
+  const liveRefresher = (
+    <HomeCardsLive
+      contests={states.map((s, idx) => ({
+        type: "auction" as const,
+        contestId: live[idx].id,
+        tournamentId: s?.config.tournamentId ?? null,
+      }))}
+    />
+  );
+  return <>{cards}{liveRefresher}</>;
 }

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
 import { loadResolvedFeatures } from "@/lib/v2/features-server";
@@ -51,15 +52,36 @@ export default async function EventHome({
   if (!org) redirect("/new");
 
   const supabase = await v2ServerClient();
-  const { data } = await supabase
-    .from("v2_events")
-    .select("id, name, year, start_date, start_time, end_date, timezone, status, location")
-    .eq("org_id", org.id)
-    .eq("status", "active")
-    .order("start_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const event = data as EventRow | null;
+  // The active event (if any) powers the event hero + event-scoped modules. The
+  // separate count tells "between events" (has events, none active) apart from a
+  // group that doesn't run events at all — only the former gets a status note.
+  const [activeRes, anyEventRes, memberCountRes] = await Promise.all([
+    supabase
+      .from("v2_events")
+      .select("id, name, year, start_date, start_time, end_date, timezone, status, location")
+      .eq("org_id", org.id)
+      .eq("status", "active")
+      .order("start_date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("v2_events")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", org.id),
+    // Member count for the no-event stripe (founding year comes from context).
+    supabase
+      .from("v2_memberships")
+      .select("user_id", { count: "exact", head: true })
+      .eq("org_id", org.id)
+      .eq("status", "active")
+      .is("archived_at", null),
+  ]);
+  const event = activeRes.data as EventRow | null;
+  const hasAnyEvent = (anyEventRes.count ?? 0) > 0;
+  const memberCount = memberCountRes.count ?? 0;
+  const memberNoun = memberCount === 1 ? org.member_noun : org.member_noun_plural;
+  // Admin-set founding year, falling back to the year the group was created.
+  const foundedYear = org.founded_year ?? (org.created_at ? new Date(org.created_at).getFullYear() : null);
   const range = event ? dateRange(event.start_date, event.end_date) : null;
 
   // Home modules that mirror a registry feature honor its visibility.
@@ -67,6 +89,14 @@ export default async function EventHome({
   const resolved = await loadResolvedFeatures(supabase, org.id, event?.id ?? null);
   const articlesVisible = isFeatureVisible(resolved, "articles", isAdmin);
   const moneyVisible = isFeatureVisible(resolved, "my_money", isAdmin);
+  // The activity feed's empty-state hint should only name producers that are
+  // actually enabled (e.g. don't promise "rounds" when My Rounds is off).
+  const activityProducers = [
+    isFeatureVisible(resolved, "my_rounds", isAdmin) && "rounds",
+    isFeatureVisible(resolved, "photos", isAdmin) && "photos",
+    event && "RSVPs",
+    isFeatureVisible(resolved, "music", isAdmin) && "songs",
+  ].filter((v): v is string => typeof v === "string");
   // Options: visibility/open come from the feature window; the read-only cutoff is
   // the Options-specific close date. "Open" (editable) means both hold.
   const optionsFeat = event ? resolved.find((r) => r.def.key === "options") || null : null;
@@ -108,28 +138,47 @@ export default async function EventHome({
               <EventLocation location={event.location} />
             </div>
           )}
-
-          <HomeModules
-            orgId={org.id}
-            eventId={event.id}
-            userId={ctx.userId}
-            slug={slug}
-            eventName={event.name}
-            storeUrl={org.store_url}
-            storeLabel={org.store_label}
-            storeEnabled={org.store_enabled}
-            nameDisplay={org.name_display}
-            articlesVisible={articlesVisible}
-            optionsOpen={optionsOpen}
-            moneyVisible={moneyVisible}
-          />
         </>
       ) : (
-        <div className={styles.eventHero}>
-          <h1 className={styles.title}>No active event</h1>
-          <p className={styles.lede}>There isn&apos;t an event running right now. Check back soon.</p>
-        </div>
+        // No active event: the group name takes the title slot. "Between events"
+        // (the org has events, none active) adds a soft note; a group that doesn't
+        // run events gets the name alone.
+        <>
+          <div className={styles.eventHero}>
+            <h1 className={`${styles.title} ${styles.eventTitle}`}>{org.name}</h1>
+            {hasAnyEvent && (
+              <p className={styles.lede}>No event running right now. Check back soon.</p>
+            )}
+          </div>
+          {/* Group stripe: the no-event analog of the event date/location band.
+              Member count (→ directory) on the left, founding year on the right. */}
+          <div className={styles.dateBand}>
+            <Link href={`/new/${slug}/members`} className={styles.dateText}>
+              {memberCount} {memberNoun}
+            </Link>
+            {foundedYear && <span className={styles.countdown}>Since {foundedYear}</span>}
+          </div>
+        </>
       )}
+
+      {/* Group-scoped home (birthdays, group contests, article, My Money, activity,
+          store, ads) renders with or without an active event. Event-scoped modules
+          inside self-gate on the eventId. */}
+      <HomeModules
+        orgId={org.id}
+        eventId={event?.id ?? null}
+        userId={ctx.userId}
+        slug={slug}
+        eventName={event?.name ?? ""}
+        storeUrl={org.store_url}
+        storeLabel={org.store_label}
+        storeEnabled={org.store_enabled}
+        nameDisplay={org.name_display}
+        articlesVisible={articlesVisible}
+        optionsOpen={optionsOpen}
+        moneyVisible={moneyVisible}
+        activityProducers={activityProducers}
+      />
     </div>
   );
 }

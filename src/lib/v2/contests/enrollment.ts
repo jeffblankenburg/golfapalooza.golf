@@ -276,6 +276,40 @@ export async function addContestParticipants(
 }
 
 /**
+ * Release everything a set of users "owned" in a contest, so removing them (admin removal OR a
+ * member deselecting the option that enrolled them) is completely clean no matter the contest
+ * type. Each write is keyed by contest_id, so it's a safe no-op for the types this contest
+ * doesn't use:
+ *   - Auction:  delete their team ownership → the team drops back to the available pool
+ *   - Squares:  reopen any cells they held (NULL owner = open square)
+ *   - Pick'em / slate pools: drop their picks
+ *   - Scramble / Ryder: vacate their team seats + flag the affected teams "needs attention" (#217)
+ * Does NOT touch results/history (winnings, scoring observations) — those are facts, not holdings.
+ * Realtime subscribers (auction board, pick'em leaderboard) update live off these writes.
+ */
+export async function releaseContestAssets(admin: SupabaseClient, contestId: string, userIds: string[]): Promise<void> {
+  const ids = [...new Set(userIds)].filter(Boolean);
+  if (ids.length === 0) return;
+
+  await admin.from("v2_auction_teams").delete().eq("contest_id", contestId).in("user_id", ids);
+  await admin.from("v2_squares_cells").update({ user_id: null, purchased_at: null }).eq("contest_id", contestId).in("user_id", ids);
+  await admin.from("v2_picks").delete().eq("contest_id", contestId).in("user_id", ids);
+
+  const { data: teams } = await admin.from("v2_scramble_teams").select("id").eq("contest_id", contestId);
+  const teamIds = (teams || []).map((t) => t.id as string);
+  if (teamIds.length) {
+    const { data: seats } = await admin
+      .from("v2_scramble_team_members").select("team_id").in("user_id", ids).in("team_id", teamIds);
+    const hitTeams = [...new Set((seats || []).map((s) => s.team_id as string))];
+    if (hitTeams.length) {
+      await admin.from("v2_scramble_team_members").delete().in("user_id", ids).in("team_id", hitTeams);
+      const nowIso = new Date().toISOString();
+      await admin.from("v2_scramble_teams").update({ needs_attention_at: nowIso, updated_at: nowIso }).in("id", hitTeams);
+    }
+  }
+}
+
+/**
  * Remove specific members from a contest and tombstone them so attendance-sync won't
  * re-add. Never blocked — surfacing downstream breakage (team seats, etc.) is #217.
  */
@@ -296,19 +330,29 @@ export async function removeContestParticipants(
     .in("user_id", ids);
   if (error) throw new Error(error.message);
 
-  // Someone removed from the contest can't stay on its scramble teams — pull their
-  // seats and flag any team that lost one so it shows "needs attention" (#217).
-  const { data: teams } = await admin.from("v2_scramble_teams").select("id").eq("contest_id", contestId);
-  const teamIds = (teams || []).map((t) => t.id as string);
-  if (teamIds.length) {
-    const { data: seats } = await admin
-      .from("v2_scramble_team_members").select("team_id").in("user_id", ids).in("team_id", teamIds);
-    const hitTeams = [...new Set((seats || []).map((s) => s.team_id as string))];
-    if (hitTeams.length) {
-      await admin.from("v2_scramble_team_members").delete().in("user_id", ids).in("team_id", hitTeams);
-      const nowIso = new Date().toISOString();
-      await admin.from("v2_scramble_teams").update({ needs_attention_at: nowIso, updated_at: nowIso }).in("id", hitTeams);
+  // Hand back everything they held in this contest, whatever its type (auction teams, squares
+  // cells, pick'em picks, scramble seats) so the removal is completely clean.
+  await releaseContestAssets(admin, contestId, ids);
+
+  // Refund the buy-in. A paid contest's charge is DERIVED from the member's selection of its
+  // funding option (never a stored ledger row), so just deleting the participant leaves them
+  // charged. If this contest's buy-in is a DEDICATED option (its cost_items fund ONLY this
+  // contest), clear the removed members' selection of it and the derived charge disappears. An
+  // option that also funds other contests or costs is left alone, so a bundle is never
+  // over-refunded — an admin can issue a manual credit for those.
+  const { data: contestItems } = await admin
+    .from("v2_cost_items").select("linked_option_id")
+    .eq("source_type", "contest").eq("source_id", contestId).not("linked_option_id", "is", null);
+  const optIds = [...new Set((contestItems || []).map((i) => i.linked_option_id as string).filter(Boolean))];
+  const dedicated: string[] = [];
+  for (const optId of optIds) {
+    const { data: items } = await admin.from("v2_cost_items").select("source_type, source_id").eq("linked_option_id", optId);
+    if ((items || []).length > 0 && (items || []).every((i) => i.source_type === "contest" && i.source_id === contestId)) {
+      dedicated.push(optId);
     }
+  }
+  if (dedicated.length) {
+    await admin.from("v2_user_option_selections").delete().in("user_id", ids).in("option_id", dedicated);
   }
 
   const tombstones = ids.map((user_id) => ({

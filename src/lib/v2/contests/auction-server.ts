@@ -28,21 +28,21 @@ import {
 
 export interface AuctionEntity {
   id: string; name: string; short_name: string | null; seed: number; region: string | null;
-  record: string | null; logo_url: string | null; eliminated: boolean; wins: number;
+  record: string | null; logo_url: string | null; color: string | null; eliminated: boolean; wins: number;
   playInSlot: boolean;              // an unresolved First Four cell ("winner of A/B")
-  cellTeams: { name: string; shortName: string | null; logo: string | null }[]; // every team in the cell (two for a play-in)
+  cellTeams: { name: string; shortName: string | null; logo: string | null; color: string | null }[]; // every team in the cell (two for a play-in)
   ownerId: string | null; bidCents: number | null;
   bundledThrowIn: AuctionEntity | null; // free rider position that comes with this host
 }
 export interface AuctionParticipant {
-  userId: string; name: string;
+  userId: string; name: string; avatarUrl: string | null;
   spentCents: number; remainingCents: number; paidTeams: number; done: boolean; points: number;
   teams: {
-    entityId: string; name: string; short_name: string | null; seed: number; logo_url: string | null; bidCents: number;
+    entityId: string; name: string; short_name: string | null; seed: number; logo_url: string | null; color: string | null; bidCents: number;
     freeName: string | null; // kept for the compact views; `free` carries the full rider
     free: {
-      name: string; short_name: string | null; seed: number; logo_url: string | null;
-      cellTeams: { name: string; shortName: string | null; logo: string | null }[]; // both teams for a play-in rider
+      name: string; short_name: string | null; seed: number; logo_url: string | null; color: string | null;
+      cellTeams: { name: string; shortName: string | null; logo: string | null; color: string | null }[]; // both teams for a play-in rider
     } | null;
   }[];
 }
@@ -69,11 +69,15 @@ export interface AuctionState {
   results: AuctionResults;
 }
 
-async function names(admin: SupabaseClient, orgId: string, ids: string[]): Promise<{ map: Map<string, string>; mode: NameMode }> {
+async function names(admin: SupabaseClient, orgId: string, ids: string[]): Promise<{ map: Map<string, string>; avatars: Map<string, string | null>; mode: NameMode }> {
   const mode = await orgNameMode(admin, orgId);
-  if (!ids.length) return { map: new Map(), mode };
-  const { data } = await admin.from("v2_profiles").select("id, display_name, first_name, last_name, nickname").in("id", ids);
-  return { map: new Map((data || []).map((p) => [p.id as string, pickName(p, mode, "Member")])), mode };
+  if (!ids.length) return { map: new Map(), avatars: new Map(), mode };
+  const { data } = await admin.from("v2_profiles").select("id, display_name, first_name, last_name, nickname, avatar_url").in("id", ids);
+  return {
+    map: new Map((data || []).map((p) => [p.id as string, pickName(p, mode, "Member")])),
+    avatars: new Map((data || []).map((p) => [p.id as string, (p.avatar_url as string | null) ?? null])),
+    mode,
+  };
 }
 
 /** Read the frozen/overridden bundle list off a raw contest config, if present. */
@@ -85,7 +89,7 @@ function storedBundlesOf(raw: Record<string, unknown> | null | undefined): Aucti
 
 interface FieldTeam {
   id: string; name: string; short_name: string | null; seed: number; region: string | null;
-  record: string | null; logo_url: string | null; eliminated: boolean; play_in_slot: string | null;
+  record: string | null; logo_url: string | null; color: string | null; eliminated: boolean; play_in_slot: string | null;
 }
 
 /** A bracket cell: one biddable lot of 1–2 teams. Two teams = an unresolved First Four. */
@@ -95,8 +99,8 @@ interface Position {
   teamIds: string[];     // all member team ids (1 or 2)
   name: string;          // "Duke" or "American / Mount St. Mary's" (→ winner once resolved)
   short_name: string | null; // abbreviation for the compact cards (null for unresolved play-ins)
-  cellTeams: { name: string; shortName: string | null; logo: string | null }[]; // every team in the cell
-  record: string | null; logo_url: string | null;
+  cellTeams: { name: string; shortName: string | null; logo: string | null; color: string | null }[]; // every team in the cell
+  record: string | null; logo_url: string | null; color: string | null;
   eliminated: boolean;   // the cell's run is over (all members out)
   playInSlot: boolean;   // two teams, not yet resolved
 }
@@ -130,7 +134,7 @@ async function resolveField(
   for (const t of src.teams) {
     if (!t.region) continue;
     const key = `${t.region}:${t.seed}`;
-    const ft: FieldTeam = { id: t.id, name: t.name, short_name: t.short_name, seed: t.seed, region: t.region, record: t.record, logo_url: t.logo_url, eliminated: t.eliminated, play_in_slot: t.play_in_slot };
+    const ft: FieldTeam = { id: t.id, name: t.name, short_name: t.short_name, seed: t.seed, region: t.region, record: t.record, logo_url: t.logo_url, color: t.color, eliminated: t.eliminated, play_in_slot: t.play_in_slot };
     (cells.get(key) ?? cells.set(key, []).get(key)!).push(ft);
   }
 
@@ -146,8 +150,8 @@ async function resolveField(
       seed: members[0].seed, region: members[0].region,
       teamIds: members.map((m) => m.id), name,
       short_name: isPlayIn && !resolved ? null : face.short_name,
-      cellTeams: members.map((m) => ({ name: m.name, shortName: m.short_name, logo: m.logo_url })),
-      record: face.record, logo_url: isPlayIn && !resolved ? null : face.logo_url,
+      cellTeams: members.map((m) => ({ name: m.name, shortName: m.short_name, logo: m.logo_url, color: m.color })),
+      record: face.record, logo_url: isPlayIn && !resolved ? null : face.logo_url, color: isPlayIn && !resolved ? null : face.color,
       eliminated: members.every((m) => m.eliminated), playInSlot: isPlayIn && !resolved,
     });
   }
@@ -209,7 +213,7 @@ export async function loadAuction(admin: SupabaseClient, contestId: string): Pro
   const toEntity = (p: Position, rider: AuctionEntity | null): AuctionEntity => {
     const o = ownerByTeam.get(p.id) || null;
     return {
-      id: p.id, name: p.name, short_name: p.short_name, seed: p.seed, region: p.region, record: p.record, logo_url: p.logo_url,
+      id: p.id, name: p.name, short_name: p.short_name, seed: p.seed, region: p.region, record: p.record, logo_url: p.logo_url, color: p.color,
       cellTeams: p.cellTeams,
       eliminated: p.eliminated, wins: posWins(p), playInSlot: p.playInSlot, ownerId: o?.userId ?? null, bidCents: o?.bidCents ?? null, bundledThrowIn: rider,
     };
@@ -225,7 +229,7 @@ export async function loadAuction(admin: SupabaseClient, contestId: string): Pro
     })
     .sort((a, b) => a.seed - b.seed);
 
-  const { map: nameMap } = await names(admin, contest.org_id as string, participantIds);
+  const { map: nameMap, avatars: avatarMap } = await names(admin, contest.org_id as string, participantIds);
   const order = draftOrder(participantIds, config.orderSeed, config.firstParticipantId);
   const { currentId, onDeckId } = nextThrowers(order, ownership, teamsPerPlayer, config.nominationSkips);
 
@@ -236,12 +240,12 @@ export async function loadAuction(admin: SupabaseClient, contestId: string): Pro
   const participants: AuctionParticipant[] = order.map((uid) => {
     const b = budget(ownership, uid, config.salaryCapCents);
     const lots = (lotsByOwner.get(uid) ?? []).map((e) => ({
-      entityId: e.id, name: e.name, short_name: e.short_name, seed: e.seed, logo_url: e.logo_url, bidCents: e.bidCents ?? 0,
+      entityId: e.id, name: e.name, short_name: e.short_name, seed: e.seed, logo_url: e.logo_url, color: e.color, bidCents: e.bidCents ?? 0,
       freeName: e.bundledThrowIn?.name ?? null,
-      free: e.bundledThrowIn ? { name: e.bundledThrowIn.name, short_name: e.bundledThrowIn.short_name, seed: e.bundledThrowIn.seed, logo_url: e.bundledThrowIn.logo_url, cellTeams: e.bundledThrowIn.cellTeams } : null,
+      free: e.bundledThrowIn ? { name: e.bundledThrowIn.name, short_name: e.bundledThrowIn.short_name, seed: e.bundledThrowIn.seed, logo_url: e.bundledThrowIn.logo_url, color: e.bundledThrowIn.color, cellTeams: e.bundledThrowIn.cellTeams } : null,
     })).sort((a, b2) => b2.bidCents - a.bidCents);
     return {
-      userId: uid, name: nameMap.get(uid) || "Member",
+      userId: uid, name: nameMap.get(uid) || "Member", avatarUrl: avatarMap.get(uid) ?? null,
       spentCents: b.spent, remainingCents: b.remaining, paidTeams: paidTeamCount(ownership, uid), done: isDone(ownership, uid, teamsPerPlayer),
       points: userPoints(ownership, uid, seedByEntity, winRoundsByEntity, config.scoringMode), teams: lots,
     };

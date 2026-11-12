@@ -13,6 +13,7 @@ import PhotosDrawer from "./PhotosDrawer";
 import RoundsDrawer from "./RoundsDrawer";
 import { useV2Music } from "./MusicProvider";
 import FeatureIcon from "@/app/new/_components/FeatureIcon";
+import { stashPendingGroup, clearPendingGroup } from "@/lib/v2/pending-group";
 import type { NavFeature, LauncherGroup } from "@/lib/v2/features";
 import styles from "./event-shell.module.css";
 /* eslint-disable @next/next/no-img-element */
@@ -43,6 +44,9 @@ export default function EventShell({
   isAdmin,
   orgName,
   logoUrl,
+  groups,
+  onCustomDomain,
+  platformOrigin,
   userAvatarUrl,
   initialUnreadCount,
   initialChatUnread,
@@ -51,6 +55,7 @@ export default function EventShell({
   musicEnabled,
   chatEnabled,
   photosEnabled,
+  roundsEnabled,
   children,
 }: {
   slug: string;
@@ -59,6 +64,9 @@ export default function EventShell({
   isAdmin: boolean;
   orgName: string;
   logoUrl: string | null;
+  groups: { slug: string; name: string; logoUrl: string | null; role: string }[];
+  onCustomDomain: boolean;
+  platformOrigin: string;
   userAvatarUrl: string | null;
   initialUnreadCount: number;
   initialChatUnread: number;
@@ -67,10 +75,20 @@ export default function EventShell({
   musicEnabled: boolean;
   chatEnabled: boolean;
   photosEnabled: boolean;
+  roundsEnabled: boolean;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState<DrawerKey | null>(null);
   const [everythingOpen, setEverythingOpen] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  // The switcher only matters when the member belongs to more than one group.
+  const multiGroup = groups.length > 1;
+
+  // Destination shell is up — drop any switch handoff (covers an instant nav where
+  // the loading fallback never mounted to clear it itself).
+  useEffect(() => {
+    clearPendingGroup();
+  }, []);
   // The My Rounds "log a round" form: header +/× toggles it. Reset in `toggle`
   // (any drawer switch) so reopening My Rounds always lands on the list.
   const [roundsFormOpen, setRoundsFormOpen] = useState(false);
@@ -109,6 +127,7 @@ export default function EventShell({
     // reopened drawer doesn't jump back to a previously deep-linked item.
     setDeepLink((d) => (d.room || d.photo || d.msg || d.bulk ? {} : d));
     setEverythingOpen(false);
+    setSwitcherOpen(false);
     setRoundsFormOpen(false);
     const willOpen = open !== k;
     // Closing chat: read receipts may have changed — refresh the badge.
@@ -131,6 +150,16 @@ export default function EventShell({
     setEverythingOpen(willOpen);
   };
 
+  // Open/close the group switcher (bottom sheet), coordinating with the other
+  // surfaces the same way the launcher does.
+  const openSwitcher = () => {
+    const willOpen = !switcherOpen;
+    if (willOpen && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("ui:drawer-open", { detail: { name: "switcher" } }));
+    }
+    setSwitcherOpen(willOpen);
+  };
+
   // Coordinate surfaces: opening the launcher closes any drawer; opening a drawer
   // (or expanding music) closes the launcher. Music also owns the shared drawers.
   useEffect(() => {
@@ -139,8 +168,13 @@ export default function EventShell({
       if (!name) return;
       if (name === "everything") {
         setOpen(null);
+        setSwitcherOpen(false);
+      } else if (name === "switcher") {
+        setOpen(null);
+        setEverythingOpen(false);
       } else {
         setEverythingOpen(false);
+        setSwitcherOpen(false);
         if (name === "music") setOpen(null);
       }
     };
@@ -169,6 +203,8 @@ export default function EventShell({
         /* chat is off for this viewer */
       } else if (target === "photos" && !photosEnabled) {
         /* photos is off for this viewer */
+      } else if (target === "rounds" && !roundsEnabled) {
+        /* My Rounds is off for this group */
       } else if (target in DRAWERS) {
         setDeepLink({ room, photo, msg });
         window.dispatchEvent(new CustomEvent("ui:drawer-open", { detail: { name: target } }));
@@ -176,7 +212,7 @@ export default function EventShell({
       }
     });
     return () => cancelAnimationFrame(raf);
-  }, [music, musicEnabled, chatEnabled, photosEnabled]);
+  }, [music, musicEnabled, chatEnabled, photosEnabled, roundsEnabled]);
 
   // Open a drawer on request from elsewhere (an Activity-feed row or an in-app
   // notification tap). detail may carry a deep target (room/photo).
@@ -190,6 +226,8 @@ export default function EventShell({
         /* off */
       } else if (name === "photos" && !photosEnabled) {
         /* off */
+      } else if (name === "rounds" && !roundsEnabled) {
+        /* off */
       } else if (name && name in DRAWERS) {
         if (detail?.room || detail?.photo || detail?.msg || detail?.bulk)
           setDeepLink({ room: detail.room, photo: detail.photo, msg: detail.msg, bulk: detail.bulk });
@@ -199,7 +237,7 @@ export default function EventShell({
     };
     window.addEventListener("ui:open-drawer", handler);
     return () => window.removeEventListener("ui:open-drawer", handler);
-  }, [music, musicEnabled, chatEnabled, photosEnabled]);
+  }, [music, musicEnabled, chatEnabled, photosEnabled, roundsEnabled]);
 
   // Refetch the authoritative unread count (used after read/delete events).
   const refetchUnread = useCallback(async () => {
@@ -298,13 +336,31 @@ export default function EventShell({
     <>
       {/* ── Top bar ─────────────────────────────────────────────────────── */}
       <header className={styles.topbar}>
-        <Link href={`/new/${slug}`} className={styles.topLogo} aria-label={orgName}>
-          {logoUrl ? (
-            <img src={logoUrl} alt="" />
-          ) : (
-            <span className={styles.topLogoMono}>{orgName.charAt(0).toUpperCase()}</span>
+        {/* Logo is always a Home link for the group; the caret (multi-group only)
+            opens the switcher. */}
+        <div className={styles.logoSwitch}>
+          <Link href={`/new/${slug}`} className={styles.topLogo} aria-label={`${orgName} home`}>
+            {logoUrl ? (
+              <img src={logoUrl} alt="" />
+            ) : (
+              <span className={styles.topLogoMono}>{orgName.charAt(0).toUpperCase()}</span>
+            )}
+          </Link>
+          {multiGroup && (
+            <button
+              type="button"
+              className={styles.logoCaretBtn}
+              onClick={openSwitcher}
+              aria-label="Switch group"
+              aria-haspopup="dialog"
+              aria-expanded={switcherOpen}
+            >
+              <svg className={styles.logoCaret} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
           )}
-        </Link>
+        </div>
 
         <div className={styles.topGroup}>
           {chatEnabled && (
@@ -327,17 +383,19 @@ export default function EventShell({
               <path d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
             </TopIcon>
           )}
-          <TopIcon label="Rounds" active={open === "rounds"} onClick={() => toggle("rounds")} viewBox="10.8 9.5 48 48">
-            {/* v1 courses icon — golf flag in a hole (noun-golf-flag-5010192). */}
-            <path
-              fill="currentColor"
-              stroke="currentColor"
-              strokeWidth={1.6}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-              d="M39.688,26.247c3.334.455,7.113.973,11.121-2.517a1,1,0,0,0-.949-1.709c-2.957.9-5.8-1.447-8.815-3.932-2.955-2.439-6-4.945-9.482-4.543l.153-1.669a2,2,0,1,0-1.975-.362L26.386,48.156c-3.977.363-7.538,1.59-7.538,3.821,0,2.706,5.24,3.938,10.109,3.938s10.11-1.232,10.11-3.938-5.241-3.939-10.11-3.939c-.184,0-.368.005-.553.009l1.814-19.812C33.512,25.407,36.376,25.793,39.688,26.247Zm.084-6.615c2.215,1.826,4.48,3.7,6.94,4.349-2.236.9-4.38.609-6.754.285-2.814-.385-5.948-.815-9.267,1.163l.9-9.875C34.319,15.14,36.976,17.325,39.772,19.632ZM20.847,51.98c.085-.466,1.966-1.435,5.354-1.8l-.325,3.552C22.7,53.344,20.929,52.426,20.847,51.98Zm8.11-1.942c5.106,0,7.991,1.356,8.109,1.939-.118.583-3,1.938-8.109,1.938-.376,0-.736-.009-1.088-.023l.352-3.842C28.462,50.044,28.705,50.038,28.957,50.038Z"
-            />
-          </TopIcon>
+          {roundsEnabled && (
+            <TopIcon label="Rounds" active={open === "rounds"} onClick={() => toggle("rounds")} viewBox="10.8 9.5 48 48">
+              {/* v1 courses icon — golf flag in a hole (noun-golf-flag-5010192). */}
+              <path
+                fill="currentColor"
+                stroke="currentColor"
+                strokeWidth={1.6}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                d="M39.688,26.247c3.334.455,7.113.973,11.121-2.517a1,1,0,0,0-.949-1.709c-2.957.9-5.8-1.447-8.815-3.932-2.955-2.439-6-4.945-9.482-4.543l.153-1.669a2,2,0,1,0-1.975-.362L26.386,48.156c-3.977.363-7.538,1.59-7.538,3.821,0,2.706,5.24,3.938,10.109,3.938s10.11-1.232,10.11-3.938-5.241-3.939-10.11-3.939c-.184,0-.368.005-.553.009l1.814-19.812C33.512,25.407,36.376,25.793,39.688,26.247Zm.084-6.615c2.215,1.826,4.48,3.7,6.94,4.349-2.236.9-4.38.609-6.754.285-2.814-.385-5.948-.815-9.267,1.163l.9-9.875C34.319,15.14,36.976,17.325,39.772,19.632ZM20.847,51.98c.085-.466,1.966-1.435,5.354-1.8l-.325,3.552C22.7,53.344,20.929,52.426,20.847,51.98Zm8.11-1.942c5.106,0,7.991,1.356,8.109,1.939-.118.583-3,1.938-8.109,1.938-.376,0-.736-.009-1.088-.023l.352-3.842C28.462,50.044,28.705,50.038,28.957,50.038Z"
+              />
+            </TopIcon>
+          )}
           <span className={styles.bellWrap}>
             <TopIcon label="Notifications" active={open === "notifications"} onClick={() => toggle("notifications")}>
               <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -479,8 +537,67 @@ export default function EventShell({
               </div>
             ))
           )}
+          {multiGroup && (
+            <div className={styles.launchGroup}>
+              <p className={styles.launchHead}>Groups</p>
+              <div className={styles.launchList}>
+                <button
+                  type="button"
+                  className={`${styles.launchItem} ${styles.launchItemBtn}`}
+                  onClick={() => {
+                    setEverythingOpen(false);
+                    openSwitcher();
+                  }}
+                >
+                  <span className={styles.launchIcon}>
+                    <FeatureIcon name="users" size={22} />
+                  </span>
+                  <span className={styles.launchText}>
+                    <span className={styles.launchLabel}>Switch group</span>
+                    <span className={styles.launchBlurb}>Jump to another group you&apos;re in</span>
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
+
+      {/* ── Group switcher (bottom sheet) — multi-group members only ────── */}
+      {multiGroup && (
+        <>
+          <div
+            className={styles.backdrop}
+            data-open={switcherOpen}
+            onClick={() => setSwitcherOpen(false)}
+            aria-hidden
+          />
+          <section className={styles.drawer} data-open={switcherOpen} aria-hidden={!switcherOpen}>
+            <div className={styles.drawerHead}>
+              <span className={styles.drawerTitle}>Your groups</span>
+              <button type="button" className={styles.drawerClose} onClick={() => setSwitcherOpen(false)} aria-label="Close">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className={styles.drawerBody}>
+              <div className={styles.launchList}>
+                {groups.map((g) => (
+                  <GroupSwitchRow
+                    key={g.slug}
+                    group={g}
+                    current={g.slug === slug}
+                    onCustomDomain={onCustomDomain}
+                    platformOrigin={platformOrigin}
+                    onNavigate={() => setSwitcherOpen(false)}
+                  />
+                ))}
+              </div>
+            </div>
+          </section>
+        </>
+      )}
 
       {/* ── Bottom nav (admin-configurable; gear pinned far right) ──────── */}
       <nav className={styles.bottomnav}>
@@ -566,6 +683,60 @@ function TopIcon({
         {children}
       </svg>
     </button>
+  );
+}
+
+function GroupSwitchRow({
+  group,
+  current,
+  onCustomDomain,
+  platformOrigin,
+  onNavigate,
+}: {
+  group: { slug: string; name: string; logoUrl: string | null; role: string };
+  current: boolean;
+  onCustomDomain: boolean;
+  platformOrigin: string;
+  onNavigate: () => void;
+}) {
+  const inner = (
+    <>
+      <span className={styles.switchThumb}>
+        {group.logoUrl ? (
+          <img src={group.logoUrl} alt="" />
+        ) : (
+          <span className={styles.switchThumbMono}>{group.name.charAt(0).toUpperCase()}</span>
+        )}
+      </span>
+      <span className={styles.launchText}>
+        <span className={styles.launchLabel}>{group.name}</span>
+        {(group.role === "owner" || group.role === "admin") && (
+          <span className={styles.launchBlurb}>{group.role === "owner" ? "Owner" : "Admin"}</span>
+        )}
+      </span>
+      {current && <span className={styles.switchCurrent}>Current</span>}
+    </>
+  );
+  // Stash the destination branding so the loading screen can greet the switch with
+  // this group's logo (the loading boundary can't see the target route's params).
+  const go = () => {
+    stashPendingGroup({ name: group.name, logoUrl: group.logoUrl });
+    onNavigate();
+  };
+  // Current group (and everything on the platform host) navigates in-app. On a
+  // locked custom domain, OTHER groups must leave the host — full-page link to the
+  // platform origin so the custom domain never renders another org.
+  if (!current && onCustomDomain) {
+    return (
+      <a href={`${platformOrigin}/new/${group.slug}`} className={styles.launchItem} onClick={go}>
+        {inner}
+      </a>
+    );
+  }
+  return (
+    <Link href={`/new/${group.slug}`} className={styles.launchItem} onClick={go}>
+      {inner}
+    </Link>
   );
 }
 

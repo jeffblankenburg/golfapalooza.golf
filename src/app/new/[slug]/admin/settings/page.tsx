@@ -31,6 +31,8 @@ export default async function GroupSettingsPage({
       initialSystemAvatar={org.system_avatar_url}
       initialMemberNoun={org.member_noun || "Member"}
       initialMemberNounPlural={org.member_noun_plural || "Members"}
+      initialFoundedYear={org.founded_year}
+      createdYear={new Date(org.created_at).getFullYear()}
     />
   );
 }

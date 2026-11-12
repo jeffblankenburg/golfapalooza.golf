@@ -100,6 +100,33 @@
   font-weight: 600;
   font-size: 1.4rem;
 }
+/* Logo (Home link) + a caret button that opens the group switcher. */
+.logoSwitch {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+.logoCaretBtn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  color: var(--ink-soft);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.logoCaretBtn:active {
+  opacity: 0.6;
+}
+.logoCaret {
+  flex: none;
+}
 
 .content {
   padding-top: 56px;
@@ -347,6 +374,53 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* A launchItem rendered as a <button> (e.g. the "Switch group" row). */
+.launchItemBtn {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+/* Group switcher rows reuse .launchItem; the thumb is a circular org logo. */
+.switchThumb {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--brand) 10%, var(--paper));
+}
+.switchThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.switchThumbMono {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--brand);
+  color: #fff;
+  font-family: var(--font-libre), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+.switchCurrent {
+  flex: none;
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  padding: 3px 8px;
+  border-radius: 999px;
 }
 .launchLock {
   flex: none;

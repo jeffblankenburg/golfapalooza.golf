@@ -169,7 +169,7 @@ export async function buildMemberSchedule(
           all_day: true,
           sort_order: -50, // above timed items, below the event banner
           context: null,
-          href: `/new/${slug}/loozers/${p.id}`,
+          href: `/new/${slug}/members/${p.id}`,
         });
       }
     }

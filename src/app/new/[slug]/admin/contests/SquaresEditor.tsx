@@ -315,7 +315,8 @@ export default function SquaresEditor({
     const basics = gamesOnly
       ? {}
       : {
-          ...(editingId ? { collected_by: collectedBy || null } : { contest_type: "squares", event_id: eventId ?? null }),
+          collected_by: collectedBy || null,
+          ...(editingId ? {} : { contest_type: "squares", event_id: eventId ?? null }),
           name: name.trim(),
           cell_cost_cents: Math.round((cost ?? 0) * 100),
           max_squares_primary: Math.max(1, parseInt(maxPrimaryStr, 10) || 1),
@@ -409,19 +410,17 @@ export default function SquaresEditor({
                   </span>
                   <span className={styles.costNote}>pot fills to {money(Math.round((cost ?? 0) * 100) * 100)} if all 100 sell</span>
                 </div>
-                {editingId && (
-                  <ContestCollector
-                    base={`${collectionBase}/${editingId}`}
-                    orgId={orgId}
-                    nameMode={nameMode}
-                    currentUserId={currentUserId}
-                    initialCollectedBy={editing?.collectedBy ?? null}
-                    value={collectedBy}
-                    onChange={setCollectedBy}
-                    labelClassName={styles.label}
-                    selectClassName={styles.selectInput}
-                  />
-                )}
+                <ContestCollector
+                  base={editingId ? `${collectionBase}/${editingId}` : collectionBase}
+                  orgId={orgId}
+                  nameMode={nameMode}
+                  currentUserId={currentUserId}
+                  initialCollectedBy={editing?.collectedBy ?? null}
+                  value={collectedBy}
+                  onChange={setCollectedBy}
+                  labelClassName={styles.label}
+                  selectClassName={styles.selectInput}
+                />
               </Section>
 
               <Section

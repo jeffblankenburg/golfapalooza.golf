@@ -3,6 +3,8 @@ import { v2AdminClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
 import PwaRegistrar from "./PwaRegistrar";
 import MusicProvider from "./(event)/MusicProvider";
+import SoundboardProvider from "./(event)/SoundboardProvider";
+import { hasPermission } from "@/lib/v2/permissions-server";
 import { NameModeProvider } from "./(event)/NameMode";
 import SimBanner from "./(event)/SimBanner";
 import { SimTimeProvider } from "./(event)/SimTime";
@@ -86,13 +88,51 @@ export default async function OrgLayout({
     ? ({ display: "contents", ["--brand" as string]: org.primary_color } as React.CSSProperties)
     : ({ display: "contents" } as React.CSSProperties);
 
+  // Resolve the soundboard's group on/off + this member's operator grant +
+  // blast opt-out, so the provider (mounted here so the receiver survives nav
+  // app-wide, like Music) has correct state on first render with no flash.
+  const admin = v2AdminClient();
+  const uid = ctx!.userId;
+  const [{ data: sbFeat }, sbOperator, { data: sbPref }, { data: meProfile }] = await Promise.all([
+    admin
+      .from("v2_event_features")
+      .select("visibility")
+      .eq("org_id", org.id)
+      .eq("feature_key", "soundboard")
+      .is("event_id", null)
+      .maybeSingle(),
+    hasPermission(admin, uid, org.id, "manage_soundboard"),
+    admin
+      .from("v2_notification_prefs")
+      .select("enabled")
+      .eq("org_id", org.id)
+      .eq("user_id", uid)
+      .eq("category", "soundboard_blast")
+      .maybeSingle(),
+    admin.from("v2_profiles").select("display_name, first_name, nickname").eq("id", uid).maybeSingle(),
+  ]);
+  const soundboardEnabled = !!sbFeat && sbFeat.visibility !== "off";
+  const receiveBlasts = sbPref?.enabled !== false; // missing row = on (opt-out)
+  const myName = meProfile?.nickname || meProfile?.display_name || meProfile?.first_name || "Someone";
+
   return (
     <div style={brandStyle}>
       <PwaRegistrar />
       {(ctx?.simulating || simAt) && <SimBanner name={ctx?.simulating ? ctx.simName : null} at={simAt} />}
       <SimTimeProvider serverNowMs={serverNowMs}>
         <NameModeProvider mode={org.name_display}>
-          <MusicProvider orgId={org.id}>{children}</MusicProvider>
+          <MusicProvider orgId={org.id}>
+            <SoundboardProvider
+              orgId={org.id}
+              slug={slug}
+              myName={myName}
+              enabled={soundboardEnabled}
+              isOperator={sbOperator}
+              receiveBlasts={receiveBlasts}
+            >
+              {children}
+            </SoundboardProvider>
+          </MusicProvider>
         </NameModeProvider>
       </SimTimeProvider>
     </div>

@@ -60,6 +60,17 @@ export interface FeatureDef {
   defaultEnabled?: boolean;
   /** Suggested default when a group first exposes it to spectators. */
   defaultPublic?: boolean;
+  /**
+   * How visibility is decided:
+   *   'visibility' (default) — the standard off/everyone/admins registry value.
+   *   'permission' — the registry row is only a group on/off switch; who actually
+   *     sees/uses it is gated by `permissionKey` (admins + granted members), applied
+   *     explicitly in the layout. Used by Soundboard (an operator tool). These
+   *     features are `topbar` so they never surface in the generic launcher.
+   */
+  access?: "visibility" | "permission";
+  /** The permission key that gates an `access: 'permission'` feature. */
+  permissionKey?: string;
 }
 
 export interface BucketDef {
@@ -109,6 +120,7 @@ export const FEATURE_CATALOG: FeatureDef[] = [
   { key: "chat", label: "Chat", bucket: "community", scope: "group", icon: "chat", status: "available", surface: "drawer", blurb: "Group chat & direct messages.", topbar: true, defaultEnabled: true },
   { key: "photos", label: "Photos", bucket: "community", scope: "group", icon: "image", status: "available", surface: "drawer", blurb: "The shared photo & video gallery.", topbar: true, defaultEnabled: true },
   { key: "music", label: "Music", bucket: "community", scope: "group", icon: "music", status: "available", surface: "drawer", blurb: "The group jukebox & walk-up songs.", topbar: true, defaultEnabled: true },
+  { key: "soundboard", label: "Soundboard", bucket: "community", scope: "group", icon: "soundboard", status: "available", surface: "drawer", blurb: "Play clips and blast them to the whole group.", topbar: true, access: "permission", permissionKey: "manage_soundboard" },
   { key: "notebook", label: "Notebook", bucket: "community", scope: "group", icon: "book", status: "planned", surface: "route", blurb: "Shared notes & inside jokes." },
   { key: "loozers", label: "Members", bucket: "community", scope: "group", icon: "users", status: "available", surface: "route", blurb: "The member directory." },
   { key: "birthdays", label: "Birthdays", bucket: "community", scope: "group", icon: "cake", status: "available", surface: "route", blurb: "Who's celebrating & when." },
@@ -298,6 +310,18 @@ export function isFeatureVisible(
 /** Is Music visible to this viewer? (topbar utility with a group toggle.) */
 export function isMusicEnabled(resolved: ResolvedFeature[], viewerIsAdmin: boolean): boolean {
   return isFeatureVisible(resolved, "music", viewerIsAdmin);
+}
+
+/**
+ * Is the Soundboard turned on for the group? Any non-'off' registry value counts
+ * as enabled — the everyone/admins distinction is irrelevant here because actual
+ * access is gated by the `manage_soundboard` permission in the layout, not by this
+ * value. When enabled, the receiver mounts for every member; the operator trigger +
+ * drawer mount only for admins + grantees.
+ */
+export function isSoundboardEnabled(resolved: ResolvedFeature[]): boolean {
+  const f = resolved.find((r) => r.def.key === "soundboard");
+  return !!f && f.visibility !== "off";
 }
 
 /** Max number of bottom-bar pins (Home + these + Everything + Admin). */

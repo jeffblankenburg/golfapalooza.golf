@@ -37,6 +37,7 @@ export interface CreateSquaresInput {
   secondaryEndsAt?: string | null; // ISO; secondary auto-closes (null = until admin closes)
   games: SquaresGameInput[];
   createdBy: string;
+  collectedBy?: string | null; // who members settle the buy-in with (default: creator)
 }
 
 export async function createSquaresContest(admin: SupabaseClient, input: CreateSquaresInput): Promise<{ id: string }> {
@@ -61,6 +62,7 @@ export async function createSquaresContest(admin: SupabaseClient, input: CreateS
         ...(input.periodWeights ? { period_weights: input.periodWeights } : {}),
       },
       created_by: input.createdBy,
+      collected_by: input.collectedBy ?? null,
     })
     .select("id")
     .single();

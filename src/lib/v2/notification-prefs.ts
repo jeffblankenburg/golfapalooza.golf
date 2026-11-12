@@ -52,6 +52,15 @@ export const NOTIFICATION_SECTIONS: NotificationSection[] = [
     items: [{ type: "article", label: "New articles", description: "When a new article is published" }],
   },
   {
+    // Not a push type — this toggle gates whether live soundboard blasts play on
+    // this member's device (checked client-side by the receiver). Opt-out: default on.
+    key: "soundboard",
+    label: "Soundboard",
+    items: [
+      { type: "soundboard_blast", label: "Hear sound blasts", description: "Play soundboard clips an operator blasts to the group" },
+    ],
+  },
+  {
     key: "rounds",
     label: "My Rounds",
     items: [

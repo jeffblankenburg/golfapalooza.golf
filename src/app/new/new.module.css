@@ -5804,6 +5804,29 @@ button.rosterChip {
   color: var(--ink-soft);
 }
 .orgBalLineRow span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Inline actions on a group-financials breakdown line. */
+.orgBalLineRow .markPaid,
+.orgBalLineRow .unmark {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.orgBalLineRow .markPaid { background: var(--accent, #2e7d32); color: #fff; border-color: transparent; }
+.orgBalLineRow .unmark { background: transparent; color: var(--ink-soft); }
+.orgBalLineRow .markPaid:disabled,
+.orgBalLineRow .unmark:disabled { opacity: 0.5; cursor: default; }
+.orgBalLink {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent, #2e7d32);
+  white-space: nowrap;
+  text-decoration: none;
+}
 .balCaret {
   display: inline-block;
   width: 0.7em;

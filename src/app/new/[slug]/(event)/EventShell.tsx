@@ -12,6 +12,7 @@ import ChatDrawer from "./ChatDrawer";
 import PhotosDrawer from "./PhotosDrawer";
 import RoundsDrawer from "./RoundsDrawer";
 import { useV2Music } from "./MusicProvider";
+import { useSoundboardOptional } from "./SoundboardProvider";
 import FeatureIcon from "@/app/new/_components/FeatureIcon";
 import { stashPendingGroup, clearPendingGroup } from "@/lib/v2/pending-group";
 import type { NavFeature, LauncherGroup } from "@/lib/v2/features";
@@ -98,6 +99,7 @@ export default function EventShell({
   // consumed by ChatDrawer/PhotosDrawer on open, cleared when the drawer closes.
   const [deepLink, setDeepLink] = useState<{ room?: string; photo?: string; msg?: string; bulk?: string }>({});
   const music = useV2Music();
+  const soundboard = useSoundboardOptional();
 
   // Publish the bottom-nav footprint globally while the shell is mounted, so the
   // (org-level) mini-player can sit directly above the nav and content/drawers
@@ -381,6 +383,12 @@ export default function EventShell({
           {musicEnabled && (
             <TopIcon label="Music" active={music.isDrawerExpanded} onClick={() => music.toggleDrawer()}>
               <path d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+            </TopIcon>
+          )}
+          {soundboard?.enabled && soundboard?.isOperator && (
+            <TopIcon label="Soundboard" active={soundboard.isOpen} onClick={() => soundboard.toggle()}>
+              <path d="M4 9v6h4l5 4V5L8 9H4z" />
+              <path d="M16 9.5a3 3 0 010 5M18.5 7a6 6 0 010 10" />
             </TopIcon>
           )}
           {roundsEnabled && (

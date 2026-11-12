@@ -10,9 +10,9 @@ import styles from "@/app/new/new.module.css";
 
 /**
  * Group-wide financial rollup (#237). The admin's single board of every member's net
- * money across all events + group contests. Read-only — payments are recorded per
- * event (Balances) or per contest (its collector page); this view only nets & shows.
- * Owner/admin only.
+ * money across all events + group contests. Group-contest lines are markable paid
+ * inline (via the contest's own /payments write); event lines deep-link to that
+ * event's Balances recorder. Owner/admin only.
  */
 export default async function GroupFinancialsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -46,10 +46,10 @@ export default async function GroupFinancialsPage({ params }: { params: Promise<
       </Link>
       <h1 className={styles.title}>Financials</h1>
       <p className={styles.lede} style={{ marginTop: 6 }}>
-        Every member&apos;s money across all events and group contests. Tap a member to see what makes up their balance. Record payments on an event&apos;s Balances page or a contest&apos;s page.
+        Every member&apos;s money across all events and group contests. Tap a member to see what makes up their balance, mark group-contest buy-ins paid, or jump to an event&apos;s Balances page.
       </p>
 
-      <OrgBalances rows={displayRows} />
+      <OrgBalances rows={displayRows} orgId={org.id} slug={slug} />
     </div>
   );
 }

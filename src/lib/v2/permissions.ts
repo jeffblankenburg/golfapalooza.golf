@@ -34,6 +34,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: "send_announcements", label: "Announcements", description: "Send member notifications" },
       { key: "manage_gallery", label: "Photos", description: "Moderate the gallery" },
       { key: "manage_music", label: "Music", description: "Manage the jukebox library" },
+      { key: "manage_soundboard", label: "Soundboard", description: "Use & manage the soundboard; blast the group" },
     ],
   },
 ];

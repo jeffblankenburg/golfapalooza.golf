@@ -183,6 +183,16 @@ The official app for Golfapalooza — a multi-day golf trip with live scoring, c
 - Mini player UI (always available)
 - Play count tracking
 
+### Soundboard (v2)
+- A group board of short, tappable sound clips (air-horn, applause, catchphrases), delivered as a top-bar **drawer** that opens over whatever you're doing
+- **Operator tool** — admins (and members an admin grants the Soundboard permission to) see and drive the board: play, blast, add, edit, delete, manage tags. Members without the grant never see the board
+- **Blast to group** — with the toggle on, tapping a clip plays it on **every member's device** in real time (Supabase realtime broadcast). Members can turn "Hear soundboard blasts" off in their notification settings (default on)
+- **Instant playback** — clips are pre-decoded into Web Audio buffers on open, so taps fire with zero latency and can overlap
+- **Tag-first navigation** — a consistent, group-wide tag vocabulary; filter/search/group by tag with no round-trips, plus a personal "My most played" quick list
+- **Icons** — an emoji per clip by default, or an uploaded image
+- **Stats** — most-played clips and the "top blaster" per clip
+- Admin enables the Soundboard per group under Features; operator access is granted per member under Members; hard-delete removes the clip + its audio/image from storage
+
 ### Articles & Announcements
 - Admin composes articles in a rich-text editor (headings, bold/italic/underline, links, bullet lists, horizontal rules) with inline images and video — upload new or reuse previously-uploaded media, and resize images (Small 33% / Medium 66% / Full)
 - Author attribution — assign an article to any member, not just the poster

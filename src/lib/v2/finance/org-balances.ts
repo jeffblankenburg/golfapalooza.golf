@@ -15,7 +15,10 @@ import { loadEventBalances } from "@/lib/v2/balances";
 
 export interface OrgBalanceLine {
   label: string;
-  amountCents: number;
+  amountCents: number;        // owed for this line
+  eventId?: string;           // event money → deep-link to that event's Balances page
+  contestId?: string;         // group contest → inline mark-paid (via /contests/{id}/payments)
+  contestPaidCents?: number;  // group contest → recorded so far (drives the toggle state)
 }
 export interface OrgBalanceRow {
   userId: string;
@@ -29,10 +32,10 @@ export async function loadOrgBalances(admin: SupabaseClient, orgId: string): Pro
   const owed = new Map<string, number>();
   const paid = new Map<string, number>();
   const lines = new Map<string, OrgBalanceLine[]>();
-  const addOwed = (uid: string, cents: number, label: string) => {
+  const addOwed = (uid: string, cents: number, label: string, ref?: { eventId?: string; contestId?: string }) => {
     if (!uid || cents <= 0) return;
     owed.set(uid, (owed.get(uid) || 0) + cents);
-    (lines.get(uid) ?? lines.set(uid, []).get(uid)!).push({ label, amountCents: cents });
+    (lines.get(uid) ?? lines.set(uid, []).get(uid)!).push({ label, amountCents: cents, ...ref });
   };
   const addPaid = (uid: string, cents: number) => {
     if (!uid || cents <= 0) return;
@@ -43,11 +46,11 @@ export async function loadOrgBalances(admin: SupabaseClient, orgId: string): Pro
   const { data: events } = await admin.from("v2_events").select("id, name").eq("org_id", orgId);
   const evList = events || [];
   const evBalances = await Promise.all(
-    evList.map((e) => loadEventBalances(admin, e.id as string).then((rows) => ({ name: (e.name as string) || "Event", rows }))),
+    evList.map((e) => loadEventBalances(admin, e.id as string).then((rows) => ({ id: e.id as string, name: (e.name as string) || "Event", rows }))),
   );
-  for (const { name, rows } of evBalances) {
+  for (const { id, name, rows } of evBalances) {
     for (const r of rows) {
-      addOwed(r.userId, r.owedCents, name);
+      addOwed(r.userId, r.owedCents, name, { eventId: id });
       addPaid(r.userId, r.paidCents);
     }
   }
@@ -76,7 +79,7 @@ export async function loadOrgBalances(admin: SupabaseClient, orgId: string): Pro
 
   if (pickemFee.size) {
     const { data: parts } = await admin.from("v2_contest_participants").select("contest_id, user_id").in("contest_id", [...pickemFee.keys()]);
-    for (const p of parts || []) addOwed(p.user_id as string, pickemFee.get(p.contest_id as string) || 0, contestName.get(p.contest_id as string) || "Contest");
+    for (const p of parts || []) addOwed(p.user_id as string, pickemFee.get(p.contest_id as string) || 0, contestName.get(p.contest_id as string) || "Contest", { contestId: p.contest_id as string });
   }
   if (squaresCost.size) {
     const { data: cells } = await admin.from("v2_squares_cells").select("contest_id, user_id").in("contest_id", [...squaresCost.keys()]).not("user_id", "is", null);
@@ -88,7 +91,31 @@ export async function loadOrgBalances(admin: SupabaseClient, orgId: string): Pro
     for (const [k, n] of perUserContest) {
       const [uid, cid] = k.split("|");
       const amt = (squaresCost.get(cid) || 0) * n;
-      addOwed(uid, amt, `${contestName.get(cid) || "Squares"} (${n} sq)`);
+      addOwed(uid, amt, `${contestName.get(cid) || "Squares"} (${n} sq)`, { contestId: cid });
+    }
+  }
+
+  // Per-(member, group contest) recorded entry payments (source='deposit'), so the
+  // admin board can show paid/outstanding + an inline mark-paid toggle on each group
+  // contest line. These dollars are ALREADY in `paid` via step 3's event_id-NULL
+  // ledger scan — this is a display-only breakdown, never re-added to totals.
+  const groupContestIds = [...new Set([...pickemFee.keys(), ...squaresCost.keys()])];
+  if (groupContestIds.length) {
+    const { data: deposits } = await admin
+      .from("v2_financial_transactions")
+      .select("user_id, contest_id, amount_cents")
+      .in("contest_id", groupContestIds)
+      .eq("type", "payment")
+      .eq("source", "deposit");
+    const paidByUserContest = new Map<string, number>(); // "uid|cid" → cents
+    for (const d of deposits || []) {
+      const k = `${d.user_id}|${d.contest_id}`;
+      paidByUserContest.set(k, (paidByUserContest.get(k) || 0) + ((d.amount_cents as number) || 0));
+    }
+    for (const [uid, userLines] of lines) {
+      for (const l of userLines) {
+        if (l.contestId) l.contestPaidCents = paidByUserContest.get(`${uid}|${l.contestId}`) || 0;
+      }
     }
   }
 

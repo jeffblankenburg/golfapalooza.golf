@@ -24,6 +24,7 @@ const PATHS: Record<string, React.ReactNode> = {
   chat: <><path d="M8 10h8M8 14h5M21 12a8 8 0 01-11.5 7.2L3 21l1.8-6.5A8 8 0 1121 12z" /></>,
   image: <><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="8.5" cy="10" r="1.5" /><path d="M21 16l-5-5-9 8" /></>,
   music: <><path d="M9 18V6l10-2v12" /><circle cx="6" cy="18" r="3" /><circle cx="16" cy="16" r="3" /></>,
+  soundboard: <><path d="M4 9v6h4l5 4V5L8 9H4z" /><path d="M16 9.5a3 3 0 010 5M18.5 7a6 6 0 010 10" /></>,
   book: <><path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z" /><path d="M4 19a2 2 0 012-2h13" /></>,
   userPlus: <><circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0112 0" /><path d="M17 8v6M14 11h6" /></>,
   news: <><path d="M4 5h13v14H4z" /><path d="M17 8h3v9a2 2 0 01-2 2h-1" /><path d="M7 9h7M7 13h7M7 17h4" /></>,

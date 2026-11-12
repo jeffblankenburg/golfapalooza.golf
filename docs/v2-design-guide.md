@@ -139,6 +139,14 @@ value; omit them for standalone auto-save.
 - **Dialogs**: use the shared `ConfirmModal` — never `window.confirm/alert/prompt`.
 - **Destructive actions**: a real destructive button (`.deleteBtn`, its own row) +
   `ConfirmModal`, never a text link next to Save.
+- **Top-bar drawers**: universal drawers (Chat/Photos/Music/Soundboard) open over
+  the current page at `z-55` (below the `z-60` navs) and close back to the same
+  spot — they never navigate. Mount the provider at the `[slug]` layout so audio/
+  realtime survives navigation; dispatch `ui:drawer-open` so sibling drawers
+  collapse. A **permission-gated** drawer (Soundboard) is `topbar: true` +
+  `access: "permission"` in the feature catalog: the registry row is only a group
+  on/off; who sees the trigger is the `permissionKey` grant, checked in the layout,
+  not the `everyone/admins` visibility.
 
 ---
 

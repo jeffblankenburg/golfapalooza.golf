@@ -32,6 +32,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
     primary_ends_at?: string | null;
     secondary_ends_at?: string | null;
     games?: SquaresGameInput[];
+    collected_by?: string | null;
   };
   try {
     body = await request.json();
@@ -112,6 +113,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
       secondaryEndsAt: body.secondary_ends_at ?? null,
       games,
       createdBy: userId,
+      collectedBy: typeof body.collected_by === "string" ? body.collected_by : null,
     });
     return NextResponse.json({ id });
   } catch (e) {

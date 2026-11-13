@@ -50,10 +50,37 @@ export default function ThreesManager({
   const [gifModalFor, setGifModalFor] = useState<ThreesReactionKey | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [savedNote, setSavedNote] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const dirty = useRef(false); // true while the user has unsaved reaction edits
 
-  useEffect(() => setReactions(state.reactions), [state.reactions]);
-  useEffect(() => setStreakCap(state.streakCap), [state.streakCap]);
+  // Server-sync, but never clobber an edit the user is mid-way through.
+  useEffect(() => { if (!dirty.current) setReactions(state.reactions); }, [state.reactions]);
+  useEffect(() => { if (!dirty.current) setStreakCap(state.streakCap); }, [state.streakCap]);
+
+  // Auto-save reactions + cap (debounced) — no Save button.
+  useEffect(() => {
+    if (!dirty.current) return;
+    const t = setTimeout(() => {
+      dirty.current = false;
+      void (async () => {
+        setSaveState("saving");
+        setErr(null);
+        try {
+          const res = await fetch(`${apiBase}/threes`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "reactions", reactions, streakCap }),
+          });
+          if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Could not save");
+          setSaveState("saved");
+        } catch (e) {
+          setErr(e instanceof Error ? e.message : "Could not save");
+          setSaveState("idle");
+        }
+      })();
+    }, 700);
+    return () => clearTimeout(t);
+  }, [reactions, streakCap, apiBase]);
 
   useEffect(() => {
     fetch(`/api/v2/soundboard?orgId=${orgId}`)
@@ -89,13 +116,8 @@ export default function ThreesManager({
   }
 
   function updateReaction(key: ThreesReactionKey, patch: Partial<ThreesReaction>) {
+    dirty.current = true;
     setReactions((r) => ({ ...r, [key]: { ...(r[key] as ThreesReaction), ...patch } }));
-    setSavedNote(false);
-  }
-
-  async function saveReactions() {
-    await post({ action: "reactions", reactions, streakCap });
-    setSavedNote(true);
   }
 
   async function uploadGif(file: File) {
@@ -186,8 +208,8 @@ export default function ThreesManager({
             value={streakCap ?? ""}
             disabled={streakCap === null}
             onChange={(e) => {
+              dirty.current = true;
               setStreakCap(e.target.value ? Math.max(1, parseInt(e.target.value, 10)) : 1);
-              setSavedNote(false);
             }}
           />
           <label className={styles.capNoCap}>
@@ -195,8 +217,8 @@ export default function ThreesManager({
               type="checkbox"
               checked={streakCap === null}
               onChange={(e) => {
+                dirty.current = true;
                 setStreakCap(e.target.checked ? null : 5);
-                setSavedNote(false);
               }}
             />
             No cap
@@ -246,8 +268,9 @@ export default function ThreesManager({
           })}
         </div>
         <div className={styles.saveRow}>
-          {savedNote && <span className={styles.savedNote}>Saved</span>}
-          <button type="button" className={styles.primaryBtn} onClick={() => void saveReactions()} disabled={busy}>Save reactions</button>
+          <span className={styles.savedNote}>
+            {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : ""}
+          </span>
         </div>
       </section>
 

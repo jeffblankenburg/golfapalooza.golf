@@ -118,6 +118,13 @@ export async function soundDurationMs(url: string): Promise<number | null> {
   return buf ? Math.round(buf.duration * 1000) : null;
 }
 
+/** Length in ms if the clip is ALREADY decoded/cached, else null — a synchronous
+ *  lookup so callers can schedule without awaiting (preload warms the cache). */
+export function cachedSoundDurationMs(url: string): number | null {
+  const buf = buffers.get(url);
+  return buf ? Math.round(buf.duration * 1000) : null;
+}
+
 /** Drop a clip from the cache (e.g. after it's deleted/replaced). */
 export function evictSound(url: string): void {
   buffers.delete(url);

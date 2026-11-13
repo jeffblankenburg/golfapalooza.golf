@@ -151,7 +151,7 @@ export default function ThreesRecorder({
               onClick={() => void post({ action: "log_event", team: activeTeam, event: e.key })}
             >
               <span className={styles.eventLabel}>{e.label}</span>
-              <span className={styles.eventVal}>{e.result === "win" ? "+" : "−"}{e.points}X</span>
+              <span className={styles.eventVal}>{e.result === "win" ? "+" : "−"}{e.points}</span>
             </button>
           );
         })}

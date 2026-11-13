@@ -10,6 +10,7 @@ export type ThreesResult = "win" | "owe";
 
 export type ThreesEventType =
   | "three_pointer"
+  | "logo_three"
   | "three_point_play"
   | "dunk"
   | "four_point_play"
@@ -34,6 +35,7 @@ export type ThreesAnimation = "slam" | "confetti" | "zoom" | "shake" | "groan";
 /** The house ruleset. Order = the scorer console button order. */
 export const THREES_EVENTS: ThreesEventDef[] = [
   { key: "three_pointer", label: "3-pointer", short: "3PT", points: 1, result: "win", animation: "zoom" },
+  { key: "logo_three", label: "Logo 3", short: "LOGO 3", points: 2, result: "win", animation: "zoom" },
   { key: "three_point_play", label: "3-point play", short: "3PT PLAY", points: 1, result: "win", animation: "confetti" },
   { key: "dunk", label: "Dunk", short: "DUNK", points: 1, result: "win", animation: "slam" },
   { key: "four_point_play", label: "4-point play", short: "4PT PLAY", points: 2, result: "win", animation: "confetti" },

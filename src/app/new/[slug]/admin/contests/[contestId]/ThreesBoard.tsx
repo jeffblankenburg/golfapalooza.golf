@@ -15,7 +15,7 @@ import {
 import type { ThreesState } from "@/lib/v2/contests/threes-server";
 import type { GameScore } from "@/lib/v2/sports/espn";
 import { subscribeToThrees } from "@/lib/v2/realtime/threes-channel";
-import { playSound, preloadSounds, soundDurationMs, unlockAudio } from "@/lib/v2/soundboard-audio";
+import { playSound, preloadSounds, cachedSoundDurationMs, unlockAudio } from "@/lib/v2/soundboard-audio";
 import styles from "./threes.module.css";
 /* eslint-disable @next/next/no-img-element */
 
@@ -25,6 +25,7 @@ const GAP = 550; // ms between cash-register rings
 const SWIPE_OUT = 420; // ms: stripe swipe-out
 const HOLD_AFTER_SOUNDS = 1000; // ms: linger fully extended after the last ring, for reading
 const AND_ONE_EXIT = SWIPE_OUT; // an And-1 bar fully slides out before a resolving play's swipe
+const DEFAULT_SOUND_LEAD = 900; // ms: fallback gap before the register when a clip's length isn't cached yet
 
 /** Scale the bills so N of them always fit across the team's half, and stay
  *  small on phones (vmin cap) so they don't swamp the layout. */
@@ -100,6 +101,7 @@ async function gifLoopMs(url: string): Promise<number | null> {
 export default function ThreesBoard({ state, score, exitHref }: { state: ThreesState; score: GameScore | null; exitHref?: string }) {
   const router = useRouter();
   const { game, events, reactions, streakCap, andOne } = state;
+  const [audioReady, setAudioReady] = useState(false);
   const [andOneView, setAndOneView] = useState<AndOneView | null>(null);
   const andOneRef = useRef<string | null>(null); // prev pending team (raise sound once + resolve sequencing)
   const andOneViewKey = useRef(0);
@@ -131,16 +133,18 @@ export default function ThreesBoard({ state, score, exitHref }: { state: ThreesS
   }, [reactions]);
 
   useEffect(() => {
-    const onGesture = () => unlockAudio();
-    window.addEventListener("pointerdown", onGesture, { once: true });
-    window.addEventListener("touchend", onGesture, { once: true });
-    window.addEventListener("keydown", onGesture, { once: true });
+    // Keep priming audio on EVERY interaction (not just the first) — a projected
+    // board can sit idle and the context may re-suspend; any tap re-unlocks it.
+    const onGesture = () => {
+      unlockAudio();
+      setAudioReady(true); // in a gesture handler, not the effect body
+    };
+    const events = ["pointerdown", "touchend", "keydown", "click"] as const;
+    for (const e of events) window.addEventListener(e, onGesture);
     const unsub = subscribeToThrees(state.contest.id, () => router.refresh());
     const iv = setInterval(() => router.refresh(), 4000);
     return () => {
-      window.removeEventListener("pointerdown", onGesture);
-      window.removeEventListener("touchend", onGesture);
-      window.removeEventListener("keydown", onGesture);
+      for (const e of events) window.removeEventListener(e, onGesture);
       unsub();
       clearInterval(iv);
     };
@@ -170,7 +174,9 @@ export default function ThreesBoard({ state, score, exitHref }: { state: ThreesS
     // Always show the actual play; a broken streak is an ADDITIONAL callout.
     const r = reactions[newest.event_type] as ThreesReaction | undefined;
     const label = def?.label || "";
-    const value = def && def.points > 1 ? `${def.result === "win" ? "+" : "−"}${def.points}` : null;
+    // The chip is the PAYOUT to the collecting team — always positive (the bar
+    // already sits on the team that collects, even on an owe like a missed dunk).
+    const value = def && def.points > 1 ? `+${def.points}` : null;
     const brokenTeam = broke.broke && broke.side ? (broke.side === "a" ? game.teamA : game.teamB) : null;
     const brokeText = brokenTeam ? `${brokenTeam.abbrev || brokenTeam.shortName}'s ${broke.count} run ended` : null;
 
@@ -216,20 +222,16 @@ export default function ThreesBoard({ state, score, exitHref }: { state: ThreesS
       if (soundUrl) setTimeout(() => void playSound(soundUrl), SWIPE_IN);
       if (breakSound) setTimeout(() => void playSound(breakSound), SWIPE_IN);
 
-      // The cash register (bills + rings) FOLLOWS the reaction sound — it starts one
-      // sound-length after SWIPE_IN so the assigned clip is heard first. Anchored to
-      // begin() time so the (preloaded) duration lookup doesn't shift the schedule.
-      const t0 = performance.now();
-      const ringRegister = (lead: number) => {
-        const startIn = Math.max(0, SWIPE_IN + lead - (performance.now() - t0));
-        setTimeout(() => setBills({ side: billSide, count: kachings }), startIn);
-        for (let i = 0; i < kachings; i++) setTimeout(() => void playSound(KACHING), startIn + i * GAP);
-        const recedeIn = startIn + kachings * GAP + HOLD_AFTER_SOUNDS;
-        setTimeout(() => setReaction((cur) => (cur && cur.key === myKey ? { ...cur, phase: "out" } : cur)), recedeIn);
-        setTimeout(() => setReaction((cur) => (cur && cur.key === myKey ? null : cur)), recedeIn + SWIPE_OUT);
-      };
-      if (soundUrl) void soundDurationMs(soundUrl).then((ms) => ringRegister(ms ?? 0));
-      else ringRegister(0);
+      // The cash register FOLLOWS the reaction sound: start it one clip-length after
+      // SWIPE_IN so the clip is heard first. The length is read synchronously from
+      // the preloaded cache (default on a miss), so the rings are ALWAYS scheduled.
+      const lead = soundUrl ? cachedSoundDurationMs(soundUrl) ?? DEFAULT_SOUND_LEAD : 0;
+      const start = SWIPE_IN + lead;
+      setTimeout(() => setBills({ side: billSide, count: kachings }), start);
+      for (let i = 0; i < kachings; i++) setTimeout(() => void playSound(KACHING), start + i * GAP);
+      const recedeAt = start + kachings * GAP + HOLD_AFTER_SOUNDS;
+      setTimeout(() => setReaction((cur) => (cur && cur.key === myKey ? { ...cur, phase: "out" } : cur)), recedeAt);
+      setTimeout(() => setReaction((cur) => (cur && cur.key === myKey ? null : cur)), recedeAt + SWIPE_OUT);
 
       // The GIF cover runs on its OWN clock: stay up for at least one full loop
       // (measured when we can) so the whole GIF plays before it dismisses.
@@ -295,6 +297,11 @@ export default function ThreesBoard({ state, score, exitHref }: { state: ThreesS
     >
       {exitHref && (
         <Link href={exitHref} className={styles.boardExit} aria-label="Close board">×</Link>
+      )}
+      {!audioReady && (
+        <button type="button" className={styles.audioHint} onClick={() => { unlockAudio(); setAudioReady(true); void playSound(KACHING); }}>
+          🔊 Tap to enable sound
+        </button>
       )}
       <div className={styles.sides}>
         {liveOn && (

@@ -34,6 +34,16 @@ interface EspnGame {
   favorite?: "home" | "away" | null;
 }
 
+/** Today's date as ESPN's YYYYMMDD, in the admin's LOCAL timezone (so "today"
+ *  matches the person opening the picker, not the server's UTC day). Without an
+ *  explicit date ESPN returns its last completed slate (yesterday's games). */
+function todayYMD(): string {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}${m}${day}`;
+}
+
 /** Since the list is always today, show just the tip-off time (not the date) for
  *  upcoming games; live/final games show their status. */
 function statusText(g: EspnGame): string {
@@ -84,7 +94,7 @@ export default function ThreesGamePicker({
       setLoading(true);
       setErr(null);
       try {
-        const res = await fetch(`/api/v2/sports/games?league=${league}`);
+        const res = await fetch(`/api/v2/sports/games?league=${league}&date=${todayYMD()}`);
         const d = await res.json().catch(() => ({}));
         if (!active) return;
         if (!res.ok) throw new Error(d.error || "Could not load games");

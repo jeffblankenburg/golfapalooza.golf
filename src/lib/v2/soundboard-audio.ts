@@ -111,6 +111,13 @@ export async function playSound(url: string): Promise<void> {
   src.start(0);
 }
 
+/** One clip's length in ms (decodes on miss; null if it can't be loaded). Used to
+ *  sequence sounds back-to-back (e.g. a reaction sound before the cash register). */
+export async function soundDurationMs(url: string): Promise<number | null> {
+  const buf = await loadBuffer(url);
+  return buf ? Math.round(buf.duration * 1000) : null;
+}
+
 /** Drop a clip from the cache (e.g. after it's deleted/replaced). */
 export function evictSound(url: string): void {
   buffers.delete(url);

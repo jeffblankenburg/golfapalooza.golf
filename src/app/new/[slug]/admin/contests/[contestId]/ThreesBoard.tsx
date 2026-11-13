@@ -15,7 +15,7 @@ import {
 import type { ThreesState } from "@/lib/v2/contests/threes-server";
 import type { GameScore } from "@/lib/v2/sports/espn";
 import { subscribeToThrees } from "@/lib/v2/realtime/threes-channel";
-import { playSound, preloadSounds, unlockAudio } from "@/lib/v2/soundboard-audio";
+import { playSound, preloadSounds, soundDurationMs, unlockAudio } from "@/lib/v2/soundboard-audio";
 import styles from "./threes.module.css";
 /* eslint-disable @next/next/no-img-element */
 
@@ -121,8 +121,16 @@ export default function ThreesBoard({ state, score, exitHref }: { state: ThreesS
     billsRef.current = bills;
   }, [bills]);
 
+  // Warm the cash register + every configured reaction sound so they play
+  // instantly and their durations are known for sequencing the register after.
   useEffect(() => {
-    preloadSounds([KACHING]);
+    const reactionSounds = Object.values(reactions)
+      .map((r) => (r as ThreesReaction | undefined)?.soundUrl)
+      .filter((u): u is string => !!u);
+    preloadSounds([KACHING, ...reactionSounds]);
+  }, [reactions]);
+
+  useEffect(() => {
     const onGesture = () => unlockAudio();
     window.addEventListener("pointerdown", onGesture, { once: true });
     window.addEventListener("touchend", onGesture, { once: true });
@@ -202,16 +210,26 @@ export default function ThreesBoard({ state, score, exitHref }: { state: ThreesS
 
       setReaction({ key: myKey, side: billSide, color, label, value, broke: brokeText, phase: "in" });
       if (tickerRef.current) tickerRef.current.scrollLeft = 0;
-      setTimeout(() => setBills({ side: billSide, count: kachings }), SWIPE_IN);
 
-      for (let i = 0; i < kachings; i++) setTimeout(() => void playSound(KACHING), SWIPE_IN + i * GAP);
+      // When the bar lands: the streak pops and the assigned reaction sound plays.
+      setTimeout(() => setLanded((l) => l + 1), SWIPE_IN);
       if (soundUrl) setTimeout(() => void playSound(soundUrl), SWIPE_IN);
       if (breakSound) setTimeout(() => void playSound(breakSound), SWIPE_IN);
-      setTimeout(() => setLanded((l) => l + 1), SWIPE_IN);
 
-      const recedeAt = SWIPE_IN + kachings * GAP + HOLD_AFTER_SOUNDS;
-      setTimeout(() => setReaction((cur) => (cur && cur.key === myKey ? { ...cur, phase: "out" } : cur)), recedeAt);
-      setTimeout(() => setReaction((cur) => (cur && cur.key === myKey ? null : cur)), recedeAt + SWIPE_OUT);
+      // The cash register (bills + rings) FOLLOWS the reaction sound — it starts one
+      // sound-length after SWIPE_IN so the assigned clip is heard first. Anchored to
+      // begin() time so the (preloaded) duration lookup doesn't shift the schedule.
+      const t0 = performance.now();
+      const ringRegister = (lead: number) => {
+        const startIn = Math.max(0, SWIPE_IN + lead - (performance.now() - t0));
+        setTimeout(() => setBills({ side: billSide, count: kachings }), startIn);
+        for (let i = 0; i < kachings; i++) setTimeout(() => void playSound(KACHING), startIn + i * GAP);
+        const recedeIn = startIn + kachings * GAP + HOLD_AFTER_SOUNDS;
+        setTimeout(() => setReaction((cur) => (cur && cur.key === myKey ? { ...cur, phase: "out" } : cur)), recedeIn);
+        setTimeout(() => setReaction((cur) => (cur && cur.key === myKey ? null : cur)), recedeIn + SWIPE_OUT);
+      };
+      if (soundUrl) void soundDurationMs(soundUrl).then((ms) => ringRegister(ms ?? 0));
+      else ringRegister(0);
 
       // The GIF cover runs on its OWN clock: stay up for at least one full loop
       // (measured when we can) so the whole GIF plays before it dismisses.

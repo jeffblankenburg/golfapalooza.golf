@@ -32,9 +32,10 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
   // 3s and Ds enrichment: whether a game is set (for the list meta).
   const threesIds = (contests ?? []).filter((c) => c.contest_type === "3s_and_ds").map((c) => c.id);
   const { data: threesMatchups } = threesIds.length
-    ? await supabase.from("v2_matchups").select("contest_id").in("contest_id", threesIds)
-    : { data: [] as { contest_id: string }[] };
+    ? await supabase.from("v2_matchups").select("contest_id, start_time").in("contest_id", threesIds)
+    : { data: [] as { contest_id: string; start_time: string | null }[] };
   const threesHasGame = new Set((threesMatchups ?? []).map((m) => m.contest_id as string));
+  const threesGameDate = new Map((threesMatchups ?? []).map((m) => [m.contest_id as string, (m.start_time as string) ?? null]));
 
   const squaresIds = (contests ?? []).filter((c) => c.contest_type === "squares").map((c) => c.id);
   const { data: games } = squaresIds.length
@@ -83,6 +84,7 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
       return {
         kind: "3s_and_ds", id: c.id as string, createdAt: c.created_at as string, name: c.name as string,
         status: c.status as string, hasGame: threesHasGame.has(c.id as string),
+        gameDate: threesGameDate.get(c.id as string) ?? null,
       };
     }
     if (c.contest_type === "auction") {

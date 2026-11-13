@@ -7,11 +7,13 @@ import styles from "./ContestCard.module.css";
  *  same classes as the shell. */
 export { styles as cardStyles };
 
-type IconKind = "squares" | "pickem" | "calcutta" | "cornhole" | "props" | "other" | "golf";
+type IconKind = "squares" | "pickem" | "calcutta" | "cornhole" | "props" | "auction" | "threes" | "other" | "golf";
 
 /** Golf-round contests all share the flag glyph; the label text disambiguates them. */
 function iconKindFor(kind: string): IconKind {
   if (kind === "squares" || kind === "pickem" || kind === "calcutta" || kind === "cornhole" || kind === "props") return kind;
+  if (kind === "auction") return "auction";
+  if (kind === "3s_and_ds") return "threes";
   if (kind === "other") return "other";
   return "golf"; // scramble, ryder_cup, skins, ctp, long_drive, long_putt, bspitw, hundred_feet
 }
@@ -52,6 +54,22 @@ export function ContestTypeIcon({ kind, size = 13 }: { kind: string; size?: numb
           <rect x="4" y="3" width="16" height="18" rx="2" />
           <path d="M9.2 9a2.5 2.5 0 1 1 3.3 2.4c-.8.3-1.2.9-1.2 1.7" />
           <path d="M11.3 16.3h.01" />
+        </svg>
+      );
+    case "auction":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <rect x="13" y="3" width="6" height="5" rx="1.2" transform="rotate(45 16 5.5)" />
+          <path d="M14.5 7 7 14.5" />
+          <path d="M4 20h8" />
+        </svg>
+      );
+    case "threes":
+      return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 3v18M3 12h18" />
+          <path d="M5.7 5.7c3.1 2.3 3.1 10.3 0 12.6M18.3 5.7c-3.1 2.3-3.1 10.3 0 12.6" />
         </svg>
       );
     case "other":
@@ -132,7 +150,9 @@ export default function ContestCard({
             <span className={styles.rowMeta}>{meta}</span>
             {count != null && <span className={styles.rowCount}>{count}</span>}
           </span>
-          <svg className={styles.rowChev} data-open={isOpen || undefined} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+          {/* Only accordion cards (those with a body) get the toggle caret; cards
+              that just navigate on tap don't — their row opens the detail page. */}
+          {children != null && <svg className={styles.rowChev} data-open={isOpen || undefined} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>}
         </button>
         {(onGear || detailHref || onDelete) && (
           <div className={styles.rowActions}>

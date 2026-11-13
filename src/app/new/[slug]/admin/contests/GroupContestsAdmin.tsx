@@ -36,7 +36,7 @@ export type GroupContestItem =
     }
   | { kind: "auction"; id: string; createdAt: string; name: string; status: string; tournamentName: string | null; participantCount: number; complete: boolean }
   | { kind: "props"; id: string; createdAt: string; name: string; status: string; entryCents: number; locksAt: string | null; questionCount: number; participantCount: number }
-  | { kind: "3s_and_ds"; id: string; createdAt: string; name: string; status: string; hasGame: boolean };
+  | { kind: "3s_and_ds"; id: string; createdAt: string; name: string; status: string; hasGame: boolean; gameDate: string | null };
 
 // Contest types an admin can create at the group level today.
 const ADDABLE = [
@@ -245,7 +245,9 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
               isOpen={false} onToggle={() => router.push(`${adminBase}/${it.id}`)} />
           ) : it.kind === "3s_and_ds" ? (
             <ContestCard key={it.id} kind="3s_and_ds" name={it.name}
-              meta={[it.hasGame ? "game set" : "no game", statusLabel(it.status)].join(", ")}
+              meta={it.hasGame && it.gameDate
+                ? <span suppressHydrationWarning>{new Date(it.gameDate).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}</span>
+                : "No game yet"}
               detailHref={`${adminBase}/${it.id}`} detailLabel="Open 3s and Ds"
               deleteLabel="Delete 3s and Ds"
               onDelete={() => setToDelete({ id: it.id, name: it.name })}

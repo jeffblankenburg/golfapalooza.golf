@@ -32,6 +32,22 @@ const DEFAULT_SOUND_LEAD = 900; // ms: fallback gap before the register when a c
 function billFont(n: number): string {
   return `clamp(1rem, ${(40 / n).toFixed(2)}vw, min(10rem, 16vmin))`;
 }
+
+/** Deterministic index from a seed (an event id), so every board view picks the
+ *  SAME GIF for a given play instead of each client rolling its own random. */
+function seededIndex(seed: string, n: number): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) % n;
+}
+
+/** Pick a GIF for a play deterministically (same across all boards). */
+function pickGif(gifs: string[] | undefined, seed: string): string | null {
+  return gifs && gifs.length ? gifs[seededIndex(seed, gifs.length)] : null;
+}
 interface Reaction {
   key: number;
   side: "a" | "b";
@@ -180,7 +196,9 @@ export default function ThreesBoard({ state, score, exitHref }: { state: ThreesS
     const brokenTeam = broke.broke && broke.side ? (broke.side === "a" ? game.teamA : game.teamB) : null;
     const brokeText = brokenTeam ? `${brokenTeam.abbrev || brokenTeam.shortName}'s ${broke.count} run ended` : null;
 
-    const gif = r?.gifs && r.gifs.length ? r.gifs[Math.floor(Math.random() * r.gifs.length)] : null;
+    // The server picked this play's GIF (shuffle bag). Fall back to a deterministic
+    // pick for any event logged before gif_url existed, so it's still board-consistent.
+    const gif = newest.gif_url ?? pickGif(r?.gifs, newest.id);
 
     const myKey = ++reactionKey.current;
 
@@ -265,12 +283,11 @@ export default function ThreesBoard({ state, score, exitHref }: { state: ThreesS
       return;
     }
     const r = reactions.and_one as ThreesReaction | undefined;
-    const gifs = r?.gifs ?? [];
-    const gif = gifs.length ? gifs[Math.floor(Math.random() * gifs.length)] : null;
     const favTeam = team === "a" ? game?.teamA : game?.teamB;
     const color = favTeam?.color || (team === "a" ? "#1d4ed8" : "#b91c1c");
     const k = ++andOneViewKey.current;
-    setAndOneView({ key: k, side: team, color, potential: andOne?.potential ?? 3, gif, phase: "in" });
+    // GIF is the server's pick (same on every board), not a per-client random.
+    setAndOneView({ key: k, side: team, color, potential: andOne?.potential ?? 3, gif: andOne?.gif ?? null, phase: "in" });
     const soundUrl = r?.soundUrl;
     if (soundUrl) void playSound(soundUrl);
   }, [andOne, reactions, game]);

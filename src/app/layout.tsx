@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ActivityTracker } from "@/components/ActivityTracker";
@@ -117,11 +118,15 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // The active group's logo for the launch splash (set client-side by the v2
+  // shell when you're inside a group). Falls back to the platform logo.
+  const raw = (await cookies()).get("v2_brand_logo")?.value || null;
+  const brandLogo = raw ? decodeURIComponent(raw) : null;
   return (
     <html lang="en" className="light">
       <head>
@@ -145,7 +150,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50 text-gray-900 min-h-dvh`}
       >
-        <SplashFader />
+        <SplashFader logoUrl={brandLogo} />
         <ActivityTracker />
         <WakeLockKeeper />
         {/* Root is deliberately bare beyond global load/utility bits. The legacy

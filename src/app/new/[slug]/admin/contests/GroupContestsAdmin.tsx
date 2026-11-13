@@ -246,7 +246,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
           ) : it.kind === "3s_and_ds" ? (
             <ContestCard key={it.id} kind="3s_and_ds" name={it.name}
               meta={it.hasGame && it.gameDate
-                ? <span suppressHydrationWarning>{new Date(it.gameDate).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}</span>
+                ? <span suppressHydrationWarning>{new Date(it.gameDate).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
                 : "No game yet"}
               detailHref={`${adminBase}/${it.id}`} detailLabel="Open 3s and Ds"
               deleteLabel="Delete 3s and Ds"

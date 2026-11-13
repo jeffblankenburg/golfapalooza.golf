@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { v2AdminClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
 import PwaRegistrar from "./PwaRegistrar";
+import { BrandCookie } from "@/components/v2/BrandCookie";
 import MusicProvider from "./(event)/MusicProvider";
 import SoundboardProvider from "./(event)/SoundboardProvider";
 import { hasPermission } from "@/lib/v2/permissions-server";
@@ -118,6 +119,7 @@ export default async function OrgLayout({
   return (
     <div style={brandStyle}>
       <PwaRegistrar />
+      <BrandCookie logoUrl={org.logo_url} />
       {(ctx?.simulating || simAt) && <SimBanner name={ctx?.simulating ? ctx.simName : null} at={simAt} />}
       <SimTimeProvider serverNowMs={serverNowMs}>
         <NameModeProvider mode={org.name_display}>

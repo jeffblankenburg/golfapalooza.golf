@@ -34,8 +34,9 @@ export interface ThreesState {
   game: ThreesGame | null;
   events: ThreesEventRow[];
   /** Pending "And 1" (a made basket + foul), held on the board until resolved.
-   *  `potential` = whether a made FT completes a 3- or 4-point play. */
-  andOne: { team: ThreesTeam; potential: AndOnePotential } | null;
+   *  `potential` = whether a made FT completes a 3- or 4-point play. `gif` is
+   *  chosen once server-side so every board view shows the same one. */
+  andOne: { team: ThreesTeam; potential: AndOnePotential; gif: string | null } | null;
 }
 
 function competitorOf(raw: unknown): ThreesCompetitor {
@@ -121,16 +122,20 @@ export async function loadThreesState(
       .maybeSingle(),
     supabase
       .from("v2_3s_events")
-      .select("id, team, event_type, points, result, created_at")
+      .select("id, team, event_type, points, result, created_at, gif_url")
       .eq("contest_id", contestId)
       .order("created_at", { ascending: true }),
   ]);
 
   const cfg = (contest.config as Record<string, unknown> | null) ?? null;
-  const ao = cfg?.and_one as { team?: unknown; potential?: unknown } | null;
+  const ao = cfg?.and_one as { team?: unknown; potential?: unknown; gif?: unknown } | null;
   const andOne =
     ao?.team === "a" || ao?.team === "b"
-      ? { team: ao.team as ThreesTeam, potential: (ao.potential === 4 ? 4 : 3) as AndOnePotential }
+      ? {
+          team: ao.team as ThreesTeam,
+          potential: (ao.potential === 4 ? 4 : 3) as AndOnePotential,
+          gif: typeof ao.gif === "string" ? ao.gif : null,
+        }
       : null;
 
   const ext = (matchup?.external_ref as Record<string, unknown> | null) ?? null;
@@ -172,10 +177,11 @@ export async function setPendingAndOne(
   contestId: string,
   team: ThreesTeam | null,
   potential: AndOnePotential = 3,
+  gif: string | null = null,
 ): Promise<{ error?: string }> {
   const { data } = await admin.from("v2_contests").select("config").eq("id", contestId).maybeSingle();
   const config: Record<string, unknown> = { ...((data?.config as Record<string, unknown> | null) ?? {}) };
-  if (team) config.and_one = { team, potential };
+  if (team) config.and_one = { team, potential, gif };
   else delete config.and_one;
   const { error } = await admin.from("v2_contests").update({ config }).eq("id", contestId);
   return { error: error?.message };

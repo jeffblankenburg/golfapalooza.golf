@@ -123,6 +123,27 @@ export interface ThreesEventRow {
   points: number;
   result: ThreesResult;
   created_at: string;
+  gif_url?: string | null; // the GIF chosen for this play (server shuffle-bag pick)
+}
+
+/** Per-reaction "shuffle bag" state (which GIFs have been used this cycle). */
+export type GifBags = Record<string, { used: string[] }>;
+
+/**
+ * Random-without-replacement: pick a GIF not yet used this cycle for `key`; when
+ * all are used, reset and start a fresh cycle. Returns the pick + updated bags.
+ * Made once server-side so every board shows the same GIF.
+ */
+export function pickFromBag(bags: GifBags, key: string, gifs: string[]): { gif: string | null; bags: GifBags } {
+  if (!gifs.length) return { gif: null, bags };
+  let used = (bags[key]?.used ?? []).filter((u) => gifs.includes(u)); // drop GIFs no longer configured
+  let available = gifs.filter((g) => !used.includes(g));
+  if (available.length === 0) {
+    used = [];
+    available = gifs.slice();
+  }
+  const gif = available[Math.floor(Math.random() * available.length)];
+  return { gif, bags: { ...bags, [key]: { used: [...used, gif] } } };
 }
 
 /**

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
 import { setThreesGame, clearThreesGame, saveThreesSettings, loadThreesSettings, setPendingAndOne } from "@/lib/v2/contests/threes-server";
-import { THREES_EVENT_BY_KEY, type ThreesReactions } from "@/lib/v2/contests/threes";
+import { THREES_EVENT_BY_KEY, pickFromBag, type ThreesReactions, type GifBags } from "@/lib/v2/contests/threes";
 import type { EspnGameInput } from "@/lib/v2/contests/pickem-server";
 
 type Params = Promise<{ id: string; contestId: string }>;
@@ -27,7 +27,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
   // Confirm the contest belongs to this org and is the right type.
   const { data: contest } = await admin
     .from("v2_contests")
-    .select("id, contest_type, org_id")
+    .select("id, contest_type, org_id, config")
     .eq("id", contestId)
     .eq("org_id", orgId)
     .maybeSingle();
@@ -74,6 +74,13 @@ export async function POST(request: Request, { params }: { params: Params }) {
         .limit(1)
         .maybeSingle();
       if (!matchup) return NextResponse.json({ error: "No game set" }, { status: 400 });
+
+      // Pick this play's GIF once (no-repeat shuffle bag per reaction type), so
+      // every board shows the same one. Bag state lives in the contest config.
+      const cfg = (contest.config as Record<string, unknown> | null) ?? {};
+      const eventGifs = (await loadThreesSettings(admin, orgId)).reactions[def.key]?.gifs ?? [];
+      const picked = pickFromBag((cfg.gif_bags as GifBags) ?? {}, def.key, eventGifs);
+
       const { error } = await admin.from("v2_3s_events").insert({
         contest_id: contestId,
         matchup_id: matchup.id,
@@ -81,12 +88,17 @@ export async function POST(request: Request, { params }: { params: Params }) {
         event_type: def.key,
         points: def.points,
         result: def.result,
+        gif_url: picked.gif,
         created_by: userId,
       });
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      // A logged play resolves any pending And-1 (a made 3-/4-point play is the
-      // free throw going in; other events only fire while nothing is pending).
-      await setPendingAndOne(admin, contestId, null);
+
+      // One config write: persist the bag, and clear any pending And-1 (a made
+      // 3-/4-point play is the free throw going in; other events only fire while
+      // nothing is pending).
+      const nextCfg: Record<string, unknown> = { ...cfg, gif_bags: picked.bags };
+      delete nextCfg.and_one;
+      await admin.from("v2_contests").update({ config: nextCfg }).eq("id", contestId);
       return NextResponse.json({ ok: true });
     }
 
@@ -96,9 +108,20 @@ export async function POST(request: Request, { params }: { params: Params }) {
       const team = body.team;
       if (team !== "a" && team !== "b" && team !== null)
         return NextResponse.json({ error: "Bad team" }, { status: 400 });
+      if (!team) {
+        const { error } = await setPendingAndOne(admin, contestId, null);
+        if (error) return NextResponse.json({ error }, { status: 500 });
+        return NextResponse.json({ ok: true });
+      }
+      // Raise: the And-1 GIF comes from the same no-repeat shuffle bag, chosen
+      // once here so every board shows the same one. Write and_one + bag together.
       const potential = body.potential === 4 ? 4 : 3;
-      const { error } = await setPendingAndOne(admin, contestId, team ?? null, potential);
-      if (error) return NextResponse.json({ error }, { status: 500 });
+      const cfg = (contest.config as Record<string, unknown> | null) ?? {};
+      const gifs = (await loadThreesSettings(admin, orgId)).reactions.and_one?.gifs ?? [];
+      const picked = pickFromBag((cfg.gif_bags as GifBags) ?? {}, "and_one", gifs);
+      const nextCfg = { ...cfg, gif_bags: picked.bags, and_one: { team, potential, gif: picked.gif } };
+      const { error } = await admin.from("v2_contests").update({ config: nextCfg }).eq("id", contestId);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       return NextResponse.json({ ok: true });
     }
 

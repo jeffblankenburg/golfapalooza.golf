@@ -19,7 +19,7 @@ import styles from "./threes.module.css";
 /* eslint-disable @next/next/no-img-element */
 
 const ANIMATIONS: ThreesAnimation[] = ["slam", "confetti", "zoom", "shake", "groan"];
-const REACTION_KEYS: ThreesReactionKey[] = [...THREES_EVENTS.map((e) => e.key), "streak_break"];
+const REACTION_KEYS: ThreesReactionKey[] = [...THREES_EVENTS.map((e) => e.key), "and_one", "streak_break"];
 
 interface Clip { id: string; name: string; audio_url: string }
 interface GifRow { id: string; url: string; label: string | null }
@@ -170,9 +170,12 @@ export default function ThreesManager({
         )}
       </section>
 
-      {/* Reactions */}
+      {/* Reactions — a GROUP-level setup, shared by every 3s & Ds game */}
       <section className={styles.card}>
         <h2 className={styles.cardTitle}>Reactions</h2>
+        <p className={styles.muted}>
+          This setup is saved for your whole group, not just this game. Change it once and every future 3s &amp; Ds game uses it.
+        </p>
 
         <div className={styles.capRow}>
           <span className={styles.capLabel}>Max streak</span>

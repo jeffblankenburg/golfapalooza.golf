@@ -55,9 +55,29 @@ export interface ThreesReaction {
   soundUrl: string | null; // a Soundboard clip URL or upload; null = the default cash register
 }
 
-/** Reactions exist for each event plus the special "streak broken" moment. */
-export type ThreesReactionKey = ThreesEventType | "streak_break";
+/**
+ * Reactions exist for each event, the "streak broken" moment, and the "And 1" —
+ * a non-scoring pending state (a made basket + a foul) that the board holds up
+ * until it resolves into a 3- or 4-point play (or is dismissed).
+ */
+export type ThreesReactionKey = ThreesEventType | "streak_break" | "and_one";
 export type ThreesReactions = Partial<Record<ThreesReactionKey, ThreesReaction>>;
+
+/** An And-1 is either a potential 3-point play (fouled on a 2) or a potential
+ *  4-point play (fouled on a 3) — the scorer picks which so the board can show it. */
+export type AndOnePotential = 3 | 4;
+
+/**
+ * The scoring play that resolves a pending And-1 from the scorer console: a made
+ * free throw completes a 3-point play (potential 3) or a 4-point play (potential
+ * 4). A miss scores nothing here, so the scorer just dismisses.
+ */
+export function andOneResolvers(potential: AndOnePotential): ThreesEventType[] {
+  return potential === 4 ? ["four_point_play"] : ["three_point_play"];
+}
+
+/** Events that resolve a pending "And 1" (the made free throw completes the play). */
+export const AND_ONE_RESOLVERS: ThreesEventType[] = ["three_point_play", "four_point_play"];
 
 /** Default max-streak cap (admin-configurable per activity; null = no cap). */
 export const STREAK_CAP = 5;
@@ -73,9 +93,11 @@ export function kachingCount(streakCount: number, points: number, cap: number | 
   return Math.max(0, prior) + points;
 }
 
-/** Label for a reaction key (events + the streak-break moment). */
+/** Label for a reaction key (events + the streak-break and And-1 moments). */
 export function reactionKeyLabel(key: ThreesReactionKey): string {
-  return key === "streak_break" ? "Streak broken" : THREES_EVENT_BY_KEY[key]?.label || key;
+  if (key === "streak_break") return "Streak broken";
+  if (key === "and_one") return "And 1";
+  return THREES_EVENT_BY_KEY[key]?.label || key;
 }
 
 /** The bundled default sound (public/) played when an event has no custom sound. */
@@ -88,6 +110,7 @@ export function defaultReactions(): ThreesReactions {
     out[e.key] = { animation: e.animation, gifs: [], soundUrl: null };
   }
   out.streak_break = { animation: "shake", gifs: [], soundUrl: null };
+  out.and_one = { animation: "zoom", gifs: [], soundUrl: null };
   return out;
 }
 

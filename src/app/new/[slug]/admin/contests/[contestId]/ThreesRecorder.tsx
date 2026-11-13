@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { THREES_EVENTS, currentStreak, type ThreesTeam } from "@/lib/v2/contests/threes";
+import { THREES_EVENTS, andOneResolvers, currentStreak, type ThreesTeam } from "@/lib/v2/contests/threes";
 import type { ThreesState } from "@/lib/v2/contests/threes-server";
 import { subscribeToThrees } from "@/lib/v2/realtime/threes-channel";
 import styles from "./threes.module.css";
@@ -62,7 +62,11 @@ export default function ThreesRecorder({
   const streak = currentStreak(state.events, state.streakCap);
   const runTeam = streak.side ? (streak.side === "a" ? game.teamA : game.teamB) : null;
   const last = state.events[state.events.length - 1];
-  const active = team === "a" ? game.teamA : game.teamB;
+  // A pending And-1 locks the console to that team and leaves only the resolving
+  // plays (3-/4-point play) and the dismiss button active.
+  const pending = state.andOne;
+  const activeTeam: ThreesTeam = pending ? pending.team : team;
+  const active = activeTeam === "a" ? game.teamA : game.teamB;
 
   return (
     <div className={styles.recorder}>
@@ -78,19 +82,20 @@ export default function ThreesRecorder({
         <a href={boardHref} target="_blank" rel="noopener" className={styles.secondaryBtn}>Board ↗</a>
       </div>
 
-      {/* Which team executed the play */}
+      {/* Which team executed the play (locked while an And-1 is pending) */}
       <div className={styles.teamToggle}>
         {(["a", "b"] as ThreesTeam[]).map((t) => {
           const tm = t === "a" ? game.teamA : game.teamB;
-          const on = team === t;
+          const on = activeTeam === t;
           return (
             <button
               key={t}
               type="button"
               className={styles.teamBtn}
               data-on={on || undefined}
+              disabled={!!pending && !on}
               style={on && tm.color ? { borderColor: tm.color, background: tm.color } : undefined}
-              onClick={() => setTeam(t)}
+              onClick={() => { if (!pending) setTeam(t); }}
             >
               {tm.logo && <img src={tm.logo} alt="" className={styles.teamBtnLogo} />}
               <span className={styles.teamBtnName}>{tm.shortName}</span>
@@ -100,24 +105,56 @@ export default function ThreesRecorder({
       </div>
 
       <p className={styles.scoringFor}>
-        Scoring for <strong>{active.shortName}</strong>
+        {pending ? (
+          <>Waiting on the <strong>And 1</strong> free throw for <strong>{active.shortName}</strong> (potential {pending.potential})</>
+        ) : (
+          <>Scoring for <strong>{active.shortName}</strong></>
+        )}
       </p>
 
-      {/* Event buttons */}
-      <div className={styles.eventGrid}>
-        {THREES_EVENTS.map((e) => (
-          <button
-            key={e.key}
-            type="button"
-            className={styles.eventBtn}
-            data-owe={e.result === "owe" || undefined}
-            disabled={busy}
-            onClick={() => void post({ action: "log_event", team, event: e.key })}
-          >
-            <span className={styles.eventLabel}>{e.label}</span>
-            <span className={styles.eventVal}>{e.result === "win" ? "+" : "−"}{e.points}X</span>
+      {/* And 1 — a non-scoring pending state. Pick the potential (3 or 4) so the
+          board can show it; while pending the button dismisses it. */}
+      {pending ? (
+        <button
+          type="button"
+          className={styles.andOneBtn}
+          data-on
+          disabled={busy}
+          onClick={() => void post({ action: "and_one", team: null })}
+        >
+          ✕ Dismiss And 1
+        </button>
+      ) : (
+        <div className={styles.andOneRow}>
+          <button type="button" className={styles.andOneBtn} disabled={busy} onClick={() => void post({ action: "and_one", team: activeTeam, potential: 3 })}>
+            🏀 And 1 (potential 3)
           </button>
-        ))}
+          <button type="button" className={styles.andOneBtn} disabled={busy} onClick={() => void post({ action: "and_one", team: activeTeam, potential: 4 })}>
+            🏀 And 1 (potential 4)
+          </button>
+        </div>
+      )}
+
+      {/* Event buttons — while an And-1 is pending, only its resolving play is live */}
+      <div className={styles.eventGrid}>
+        {THREES_EVENTS.map((e) => {
+          const isResolver = !!pending && andOneResolvers(pending.potential).includes(e.key);
+          const locked = !!pending && !isResolver;
+          return (
+            <button
+              key={e.key}
+              type="button"
+              className={styles.eventBtn}
+              data-owe={e.result === "owe" || undefined}
+              data-resolver={isResolver || undefined}
+              disabled={busy || locked}
+              onClick={() => void post({ action: "log_event", team: activeTeam, event: e.key })}
+            >
+              <span className={styles.eventLabel}>{e.label}</span>
+              <span className={styles.eventVal}>{e.result === "win" ? "+" : "−"}{e.points}X</span>
+            </button>
+          );
+        })}
       </div>
 
       <div className={styles.recorderActions}>

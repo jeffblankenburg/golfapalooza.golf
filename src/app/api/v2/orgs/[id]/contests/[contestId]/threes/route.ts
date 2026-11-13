@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
-import { setThreesGame, clearThreesGame } from "@/lib/v2/contests/threes-server";
+import { setThreesGame, clearThreesGame, saveThreesSettings, loadThreesSettings, setPendingAndOne } from "@/lib/v2/contests/threes-server";
 import { THREES_EVENT_BY_KEY, type ThreesReactions } from "@/lib/v2/contests/threes";
 import type { EspnGameInput } from "@/lib/v2/contests/pickem-server";
 
@@ -27,7 +27,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
   // Confirm the contest belongs to this org and is the right type.
   const { data: contest } = await admin
     .from("v2_contests")
-    .select("id, config, contest_type, org_id")
+    .select("id, contest_type, org_id")
     .eq("id", contestId)
     .eq("org_id", orgId)
     .maybeSingle();
@@ -37,8 +37,9 @@ export async function POST(request: Request, { params }: { params: Params }) {
   let body: {
     action?: string;
     game?: EspnGameInput;
-    team?: "a" | "b";
+    team?: "a" | "b" | null;
     event?: string;
+    potential?: number;
     reactions?: ThreesReactions;
     streakCap?: number | null;
   };
@@ -83,6 +84,21 @@ export async function POST(request: Request, { params }: { params: Params }) {
         created_by: userId,
       });
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      // A logged play resolves any pending And-1 (a made 3-/4-point play is the
+      // free throw going in; other events only fire while nothing is pending).
+      await setPendingAndOne(admin, contestId, null);
+      return NextResponse.json({ ok: true });
+    }
+
+    case "and_one": {
+      // Toggle the non-scoring "And 1" pending state for a team (null = dismiss).
+      // `potential` (3|4) = whether a made FT completes a 3- or 4-point play.
+      const team = body.team;
+      if (team !== "a" && team !== "b" && team !== null)
+        return NextResponse.json({ error: "Bad team" }, { status: 400 });
+      const potential = body.potential === 4 ? 4 : 3;
+      const { error } = await setPendingAndOne(admin, contestId, team ?? null, potential);
+      if (error) return NextResponse.json({ error }, { status: 500 });
       return NextResponse.json({ ok: true });
     }
 
@@ -99,14 +115,12 @@ export async function POST(request: Request, { params }: { params: Params }) {
     }
 
     case "reactions": {
+      // Group-level config: saved against the org, used by EVERY 3s-and-Ds game.
       if (!body.reactions || typeof body.reactions !== "object")
         return NextResponse.json({ error: "Bad reactions" }, { status: 400 });
-      const config: Record<string, unknown> = { ...(contest.config as Record<string, unknown> | null), reactions: body.reactions };
-      if (body.streakCap !== undefined) {
-        config.streakCap = body.streakCap === null ? null : Math.max(1, Math.floor(body.streakCap));
-      }
-      const { error } = await admin.from("v2_contests").update({ config }).eq("id", contestId);
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      const cap = body.streakCap !== undefined ? body.streakCap : (await loadThreesSettings(admin, orgId)).streakCap;
+      const { error } = await saveThreesSettings(admin, orgId, body.reactions, cap, userId);
+      if (error) return NextResponse.json({ error }, { status: 500 });
       return NextResponse.json({ ok: true });
     }
 

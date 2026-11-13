@@ -6,7 +6,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addEspnGames, type EspnGameInput } from "@/lib/v2/contests/pickem-server";
-import { defaultReactions, type ThreesReactions, type ThreesEventRow } from "@/lib/v2/contests/threes";
+import { defaultReactions, type ThreesReactions, type ThreesEventRow, type ThreesTeam, type AndOnePotential } from "@/lib/v2/contests/threes";
 
 export interface ThreesCompetitor {
   name: string;
@@ -33,6 +33,9 @@ export interface ThreesState {
   streakCap: number | null;
   game: ThreesGame | null;
   events: ThreesEventRow[];
+  /** Pending "And 1" (a made basket + foul), held on the board until resolved.
+   *  `potential` = whether a made FT completes a 3- or 4-point play. */
+  andOne: { team: ThreesTeam; potential: AndOnePotential } | null;
 }
 
 function competitorOf(raw: unknown): ThreesCompetitor {
@@ -48,17 +51,51 @@ function competitorOf(raw: unknown): ThreesCompetitor {
   };
 }
 
-export function reactionsOf(config: Record<string, unknown> | null): ThreesReactions {
-  const r = config?.reactions as ThreesReactions | undefined;
-  return r && typeof r === "object" ? { ...defaultReactions(), ...r } : defaultReactions();
+/**
+ * Group-level reaction config (animations / sounds / GIF picks + max-streak).
+ * One row per org in v2_3s_settings; every 3s-and-Ds game uses it. A missing row
+ * means app defaults (default animations, no GIFs, bundled sound, streak cap 5).
+ */
+export async function loadThreesSettings(
+  supabase: SupabaseClient,
+  orgId: string,
+): Promise<{ reactions: ThreesReactions; streakCap: number | null }> {
+  const { data } = await supabase
+    .from("v2_3s_settings")
+    .select("reactions, streak_cap")
+    .eq("org_id", orgId)
+    .maybeSingle();
+
+  const raw = data?.reactions as ThreesReactions | undefined;
+  const reactions =
+    raw && typeof raw === "object" && Object.keys(raw).length
+      ? { ...defaultReactions(), ...raw }
+      : defaultReactions();
+
+  let streakCap: number | null = 5;
+  if (data) {
+    const v = data.streak_cap;
+    streakCap = v === null ? null : typeof v === "number" && v > 0 ? Math.floor(v) : 5;
+  }
+  return { reactions, streakCap };
 }
 
-/** Admin's max-streak cap: a positive integer, or null for no cap. Default 5. */
-export function streakCapOf(config: Record<string, unknown> | null): number | null {
-  const v = config?.streakCap;
-  if (v === null) return null;
-  if (typeof v === "number" && v > 0) return Math.floor(v);
-  return 5;
+/** Upsert the group's reaction config. Admin-gated at the API layer. */
+export async function saveThreesSettings(
+  admin: SupabaseClient,
+  orgId: string,
+  reactions: ThreesReactions,
+  streakCap: number | null,
+  userId: string,
+): Promise<{ error?: string }> {
+  const cap = streakCap === null ? null : Math.max(1, Math.floor(streakCap));
+  const { error } = await admin
+    .from("v2_3s_settings")
+    .upsert(
+      { org_id: orgId, reactions, streak_cap: cap, updated_by: userId, updated_at: new Date().toISOString() },
+      { onConflict: "org_id" },
+    );
+  return { error: error?.message };
 }
 
 /** Load everything the manage view / scorer / board needs for a 3s-and-Ds activity. */
@@ -68,12 +105,13 @@ export async function loadThreesState(
 ): Promise<ThreesState | null> {
   const { data: contest } = await supabase
     .from("v2_contests")
-    .select("id, name, status, org_id, event_id, config, contest_type")
+    .select("id, name, status, org_id, event_id, contest_type, config")
     .eq("id", contestId)
     .maybeSingle();
   if (!contest || contest.contest_type !== "3s_and_ds") return null;
 
-  const [{ data: matchup }, { data: events }] = await Promise.all([
+  const [settings, { data: matchup }, { data: events }] = await Promise.all([
+    loadThreesSettings(supabase, contest.org_id),
     supabase
       .from("v2_matchups")
       .select("id, competitor_a, competitor_b, external_ref, start_time, status")
@@ -87,6 +125,13 @@ export async function loadThreesState(
       .eq("contest_id", contestId)
       .order("created_at", { ascending: true }),
   ]);
+
+  const cfg = (contest.config as Record<string, unknown> | null) ?? null;
+  const ao = cfg?.and_one as { team?: unknown; potential?: unknown } | null;
+  const andOne =
+    ao?.team === "a" || ao?.team === "b"
+      ? { team: ao.team as ThreesTeam, potential: (ao.potential === 4 ? 4 : 3) as AndOnePotential }
+      : null;
 
   const ext = (matchup?.external_ref as Record<string, unknown> | null) ?? null;
   const game: ThreesGame | null = matchup
@@ -109,11 +154,31 @@ export async function loadThreesState(
       org_id: contest.org_id,
       event_id: contest.event_id,
     },
-    reactions: reactionsOf(contest.config as Record<string, unknown> | null),
-    streakCap: streakCapOf(contest.config as Record<string, unknown> | null),
+    reactions: settings.reactions,
+    streakCap: settings.streakCap,
     game,
     events: (events ?? []) as ThreesEventRow[],
+    andOne,
   };
+}
+
+/**
+ * Set or clear the pending "And 1" for a game (live per-game state in the
+ * contest config). Pass a team to raise it, or null to dismiss. Merges so other
+ * config keys survive; writing bumps v2_contests → realtime pushes to the board.
+ */
+export async function setPendingAndOne(
+  admin: SupabaseClient,
+  contestId: string,
+  team: ThreesTeam | null,
+  potential: AndOnePotential = 3,
+): Promise<{ error?: string }> {
+  const { data } = await admin.from("v2_contests").select("config").eq("id", contestId).maybeSingle();
+  const config: Record<string, unknown> = { ...((data?.config as Record<string, unknown> | null) ?? {}) };
+  if (team) config.and_one = { team, potential };
+  else delete config.and_one;
+  const { error } = await admin.from("v2_contests").update({ config }).eq("id", contestId);
+  return { error: error?.message };
 }
 
 /** The activity's display name = the matchup, e.g. "NIU vs. BGSU". */
@@ -137,6 +202,7 @@ export async function setThreesGame(
   const r = await addEspnGames(admin, contestId, [game]);
   if (!r.ok) return { ok: false, error: r.error };
   await admin.from("v2_contests").update({ name: matchupName(game) }).eq("id", contestId);
+  await setPendingAndOne(admin, contestId, null); // never carry a pending And-1 into a new game
   return { ok: true };
 }
 
@@ -144,4 +210,5 @@ export async function setThreesGame(
 export async function clearThreesGame(admin: SupabaseClient, contestId: string): Promise<void> {
   await admin.from("v2_3s_events").delete().eq("contest_id", contestId);
   await admin.from("v2_matchups").delete().eq("contest_id", contestId);
+  await setPendingAndOne(admin, contestId, null);
 }

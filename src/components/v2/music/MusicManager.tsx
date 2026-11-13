@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import { BottomDrawer } from "@/components/v2/BottomDrawer";
 import { compressImage, generateThumbnail } from "@/lib/v2/gallery-compress";
@@ -393,7 +394,7 @@ export default function MusicManager({ orgId, nameMode }: { orgId: string; nameM
               )}
             </div>
             {showLyricsPreview ? (
-              <div className="p-3 bg-white border border-gray-300 rounded-lg prose prose-sm max-w-none text-gray-700 min-h-[80px]"><ReactMarkdown>{lyrics}</ReactMarkdown></div>
+              <div className="p-3 bg-white border border-gray-300 rounded-lg prose prose-sm max-w-none text-gray-700 min-h-[80px]"><ReactMarkdown remarkPlugins={[remarkBreaks]}>{lyrics}</ReactMarkdown></div>
             ) : (
               <textarea value={lyrics} onChange={(e) => setLyrics(e.target.value)} placeholder="Song lyrics..." rows={4} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base" />
             )}
@@ -549,7 +550,7 @@ export default function MusicManager({ orgId, nameMode }: { orgId: string; nameM
                 )}
               </div>
               {editShowPreview ? (
-                <div className="p-3 bg-white border border-gray-300 rounded-lg prose prose-sm max-w-none text-gray-700 min-h-[120px]"><ReactMarkdown>{editLyrics}</ReactMarkdown></div>
+                <div className="p-3 bg-white border border-gray-300 rounded-lg prose prose-sm max-w-none text-gray-700 min-h-[120px]"><ReactMarkdown remarkPlugins={[remarkBreaks]}>{editLyrics}</ReactMarkdown></div>
               ) : (
                 <textarea value={editLyrics} onChange={(e) => setEditLyrics(e.target.value)} placeholder="Song lyrics..." rows={6} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base" />
               )}

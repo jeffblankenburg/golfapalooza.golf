@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { useV2Music } from "./MusicProvider";
 import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import { AndroidBackgroundAudioHint } from "./AndroidBackgroundAudioHint";
 import { useNameMode } from "./NameMode";
 import { pickName } from "@/lib/v2/profile";
@@ -140,7 +141,7 @@ export default function MusicPage() {
               </button>
               {showLyrics && (
                 <div className={styles.musicLyrics}>
-                  <ReactMarkdown>{currentSong.lyrics}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkBreaks]}>{currentSong.lyrics}</ReactMarkdown>
                 </div>
               )}
             </div>

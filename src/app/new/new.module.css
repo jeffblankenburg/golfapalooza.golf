@@ -385,9 +385,17 @@
 /* ── Admin area tile grid (group / event administration) ─────────────────── */
 .adminGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  /* One tile per line on phones; auto-fill multiple columns only once there's
+     real width (tablet/desktop). A wide phone like the Pro Max is still ~440px,
+     which would otherwise squeeze two 200px columns onto a line. */
+  grid-template-columns: 1fr;
   gap: 10px;
   margin-top: 12px;
+}
+@media (min-width: 600px) {
+  .adminGrid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
 }
 .adminTile {
   display: flex;

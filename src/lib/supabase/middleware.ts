@@ -40,6 +40,10 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/spectator") ||
     // Public spectator watch page for a round (#205): /new/<slug>/rounds/<id>/watch
     /^\/new\/[^/]+\/rounds\/[^/]+\/watch\/?$/.test(request.nextUrl.pathname) ||
+    // Invite acceptance must be reachable while logged out — a brand-new invitee
+    // has no session and isn't yet a member. The join page runs its own phone
+    // OTP + accept flow, so it's safe to expose without auth.
+    /^\/new\/join\/[^/]+\/?$/.test(request.nextUrl.pathname) ||
     request.nextUrl.pathname === "/privacy" ||
     request.nextUrl.pathname === "/terms";
   const isProtectedRoute =

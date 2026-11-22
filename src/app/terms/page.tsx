@@ -10,7 +10,7 @@ export default function TermsPage() {
     <div className="mx-auto max-w-3xl px-4 py-10 prose prose-neutral dark:prose-invert">
       <h1>Terms of Use</h1>
       <p>
-        <em>Last updated: May 4, 2026</em>
+        <em>Last updated: November 22, 2026</em>
       </p>
 
       <p>
@@ -53,6 +53,19 @@ export default function TermsPage() {
         Songs played through the Alexa skill are licensed for use within the
         Golfapalooza group only. You may not redistribute, rebroadcast, or
         commercially exploit the audio.
+      </p>
+
+      <h2>SMS / text messaging</h2>
+      <p>
+        By providing your mobile phone number &mdash; or by accepting an invite
+        from a group administrator who entered it &mdash; you agree to receive
+        account and group-related text messages from Golfapalooza, such as
+        one-time join links, sign-in codes, and transactional notifications.
+        These messages are not marketing. Message frequency varies, and message
+        and data rates may apply. Reply <strong>STOP</strong> to unsubscribe at
+        any time or <strong>HELP</strong> for help. How we handle your mobile
+        number is described in our{" "}
+        <a href="https://www.golfapalooza.app/privacy">Privacy Policy</a>.
       </p>
 
       <h2>Disclaimers</h2>

@@ -8,9 +8,13 @@
 const SID = process.env.TWILIO_ACCOUNT_SID;
 const TOKEN = process.env.TWILIO_AUTH_TOKEN;
 const FROM = process.env.TWILIO_FROM_NUMBER;
+// Preferred sender: a Messaging Service carries the A2P 10DLC campaign
+// registration US carriers require for app-to-person SMS. When set, Twilio picks
+// the sending number from the service's pool and the From number is ignored.
+const MESSAGING_SERVICE_SID = process.env.TWILIO_MESSAGING_SERVICE_SID;
 
 export function smsConfigured(): boolean {
-  return !!(SID && TOKEN && FROM);
+  return !!(SID && TOKEN && (MESSAGING_SERVICE_SID || FROM));
 }
 
 export async function sendSms(
@@ -26,7 +30,12 @@ export async function sendSms(
         Authorization: "Basic " + Buffer.from(`${SID}:${TOKEN}`).toString("base64"),
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: new URLSearchParams({ To: to, From: FROM!, Body: body }).toString(),
+      body: new URLSearchParams({
+        To: to,
+        Body: body,
+        // Prefer the Messaging Service (A2P campaign sender); fall back to a raw From.
+        ...(MESSAGING_SERVICE_SID ? { MessagingServiceSid: MESSAGING_SERVICE_SID } : { From: FROM! }),
+      }).toString(),
     }
   );
   if (!res.ok) {

@@ -10,7 +10,7 @@ export default function PrivacyPage() {
     <div className="mx-auto max-w-3xl px-4 py-10 prose prose-neutral dark:prose-invert">
       <h1>Privacy Policy</h1>
       <p>
-        <em>Last updated: May 4, 2026</em>
+        <em>Last updated: November 22, 2026</em>
       </p>
 
       <p>
@@ -76,6 +76,47 @@ export default function PrivacyPage() {
         A subset of group activity is visible without sign-in on our spectator
         pages (event info, schedules, public articles, scoreboards). Personal
         contact info, financials, and private messages are never shown there.
+      </p>
+
+      <h2>SMS / text messaging</h2>
+      <p>
+        Golfapalooza sends SMS text messages for account and group purposes
+        only &mdash; for example, a one-time invite/join link when a group
+        administrator adds you, sign-in codes, and transactional group
+        notifications such as tee-time reminders or alerts you opted into. We do
+        not send marketing or promotional text messages.
+      </p>
+      <ul>
+        <li>
+          <strong>How we get your number</strong> &mdash; you provide it when
+          you sign in, or a group administrator who already knows you enters it
+          to invite you to their private group. We do not purchase phone numbers
+          or send to numbers we obtain from third parties.
+        </li>
+        <li>
+          <strong>Message frequency</strong> &mdash; message frequency varies
+          based on your activity and your group&rsquo;s activity.
+        </li>
+        <li>
+          <strong>Rates</strong> &mdash; message and data rates may apply,
+          depending on your mobile carrier and plan.
+        </li>
+        <li>
+          <strong>Opting out</strong> &mdash; reply <strong>STOP</strong> to any
+          message to unsubscribe at any time. Reply <strong>HELP</strong> for
+          help, or contact us at the email below.
+        </li>
+      </ul>
+      <p>
+        <strong>
+          We do not share, sell, or provide your mobile phone number or your
+          SMS/messaging consent data to third parties or affiliates for
+          marketing or promotional purposes.
+        </strong>{" "}
+        Mobile information is shared only with the telephony providers we use to
+        deliver these messages (for example, our SMS provider and the provider
+        used by Supabase Auth for sign-in codes), solely so the messages can be
+        sent.
       </p>
 
       <h2>How long we keep it</h2>

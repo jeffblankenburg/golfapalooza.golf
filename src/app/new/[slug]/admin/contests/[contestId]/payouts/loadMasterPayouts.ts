@@ -76,8 +76,8 @@ export async function loadMasterPayouts(
 
   const winnerIds = Object.keys(won);
   const { data: profiles } = winnerIds.length
-    ? await supabase.from("v2_profiles").select("id, display_name, first_name, last_name, venmo_username, paypal_username, mailing_address").in("id", winnerIds)
-    : { data: [] as { id: string; display_name: string | null; first_name: string | null; last_name: string | null; venmo_username: string | null; paypal_username: string | null; mailing_address: string | null }[] };
+    ? await supabase.from("v2_profiles").select("id, display_name, first_name, last_name, venmo_username, paypal_username, address, city, state, zip").in("id", winnerIds)
+    : { data: [] as { id: string; display_name: string | null; first_name: string | null; last_name: string | null; venmo_username: string | null; paypal_username: string | null; address: string | null; city: string | null; state: string | null; zip: string | null }[] };
   const profById = new Map((profiles ?? []).map((p) => [p.id, p]));
   const paidById = new Map<string, { cents: number; note: string | null }>();
   for (const r of paidRows ?? []) {
@@ -99,7 +99,7 @@ export async function loadMasterPayouts(
         note: paid?.note ?? null,
         venmo: p?.venmo_username ?? null,
         paypal: p?.paypal_username ?? null,
-        address: p?.mailing_address ?? null,
+        address: [p?.address, p?.city, p?.state, p?.zip].filter(Boolean).join(", ") || null,
         lines: won[uid].lines,
         games: Object.entries(wonByGame[uid] ?? {}).map(([gameId, wonCents]) => ({ gameId, wonCents })),
         entryPaid: entryPaidFor(uid),

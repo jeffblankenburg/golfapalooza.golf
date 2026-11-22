@@ -1,0 +1,268 @@
+/* Lodging admin + member view. Themed via app CSS vars with safe fallbacks. */
+
+.warn {
+  margin: 14px 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--warn-soft, #fff6e6);
+  color: var(--warn-ink, #8a5a00);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.propCard {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--line, #e4e4e4);
+  border-radius: 16px;
+  background: var(--card, #fff);
+}
+
+.propHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.propTitleWrap { min-width: 0; }
+.propTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+  color: var(--ink, #1b1b1b);
+}
+.propKind {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--chip, #eef1ee);
+  color: var(--ink-soft, #59635b);
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.propMeta {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-soft, #59635b);
+  overflow-wrap: anywhere;
+}
+.propLink {
+  color: var(--accent, #2f7d4f);
+  text-decoration: none;
+  font-weight: 600;
+}
+.propLink:hover { text-decoration: underline; }
+
+.iconBtn {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line, #e4e4e4);
+  border-radius: 10px;
+  background: var(--card, #fff);
+  color: var(--ink-soft, #59635b);
+  cursor: pointer;
+}
+.iconBtn:hover { background: var(--chip, #f1f3f1); }
+
+.thumbRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.thumb {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line, #e4e4e4);
+  background: var(--chip, #f1f3f1);
+}
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumbCap {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  padding: 2px 5px;
+  font-size: 10px;
+  line-height: 1.2;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.thumbDel {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.roomList {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.roomRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line, #e4e4e4);
+  border-radius: 12px;
+}
+.roomMain { flex: 1 1 auto; min-width: 0; text-align: left; background: none; border: none; padding: 0; cursor: pointer; }
+.roomLabel {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink, #1b1b1b);
+}
+.roomAttrs {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--ink-soft, #59635b);
+}
+.occupants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.occ {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 3px;
+  border-radius: 999px;
+  background: var(--chip, #eef1ee);
+  font-size: 12px;
+  color: var(--ink, #1b1b1b);
+}
+.occAvatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  object-fit: cover;
+  background: var(--line, #d8d8d8);
+}
+.avatarFallback {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--accent, #2f7d4f);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+.capWarn { color: var(--danger, #b23b3b); font-weight: 600; }
+
+.assignBtn {
+  margin-top: 8px;
+  padding: 6px 12px;
+  border: 1px dashed var(--line, #cfcfcf);
+  border-radius: 999px;
+  background: none;
+  color: var(--ink-soft, #59635b);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.assignBtn:hover { border-color: var(--accent, #2f7d4f); color: var(--accent, #2f7d4f); }
+
+.addRoomBtn {
+  margin-top: 12px;
+  width: 100%;
+  padding: 10px;
+  border: 1px dashed var(--line, #cfcfcf);
+  border-radius: 12px;
+  background: none;
+  color: var(--ink-soft, #59635b);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.addRoomBtn:hover { border-color: var(--accent, #2f7d4f); color: var(--accent, #2f7d4f); }
+
+.emptyHint {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--ink-soft, #59635b);
+}
+
+/* Assignment drawer rows */
+.assignRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 4px;
+  border: none;
+  border-bottom: 1px solid var(--line, #eee);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.assignName { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: var(--ink, #1b1b1b); }
+.assignAllergy { font-size: 11px; font-weight: 600; color: var(--danger, #b23b3b); }
+.assignWhere { font-size: 11px; color: var(--ink-soft, #8a918a); }
+.assignCheck {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1.5px solid var(--line, #cfcfcf);
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+.assignCheckOn { background: var(--accent, #2f7d4f); border-color: var(--accent, #2f7d4f); }
+
+/* Image upload tile inside the property modal */
+.uploadTile {
+  width: 84px;
+  height: 84px;
+  border-radius: 10px;
+  border: 1px dashed var(--line, #cfcfcf);
+  display: grid;
+  place-items: center;
+  color: var(--ink-soft, #59635b);
+  cursor: pointer;
+  background: none;
+}
+.uploadTile:hover { border-color: var(--accent, #2f7d4f); color: var(--accent, #2f7d4f); }
+
+/* Flag chips in the room form */
+.flagRow { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Member resident list (sort-by-resident + search results) */
+.residentRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 2px;
+  border-bottom: 1px solid var(--line, #eee);
+}
+.residentRow:last-child { border-bottom: none; }
+.residentName { flex: 1 1 auto; font-size: 14px; color: var(--ink, #1b1b1b); }
+.residentWhere { font-size: 12px; color: var(--ink-soft, #8a918a); text-align: right; }
+.youTag { margin-left: 6px; font-size: 10px; font-weight: 700; color: var(--accent, #2f7d4f); }

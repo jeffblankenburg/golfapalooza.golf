@@ -30,6 +30,8 @@ export interface PlatformOrg {
   founded_year: number | null;
   /** Org creation timestamp (the founded_year fallback). */
   created_at: string;
+  /** Org "home" IANA timezone — the zone group-scoped times display in; events override per-event. */
+  timezone: string;
   role: OrgRole;
 }
 
@@ -71,7 +73,7 @@ export const getPlatformContext = cache(async (): Promise<PlatformContext | null
   const { data: memberships } = await client
     .from("v2_memberships")
     .select(
-      "role, org:v2_organizations(id, name, slug, logo_url, primary_color, secondary_color, store_url, store_label, store_enabled, name_display, system_name, system_avatar_url, member_noun, member_noun_plural, show_birthdays, founded_year, created_at)"
+      "role, org:v2_organizations(id, name, slug, logo_url, primary_color, secondary_color, store_url, store_label, store_enabled, name_display, system_name, system_avatar_url, member_noun, member_noun_plural, show_birthdays, founded_year, created_at, timezone)"
     )
     .eq("user_id", effUserId)
     .eq("status", "active")

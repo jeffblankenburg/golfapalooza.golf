@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { v2GetUser, v2AdminClient } from "@/lib/v2/supabase";
 import { isOrgAdmin } from "@/lib/v2/orgs";
+import { isValidTimeZone } from "@/lib/v2/timezone";
 
 /**
  * PATCH /api/v2/orgs/[id] — update an org's name, brand color, and/or store link.
@@ -33,6 +34,7 @@ export async function PATCH(
     member_noun?: string;
     member_noun_plural?: string;
     founded_year?: number | null;
+    timezone?: string;
     onboarding_dismissed?: boolean;
   };
   try {
@@ -102,6 +104,12 @@ export async function PATCH(
       }
       patch.founded_year = yr;
     }
+  }
+  if (typeof body.timezone === "string") {
+    if (!isValidTimeZone(body.timezone)) {
+      return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
+    }
+    patch.timezone = body.timezone;
   }
   if (typeof body.onboarding_dismissed === "boolean") {
     patch.onboarding_dismissed_at = body.onboarding_dismissed ? new Date().toISOString() : null;

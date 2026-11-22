@@ -21,12 +21,28 @@ interface EventRow {
   start_date: string | null;
   start_time: string | null;
   end_date: string | null;
+  end_time: string | null;
   timezone: string | null;
   status: string;
   location: string | null;
 }
 
-function dateRange(start: string | null, end: string | null): string | null {
+/** "6:00 PM" from an "HH:MM" / "HH:MM:SS" wall-clock string (zone-agnostic). */
+function fmtTime(t: string | null): string | null {
+  if (!t) return null;
+  const [h, m] = t.split(":").map(Number);
+  if (Number.isNaN(h)) return null;
+  const am = h < 12;
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m || 0).padStart(2, "0")} ${am ? "AM" : "PM"}`;
+}
+
+function dateRange(
+  start: string | null,
+  end: string | null,
+  startTime: string | null,
+  endTime: string | null,
+): string | null {
   if (!start) return null;
   const fmt = (iso: string) =>
     new Date(iso + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -37,7 +53,12 @@ function dateRange(start: string | null, end: string | null): string | null {
       ? `${fmt(start)}, ${startYear} – ${fmt(end)}, ${endYear}`
       : `${fmt(start)} – ${fmt(end)}, ${startYear}`;
   }
-  return `${fmt(start)}, ${startYear}`;
+  // Single-day event — append a time range when set (e.g. a Super Bowl party
+  // that runs 6:00–10:00 PM). Falls back to just the date.
+  const st = fmtTime(startTime);
+  const et = fmtTime(endTime);
+  const time = st && et ? `${st} – ${et}` : st || null;
+  return `${fmt(start)}, ${startYear}${time ? `, ${time}` : ""}`;
 }
 
 export default async function EventHome({
@@ -58,7 +79,7 @@ export default async function EventHome({
   const [activeRes, anyEventRes, memberCountRes] = await Promise.all([
     supabase
       .from("v2_events")
-      .select("id, name, year, start_date, start_time, end_date, timezone, status, location")
+      .select("id, name, year, start_date, start_time, end_date, end_time, timezone, status, location")
       .eq("org_id", org.id)
       .eq("status", "active")
       .order("start_date", { ascending: false })
@@ -82,7 +103,7 @@ export default async function EventHome({
   const memberNoun = memberCount === 1 ? org.member_noun : org.member_noun_plural;
   // Admin-set founding year, falling back to the year the group was created.
   const foundedYear = org.founded_year ?? (org.created_at ? new Date(org.created_at).getFullYear() : null);
-  const range = event ? dateRange(event.start_date, event.end_date) : null;
+  const range = event ? dateRange(event.start_date, event.end_date, event.start_time, event.end_time) : null;
 
   // Home modules that mirror a registry feature honor its visibility.
   const isAdmin = org.role === "owner" || org.role === "admin";
@@ -129,7 +150,7 @@ export default async function EventHome({
           {(range || event.start_date) && (
             <div className={styles.dateBand}>
               {range && <span className={styles.dateText}>{range}</span>}
-              {event.start_date && <Countdown start={event.start_date} startTime={event.start_time} end={event.end_date} timeZone={event.timezone} nowMs={(await v2Now()).getTime()} />}
+              {event.start_date && <Countdown start={event.start_date} startTime={event.start_time} end={event.end_date} endTime={event.end_time} timeZone={event.timezone} nowMs={(await v2Now()).getTime()} />}
             </div>
           )}
 
@@ -178,6 +199,7 @@ export default async function EventHome({
         optionsOpen={optionsOpen}
         moneyVisible={moneyVisible}
         activityProducers={activityProducers}
+        timeZone={org.timezone}
       />
     </div>
   );

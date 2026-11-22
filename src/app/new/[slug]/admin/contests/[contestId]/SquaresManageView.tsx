@@ -15,11 +15,14 @@ export async function loadSquaresContestRow(
   contest: { id: string; name: string; status: string; config: unknown; collected_by?: string | null },
 ): Promise<SquaresContestRow> {
   const cfg = (contest.config as Record<string, unknown>) ?? {};
-  const { data: gameRows } = await supabase
-    .from("v2_squares_games")
-    .select("espn_event_id, league, label, team_row, team_col, start_time, game_alloc, period_alloc, sort_order")
-    .eq("contest_id", contest.id)
-    .order("sort_order");
+  const [{ data: gameRows }, { count: claimedCount }] = await Promise.all([
+    supabase
+      .from("v2_squares_games")
+      .select("espn_event_id, league, label, team_row, team_col, start_time, game_alloc, period_alloc, sort_order")
+      .eq("contest_id", contest.id)
+      .order("sort_order"),
+    supabase.from("v2_squares_cells").select("id", { count: "exact", head: true }).eq("contest_id", contest.id).not("user_id", "is", null),
+  ]);
   return {
     id: contest.id,
     name: contest.name,
@@ -32,6 +35,8 @@ export async function loadSquaresContestRow(
     maxSquaresSecondary: cfg.max_squares_secondary === undefined ? null : (cfg.max_squares_secondary as number | null),
     primaryEndsAt: (cfg.primary_ends_at as string | null) ?? null,
     secondaryEndsAt: (cfg.secondary_ends_at as string | null) ?? null,
+    revealLeadMinutes: (cfg.reveal_lead_minutes as number) ?? 10080,
+    claimedCount: claimedCount ?? 0,
     collectedBy: contest.collected_by ?? null,
     games: (gameRows ?? []).map((g) => ({
       espnEventId: g.espn_event_id as string,
@@ -61,6 +66,7 @@ export default async function SquaresManageView({
   playerHref,
   editHref,
   nameMode,
+  timeZone,
 }: {
   supabase: SupabaseClient;
   contest: { id: string; name: string; status: string; config: unknown };
@@ -70,6 +76,7 @@ export default async function SquaresManageView({
   playerHref: string;
   editHref?: string;
   nameMode: NameMode;
+  timeZone: string;
 }) {
   const contestId = contest.id;
 
@@ -238,6 +245,7 @@ export default async function SquaresManageView({
       winnersByGame={winnersByGame}
       scoresByGame={scoresByGame}
       scoredGameIds={scoredGameIds}
+      timeZone={timeZone}
     />
   );
 }

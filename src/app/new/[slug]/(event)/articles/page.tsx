@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
+import { formatInstant } from "@/lib/v2/timezone";
 import { pickName } from "@/lib/v2/profile";
 import { stripMarkdown } from "@/lib/v2/text";
 import { loadResolvedFeatures } from "@/lib/v2/features-server";
@@ -71,7 +72,7 @@ export default async function ArticlesPage({
       focalX: a.image_focal_x ?? 50,
       focalY: a.image_focal_y ?? 50,
       preview: stripMarkdown(a.content || "") || null,
-      dateText: new Date(a.publish_at).toLocaleDateString("en-US", {
+      dateText: formatInstant(a.publish_at, org.timezone, {
         month: "long",
         day: "numeric",
         year: "numeric",

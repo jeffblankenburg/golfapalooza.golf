@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import styles from "./SquaresPlay.module.css";
 import SquaresGrid from "@/components/v2/contests/SquaresGrid";
 import { cellKey, winningCell, type SquaresGridState, type Cell } from "@/lib/v2/contests/squares";
+import { formatInstant } from "@/lib/v2/timezone";
+import InfoDot from "@/app/new/_components/InfoDot";
 
 type TeamRef = { name?: string; abbrev?: string; color?: string; logo?: string } | null;
 export interface PlayGame {
@@ -20,18 +22,13 @@ export interface PlayGame {
   startTime: string | null;
   live: { away: number | null; home: number | null; state: string; detail: string } | null;
   periodScores: Record<string, { away: number | null; home: number | null } | null> | null;
-  periodCents: Record<string, number>; // resolved dollars per period (server-computed)
+  periodCents: Record<string, number>; // resolved dollars per period over the CURRENT sold pot
+  fullBoard: { key: string; cents: number }[]; // per-period payout if the board sells out (ordered)
 }
 
 const money = (c: number) => `$${c / 100 % 1 === 0 ? (c / 100).toFixed(0) : (c / 100).toFixed(2)}`;
-const gameTime = (iso: string | null): string => {
-  if (!iso) return "";
-  try {
-    return new Date(iso).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-  } catch {
-    return "";
-  }
-};
+const gameTime = (iso: string | null, timeZone: string): string =>
+  formatInstant(iso, timeZone, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 /**
  * Which game the picker lands on by default: the live game that started earliest,
@@ -46,18 +43,23 @@ function defaultGameIndex(games: PlayGame[]): number {
   return Math.max(0, games.length - 1);
 }
 
-const mdy = (iso: string | null): string =>
-  iso ? new Date(iso).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" }) : "";
+const mdy = (iso: string | null, timeZone: string): string =>
+  formatInstant(iso, timeZone, { month: "2-digit", day: "2-digit", year: "2-digit" });
 
 /** Dropdown label for a game — kickoff first, then matchup + score/state. */
-function gameOptionLabel(x: PlayGame): string {
+function gameOptionLabel(x: PlayGame, timeZone: string): string {
   const m = `${x.teamRow?.abbrev ?? "Away"} @ ${x.teamCol?.abbrev ?? "Home"}`;
-  const when = mdy(x.startTime) || "TBD";
+  const when = mdy(x.startTime, timeZone) || "TBD";
   const live = x.live;
   if (live && live.away != null && live.home != null && live.state === "post") return `${when} - ${m}, ${live.away}-${live.home} Final`;
   if (live && live.away != null && live.home != null && live.state === "in") return `${when} - ${m}, ${live.away}-${live.home}, ${live.detail || "Live"}`;
   return `${when} - ${m}`;
 }
+
+const HOW_IT_WORKS =
+  "Everyone claims squares on a 10×10 grid. Once drafting closes and the board locks, each row and column is randomly assigned a digit 0-9. You win a payout whenever the last digit of each team's score lands on one of your squares.";
+const SPREAD_TIP =
+  "Tip: spread your squares across different rows and columns — stacking them in the same row or column gives you fewer winning number combinations.";
 
 const PHASE_NOTE: Record<string, string> = {
   setup: "The draft hasn't opened yet.",
@@ -76,12 +78,15 @@ export default function SquaresPlay({
   cellCostCents,
   maxPrimary,
   maxSecondary,
+  primaryEndsAt,
+  secondaryEndsAt,
   games,
   owners: propOwners,
   avatars: propAvatars,
   mine,
   myName,
   myAvatar,
+  timeZone,
 }: {
   // Scope-agnostic: `base` is this contest's API root, `homeHref` the back link.
   base: string;
@@ -91,12 +96,15 @@ export default function SquaresPlay({
   cellCostCents: number;
   maxPrimary: number;
   maxSecondary: number | null;
+  primaryEndsAt: string | null;
+  secondaryEndsAt: string | null;
   games: PlayGame[];
   owners: Record<string, string>;
   avatars: Record<string, string | null>;
   mine: string[];
   myName: string;
   myAvatar: string | null;
+  timeZone: string;
 }) {
   const router = useRouter();
   const [sel, setSel] = useState(() => defaultGameIndex(games));
@@ -106,10 +114,33 @@ export default function SquaresPlay({
   // reconciles in the background and reverts on failure (no refresh latency).
   const [myKeys, setMyKeys] = useState<Set<string>>(() => new Set(mine));
   const [inflight, setInflight] = useState<Set<string>>(() => new Set());
+  // Viewer choice: show owners as avatars (photos) or initials. Persisted per device.
+  const [showAvatars, setShowAvatars] = useState(true);
+  useEffect(() => {
+    try { if (localStorage.getItem("v2.squares.view") === "initials") setShowAvatars(false); } catch { /* ignore */ }
+  }, []);
+  const setView = (av: boolean) => {
+    setShowAvatars(av);
+    try { localStorage.setItem("v2.squares.view", av ? "avatars" : "initials"); } catch { /* ignore */ }
+  };
 
   const buyingOpen = phase === "primary" || phase === "secondary";
   const cap = phase === "primary" ? maxPrimary : maxSecondary;
   const atCap = cap != null && myKeys.size >= cap;
+
+  const hasPayouts = games.some((x) => x.fullBoard.some((p) => p.cents > 0));
+  // Round deadlines in the event's zone, compact, with the generic zone abbreviation
+  // ("ET") on each — e.g. "Feb 7, 6:00 PM ET". "TBD" until an admin sets the window.
+  const roundTime = (iso: string | null): string => {
+    if (!iso) return "TBD";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "TBD";
+    try {
+      return new Intl.DateTimeFormat("en-US", { timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "shortGeneric" }).format(d);
+    } catch {
+      return "TBD";
+    }
+  };
 
   // Board ownership: OTHERS come from the server; MY squares come ONLY from
   // myKeys (the optimistic truth), so the server can never resurrect a square I
@@ -193,11 +224,43 @@ export default function SquaresPlay({
     }
   }
 
+  const viewToggle = claimed > 0 ? (
+    <div className={styles.viewToggle} role="group" aria-label="Show squares as">
+      <span className={styles.viewToggleLabel}>Show as</span>
+      <button type="button" className={styles.viewToggleBtn} data-on={showAvatars || undefined} onClick={() => setView(true)}>Avatars</button>
+      <button type="button" className={styles.viewToggleBtn} data-on={!showAvatars || undefined} onClick={() => setView(false)}>Initials</button>
+    </div>
+  ) : null;
+
   return (
     <div className={styles.page}>
       <Link href={homeHref} className={styles.back}>← Home</Link>
-      <h1 className={styles.title}>{name}</h1>
-      <p className={styles.note}>{PHASE_NOTE[phase] ?? ""}</p>
+      <div className={styles.titleRow}>
+        <h1 className={styles.title}>{name}</h1>
+        <InfoDot ariaLabel="How Squares works">
+          <p style={{ margin: "0 0 8px" }}>{HOW_IT_WORKS}</p>
+          <p style={{ margin: 0 }}>{SPREAD_TIP}</p>
+        </InfoDot>
+      </div>
+
+      {buyingOpen ? (
+        <>
+          <div className={styles.rounds}>
+            <div className={`${styles.roundsRow} ${styles.roundsHead}`}>
+              <span>Round</span><span>Max picks</span><span>Closes</span>
+            </div>
+            <div className={styles.roundsRow} data-current={phase === "primary" || undefined}>
+              <span>Round 1</span><span>{maxPrimary}</span><span>{roundTime(primaryEndsAt)}</span>
+            </div>
+            <div className={styles.roundsRow} data-current={phase === "secondary" || undefined}>
+              <span>Round 2</span><span>{maxSecondary == null ? "Unlimited" : maxSecondary}</span><span>{roundTime(secondaryEndsAt)}</span>
+            </div>
+          </div>
+          <p className={styles.note}>Tap an open square to claim it. Tap it again to remove it.</p>
+        </>
+      ) : (
+        <p className={styles.note}>{PHASE_NOTE[phase] ?? ""}</p>
+      )}
 
       <div className={styles.stats}>
         <div className={styles.stat}>
@@ -214,15 +277,23 @@ export default function SquaresPlay({
         </div>
       </div>
 
-      {err && <p className={styles.err}>{err}</p>}
-
       {buyingOpen ? (
         <>
           {/* Drafting: a team-agnostic board (squares are owned once, across every
               game), so no teams/digits here — the games live in the list below. */}
-          <SquaresGrid grid={grid} bare mine={mineSet} avatars={avatars} onCellClick={tap} />
+          <div className={styles.boardWrap}>
+            <SquaresGrid grid={grid} bare mine={mineSet} avatars={avatars} showAvatars={showAvatars} onCellClick={tap} />
+            {err && (
+              <div className={styles.boardScrim} onClick={() => setErr(null)}>
+                <div className={styles.boardMsg} onClick={(e) => e.stopPropagation()}>
+                  <p>{err}</p>
+                  <button type="button" className={styles.boardMsgBtn} onClick={() => setErr(null)}>Got it</button>
+                </div>
+              </div>
+            )}
+          </div>
+          {viewToggle}
           {peek && <p className={styles.peek}>That&apos;s <strong>{peek}</strong>&apos;s square.</p>}
-          <p className={styles.help}>Tap an open square to claim it. Tap one of yours to release it, or someone else&apos;s to see who it is.</p>
 
           {games.length > 0 && (
             <div className={styles.gameList}>
@@ -230,9 +301,33 @@ export default function SquaresPlay({
               {games.map((x) => (
                 <div key={x.id} className={styles.gameItem}>
                   <span className={styles.gameTeams}>{x.teamRow?.abbrev ?? "Away"} @ {x.teamCol?.abbrev ?? "Home"}</span>
-                  <span className={styles.gameWhen}>{gameTime(x.startTime) || "Time TBD"}</span>
+                  <span className={styles.gameWhen}>{gameTime(x.startTime, timeZone) || "Time TBD"}</span>
                 </div>
               ))}
+            </div>
+          )}
+
+          {hasPayouts && (
+            <div className={styles.payouts}>
+              <div className={styles.payoutsHead}>Payouts if the board sells out</div>
+              {games.map((x) => {
+                const rows = x.fullBoard.filter((p) => p.cents > 0);
+                if (rows.length === 0) return null;
+                return (
+                  <div key={x.id} className={styles.payoutGame}>
+                    {games.length > 1 && <div className={styles.payoutGameName}>{x.teamRow?.abbrev ?? "Away"} @ {x.teamCol?.abbrev ?? "Home"}</div>}
+                    <div className={styles.payoutRows}>
+                      {rows.map((p) => (
+                        <span key={p.key} className={styles.payoutCell}>
+                          <span className={styles.payoutPeriod}>{p.key}</span>
+                          <strong className={styles.payoutAmt}>{money(p.cents)}</strong>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              <p className={styles.payoutNote}>Based on a full 100-square board at {money(cellCostCents)}/square. Payouts scale with how many squares sell.</p>
             </div>
           )}
         </>
@@ -241,7 +336,7 @@ export default function SquaresPlay({
           {games.length > 1 && (
             <select className={styles.gamePick} value={sel} onChange={(e) => setSel(Number(e.target.value))} aria-label="Pick a game">
               {games.map((x, i) => (
-                <option key={x.id} value={i}>{gameOptionLabel(x)}</option>
+                <option key={x.id} value={i}>{gameOptionLabel(x, timeZone)}</option>
               ))}
             </select>
           )}
@@ -277,9 +372,12 @@ export default function SquaresPlay({
                   teamRow={{ label: g.teamRow?.name ?? g.teamRow?.abbrev ?? "Away", sub: "away", color: g.teamRow?.color ?? null, logo: g.teamRow?.logo ?? null }}
                   teamCol={{ label: g.teamCol?.name ?? g.teamCol?.abbrev ?? "Home", sub: "home", color: g.teamCol?.color ?? null, logo: g.teamCol?.logo ?? null }}
                   mine={mineSet}
+                  avatars={avatars}
+                  showAvatars={showAvatars}
                   currentWinner={currentWinner}
                   periodWinners={periodWinners}
                 />
+                {viewToggle}
               </>
             );
           })()}

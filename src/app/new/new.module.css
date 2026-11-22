@@ -106,6 +106,17 @@
   padding-top: 20px;
 }
 
+.adminPreviewNote {
+  margin-bottom: 14px;
+  padding: 9px 13px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--brand) 35%, transparent);
+  background: color-mix(in srgb, var(--brand) 9%, var(--card));
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 .eyebrow {
   font-size: 0.64rem;
   font-weight: 700;
@@ -389,17 +400,32 @@
   background: var(--card);
   text-decoration: none;
   color: var(--ink);
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .adminTile:hover {
   border-color: var(--line-strong);
-  transform: translateY(-1px);
+  /* A box-shadow lift, NOT transform: a transform here becomes the containing
+     block for any descendant position:fixed modal, trapping its backdrop inside
+     this tile instead of the viewport. */
+  box-shadow: 0 2px 10px -5px rgba(23, 33, 29, 0.28);
+}
+/* Tile carrying an inline control (feature visibility switch): title + desc on
+   the left, control group pinned right, across from them. */
+.adminTileRow {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.adminTileRow .adminTileBody {
+  flex: 1;
+  min-width: 0;
 }
 .adminTileStub {
   opacity: 0.72;
 }
 .adminTileStub:hover {
-  transform: none;
+  box-shadow: none;
   border-color: var(--line);
 }
 .adminTileLabel {
@@ -410,6 +436,71 @@
 .adminTileDesc {
   font-size: 0.72rem;
   line-height: 1.35;
+  color: var(--ink-soft);
+}
+/* The navigable part of a tile that also carries an inline control. */
+.adminTileBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-decoration: none;
+  color: inherit;
+}
+/* Inline member-visibility control on a feature card — the switch + a gear that
+   opens Advanced, sitting right-aligned across from the tile's title/desc. */
+.featVisRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: nowrap;
+  align-items: center;
+}
+.featVisPill {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--ink-soft);
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.featVisPill:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.featVisPill[data-on] {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+.featVisErr {
+  color: var(--danger, #b23b3b);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+/* Gear that opens the Advanced settings modal (replaces the old text button). */
+.featGearBtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+.featGearBtn:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+.featAdvNote {
+  margin-top: 4px;
+  font-size: 0.72rem;
   color: var(--ink-soft);
 }
 .soonBadge {
@@ -2273,6 +2364,17 @@ button.feedRow:active {
   min-width: 0;
 }
 .profileTwoCol .input {
+  min-width: 0;
+}
+/* A date + time pair living inside one field (e.g. "Starts" / "Ends"). Same
+   grid + min-width fix as .profileTwoCol so the native pickers don't overflow
+   the modal; the date column takes a touch more room than the time. */
+.dateTimePair {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 10px;
+}
+.dateTimePair > * {
   min-width: 0;
 }
 .textarea {

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import { compressImage } from "@/lib/v2/gallery-compress";
 import { stripMarkdown } from "@/lib/v2/text";
+import { formatInstant } from "@/lib/v2/timezone";
+import ZonedDateTimeField from "@/app/new/_components/ZonedDateTimeField";
 import { RichTextEditor } from "./RichTextEditor";
 import styles from "@/app/new/new.module.css";
 /* eslint-disable @next/next/no-img-element */
@@ -41,22 +43,15 @@ function statusOf(publishAt: string | null): Status {
 }
 
 /** A short human label for a row's publish state (now = a captured timestamp). */
-function stateLabel(publishAt: string | null, now: number): string {
+function stateLabel(publishAt: string | null, now: number, timeZone: string): string {
   if (!publishAt) return "Draft";
-  const t = new Date(publishAt);
-  const scheduled = t.getTime() > now;
-  const date = t.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const scheduled = new Date(publishAt).getTime() > now;
+  const date = formatInstant(publishAt, timeZone, { month: "short", day: "numeric", year: "numeric" });
   return scheduled ? `Scheduled ${date}` : `Published ${date}`;
 }
 
-/** ISO → value for a <input type="datetime-local"> in the viewer's local zone. */
-function toLocalInput(iso: string | null): string {
-  const d = iso ? new Date(iso) : new Date();
-  const off = d.getTimezoneOffset();
-  return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16);
-}
 
-export default function ArticleManager({ orgId, userId }: { orgId: string; slug: string; userId: string }) {
+export default function ArticleManager({ orgId, userId, timeZone }: { orgId: string; slug: string; userId: string; timeZone: string }) {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(0); // captured once on mount (avoids impure Date.now() in render)
@@ -71,7 +66,7 @@ export default function ArticleManager({ orgId, userId }: { orgId: string; slug:
   const [focalX, setFocalX] = useState(50);
   const [focalY, setFocalY] = useState(50);
   const [status, setStatus] = useState<Status>("draft");
-  const [scheduleAt, setScheduleAt] = useState("");
+  const [scheduleAt, setScheduleAt] = useState<string | null>(null);
   const [pinned, setPinned] = useState(false);
   const [notifyOnPublish, setNotifyOnPublish] = useState(true);
   const [authorId, setAuthorId] = useState<string>(userId);
@@ -129,7 +124,7 @@ export default function ArticleManager({ orgId, userId }: { orgId: string; slug:
     setFocalX(50);
     setFocalY(50);
     setStatus("draft");
-    setScheduleAt(toLocalInput(null));
+    setScheduleAt(new Date().toISOString());
     setPinned(false);
     setNotifyOnPublish(true);
     setAuthorId(userId);
@@ -144,7 +139,7 @@ export default function ArticleManager({ orgId, userId }: { orgId: string; slug:
     setFocalX(a.image_focal_x ?? 50);
     setFocalY(a.image_focal_y ?? 50);
     setStatus(statusOf(a.publish_at));
-    setScheduleAt(toLocalInput(a.publish_at));
+    setScheduleAt(a.publish_at ?? new Date().toISOString());
     setPinned(!!a.pinned_at);
     setNotifyOnPublish(a.notify_on_publish ?? true);
     setAuthorId(a.author_id ?? userId);
@@ -190,8 +185,8 @@ export default function ArticleManager({ orgId, userId }: { orgId: string; slug:
   function computePublishAt(): string | null {
     if (status === "draft") return null;
     if (status === "now") return new Date().toISOString();
-    // schedule
-    return scheduleAt ? new Date(scheduleAt).toISOString() : null;
+    // schedule — the entered wall-clock is the org's zone
+    return scheduleAt ?? null;
   }
 
   async function save() {
@@ -379,13 +374,9 @@ export default function ArticleManager({ orgId, userId }: { orgId: string; slug:
               ))}
             </div>
             {status === "schedule" && (
-              <input
-                className={styles.input}
-                type="datetime-local"
-                value={scheduleAt}
-                onChange={(e) => setScheduleAt(e.target.value)}
-                style={{ marginTop: 10 }}
-              />
+              <div style={{ marginTop: 10 }}>
+                <ZonedDateTimeField label="Publish at" value={scheduleAt} timeZone={timeZone} onChange={setScheduleAt} />
+              </div>
             )}
             <p className={styles.swatchHint}>
               {status === "draft"
@@ -497,7 +488,7 @@ export default function ArticleManager({ orgId, userId }: { orgId: string; slug:
                         {a.title || "Untitled"}
                       </span>
                       <span className={styles.memberSub}>
-                        {stateLabel(a.publish_at, now)}
+                        {stateLabel(a.publish_at, now, timeZone)}
                         {a.publish_at && new Date(a.publish_at).getTime() <= now && a.view_count != null
                           ? ` (${a.view_count} view${a.view_count === 1 ? "" : "s"})`
                           : ""}

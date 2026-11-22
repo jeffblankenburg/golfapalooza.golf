@@ -1,19 +1,31 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import styles from "./SquaresAdmin.module.css";
 import GameSelectModal from "@/components/v2/sports/GameSelectModal";
 import { parseStake, formatStake } from "@/lib/v2/rounds/stake";
 import { getLeague, type EspnGame } from "@/lib/v2/sports/espn";
-import { PERIOD_PRESETS, resolvePayouts, type Alloc, type GameAllocation } from "@/lib/v2/contests/squares";
+import { PERIOD_PRESETS, resolvePayouts, validateSquaresTimeline, type Alloc, type GameAllocation } from "@/lib/v2/contests/squares";
 import ContestCollector from "@/components/v2/contests/ContestCollector";
 import { type NameMode } from "@/lib/v2/profile";
+import { formatInstant } from "@/lib/v2/timezone";
+import ZonedDateTimeField from "@/app/new/_components/ZonedDateTimeField";
 
 export type Structure = "quarters" | "halves";
 const defaultWeights = (s: Structure): Record<string, number> =>
   Object.fromEntries(PERIOD_PRESETS[s].map((p) => [p.key, p.weightPct]));
+
+// Reveal-lead editing: store minutes, but let the admin enter minutes/hours/days.
+const LEAD_UNITS = { minutes: 1, hours: 60, days: 1440 } as const;
+type LeadUnit = keyof typeof LEAD_UNITS;
+const DEFAULT_LEAD_MINUTES = 10080; // 7 days
+function decomposeLead(mins: number): { value: string; unit: LeadUnit } {
+  const m = Number.isFinite(mins) && mins > 0 ? mins : DEFAULT_LEAD_MINUTES;
+  if (m % 1440 === 0) return { value: String(m / 1440), unit: "days" };
+  if (m % 60 === 0) return { value: String(m / 60), unit: "hours" };
+  return { value: String(m), unit: "minutes" };
+}
 
 // Editor allocation — like the engine's Alloc, but `amount` is held in DOLLARS for
 // the input (converted to cents at the storage/engine boundary).
@@ -60,20 +72,15 @@ export interface SquaresContestRow {
   maxSquaresSecondary: number | null;
   primaryEndsAt: string | null;
   secondaryEndsAt: string | null;
+  revealLeadMinutes: number;
+  claimedCount: number; // squares already owned — locks the price (accounting integrity)
   collectedBy: string | null;
   games: StoredGame[];
 }
 
 export const money = (c: number) => `$${c / 100 % 1 === 0 ? (c / 100).toFixed(0) : (c / 100).toFixed(2)}`;
-export const isoToLocal = (iso: string | null): string => {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-};
-export const localToISO = (s: string): string | null => (s ? new Date(s).toISOString() : null);
-export const dateLabel = (iso: string | null): string =>
-  iso ? new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+export const dateLabel = (iso: string | null, timeZone: string): string =>
+  formatInstant(iso, timeZone, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 /** A dollar/percent/remainder input: a number field + a $ | % | Rest toggle. */
 export function AllocInput({ alloc, onChange, allowRemainder, restLabel, compact }: { alloc: EditorAlloc; onChange: (a: EditorAlloc) => void; allowRemainder?: boolean; restLabel?: string; compact?: boolean }) {
@@ -168,6 +175,7 @@ export default function SquaresEditor({
   nameMode = "nickname",
   currentUserId = "",
   gamesOnly = false,
+  timeZone,
   onClose = () => {},
   onSaved,
 }: {
@@ -178,6 +186,7 @@ export default function SquaresEditor({
   eventId?: string | null;
   nameMode?: NameMode;       // for the collector picker's member names (edit mode only)
   currentUserId?: string;    // pre-selected collector (the active admin)
+  timeZone: string;          // event/org zone for the draft-window summary labels
   // When true, render ONLY the Games & payouts section and save a games-only partial
   // (basics/draft live in the gear). Used by the "+ Add games" button on the detail page.
   gamesOnly?: boolean;
@@ -206,8 +215,19 @@ export default function SquaresEditor({
   const [maxPrimaryStr, setMaxPrimaryStr] = useState(editing ? String(editing.maxSquaresPrimary) : "10");
   const [secondaryUnlimited, setSecondaryUnlimited] = useState(editing ? editing.maxSquaresSecondary == null : true);
   const [maxSecondaryStr, setMaxSecondaryStr] = useState(editing ? String(editing.maxSquaresSecondary ?? 20) : "20");
-  const [primaryEndsStr, setPrimaryEndsStr] = useState(editing ? isoToLocal(editing.primaryEndsAt) : "");
-  const [secondaryEndsStr, setSecondaryEndsStr] = useState(editing ? isoToLocal(editing.secondaryEndsAt) : "");
+  const [primaryEndsIso, setPrimaryEndsIso] = useState<string | null>(editing ? editing.primaryEndsAt : null);
+  const [secondaryEndsIso, setSecondaryEndsIso] = useState<string | null>(editing ? editing.secondaryEndsAt : null);
+  const [revealLeadValue, setRevealLeadValue] = useState(() => decomposeLead(editing ? editing.revealLeadMinutes : DEFAULT_LEAD_MINUTES).value);
+  const [revealLeadUnit, setRevealLeadUnit] = useState<LeadUnit>(() => decomposeLead(editing ? editing.revealLeadMinutes : DEFAULT_LEAD_MINUTES).unit);
+  // "Visible to members" — the first open/hide (phase setup ↔ primary). Once buying
+  // moves past primary, visibility is governed on the pool page, so the toggle locks.
+  const [vphase, setVphase] = useState(editing?.phase ?? "setup");
+  const [visible, setVisible] = useState(editing?.status === "active");
+  const [togglingVis, setTogglingVis] = useState(false);
+  const canToggleVisibility = !!editingId && (vphase === "setup" || vphase === "primary");
+  const [clearedPicks, setClearedPicks] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [openSec, setOpenSec] = useState<Record<string, boolean>>(
     editing ? { basics: true, draft: false, games: true, payouts: false } : { basics: true, draft: true, games: true, payouts: false },
   );
@@ -217,6 +237,9 @@ export default function SquaresEditor({
   const [err, setErr] = useState<string | null>(null);
 
   const cost = parseStake(costStr);
+  // Once squares are owned, the price is fixed — changing it would scramble who owes
+  // what. Clearing all picks (back to setup) unlocks it.
+  const priceLocked = !!editing && editing.claimedCount > 0 && !clearedPicks;
   // Distinct game structures among the picked games (NCAA = halves, NBA/NFL = quarters).
   const structures = Array.from(
     new Set(games.map((g) => getLeague(g.league)?.periods).filter((x): x is Structure => x === "quarters" || x === "halves")),
@@ -308,6 +331,15 @@ export default function SquaresEditor({
         }
       }
     }
+    // The auto-advance cron runs these dates in order (primary close → secondary
+    // close → number reveal), so they must be chronological before we save.
+    const timelineErr = validateSquaresTimeline({
+      primaryEndsAt: primaryEndsIso,
+      secondaryEndsAt: secondaryEndsIso,
+      revealLeadMinutes: Math.max(1, parseInt(revealLeadValue, 10) || 0) * LEAD_UNITS[revealLeadUnit],
+      gameStartTimes: games.map((g) => g.startTime || null),
+    });
+    if (timelineErr) return setErr(timelineErr);
     setSaving(true);
     setErr(null);
     // Detail-page games/payouts editor: send ONLY the games + payout config (basics/
@@ -321,8 +353,9 @@ export default function SquaresEditor({
           cell_cost_cents: Math.round((cost ?? 0) * 100),
           max_squares_primary: Math.max(1, parseInt(maxPrimaryStr, 10) || 1),
           max_squares_secondary: secondaryUnlimited ? null : Math.max(1, parseInt(maxSecondaryStr, 10) || 1),
-          primary_ends_at: localToISO(primaryEndsStr),
-          secondary_ends_at: localToISO(secondaryEndsStr),
+          primary_ends_at: primaryEndsIso,
+          secondary_ends_at: secondaryEndsIso,
+          reveal_lead_minutes: Math.max(1, (parseInt(revealLeadValue, 10) || 0)) * LEAD_UNITS[revealLeadUnit],
         };
     const payload = {
       ...basics,
@@ -385,6 +418,33 @@ export default function SquaresEditor({
     }
   }
 
+  async function toggleVisible() {
+    if (togglingVis || !canToggleVisibility || !editingId) return;
+    const next = !visible;
+    setTogglingVis(true); setErr(null); setVisible(next);
+    try {
+      const res = await fetch(`${collectionBase}/${editingId}/squares/action`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: next ? "open_primary" : "back_to_setup" }),
+      });
+      if (res.ok) { const d = await res.json().catch(() => ({})); setVphase(d.phase ?? (next ? "primary" : "setup")); router.refresh(); }
+      else { setVisible(!next); setErr((await res.json().catch(() => ({}))).error || "Could not change visibility"); }
+    } catch { setVisible(!next); setErr("Could not change visibility"); } finally { setTogglingVis(false); }
+  }
+
+  async function clearPicks() {
+    if (clearing || !editingId) return;
+    setClearing(true); setErr(null);
+    try {
+      const res = await fetch(`${collectionBase}/${editingId}/squares/action`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clear_picks" }),
+      });
+      if (!res.ok) { setErr((await res.json().catch(() => ({}))).error || "Could not clear picks"); setClearing(false); return; }
+      setClearedPicks(true); setConfirmClear(false); setVphase("setup"); setVisible(false); router.refresh();
+    } catch { setErr("Could not clear picks"); } finally { setClearing(false); }
+  }
+
   const inner = (
     <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
       <div className={styles.formHead}>
@@ -406,10 +466,23 @@ export default function SquaresEditor({
                 <div className={styles.cost}>
                   <span style={{ position: "relative", display: "inline-block" }}>
                     <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--ink-soft, #59635b)", fontWeight: 700, pointerEvents: "none" }}>$</span>
-                    <input value={costStr} inputMode="decimal" style={{ paddingLeft: 22 }} onChange={(e) => setCostStr(e.target.value)} onBlur={() => setCostStr(formatStake(cost))} />
+                    <input value={costStr} inputMode="decimal" disabled={priceLocked} style={{ paddingLeft: 22, opacity: priceLocked ? 0.6 : 1 }} onChange={(e) => setCostStr(e.target.value)} onBlur={() => setCostStr(formatStake(cost))} />
                   </span>
-                  <span className={styles.costNote}>pot fills to {money(Math.round((cost ?? 0) * 100) * 100)} if all 100 sell</span>
+                  {priceLocked
+                    ? <span className={styles.costNote}>Locked, {editing!.claimedCount} claimed</span>
+                    : <span className={styles.costNote}>pot fills to {money(Math.round((cost ?? 0) * 100) * 100)} if all 100 sell</span>}
                 </div>
+                {priceLocked && (
+                  confirmClear ? (
+                    <span className={styles.delInline}>
+                      <span className={styles.capHint}>Clear every claimed square and start over?</span>
+                      <button type="button" className={styles.delConfirm} onClick={clearPicks} disabled={clearing}>{clearing ? "…" : "Yes, clear"}</button>
+                      <button type="button" className={styles.cancel} onClick={() => setConfirmClear(false)}>No</button>
+                    </span>
+                  ) : (
+                    <button type="button" className={styles.delBtn} onClick={() => setConfirmClear(true)}>Clear all picks to reprice</button>
+                  )
+                )}
                 <ContestCollector
                   base={editingId ? `${collectionBase}/${editingId}` : collectionBase}
                   orgId={orgId}
@@ -421,39 +494,57 @@ export default function SquaresEditor({
                   labelClassName={styles.label}
                   selectClassName={styles.selectInput}
                 />
+                {editingId && (
+                  <div style={{ marginTop: 10 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.9rem", cursor: canToggleVisibility ? "pointer" : "default", opacity: canToggleVisibility ? 1 : 0.6 }}>
+                      <input type="checkbox" checked={visible} disabled={!canToggleVisibility || togglingVis} onChange={toggleVisible} />
+                      <span>Visible to members</span>
+                    </label>
+                    {!canToggleVisibility && <p className={styles.capHint} style={{ marginTop: 4 }}>Buying is underway — manage visibility on the pool page.</p>}
+                  </div>
+                )}
               </Section>
 
               <Section
                 title="Draft"
                 open={openSec.draft}
                 onToggle={() => setOpenSec((o) => ({ ...o, draft: !o.draft }))}
-                summary={`Primary ${maxPrimaryStr}, secondary ${secondaryUnlimited ? "unlimited" : maxSecondaryStr}${primaryEndsStr ? `, ends ${dateLabel(localToISO(primaryEndsStr))}` : ""}`}
+                summary={`Primary ${maxPrimaryStr}, secondary ${secondaryUnlimited ? "unlimited" : maxSecondaryStr}${primaryEndsIso ? `, ends ${dateLabel(primaryEndsIso, timeZone)}` : ""}`}
               >
-                <label className={styles.label}>Squares per person</label>
-                <div className={styles.caps}>
-                  <label className={styles.capField}>
-                    <span className={styles.capName}>Primary draft</span>
-                    <input className={styles.capInput} value={maxPrimaryStr} inputMode="numeric" onChange={(e) => setMaxPrimaryStr(e.target.value.replace(/\D/g, ""))} />
-                  </label>
-                  <div className={styles.capField}>
-                    <span className={styles.capName}>Secondary draft</span>
-                    <div className={styles.capRow}>
-                      <div className={styles.seg} role="group" aria-label="Secondary cap">
-                        <button type="button" data-on={secondaryUnlimited || undefined} onClick={() => setSecondaryUnlimited(true)}>Unlimited</button>
-                        <button type="button" data-on={!secondaryUnlimited || undefined} onClick={() => setSecondaryUnlimited(false)}>Limit</button>
-                      </div>
-                      {!secondaryUnlimited && (
-                        <input className={styles.capInput} value={maxSecondaryStr} inputMode="numeric" onChange={(e) => setMaxSecondaryStr(e.target.value.replace(/\D/g, ""))} />
-                      )}
+                <div className={styles.draftGroup}>
+                  <div className={styles.draftGroupTitle}>Primary draft</div>
+                  <label className={styles.label}>Max squares per person</label>
+                  <input className={styles.capInput} value={maxPrimaryStr} inputMode="numeric" onChange={(e) => setMaxPrimaryStr(e.target.value.replace(/\D/g, ""))} />
+                  <ZonedDateTimeField label="Ends" value={primaryEndsIso} timeZone={timeZone} onChange={setPrimaryEndsIso} inputClassName={styles.input} labelClassName={styles.label} />
+                </div>
+
+                <div className={styles.draftGroup}>
+                  <div className={styles.draftGroupTitle}>Secondary draft</div>
+                  <label className={styles.label}>Max squares per person</label>
+                  <div className={styles.capRow}>
+                    <div className={styles.seg} role="group" aria-label="Secondary cap">
+                      <button type="button" data-on={secondaryUnlimited || undefined} onClick={() => setSecondaryUnlimited(true)}>Unlimited</button>
+                      <button type="button" data-on={!secondaryUnlimited || undefined} onClick={() => setSecondaryUnlimited(false)}>Limit</button>
                     </div>
+                    {!secondaryUnlimited && (
+                      <input className={styles.capInput} value={maxSecondaryStr} inputMode="numeric" onChange={(e) => setMaxSecondaryStr(e.target.value.replace(/\D/g, ""))} />
+                    )}
+                  </div>
+                  <ZonedDateTimeField label="Ends" optional value={secondaryEndsIso} timeZone={timeZone} onChange={setSecondaryEndsIso} inputClassName={styles.input} labelClassName={styles.label} />
+                </div>
+
+                <div className={styles.draftGroup}>
+                  <div className={styles.draftGroupTitle}>Number reveal</div>
+                  <label className={styles.label}>Draw numbers before each game</label>
+                  <div className={styles.capRow}>
+                    <input className={styles.capInput} value={revealLeadValue} inputMode="numeric" placeholder="30" onChange={(e) => setRevealLeadValue(e.target.value.replace(/\D/g, ""))} />
+                    <select className={styles.selectInput} style={{ width: 130 }} value={revealLeadUnit} onChange={(e) => setRevealLeadUnit(e.target.value as LeadUnit)}>
+                      <option value="minutes">minutes</option>
+                      <option value="hours">hours</option>
+                      <option value="days">days</option>
+                    </select>
                   </div>
                 </div>
-                <p className={styles.capHint}>Primary caps everyone equally; secondary opens after, to sell out the board.</p>
-                <label className={styles.label}>Primary draft ends</label>
-                <input className={styles.input} type="datetime-local" value={primaryEndsStr} onChange={(e) => setPrimaryEndsStr(e.target.value)} />
-                <label className={styles.label}>Secondary draft ends (optional)</label>
-                <input className={styles.input} type="datetime-local" value={secondaryEndsStr} onChange={(e) => setSecondaryEndsStr(e.target.value)} />
-                <p className={styles.capHint}>Primary ends → secondary begins. Leave secondary blank to close it by hand — you can always close picks early from the pool page.</p>
               </Section>
               </>)}
 
@@ -483,7 +574,10 @@ export default function SquaresEditor({
                           <button type="button" className={styles.payGameHead} onClick={() => setOpenGameId(isOpen ? null : g.espnEventId)}>
                             <span className={styles.payGameName}>
                               {g.shortName}
-                              <span className={styles.payGameLeague}>{getLeague(g.league)?.label ?? g.league}</span>
+                              <span className={styles.payGameSub}>
+                                <span className={styles.payGameLeague}>{getLeague(g.league)?.label ?? g.league}</span>
+                                {g.startTime && <span className={styles.payGameWhen}>{formatInstant(g.startTime, timeZone, { weekday: "short", month: "short", day: "numeric" })}</span>}
+                              </span>
                             </span>
                             <span className={styles.payGameTotal}>
                               {potCents > 0 ? money(rg?.cents ?? 0) : ga.kind === "remainder" ? "the rest" : money(0)}
@@ -631,10 +725,9 @@ export default function SquaresEditor({
 
   return (
     <>
-      {createPortal(
-        <div className={styles.overlay} onClick={onClose}>{inner}</div>,
-        document.body,
-      )}
+      {/* Rendered inline (not portaled to document.body) so it stays inside the org's
+          themed wrapper and inherits --brand etc. — like Modal/ConfirmModal do. */}
+      <div className={styles.overlay} onClick={onClose}>{inner}</div>
 
       {pickerOpen && (
         <GameSelectModal value={games} onChange={setGames} onClose={() => setPickerOpen(false)} initialLeague={games[0]?.league} />

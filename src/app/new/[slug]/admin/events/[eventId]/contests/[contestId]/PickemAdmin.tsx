@@ -11,6 +11,8 @@ import GameSelectModal from "@/components/v2/sports/GameSelectModal";
 import type { EspnGame } from "@/lib/v2/sports/espn";
 import PayoutSplitsEditor from "./PayoutSplitsEditor";
 import { placeLabel } from "@/lib/v2/contests/payouts";
+import { formatInstant } from "@/lib/v2/timezone";
+import ZonedDateTimeField from "@/app/new/_components/ZonedDateTimeField";
 /* eslint-disable @next/next/no-img-element */
 
 const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: cents % 100 === 0 ? 0 : 2, maximumFractionDigits: 2 })}`;
@@ -73,8 +75,9 @@ function TeamCombobox({ value, onChange, placeholder }: { value: string; onChang
 // Scope-agnostic: the mount supplies `base` (API root for this contest) and
 // `adminBase` (admin URL root). Event mounts pass the event-nested paths; a
 // group mount passes the group paths. The component itself is identical.
-export default function PickemAdmin({ base, playersHref, showMoney = true, showStatus = true, initialStatus, initialFeeCents, initialSplits, enrolledCount, initialGames = [] }: {
+export default function PickemAdmin({ base, playersHref, showMoney = true, showStatus = true, initialStatus, initialFeeCents, initialSplits, enrolledCount, initialGames = [], timeZone }: {
   base: string;
+  timeZone: string; // event/org zone for displaying game times
   // Enrollment page link. Event scope has a roster/players page; group scope
   // (opt-in) has none, so it's omitted and the Players block is hidden.
   playersHref?: string | null;
@@ -120,7 +123,7 @@ export default function PickemAdmin({ base, playersHref, showMoney = true, showS
   const [home, setHome] = useState("");
   const [favorite, setFavorite] = useState<"away" | "home">("home");
   const [spread, setSpread] = useState("");
-  const [gameTime, setGameTime] = useState("");
+  const [gameTime, setGameTime] = useState<string | null>(null);
   const [tv, setTv] = useState("");
   const [isTb, setIsTb] = useState(false);
 
@@ -143,12 +146,12 @@ export default function PickemAdmin({ base, playersHref, showMoney = true, showS
         body: JSON.stringify({
           away_team: away, home_team: home, favorite,
           spread: spread.trim() ? Number(spread) : undefined,
-          game_time: gameTime ? new Date(gameTime).toISOString() : null,
+          game_time: gameTime,
           tv_channel: tv.trim() || null, is_tiebreaker: isTb,
         }),
       });
       if (!res.ok) { setError((await res.json().catch(() => ({}))).error || "Could not add"); return; }
-      setAway(""); setHome(""); setSpread(""); setGameTime(""); setTv(""); setIsTb(false);
+      setAway(""); setHome(""); setSpread(""); setGameTime(null); setTv(""); setIsTb(false);
       setAddOpen(false);
       await load();
     } finally { setBusy(false); }
@@ -359,7 +362,7 @@ export default function PickemAdmin({ base, playersHref, showMoney = true, showS
                 {row("home")}
                 <div className={styles.pickAdminFoot}>
                   <span className={styles.pickCardMeta} style={{ margin: 0 }}>
-                    {g.game_time ? new Date(g.game_time).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" }) : "No time set"}{g.tv_channel ? `, ${g.tv_channel}` : ""}
+                    {g.game_time ? formatInstant(g.game_time, timeZone, { weekday: "short", hour: "numeric", minute: "2-digit" }) : "No time set"}{g.tv_channel ? `, ${g.tv_channel}` : ""}
                   </span>
                   <span style={{ flex: 1 }} />
                   <button type="button" className={styles.pickIconBtn} data-on={g.is_tiebreaker || undefined} onClick={() => patchGame(g.id, { is_tiebreaker: !g.is_tiebreaker })} disabled={busy || anyPicks} title={anyPicks ? "Tiebreaker is locked — picks have been made" : g.is_tiebreaker ? "Tiebreaker game" : "Mark as tiebreaker"} aria-label="Toggle tiebreaker game">
@@ -403,7 +406,7 @@ export default function PickemAdmin({ base, playersHref, showMoney = true, showS
             <div className={styles.field}><label className={styles.label}>Spread</label><input className={styles.input} inputMode="decimal" value={spread} onChange={(e) => setSpread(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="e.g. 7" /></div>
           </div>
           <div className={styles.profileTwoCol}>
-            <div className={styles.field}><label className={styles.label}>Start time</label><input type="datetime-local" className={styles.input} value={gameTime} onChange={(e) => setGameTime(e.target.value)} /></div>
+            <ZonedDateTimeField label="Start time" value={gameTime} timeZone={timeZone} onChange={setGameTime} />
             <div className={styles.field}><label className={styles.label}>TV <span className={styles.optional}>(optional)</span></label><input className={styles.input} value={tv} onChange={(e) => setTv(e.target.value)} placeholder="ESPN" /></div>
           </div>
           <label className={styles.profileToggle}><input type="checkbox" checked={isTb} onChange={(e) => setIsTb(e.target.checked)} /><span>Tiebreaker game (guess total points)</span></label>

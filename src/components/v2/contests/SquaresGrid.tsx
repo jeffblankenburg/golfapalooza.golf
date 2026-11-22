@@ -38,6 +38,7 @@ export default function SquaresGrid({
   periodWinners = [],
   mine,
   avatars,
+  showAvatars = true,
   bare = false,
   onCellClick,
 }: {
@@ -48,6 +49,7 @@ export default function SquaresGrid({
   periodWinners?: { cell: Cell; label: string; amountCents?: number }[];
   mine?: Set<string>; // cellKeys owned by the viewer — highlighted distinctly
   avatars?: Record<string, string | null>; // cellKey → owner avatar url
+  showAvatars?: boolean; // false = always show initials, even when an avatar exists
   bare?: boolean; // team-agnostic board (drafting): no axes/digits, bigger cells
   onCellClick?: (row: number, col: number) => void;
 }) {
@@ -68,7 +70,7 @@ export default function SquaresGrid({
     const k = cellKey(r, c);
     const owner = grid.owners[k];
     const w = won.get(k);
-    const avatar = avatars?.[k] ?? null;
+    const avatar = showAvatars ? (avatars?.[k] ?? null) : null;
     const badge = w ? (w.amount > 0 ? money(w.amount) : w.labels.join(" ")) : null;
     return (
       <button

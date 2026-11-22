@@ -23,6 +23,34 @@ async function gate(request: Request, orgId: string, contestId: string) {
   return { admin, contest: contest as { id: string; contest_type: string; org_id: string } };
 }
 
+/** Current contest-level settings (used by the Props settings modal opened from a card). */
+export async function GET(request: Request, { params }: { params: Params }) {
+  const { id: orgId, contestId } = await params;
+  const g = await gate(request, orgId, contestId);
+  if ("error" in g) return g.error;
+  const { data } = await g.admin
+    .from("v2_contests")
+    .select("name, status, config, payout_splits")
+    .eq("id", contestId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (!data) return NextResponse.json({ error: "Contest not found" }, { status: 404 });
+  const cfg = (data.config as Record<string, unknown>) ?? {};
+  const { count } = await g.admin
+    .from("v2_contest_participants")
+    .select("id", { count: "exact", head: true })
+    .eq("contest_id", contestId);
+  return NextResponse.json({
+    name: data.name,
+    status: data.status,
+    entryCents: Number(cfg.entry_cents) || 0,
+    locksAt: (cfg.locks_at as string) ?? null,
+    numericRule: (["absolute", "no_over", "exact"].includes(cfg.numeric_rule as string) ? cfg.numeric_rule : "absolute") as string,
+    payoutSplits: (data.payout_splits as unknown[]) ?? [],
+    participantCount: count ?? 0,
+  });
+}
+
 /** Edit a group contest. Squares reconfigures the grid/games/pot; other types
  *  (Pick'em) take a generic contest-level update (status, payout splits, name). */
 export async function PATCH(request: Request, { params }: { params: Params }) {
@@ -88,6 +116,7 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
     max_squares_secondary?: number | null;
     primary_ends_at?: string | null;
     secondary_ends_at?: string | null;
+    reveal_lead_minutes?: number;
     games?: SquaresGameInput[];
   };
 
@@ -123,6 +152,7 @@ export async function PATCH(request: Request, { params }: { params: Params }) {
       maxSquaresSecondary,
       primaryEndsAt: "primary_ends_at" in b ? b.primary_ends_at ?? null : undefined,
       secondaryEndsAt: "secondary_ends_at" in b ? b.secondary_ends_at ?? null : undefined,
+      revealLeadMinutes: "reveal_lead_minutes" in b ? b.reveal_lead_minutes : undefined,
       games,
     });
     // The collector is a top-level column, not part of the Squares config.

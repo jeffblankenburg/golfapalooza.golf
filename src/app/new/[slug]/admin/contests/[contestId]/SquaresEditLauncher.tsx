@@ -16,12 +16,14 @@ export default function SquaresEditLauncher({
   returnHref,
   nameMode = "nickname",
   currentUserId = "",
+  timeZone,
 }: {
   row: SquaresContestRow;
   collectionBase: string;
   returnHref: string;
   nameMode?: NameMode;
   currentUserId?: string;
+  timeZone: string;
 }) {
   const router = useRouter();
   return (
@@ -30,6 +32,7 @@ export default function SquaresEditLauncher({
       editing={row}
       nameMode={nameMode}
       currentUserId={currentUserId}
+      timeZone={timeZone}
       onClose={() => router.push(returnHref)}
       onSaved={() => router.refresh()}
     />

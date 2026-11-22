@@ -17,6 +17,7 @@ export default function Countdown({
   start,
   startTime,
   end,
+  endTime,
   nowMs,
   timeZone,
 }: {
@@ -24,6 +25,8 @@ export default function Countdown({
   /** Optional start-of-day time ("HH:MM"/"HH:MM:SS"). Falls back to midnight. */
   startTime?: string | null;
   end?: string | null;
+  /** Optional end time ("HH:MM"/"HH:MM:SS"). Falls back to end-of-day (23:59:59). */
+  endTime?: string | null;
   nowMs: number;
   /** The event's IANA timezone — the wall-clock start is resolved in it. */
   timeZone?: string | null;
@@ -45,10 +48,12 @@ export default function Countdown({
 
   // Resolve the absolute start instant from the event's wall-clock time in ITS
   // timezone, so the countdown is the same for every viewer. A set start time
-  // targets the real kickoff (e.g. first tee); otherwise midnight of the day.
+  // targets the real kickoff (first tee, kickoff, doors, etc.); otherwise midnight.
   const tz = timeZone || DEFAULT_TIMEZONE;
   const startMs = wallTimeToUtcMs(start, startTime, tz);
-  const endMs = wallTimeToUtcMs(end || start, "23:59:59", tz);
+  // A set end time flips "Underway → Complete" at the real finish (e.g. a party
+  // that ends at 10:00 PM); otherwise fall back to end-of-day on the end date.
+  const endMs = wallTimeToUtcMs(end || start, endTime || "23:59:59", tz);
   const diff = startMs - now;
 
   if (diff <= 0) {

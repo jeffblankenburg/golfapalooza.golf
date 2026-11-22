@@ -48,7 +48,7 @@ export default async function EventLayout({
     supabase.from("v2_chat_room_members").select("room_id, hidden_at").eq("user_id", ctx.userId),
     supabase
       .from("v2_events")
-      .select("id")
+      .select("id, timezone")
       .eq("org_id", org.id)
       .eq("status", "active")
       .order("start_date", { ascending: false })
@@ -78,7 +78,9 @@ export default async function EventLayout({
     .eq("org_id", org.id)
     .or(featFilter);
   const resolved = resolveFeatures((featRows as FeatureRow[] | null) ?? [], activeEventId ?? "");
-  ({ pinned, launcher } = buildEventNav(slug, resolved, isAdmin, await v2Now()));
+  // Feature open/close labels ("Opens Mar 3") render in the event's zone, else the org's home zone.
+  const navTimeZone = (activeEventRes.data?.timezone as string | undefined) || org.timezone;
+  ({ pinned, launcher } = buildEventNav(slug, resolved, isAdmin, await v2Now(), navTimeZone));
 
   // The members directory ("loozers") is labelled per-org: use the group's
   // configured member noun (e.g. "Loozers") instead of the catalog default.

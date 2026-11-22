@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { displayNameFrom } from "./profile";
+import { geocodeAddress } from "./geocode";
 
 /**
  * Canonical sanitize + write for a v2 profile's editable data fields. Shared by the
@@ -58,10 +59,14 @@ export function buildProfilePatch(body: Record<string, unknown>): Record<string,
   }
   if ("fun_fact" in body) p.fun_fact = str(body.fun_fact);
   if ("best_shot" in body) p.best_shot = str(body.best_shot);
-  if ("show_on_map" in body) p.show_on_map = !!body.show_on_map;
   if ("venmo_username" in body) p.venmo_username = handle(body.venmo_username);
   if ("paypal_username" in body) p.paypal_username = handle(body.paypal_username);
-  if ("mailing_address" in body) p.mailing_address = str(body.mailing_address);
+  if ("address" in body) p.address = str(body.address);
+  if ("map_visibility" in body) {
+    const m = str(body.map_visibility);
+    p.map_visibility = m && ["address", "city", "state", "off"].includes(m) ? m : "off";
+  }
+  if ("allergies" in body) p.allergies = str(body.allergies);
   if ("tracked_stats" in body) {
     const allowed = ["putts", "fairways", "gir", "penalties"];
     const arr = Array.isArray(body.tracked_stats) ? body.tracked_stats : [];
@@ -101,6 +106,24 @@ export async function applyProfileUpdate(
       (cur?.display_name as string) || "Member",
     );
   }
+  // Keep the member's map point in sync with their address. Re-geocode only when an
+  // address field actually changed; clear the point if the address can't be resolved
+  // (e.g. they cleared it) so the map never shows a stale location.
+  if ("address" in patch || "city" in patch || "state" in patch) {
+    const { data: cur } = await admin
+      .from("v2_profiles")
+      .select("address, city, state")
+      .eq("id", userId)
+      .maybeSingle();
+    const coords = await geocodeAddress({
+      address: ("address" in patch ? patch.address : cur?.address) as string | null,
+      city: ("city" in patch ? patch.city : cur?.city) as string | null,
+      state: ("state" in patch ? patch.state : cur?.state) as string | null,
+    });
+    patch.latitude = coords ? coords[0] : null;
+    patch.longitude = coords ? coords[1] : null;
+  }
+
   patch.updated_at = new Date().toISOString();
 
   if (selectColumns) {

@@ -12,15 +12,8 @@ import {
   type ResolvedFeature,
 } from "@/lib/v2/features";
 import FeatureIcon from "@/app/new/_components/FeatureIcon";
+import ZonedDateTimeField from "@/app/new/_components/ZonedDateTimeField";
 import styles from "@/app/new/new.module.css";
-
-function toLocalInput(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-const toIso = (local: string): string | null => (local ? new Date(local).toISOString() : null);
 
 /** The editable slice of a feature's config. */
 interface Draft {
@@ -73,6 +66,7 @@ export default function FeaturesConfig({
   eyebrow,
   title,
   intro,
+  timeZone,
 }: {
   scope: FeatureScope;
   endpoint: string; // PUT target
@@ -82,6 +76,7 @@ export default function FeaturesConfig({
   eyebrow: string;
   title: string;
   intro: string;
+  timeZone: string;
 }) {
   const router = useRouter();
   const allowPin = scope === "event";
@@ -304,14 +299,8 @@ export default function FeaturesConfig({
                               </label>
                               {d?.availability === "window" && (
                                 <div className={styles.profileTwoCol} style={{ marginTop: 8 }}>
-                                  <div className={styles.field}>
-                                    <label className={styles.label}>Opens</label>
-                                    <input type="datetime-local" className={styles.input} value={toLocalInput(d?.availableFrom ?? null)} onChange={(e) => patch(f.def.key, { availableFrom: toIso(e.target.value) })} />
-                                  </div>
-                                  <div className={styles.field}>
-                                    <label className={styles.label}>Closes</label>
-                                    <input type="datetime-local" className={styles.input} value={toLocalInput(d?.availableUntil ?? null)} onChange={(e) => patch(f.def.key, { availableUntil: toIso(e.target.value) })} />
-                                  </div>
+                                  <ZonedDateTimeField label="Opens" value={d?.availableFrom ?? null} timeZone={timeZone} onChange={(iso) => patch(f.def.key, { availableFrom: iso })} />
+                                  <ZonedDateTimeField label="Closes" value={d?.availableUntil ?? null} timeZone={timeZone} onChange={(iso) => patch(f.def.key, { availableUntil: iso })} />
                                 </div>
                               )}
                               <div className={styles.field} style={{ marginTop: 8 }}>

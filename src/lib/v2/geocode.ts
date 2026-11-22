@@ -1,3 +1,5 @@
+import { fullStateName } from "./geo";
+
 /**
  * Geocode an address using Mapbox Geocoding API.
  * Returns [latitude, longitude] or null if not found.
@@ -8,9 +10,11 @@ export async function geocodeAddress(
   const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   if (!token) return null;
 
-  // Try most specific first, fall back to broader
+  // Try most specific first, fall back to broader. Use the FULL state name — a bare
+  // 2-letter code is ambiguous to Mapbox (e.g. "Eureka, MO" resolves to Montana).
   const queries: string[] = [];
-  const { address, city, state, name } = parts;
+  const { address, city, name } = parts;
+  const state = fullStateName(parts.state);
 
   if (address && city && state) queries.push(`${address}, ${city}, ${state}`);
   if (name && city && state) queries.push(`${name}, ${city}, ${state}`);

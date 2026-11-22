@@ -53,6 +53,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/v2-squares-advance",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/v2-sports-grade",
       "schedule": "* * * * *"
     }

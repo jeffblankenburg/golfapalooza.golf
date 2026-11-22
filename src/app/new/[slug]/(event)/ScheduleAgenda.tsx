@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { fmtTime, fmtDateShort, daysBetween, addDaysYMD, type CalendarEntry } from "@/lib/v2/schedule";
+import { tzLongName } from "@/lib/v2/timezone";
 import EventLocation from "./EventLocation";
 import styles from "@/app/new/new.module.css";
 
@@ -41,7 +42,8 @@ function sortDay(items: CalendarEntry[]): CalendarEntry[] {
  * the top of every day it spans (the composer sends one canonical span; we expand
  * it here for display, leaving the iCal feed's single multi-day VEVENT untouched).
  */
-export default function ScheduleAgenda({ entries, today }: { entries: CalendarEntry[]; today: string }) {
+export default function ScheduleAgenda({ entries, today, timeZone }: { entries: CalendarEntry[]; today: string; timeZone: string }) {
+  const zoneName = tzLongName(timeZone);
   const groups = useMemo(() => {
     const floor = addDaysYMD(today, -PAST_WINDOW_DAYS);
     const byDay = new Map<string, CalendarEntry[]>();
@@ -75,6 +77,7 @@ export default function ScheduleAgenda({ entries, today }: { entries: CalendarEn
 
   return (
     <div className={styles.schedGroups}>
+      {zoneName && <p className={styles.roundFormHint} style={{ margin: "0 0 10px" }}>All times {zoneName}.</p>}
       {groups.map((g) => (
         <div key={g.day} className={styles.schedGroup} ref={g.day === upcomingDay ? nextRef : null}>
           <div className={styles.schedDateHead}>

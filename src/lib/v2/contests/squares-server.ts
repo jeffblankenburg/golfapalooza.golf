@@ -1,4 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { validateSquaresTimeline } from "./squares";
+
+/** How many minutes before kickoff a pool draws its numbers, reading the current
+ *  `reveal_lead_minutes` with back-compat for the legacy day-granularity field. */
+export function revealLeadMinutesOf(cfg: Record<string, unknown> | null | undefined): number {
+  const c = cfg ?? {};
+  if (Number.isFinite(c.reveal_lead_minutes)) return c.reveal_lead_minutes as number;
+  if (Number.isFinite(c.reveal_lead_days)) return (c.reveal_lead_days as number) * 1440;
+  return 10080; // 7 days
+}
 
 /**
  * Server-side Squares create (#230). Builds a GROUP-scoped contest (event_id NULL,
@@ -35,12 +45,21 @@ export interface CreateSquaresInput {
   maxSquaresSecondary: number | null; // secondary draft cap; null = unlimited
   primaryEndsAt?: string | null; // ISO; primary draft ends → secondary begins
   secondaryEndsAt?: string | null; // ISO; secondary auto-closes (null = until admin closes)
+  revealLeadMinutes?: number; // draw each game's numbers this many minutes before its kickoff
   games: SquaresGameInput[];
   createdBy: string;
   collectedBy?: string | null; // who members settle the buy-in with (default: creator)
 }
 
 export async function createSquaresContest(admin: SupabaseClient, input: CreateSquaresInput): Promise<{ id: string }> {
+  const timelineErr = validateSquaresTimeline({
+    primaryEndsAt: input.primaryEndsAt ?? null,
+    secondaryEndsAt: input.secondaryEndsAt ?? null,
+    revealLeadMinutes: Number.isFinite(input.revealLeadMinutes) ? (input.revealLeadMinutes as number) : 10080,
+    gameStartTimes: input.games.map((g) => g.startTime),
+  });
+  if (timelineErr) throw new Error(timelineErr);
+
   const { data: contest, error } = await admin
     .from("v2_contests")
     .insert({
@@ -58,6 +77,7 @@ export async function createSquaresContest(admin: SupabaseClient, input: CreateS
         max_squares_secondary: input.maxSquaresSecondary,
         primary_ends_at: input.primaryEndsAt ?? null,
         secondary_ends_at: input.secondaryEndsAt ?? null,
+        reveal_lead_minutes: Number.isFinite(input.revealLeadMinutes) ? input.revealLeadMinutes : 10080, // default 7 days
         phase: "setup",
         ...(input.periodWeights ? { period_weights: input.periodWeights } : {}),
       },
@@ -104,6 +124,7 @@ export interface UpdateSquaresInput {
   maxSquaresSecondary?: number | null;
   primaryEndsAt?: string | null;
   secondaryEndsAt?: string | null;
+  revealLeadMinutes?: number;
   games?: SquaresGameInput[]; // when present, the game set is REPLACED wholesale
 }
 
@@ -119,6 +140,31 @@ export async function updateSquaresContest(admin: SupabaseClient, contestId: str
   const { data: existing, error: readErr } = await admin.from("v2_contests").select("config").eq("id", contestId).maybeSingle();
   if (readErr || !existing) throw new Error(readErr?.message ?? "Contest not found");
 
+  // The price is immutable once squares are owned — changing it would scramble the
+  // per-member ledger. Admins must clear all picks (back to setup) to reprice.
+  if (patch.cellCostCents != null && patch.cellCostCents !== ((existing.config as Record<string, unknown>)?.cell_cost_cents ?? 0)) {
+    const { count } = await admin.from("v2_squares_cells").select("id", { count: "exact", head: true }).eq("contest_id", contestId).not("user_id", "is", null);
+    if ((count ?? 0) > 0) throw new Error("Squares are already claimed — clear all picks before changing the price.");
+  }
+
+  // Enforce the chronological schedule on the RESULTING state (merge patch over
+  // existing), so a games-only edit that drags a kickoff earlier is caught too.
+  const cfg0 = (existing.config as Record<string, unknown>) ?? {};
+  if (patch.primaryEndsAt !== undefined || patch.secondaryEndsAt !== undefined || patch.revealLeadMinutes !== undefined || patch.games !== undefined) {
+    const mPrimary = patch.primaryEndsAt !== undefined ? patch.primaryEndsAt : ((cfg0.primary_ends_at as string | null) ?? null);
+    const mSecondary = patch.secondaryEndsAt !== undefined ? patch.secondaryEndsAt : ((cfg0.secondary_ends_at as string | null) ?? null);
+    const mLead = patch.revealLeadMinutes !== undefined ? patch.revealLeadMinutes : revealLeadMinutesOf(cfg0);
+    let starts: (string | null | undefined)[];
+    if (patch.games) {
+      starts = patch.games.map((g) => g.startTime ?? null);
+    } else {
+      const { data: gs } = await admin.from("v2_squares_games").select("start_time").eq("contest_id", contestId);
+      starts = (gs ?? []).map((g) => g.start_time as string | null);
+    }
+    const timelineErr = validateSquaresTimeline({ primaryEndsAt: mPrimary, secondaryEndsAt: mSecondary, revealLeadMinutes: mLead, gameStartTimes: starts });
+    if (timelineErr) throw new Error(timelineErr);
+  }
+
   const fields: Record<string, unknown> = {};
   if (patch.name != null) fields.name = patch.name;
   if (
@@ -128,7 +174,8 @@ export async function updateSquaresContest(admin: SupabaseClient, contestId: str
     patch.maxSquaresPrimary != null ||
     patch.maxSquaresSecondary !== undefined ||
     patch.primaryEndsAt !== undefined ||
-    patch.secondaryEndsAt !== undefined
+    patch.secondaryEndsAt !== undefined ||
+    patch.revealLeadMinutes !== undefined
   ) {
     const cfg = { ...((existing.config as Record<string, unknown>) ?? {}) };
     if (patch.cellCostCents != null) cfg.cell_cost_cents = patch.cellCostCents;
@@ -138,6 +185,7 @@ export async function updateSquaresContest(admin: SupabaseClient, contestId: str
     if (patch.maxSquaresSecondary !== undefined) cfg.max_squares_secondary = patch.maxSquaresSecondary;
     if (patch.primaryEndsAt !== undefined) cfg.primary_ends_at = patch.primaryEndsAt;
     if (patch.secondaryEndsAt !== undefined) cfg.secondary_ends_at = patch.secondaryEndsAt;
+    if (patch.revealLeadMinutes !== undefined) cfg.reveal_lead_minutes = patch.revealLeadMinutes;
     fields.config = cfg;
   }
   if (Object.keys(fields).length) {
@@ -148,11 +196,11 @@ export async function updateSquaresContest(admin: SupabaseClient, contestId: str
   if (patch.games) {
     const cfg = (existing.config as Record<string, unknown>) ?? {};
     const boardLocked = cfg.phase === "locked" || cfg.phase === "final" || !!cfg.board_locked_at;
-    const leadDays = Number.isFinite(cfg.reveal_lead_days as number) ? (cfg.reveal_lead_days as number) : 7;
-    // Reveal time for a game on a LOCKED board = kickoff − lead days (null otherwise:
+    const leadMinutes = revealLeadMinutesOf(cfg);
+    // Reveal time for a game on a LOCKED board = kickoff − reveal lead (null otherwise:
     // a draft board schedules reveals at lock_board, not here).
     const revealFor = (startTime: string | null): string | null =>
-      boardLocked && startTime ? new Date(new Date(startTime).getTime() - leadDays * 86400000).toISOString() : null;
+      boardLocked && startTime ? new Date(new Date(startTime).getTime() - leadMinutes * 60000).toISOString() : null;
 
     const { data: existingGames } = await admin
       .from("v2_squares_games")

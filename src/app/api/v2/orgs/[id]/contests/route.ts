@@ -33,6 +33,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
     max_squares_secondary?: number | null;
     primary_ends_at?: string | null;
     secondary_ends_at?: string | null;
+    reveal_lead_minutes?: number;
     games?: SquaresGameInput[];
     collected_by?: string | null;
     game?: EspnGameInput; // 3s and Ds: the chosen ESPN game
@@ -133,6 +134,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
       maxSquaresSecondary,
       primaryEndsAt: body.primary_ends_at ?? null,
       secondaryEndsAt: body.secondary_ends_at ?? null,
+      revealLeadMinutes: Number.isFinite(body.reveal_lead_minutes) ? body.reveal_lead_minutes : undefined,
       games,
       createdBy: userId,
       collectedBy: typeof body.collected_by === "string" ? body.collected_by : null,

@@ -17,7 +17,7 @@ const KINDS = [
   { key: "other", label: "Other", blurb: "A custom event-wide contest" },
 ];
 
-export default function AddCompetition({ orgId, eventId }: { orgId: string; eventId: string }) {
+export default function AddCompetition({ orgId, eventId, timeZone }: { orgId: string; eventId: string; timeZone: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [squaresOpen, setSquaresOpen] = useState(false);
@@ -95,6 +95,7 @@ export default function AddCompetition({ orgId, eventId }: { orgId: string; even
           collectionBase={`/api/v2/orgs/${orgId}/contests`}
           editing={null}
           eventId={eventId}
+          timeZone={timeZone}
           onClose={() => setSquaresOpen(false)}
           onSaved={() => router.refresh()}
         />

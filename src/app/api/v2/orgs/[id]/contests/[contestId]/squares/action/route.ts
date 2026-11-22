@@ -64,7 +64,13 @@ export async function POST(request: Request, { params }: { params: Params }) {
   const action = body.action ?? "";
   const cfg = { ...((contest.config as Record<string, unknown>) ?? {}) };
   const boardLocked = cfg.phase === "locked" || cfg.phase === "final" || !!cfg.board_locked_at;
-  const REVEAL_LEAD_DAYS = Number.isFinite(cfg.reveal_lead_days) ? (cfg.reveal_lead_days as number) : 7;
+  // How long before each game's kickoff the numbers are drawn, per contest. New pools
+  // store minutes; older pools may have the legacy day-granularity value; default 7 days.
+  const REVEAL_LEAD_MINUTES = Number.isFinite(cfg.reveal_lead_minutes)
+    ? (cfg.reveal_lead_minutes as number)
+    : Number.isFinite(cfg.reveal_lead_days)
+      ? (cfg.reveal_lead_days as number) * 1440
+      : 10080;
 
   // Simple phase advances. Once the board is locked it's permanent, so a draft
   // phase (close/reopen/open) can never be re-entered — it would strand a locked
@@ -93,6 +99,20 @@ export async function POST(request: Request, { params }: { params: Params }) {
     return NextResponse.json({ ok: true, phase: "setup" });
   }
 
+  // Clear ALL claimed squares back to an empty board and reset to setup, so the admin
+  // can reprice and restart drafting. Blocked once the board is locked (numbers drawn).
+  // Recorded buy-in payments are intentionally NOT touched here — the collector
+  // reconciles/refunds separately.
+  if (action === "clear_picks") {
+    if (boardLocked) return NextResponse.json({ error: "The board is locked — picks can't be cleared." }, { status: 409 });
+    const { error } = await admin.from("v2_squares_cells").update({ user_id: null, purchased_at: null }).eq("contest_id", contestId).not("user_id", "is", null);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    cfg.phase = "setup";
+    const { error: e2 } = await admin.from("v2_contests").update({ config: cfg, status: "draft" }).eq("id", contestId);
+    if (e2) return NextResponse.json({ error: e2.message }, { status: 500 });
+    return NextResponse.json({ ok: true, phase: "setup" });
+  }
+
   // Lock the board (ownership frozen) and seed each game's default reveal time —
   // a week before kickoff — without drawing any numbers yet. Reveals happen
   // per-game after this (scheduled by the cron, or by hand).
@@ -101,7 +121,7 @@ export async function POST(request: Request, { params }: { params: Params }) {
     if (!games || games.length === 0) return NextResponse.json({ error: "No games yet." }, { status: 400 });
     for (const g of games) {
       if (g.reveal_at || g.locked_at || !g.start_time) continue;
-      const revealAt = new Date(new Date(g.start_time as string).getTime() - REVEAL_LEAD_DAYS * 86400000).toISOString();
+      const revealAt = new Date(new Date(g.start_time as string).getTime() - REVEAL_LEAD_MINUTES * 60000).toISOString();
       await admin.from("v2_squares_games").update({ reveal_at: revealAt }).eq("id", g.id);
     }
     cfg.phase = "locked";
@@ -110,6 +130,23 @@ export async function POST(request: Request, { params }: { params: Params }) {
     const { error } = await admin.from("v2_contests").update({ config: cfg }).eq("id", contestId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true, phase: "locked" });
+  }
+
+  // Unlock the board back to "closed" — safe ONLY while no numbers have been drawn
+  // (the draw is the one irreversible step; locking just froze ownership + seeded
+  // reveal times). Re-opens the draft lifecycle; clears the seeded-but-undrawn
+  // reveal schedule so a later re-lock reseeds from the current reveal lead.
+  if (action === "unlock_board") {
+    if (cfg.phase !== "locked") return NextResponse.json({ error: "The board isn't locked." }, { status: 409 });
+    const { count } = await admin.from("v2_squares_games").select("id", { count: "exact", head: true }).eq("contest_id", contestId).not("locked_at", "is", null);
+    if ((count ?? 0) > 0) return NextResponse.json({ error: "Numbers have already been revealed — the board can't be unlocked." }, { status: 409 });
+    await admin.from("v2_squares_games").update({ reveal_at: null }).eq("contest_id", contestId).is("locked_at", null);
+    cfg.phase = "closed";
+    cfg.board_locked_at = null;
+    cfg.board_locked_by = null;
+    const { error } = await admin.from("v2_contests").update({ config: cfg }).eq("id", contestId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, phase: "closed" });
   }
 
   // Set / clear a single game's scheduled reveal time (admin override).

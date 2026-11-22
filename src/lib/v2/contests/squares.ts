@@ -31,6 +31,40 @@ export const lastDigit = (score: number | null | undefined): number | null =>
 export const digitsDrawn = (grid: SquaresGridState) => grid.rowDigits.length === 10 && grid.colDigits.length === 10;
 
 /**
+ * The draft/reveal schedule must run in order: primary draft closes, then the
+ * secondary draft closes, then (earliest) the numbers reveal. The reveal instant
+ * for a game is its kickoff minus the pool's reveal lead, so the first reveal is
+ * `min(kickoff) − lead`. Returns an error message if the admin's dates aren't
+ * chronological, else null. Shared by the editor (block save) and the server
+ * (reject the write) so they can never disagree.
+ */
+export function validateSquaresTimeline(opts: {
+  primaryEndsAt: string | null;
+  secondaryEndsAt: string | null;
+  revealLeadMinutes: number;
+  gameStartTimes: (string | null | undefined)[];
+}): string | null {
+  const pMs = opts.primaryEndsAt ? Date.parse(opts.primaryEndsAt) : null;
+  const sMs = opts.secondaryEndsAt ? Date.parse(opts.secondaryEndsAt) : null;
+  if (pMs != null && sMs != null && pMs >= sMs) {
+    return "The primary draft must end before the secondary draft.";
+  }
+  const kicks = opts.gameStartTimes
+    .map((t) => (t ? Date.parse(t) : NaN))
+    .filter((n) => Number.isFinite(n)) as number[];
+  if (kicks.length) {
+    const earliestReveal = Math.min(...kicks) - Math.max(0, opts.revealLeadMinutes) * 60000;
+    // The last draft phase to close (secondary if set, else primary) must finish
+    // before the first game's numbers reveal.
+    const lastDraftEnd = sMs ?? pMs;
+    if (lastDraftEnd != null && lastDraftEnd >= earliestReveal) {
+      return "Numbers would reveal before the draft closes. Shorten the reveal lead or move the draft end dates earlier.";
+    }
+  }
+  return null;
+}
+
+/**
  * The square that wins for a pair of scores — or null if the digits aren't drawn
  * yet or a score is missing. The row team's last digit selects the grid row
  * (via the row-digit assignment); the col team's selects the column.

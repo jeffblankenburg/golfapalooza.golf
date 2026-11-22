@@ -7,6 +7,7 @@ import { isFeatureVisible } from "@/lib/v2/features";
 import { v2Now } from "@/lib/v2/simulator";
 import { toYMD } from "@/lib/v2/schedule";
 import { buildMemberSchedule } from "@/lib/v2/schedule-feed";
+import { resolveOrgTimeZone } from "@/lib/v2/timezone-server";
 import ScheduleAgenda from "../ScheduleAgenda";
 import ScheduleSubscribe from "../ScheduleSubscribe";
 import styles from "@/app/new/new.module.css";
@@ -32,11 +33,12 @@ export default async function SchedulePage({ params }: { params: Promise<{ slug:
   // against this event's config (not org-default) or the toggle won't be seen.
   const { data: events } = await admin
     .from("v2_events")
-    .select("id, name, start_date, end_date, status")
+    .select("id, name, start_date, end_date, status, timezone")
     .eq("org_id", org.id)
     .order("status", { ascending: true }) // 'active' sorts before 'archived'/'draft'
     .order("start_date", { ascending: false });
   const event = (events || []).find((e) => e.status === "active") || (events || [])[0] || null;
+  const timeZone = await resolveOrgTimeZone(admin, org.id, (event as { timezone?: string | null } | null)?.timezone);
 
   const resolved = await loadResolvedFeatures(supabase, org.id, event?.id ?? null);
   if (!isFeatureVisible(resolved, "schedule", isAdmin)) redirect(`/new/${slug}`);
@@ -65,7 +67,7 @@ export default async function SchedulePage({ params }: { params: Promise<{ slug:
           <ScheduleSubscribe orgId={org.id} />
         </div>
       </div>
-      <ScheduleAgenda entries={entries} today={today} />
+      <ScheduleAgenda entries={entries} today={today} timeZone={timeZone} />
     </div>
   );
 }

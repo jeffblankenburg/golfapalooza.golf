@@ -24,7 +24,7 @@ export default async function EventFeaturesPage({
 
   const supabase = await v2ServerClient();
   const [eventRes, rowsRes] = await Promise.all([
-    supabase.from("v2_events").select("id, name").eq("id", eventId).eq("org_id", org.id).maybeSingle(),
+    supabase.from("v2_events").select("id, name, timezone").eq("id", eventId).eq("org_id", org.id).maybeSingle(),
     supabase
       .from("v2_event_features")
       .select(
@@ -36,10 +36,12 @@ export default async function EventFeaturesPage({
   if (!eventRes.data) redirect(`/new/${slug}/admin`);
 
   const resolved = resolveFeatures((rowsRes.data as FeatureRow[] | null) ?? [], eventId);
+  const timeZone = ((eventRes.data as { timezone?: string | null }).timezone) || org.timezone;
 
   return (
     <FeaturesConfig
       scope="event"
+      timeZone={timeZone}
       endpoint={`/api/v2/orgs/${org.id}/events/${eventId}/features`}
       initial={resolved}
       backHref={`/new/${slug}/admin/events/${eventId}`}

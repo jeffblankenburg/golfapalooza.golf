@@ -4,6 +4,8 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { NameMode } from "@/lib/v2/profile";
+import { TIME_ZONES } from "@/lib/v2/timezones";
+import { tzLongName } from "@/lib/v2/timezone";
 import styles from "@/app/new/new.module.css";
 import DomainsManager from "./DomainsManager";
 
@@ -23,6 +25,7 @@ export default function GroupSettingsForm({
   initialMemberNounPlural,
   initialFoundedYear,
   createdYear,
+  initialTimezone,
 }: {
   orgId: string;
   slug: string;
@@ -39,6 +42,7 @@ export default function GroupSettingsForm({
   initialMemberNounPlural: string;
   initialFoundedYear: number | null;
   createdYear: number;
+  initialTimezone: string;
 }) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
@@ -53,6 +57,7 @@ export default function GroupSettingsForm({
   const [memberNoun, setMemberNoun] = useState(initialMemberNoun);
   const [memberNounPlural, setMemberNounPlural] = useState(initialMemberNounPlural);
   const [foundedYear, setFoundedYear] = useState(initialFoundedYear != null ? String(initialFoundedYear) : "");
+  const [timezone, setTimezone] = useState(initialTimezone);
   const [systemAvatar, setSystemAvatar] = useState<File | null>(null);
   const [systemAvatarPreview, setSystemAvatarPreview] = useState<string | null>(initialSystemAvatar);
   const [saving, setSaving] = useState(false);
@@ -104,6 +109,7 @@ export default function GroupSettingsForm({
           member_noun: memberNoun.trim() || "Member",
           member_noun_plural: memberNounPlural.trim() || "Members",
           founded_year: foundedPayload,
+          timezone,
         }),
       });
       if (!res.ok) {
@@ -252,6 +258,26 @@ export default function GroupSettingsForm({
               <p className={styles.swatchHint}>
                 The year your group started, shown as &ldquo;Since {foundedYear || createdYear}&rdquo; on the home
                 page when no event is running. Leave blank to use the year the group was created.
+              </p>
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="timezone">
+                Home timezone
+              </label>
+              <select
+                id="timezone"
+                className={styles.selectInput}
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+              >
+                {TIME_ZONES.map((tz) => (
+                  <option key={tz} value={tz}>{tz.replace(/_/g, " ")}</option>
+                ))}
+              </select>
+              <p className={styles.swatchHint}>
+                Times for group-wide things (contests, announcements) are shown in {tzLongName(timezone) || "this zone"}.
+                Each event can set its own timezone.
               </p>
             </div>
           </div>

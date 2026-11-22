@@ -34,6 +34,7 @@ export async function PATCH(
     start_date?: string | null;
     start_time?: string | null;
     end_date?: string | null;
+    end_time?: string | null;
     timezone?: string | null;
     status?: string;
     location?: string | null;
@@ -59,6 +60,7 @@ export async function PATCH(
   if ("start_date" in body) patch.start_date = body.start_date || null;
   if ("start_time" in body) patch.start_time = body.start_time || null;
   if ("end_date" in body) patch.end_date = body.end_date || null;
+  if ("end_time" in body) patch.end_time = body.end_time || null;
   if ("treasurer_user_id" in body) patch.treasurer_user_id = body.treasurer_user_id || null;
   if (body.timezone) patch.timezone = body.timezone; // NOT NULL — only set when provided
   if ("location" in body) patch.location = body.location?.trim() || null;

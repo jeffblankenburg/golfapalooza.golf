@@ -33,6 +33,7 @@ export default async function GroupSettingsPage({
       initialMemberNounPlural={org.member_noun_plural || "Members"}
       initialFoundedYear={org.founded_year}
       createdYear={new Date(org.created_at).getFullYear()}
+      initialTimezone={org.timezone}
     />
   );
 }

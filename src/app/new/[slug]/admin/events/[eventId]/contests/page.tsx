@@ -6,6 +6,7 @@ import { CONTEST_SELECT, contestTypeLabel, loadBuyInCents, type Contest } from "
 import { pickName } from "@/lib/v2/profile";
 import { fmtTime } from "@/lib/v2/schedule";
 import { buildPickemPreviews } from "@/lib/v2/contests/pickem-preview";
+import { resolveOrgTimeZone } from "@/lib/v2/timezone-server";
 import { loadSquaresContestRow } from "../../../contests/[contestId]/SquaresManageView";
 import AddScramble from "./AddScramble";
 import AddCompetition from "./AddCompetition";
@@ -43,11 +44,12 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
 
   const admin = v2AdminClient();
   const [{ data: event }, { data: contests }, { data: courseRows }] = await Promise.all([
-    admin.from("v2_events").select("id, name, start_date, end_date").eq("id", eventId).eq("org_id", org.id).maybeSingle(),
+    admin.from("v2_events").select("id, name, start_date, end_date, timezone").eq("id", eventId).eq("org_id", org.id).maybeSingle(),
     admin.from("v2_contests").select(CONTEST_SELECT).eq("event_id", eventId),
     admin.from("v2_courses").select("id, name, city, state").order("name"),
   ]);
   if (!event) redirect(`/new/${slug}/admin`);
+  const timeZone = await resolveOrgTimeZone(admin, org.id, (event as { timezone: string | null }).timezone);
 
   const all = (contests as Contest[]) || [];
   const allIds = all.map((c) => c.id);
@@ -210,14 +212,14 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
         </p>
       ) : (
         <div className={styles.contestDays}>
-          <EventContestsList slug={slug} orgId={org.id} eventId={eventId} courses={courses} days={days} eventWide={[]} />
+          <EventContestsList slug={slug} orgId={org.id} eventId={eventId} courses={courses} days={days} eventWide={[]} timeZone={timeZone} />
         </div>
       )}
 
       <div className={styles.section}>
         <div className={styles.titleRow}>
           <p className={styles.sectionLabel} style={{ marginBottom: 0 }}>Event-wide</p>
-          <AddCompetition orgId={org.id} eventId={eventId} />
+          <AddCompetition orgId={org.id} eventId={eventId} timeZone={timeZone} />
         </div>
         {eventWide.length === 0 ? (
           <p className={styles.dnsHint} style={{ marginTop: 10 }}>
@@ -225,7 +227,7 @@ export default async function EventContestsPage({ params }: { params: Promise<{ 
           </p>
         ) : (
           <div style={{ marginTop: 10 }}>
-            <EventContestsList slug={slug} orgId={org.id} eventId={eventId} courses={courses} days={[]} eventWide={eventWide} />
+            <EventContestsList slug={slug} orgId={org.id} eventId={eventId} courses={courses} days={[]} eventWide={eventWide} timeZone={timeZone} />
           </div>
         )}
       </div>

@@ -4,16 +4,18 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Modal from "@/app/new/_components/Modal";
 import styles from "./SquaresAdmin.module.css";
-import SquaresEditor, { money, isoToLocal, localToISO, type SquaresContestRow } from "./SquaresEditor";
+import SquaresEditor, { money, type SquaresContestRow } from "./SquaresEditor";
 import ContestCard, { ContestTypeIcon } from "@/app/new/_components/contest-card/ContestCard";
 import AuctionSettingsModal from "@/app/new/_components/AuctionSettingsModal";
 import { PickemPreview, SquaresPreview } from "@/app/new/_components/contest-card/previews";
 import { pickName, type NameMode } from "@/lib/v2/profile";
 import { computePickemPayouts, type PayoutSplit } from "@/lib/v2/contests/pickem";
 import { placeLabel } from "@/lib/v2/contests/payouts";
+import { formatInstant } from "@/lib/v2/timezone";
 import type { PickemGamePreview } from "@/lib/v2/contests/pickem-preview";
 import PayoutSplitsEditor from "../events/[eventId]/contests/[contestId]/PayoutSplitsEditor";
 import ThreesGamePicker from "./ThreesGamePicker";
+import PropsSettings from "./[contestId]/PropsSettings";
 import type { EspnGameInput } from "@/lib/v2/contests/pickem-server";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
 
@@ -50,14 +52,15 @@ const ADDABLE = [
 type PickemItem = Extract<GroupContestItem, { kind: "pickem" }>;
 type AuctionItem = Extract<GroupContestItem, { kind: "auction" }>;
 
-const statusLabel = (s: string) => (s === "active" ? "Open" : s === "draft" ? "Draft" : s);
+// Member visibility: a draft contest is hidden; anything else (active/final) is public.
+const visOf = (s: string): "public" | "hidden" => (s === "draft" ? "hidden" : "public");
 const centsToStr = (c: number) => (c ? String(c / 100) : "");
 function fmtMoney(cents: number): string {
   const whole = cents % 100 === 0;
   return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 })}`;
 }
 
-export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, nameMode }: { orgId: string; slug: string; items: GroupContestItem[]; currentUserId: string; nameMode: NameMode }) {
+export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, nameMode, timeZone }: { orgId: string; slug: string; items: GroupContestItem[]; currentUserId: string; nameMode: NameMode; timeZone: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const collectionBase = `/api/v2/orgs/${orgId}/contests`;
@@ -81,7 +84,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
   const [pickemName, setPickemName] = useState("");
   const [settingsFor, setSettingsFor] = useState<PickemItem | null>(null);
   const [auctionSettingsFor, setAuctionSettingsFor] = useState<AuctionItem | null>(null);
-  const [squaresSettingsFor, setSquaresSettingsFor] = useState<SquaresContestRow | null>(null);
+  const [propsSettingsFor, setPropsSettingsFor] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -97,7 +100,7 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
     const id = searchParams.get("settings");
     if (!id) return;
     const it = items.find((x) => x.kind === "squares" && x.id === id);
-    if (it && it.kind === "squares") setSquaresSettingsFor(it.box);
+    if (it && it.kind === "squares") setEditing(it.box);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
@@ -190,8 +193,10 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
         )}
       </div>
 
-      {editing === null && (
-        <SquaresEditor collectionBase={collectionBase} editing={null} nameMode={nameMode} currentUserId={currentUserId} onClose={() => setEditing(undefined)} />
+      {/* ONE editor for both create (editing=null) and edit (editing=box) — the card
+          gear routes here too, so there's a single squares settings interface. */}
+      {editing !== undefined && (
+        <SquaresEditor collectionBase={collectionBase} editing={editing} nameMode={nameMode} currentUserId={currentUserId} timeZone={timeZone} onClose={() => setEditing(undefined)} onSaved={() => router.refresh()} />
       )}
 
       <Modal open={pickemOpen} title={nameKind === "auction" ? "New Auction" : nameKind === "props" ? "New Props" : "New Pick'em"} onClose={() => setPickemOpen(false)}>
@@ -225,35 +230,35 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
         {items.length === 0 && editing === undefined && <p className={styles.empty}>No contests yet. Add one above.</p>}
         {items.map((it) =>
           it.kind === "squares" ? (
-            <SquaresRow key={it.id} c={it.box} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onEdit={() => setSquaresSettingsFor(it.box)} />
+            <SquaresRow key={it.id} c={it.box} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onEdit={() => setEditing(it.box)} timeZone={timeZone} />
           ) : it.kind === "auction" ? (
-            <ContestCard key={it.id} kind="auction" name={it.name}
-              meta={[it.tournamentName || "No tournament", it.complete ? "complete" : statusLabel(it.status)].join(", ")}
+            <ContestCard key={it.id} kind="auction" name={it.name} visibility={visOf(it.status)}
+              meta={[it.tournamentName || "No tournament", it.complete ? "complete" : null].filter(Boolean).join(", ")}
               count={`${it.participantCount} player${it.participantCount === 1 ? "" : "s"}`}
               detailHref={`${adminBase}/${it.id}`} detailLabel="Open auction"
               onGear={() => setAuctionSettingsFor(it)}
               isOpen={false} onToggle={() => router.push(`${adminBase}/${it.id}`)} />
           ) : it.kind === "props" ? (
-            <ContestCard key={it.id} kind="props" name={it.name}
+            <ContestCard key={it.id} kind="props" name={it.name} visibility={visOf(it.status)}
               meta={[
                 it.entryCents > 0 ? `${fmtMoney(it.entryCents)} buy-in` : "no buy-in",
-                it.locksAt ? `locks ${new Date(it.locksAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : "no lock set",
-                statusLabel(it.status),
+                it.locksAt ? `locks ${formatInstant(it.locksAt, timeZone, { month: "short", day: "numeric" })}` : "no lock set",
               ].join(", ")}
               count={`${it.questionCount} question${it.questionCount === 1 ? "" : "s"}`}
               detailHref={`${adminBase}/${it.id}`} detailLabel="Open Props details"
+              onGear={() => setPropsSettingsFor(it.id)}
               isOpen={false} onToggle={() => router.push(`${adminBase}/${it.id}`)} />
           ) : it.kind === "3s_and_ds" ? (
-            <ContestCard key={it.id} kind="3s_and_ds" name={it.name}
+            <ContestCard key={it.id} kind="3s_and_ds" name={it.name} visibility={visOf(it.status)}
               meta={it.hasGame && it.gameDate
-                ? <span suppressHydrationWarning>{new Date(it.gameDate).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+                ? <span>{formatInstant(it.gameDate, timeZone, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
                 : "No game yet"}
               detailHref={`${adminBase}/${it.id}`} detailLabel="Open 3s and Ds"
               deleteLabel="Delete 3s and Ds"
               onDelete={() => setToDelete({ id: it.id, name: it.name })}
               isOpen={false} onToggle={() => router.push(`${adminBase}/${it.id}`)} />
           ) : (
-            <PickemRow key={it.id} it={it} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onSettings={() => setSettingsFor(it)} />
+            <PickemRow key={it.id} it={it} adminBase={adminBase} isOpen={expanded.has(it.id)} onToggle={() => toggleRow(it.id)} onSettings={() => setSettingsFor(it)} timeZone={timeZone} />
           ),
         )}
       </div>
@@ -269,17 +274,6 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
         />
       )}
 
-      {squaresSettingsFor && (
-        <SquaresQuickSettings
-          orgId={orgId}
-          box={squaresSettingsFor}
-          currentUserId={currentUserId}
-          nameMode={nameMode}
-          onClose={() => { setSquaresSettingsFor(null); router.refresh(); }}
-          onSaved={() => { setSquaresSettingsFor(null); router.refresh(); }}
-        />
-      )}
-
       {auctionSettingsFor && (
         <AuctionSettingsModal
           slug={slug}
@@ -289,6 +283,14 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
           onSaved={() => router.refresh()}
         />
       )}
+
+      <PropsSettings
+        open={!!propsSettingsFor}
+        apiBase={`${collectionBase}/${propsSettingsFor ?? ""}`}
+        timeZone={timeZone}
+        onClose={() => { setPropsSettingsFor(null); router.refresh(); }}
+        onSaved={() => router.refresh()}
+      />
 
       <ConfirmModal
         open={!!toDelete}
@@ -305,18 +307,18 @@ export default function GroupContestsAdmin({ orgId, slug, items, currentUserId, 
 
 /** One Pick'em in the list — mirrors SquaresRow: expandable (matchups preview) with
  *  a gear (quick settings) + an arrow to the full manage page. */
-function PickemRow({ it, adminBase, isOpen, onToggle, onSettings }: { it: PickemItem; adminBase: string; isOpen: boolean; onToggle: () => void; onSettings: () => void }) {
+function PickemRow({ it, adminBase, isOpen, onToggle, onSettings, timeZone }: { it: PickemItem; adminBase: string; isOpen: boolean; onToggle: () => void; onSettings: () => void; timeZone: string }) {
   const pot = it.entryCents * it.participantCount;
   const realGames = it.games.filter((g) => !g.isTiebreaker);
   const meta = [
     it.entryCents > 0 ? `${fmtMoney(it.entryCents)} buy-in` : "no buy-in",
     it.entryCents > 0 && it.participantCount > 0 ? `${fmtMoney(pot)} pot` : null,
-    statusLabel(it.status),
   ].filter(Boolean).join(", ");
   return (
     <ContestCard
       kind="pickem"
       name={it.name}
+      visibility={visOf(it.status)}
       meta={meta}
       count={`${realGames.length} game${realGames.length === 1 ? "" : "s"}`}
       detailHref={`${adminBase}/${it.id}`}
@@ -325,7 +327,7 @@ function PickemRow({ it, adminBase, isOpen, onToggle, onSettings }: { it: Pickem
       isOpen={isOpen}
       onToggle={onToggle}
     >
-      <PickemPreview games={it.games} />
+      <PickemPreview games={it.games} timeZone={timeZone} />
     </ContestCard>
   );
 }
@@ -436,143 +438,15 @@ function PickemQuickSettings({ orgId, item, currentUserId, nameMode, onClose, on
 
 const QS_LABEL = { display: "block", fontSize: "0.8125rem", fontWeight: 600, marginBottom: 4 } as const;
 
-/** Quick settings for a Squares pool (name / buy-in / visibility / collector / draft
- *  rules) — parity with Pick'em's gear. Games & payouts live on the detail page. */
-function SquaresQuickSettings({ orgId, box, currentUserId, nameMode, onClose, onSaved }: { orgId: string; box: SquaresContestRow; currentUserId: string; nameMode: NameMode; onClose: () => void; onSaved: () => void }) {
-  const base = `/api/v2/orgs/${orgId}/contests/${box.id}`;
-  const [name, setName] = useState(box.name);
-  const [costStr, setCostStr] = useState(box.cellCostCents ? String(box.cellCostCents / 100) : "");
-  const [collectedBy, setCollectedBy] = useState(box.collectedBy || currentUserId);
-  const [members, setMembers] = useState<{ user_id: string; name: string; venmo: string | null }[]>([]);
-  const [maxPrimary, setMaxPrimary] = useState(String(box.maxSquaresPrimary));
-  const [secUnlimited, setSecUnlimited] = useState(box.maxSquaresSecondary == null);
-  const [maxSecondary, setMaxSecondary] = useState(String(box.maxSquaresSecondary ?? 20));
-  const [primaryEnds, setPrimaryEnds] = useState(isoToLocal(box.primaryEndsAt));
-  const [secondaryEnds, setSecondaryEnds] = useState(isoToLocal(box.secondaryEndsAt));
-  const [visible, setVisible] = useState(box.status === "active");
-  const [phase, setPhase] = useState(box.phase);
-  const [togglingVis, setTogglingVis] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      const r = await fetch(`/api/v2/orgs/${orgId}/members`);
-      if (r.ok) {
-        const list = ((await r.json()).members || []) as { user_id: string; display_name: string; first_name: string | null; last_name: string | null; venmo_username: string | null; archived?: boolean }[];
-        setMembers(list.filter((m) => !m.archived).map((m) => ({ user_id: m.user_id, name: pickName(m, nameMode), venmo: m.venmo_username })).sort((a, b) => a.name.localeCompare(b.name)));
-      }
-    })();
-  }, [orgId]);
-
-  // The simple gear toggle only owns the first open/close; once buying has moved
-  // past primary the detail-page lifecycle governs visibility.
-  const canToggleVisibility = phase === "setup" || phase === "primary";
-
-  async function toggleVisible() {
-    if (togglingVis || !canToggleVisibility) return;
-    const next = !visible;
-    setTogglingVis(true); setErr(null); setVisible(next);
-    const res = await fetch(`${base}/squares/action`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: next ? "open_primary" : "back_to_setup" }),
-    });
-    if (res.ok) { const d = await res.json().catch(() => ({})); setPhase(d.phase ?? (next ? "primary" : "setup")); }
-    else { setVisible(!next); setErr((await res.json().catch(() => ({}))).error || "Could not change visibility"); }
-    setTogglingVis(false);
-  }
-
-  async function save() {
-    const n = name.trim();
-    if (!n || saving) return;
-    setSaving(true); setErr(null);
-    const res = await fetch(base, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: n,
-        cell_cost_cents: Math.round((Number(costStr) || 0) * 100),
-        collected_by: collectedBy || null,
-        max_squares_primary: Math.max(1, parseInt(maxPrimary, 10) || 1),
-        max_squares_secondary: secUnlimited ? null : Math.max(1, parseInt(maxSecondary, 10) || 1),
-        primary_ends_at: localToISO(primaryEnds),
-        secondary_ends_at: localToISO(secondaryEnds),
-      }),
-    });
-    if (!res.ok) { setErr((await res.json().catch(() => ({}))).error || "Could not save"); setSaving(false); return; }
-    onSaved();
-  }
-
-  return (
-    <Modal open title="Squares settings" onClose={onClose}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <label>
-          <span style={QS_LABEL}>Name</span>
-          <input className={styles.input} style={{ width: "100%" }} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
-        </label>
-        <label>
-          <span style={QS_LABEL}>Buy-in (per square)</span>
-          <span style={{ position: "relative", display: "block" }}>
-            <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--ink-soft, #59635b)", pointerEvents: "none" }}>$</span>
-            <input className={styles.input} style={{ width: "100%", paddingLeft: 26 }} inputMode="decimal" value={costStr} placeholder="0" onChange={(e) => setCostStr(e.target.value.replace(/[^0-9.]/g, ""))} />
-          </span>
-        </label>
-        <label>
-          <span style={QS_LABEL}>Who&apos;s collecting? (needs Venmo)</span>
-          <select className={styles.selectInput} value={collectedBy} onChange={(e) => setCollectedBy(e.target.value)}>
-            {members.map((m) => <option key={m.user_id} value={m.user_id} disabled={!m.venmo && m.user_id !== collectedBy}>{m.name}{m.venmo ? "" : " (needs Venmo)"}</option>)}
-          </select>
-        </label>
-        <div>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.9rem", cursor: canToggleVisibility ? "pointer" : "default", opacity: canToggleVisibility ? 1 : 0.6 }}>
-            <input type="checkbox" checked={visible} disabled={!canToggleVisibility || togglingVis} onChange={toggleVisible} />
-            <span>Visible to members {visible ? "(open for buying)" : "(draft, hidden)"}</span>
-          </label>
-          {!canToggleVisibility && <p className={styles.capHint} style={{ marginTop: 4 }}>Buying is underway — manage visibility on the pool page.</p>}
-        </div>
-        <div>
-          <span style={QS_LABEL}>Squares per person</span>
-          <div className={styles.caps}>
-            <label className={styles.capField}>
-              <span className={styles.capName}>Primary draft</span>
-              <input className={styles.capInput} value={maxPrimary} inputMode="numeric" onChange={(e) => setMaxPrimary(e.target.value.replace(/\D/g, ""))} />
-            </label>
-            <div className={styles.capField}>
-              <span className={styles.capName}>Secondary draft</span>
-              <div className={styles.capRow}>
-                <div className={styles.seg} role="group" aria-label="Secondary cap">
-                  <button type="button" data-on={secUnlimited || undefined} onClick={() => setSecUnlimited(true)}>Unlimited</button>
-                  <button type="button" data-on={!secUnlimited || undefined} onClick={() => setSecUnlimited(false)}>Limit</button>
-                </div>
-                {!secUnlimited && <input className={styles.capInput} value={maxSecondary} inputMode="numeric" onChange={(e) => setMaxSecondary(e.target.value.replace(/\D/g, ""))} />}
-              </div>
-            </div>
-          </div>
-        </div>
-        <label>
-          <span style={QS_LABEL}>Primary draft ends</span>
-          <input className={styles.input} style={{ width: "100%" }} type="datetime-local" value={primaryEnds} onChange={(e) => setPrimaryEnds(e.target.value)} />
-        </label>
-        <label>
-          <span style={QS_LABEL}>Secondary draft ends (optional)</span>
-          <input className={styles.input} style={{ width: "100%" }} type="datetime-local" value={secondaryEnds} onChange={(e) => setSecondaryEnds(e.target.value)} />
-        </label>
-        {err && <p className={styles.err} style={{ margin: 0 }}>{err}</p>}
-        <button type="button" className={styles.create} onClick={() => void save()} disabled={saving || !name.trim()}>
-          {saving ? "Saving…" : "Save"}
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
 /** One Squares pool in the list — expandable (game table) with a gear to edit. */
-function SquaresRow({ c, adminBase, isOpen, onToggle, onEdit }: { c: SquaresContestRow; adminBase: string; isOpen: boolean; onToggle: () => void; onEdit: () => void }) {
+function SquaresRow({ c, adminBase, isOpen, onToggle, onEdit, timeZone }: { c: SquaresContestRow; adminBase: string; isOpen: boolean; onToggle: () => void; onEdit: () => void; timeZone: string }) {
   const cPot = c.cellCostCents * 100;
   return (
     <ContestCard
       kind="squares"
       name={c.name}
-      meta={`${money(c.cellCostCents)}/square, ${money(cPot)} pot, ${c.status}`}
+      visibility={visOf(c.status)}
+      meta={`${money(c.cellCostCents)}/square, ${money(cPot)} pot`}
       count={`${c.games.length} game${c.games.length === 1 ? "" : "s"}`}
       detailHref={`${adminBase}/${c.id}`}
       detailLabel="Open pool details"
@@ -581,7 +455,7 @@ function SquaresRow({ c, adminBase, isOpen, onToggle, onEdit }: { c: SquaresCont
       isOpen={isOpen}
       onToggle={onToggle}
     >
-      <SquaresPreview row={c} />
+      <SquaresPreview row={c} timeZone={timeZone} />
     </ContestCard>
   );
 }

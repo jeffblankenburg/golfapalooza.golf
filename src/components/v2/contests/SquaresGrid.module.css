@@ -108,6 +108,9 @@
   padding: 0;
   overflow: hidden;
   cursor: default;
+  /* Size the owner initials relative to THIS cell so they're as large as possible
+     on every screen while the worst-case 2-initial combo ("WW"/"MM") still fits. */
+  container-type: inline-size;
 }
 .cell[data-empty] {
   background: color-mix(in srgb, var(--ink, #17211c) 3%, var(--paper, #f6f6f1));
@@ -121,8 +124,13 @@
   color: var(--brand, #0a5c36);
 }
 .owner {
-  font-size: 0.62rem;
+  /* ~44% of the cell's inner width: the largest that keeps "WW"/"MM" (≈2em in
+     Libre Franklin Bold) inside with a small margin. Falls back to a fixed size on
+     browsers without container-query units. */
+  font-size: 0.8rem;
+  font-size: 44cqi;
   font-weight: 800;
+  letter-spacing: -0.03em;
   color: var(--ink, #17211c);
   line-height: 1;
 }

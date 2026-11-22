@@ -3,6 +3,8 @@ import { v2ServerClient } from "@/lib/v2/supabase";
 import { winningCell, resolvePayouts, computeGamePayoutsFromSlices } from "@/lib/v2/contests/squares";
 import { buildGameAllocations } from "@/lib/v2/contests/squares-alloc";
 import { getLeague } from "@/lib/v2/sports/espn";
+import { resolveOrgTimeZone } from "@/lib/v2/timezone-server";
+import { formatInstant } from "@/lib/v2/timezone";
 import styles from "./SquaresHomeCards.module.css";
 /* eslint-disable @next/next/no-img-element */
 
@@ -61,14 +63,8 @@ function SquaresTag() {
   );
 }
 
-const startLabel = (iso: string | null): string => {
-  if (!iso) return "";
-  try {
-    return new Date(iso).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
-  } catch {
-    return "";
-  }
-};
+const startLabel = (iso: string | null, timeZone: string): string =>
+  formatInstant(iso, timeZone, { weekday: "short", hour: "numeric", minute: "2-digit" });
 
 /**
  * Home-page Squares cards (#230). ONE card per pool (never per game — a slate or a
@@ -81,6 +77,7 @@ const startLabel = (iso: string | null): string => {
  */
 export default async function SquaresHomeCards({ orgId, userId, slug }: { orgId: string; userId: string; slug: string }) {
   const supabase = await v2ServerClient();
+  const timeZone = await resolveOrgTimeZone(supabase, orgId);
   const { data: contestRows } = await supabase
     .from("v2_contests")
     .select("id, name, config")
@@ -209,7 +206,7 @@ export default async function SquaresHomeCards({ orgId, userId, slug }: { orgId:
                   <Logo t={g.teamCol} />
                 </span>
                 <span className={styles.gState} data-live={isLive || undefined} data-final={isFinal || undefined}>
-                  {isLive ? g.live?.detail || "Live" : isFinal ? "Final" : startLabel(g.startTime) || "Scheduled"}
+                  {isLive ? g.live?.detail || "Live" : isFinal ? "Final" : startLabel(g.startTime, timeZone) || "Scheduled"}
                 </span>
               </div>
               <div className={styles.combos}>

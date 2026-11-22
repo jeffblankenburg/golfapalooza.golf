@@ -4,6 +4,7 @@ import { getPlatformContext } from "@/lib/v2/context";
 import { v2AdminClient } from "@/lib/v2/supabase";
 import { getOrgSystemIdentity } from "@/lib/v2/system-user";
 import { pickName } from "@/lib/v2/profile";
+import { formatInstant } from "@/lib/v2/timezone";
 import styles from "@/app/new/new.module.css";
 import AnnouncementsList, { type MemberAnnouncement } from "./AnnouncementsList";
 
@@ -89,7 +90,7 @@ export default async function AnnouncementsPage({
         authorName,
         authorAvatar,
         dateText: r.sent_at
-          ? new Date(r.sent_at).toLocaleString("en-US", {
+          ? formatInstant(r.sent_at, org.timezone, {
               month: "short",
               day: "numeric",
               year: "numeric",

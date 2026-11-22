@@ -32,7 +32,7 @@ export async function GET(
   if ("error" in g) return NextResponse.json({ error: g.error }, { status: g.status });
   const { data } = await g.admin
     .from("v2_events")
-    .select("id, name, year, start_date, start_time, end_date, timezone, status, location, treasurer_user_id")
+    .select("id, name, year, start_date, start_time, end_date, end_time, timezone, status, location, treasurer_user_id")
     .eq("org_id", id)
     .order("year", { ascending: false })
     .order("start_date", { ascending: false });
@@ -53,6 +53,7 @@ export async function POST(
     start_date?: string | null;
     start_time?: string | null;
     end_date?: string | null;
+    end_time?: string | null;
     timezone?: string | null;
     status?: string;
     location?: string | null;
@@ -87,13 +88,14 @@ export async function POST(
       start_date: body.start_date || null,
       start_time: body.start_time || null,
       end_date: body.end_date || null,
+      end_time: body.end_time || null,
       timezone: body.timezone || DEFAULT_TIMEZONE,
       status,
       location: body.location?.trim() || null,
       treasurer_user_id: body.treasurer_user_id || null,
       created_by: g.userId,
     })
-    .select("id, name, year, start_date, start_time, end_date, timezone, status, location, treasurer_user_id")
+    .select("id, name, year, start_date, start_time, end_date, end_time, timezone, status, location, treasurer_user_id")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

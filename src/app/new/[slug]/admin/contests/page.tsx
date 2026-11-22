@@ -38,13 +38,20 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
   const threesGameDate = new Map((threesMatchups ?? []).map((m) => [m.contest_id as string, (m.start_time as string) ?? null]));
 
   const squaresIds = (contests ?? []).filter((c) => c.contest_type === "squares").map((c) => c.id);
-  const { data: games } = squaresIds.length
-    ? await supabase
-        .from("v2_squares_games")
-        .select("contest_id, espn_event_id, league, label, team_row, team_col, start_time, game_alloc, period_alloc, sort_order")
-        .in("contest_id", squaresIds)
-        .order("sort_order")
-    : { data: [] as Record<string, unknown>[] };
+  const [{ data: games }, { data: squaresCells }] = await Promise.all([
+    squaresIds.length
+      ? supabase
+          .from("v2_squares_games")
+          .select("contest_id, espn_event_id, league, label, team_row, team_col, start_time, game_alloc, period_alloc, sort_order")
+          .in("contest_id", squaresIds)
+          .order("sort_order")
+      : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+    squaresIds.length
+      ? supabase.from("v2_squares_cells").select("contest_id, user_id").in("contest_id", squaresIds).not("user_id", "is", null)
+      : Promise.resolve({ data: [] as { contest_id: string; user_id: string }[] }),
+  ]);
+  const squaresClaimed = new Map<string, number>();
+  for (const c of squaresCells ?? []) squaresClaimed.set(c.contest_id as string, (squaresClaimed.get(c.contest_id as string) || 0) + 1);
 
   // Pick'em enrichment: matchups (preview), participant count + buy-in (meta).
   const pickemIds = (contests ?? []).filter((c) => c.contest_type === "pickem").map((c) => c.id);
@@ -125,6 +132,7 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
         max_squares_secondary?: number | null;
         primary_ends_at?: string | null;
         secondary_ends_at?: string | null;
+        reveal_lead_minutes?: number;
       } | null) ?? {};
     const box: SquaresContestRow = {
       id: c.id,
@@ -138,6 +146,8 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
       maxSquaresSecondary: cfg.max_squares_secondary === undefined ? null : cfg.max_squares_secondary,
       primaryEndsAt: cfg.primary_ends_at ?? null,
       secondaryEndsAt: cfg.secondary_ends_at ?? null,
+      revealLeadMinutes: cfg.reveal_lead_minutes ?? 10080,
+      claimedCount: squaresClaimed.get(c.id as string) ?? 0,
       collectedBy: (c as { collected_by?: string | null }).collected_by ?? null,
       games: (games ?? [])
         .filter((g) => g.contest_id === c.id)
@@ -155,5 +165,5 @@ export default async function GroupContestsPage({ params }: { params: Promise<{ 
     return { kind: "squares", id: c.id as string, createdAt: c.created_at as string, box };
   });
 
-  return <GroupContestsAdmin orgId={org.id} slug={slug} items={items} currentUserId={ctx.userId} nameMode={org.name_display} />;
+  return <GroupContestsAdmin orgId={org.id} slug={slug} items={items} currentUserId={ctx.userId} nameMode={org.name_display} timeZone={org.timezone} />;
 }

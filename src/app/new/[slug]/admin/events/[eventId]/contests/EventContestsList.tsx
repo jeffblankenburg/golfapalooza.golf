@@ -8,6 +8,7 @@ import type { PickemGamePreview } from "@/lib/v2/contests/pickem-preview";
 import type { SquaresContestRow } from "@/app/new/[slug]/admin/contests/SquaresEditor";
 import ContestSettings, { type CourseOption } from "./[contestId]/ContestSettings";
 import AuctionSettingsModal from "@/app/new/_components/AuctionSettingsModal";
+import PropsSettings from "../../../contests/[contestId]/PropsSettings";
 import styles from "@/app/new/new.module.css";
 
 /** A nested side game shown (read-only) inside a parent scramble's accordion —
@@ -61,6 +62,7 @@ export default function EventContestsList({
   courses,
   days,
   eventWide,
+  timeZone,
 }: {
   slug: string;
   orgId: string;
@@ -68,6 +70,7 @@ export default function EventContestsList({
   courses: CourseOption[];
   days: DayGroup[];
   eventWide: EventCard[];
+  timeZone: string;
 }) {
   const router = useRouter();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -96,9 +99,9 @@ export default function EventContestsList({
           badge={c.needsAttention ? <span className={styles.needsAttn} style={{ marginLeft: 8 }}>Needs attention</span> : undefined}
         >
           {c.pickemGames ? (
-            <PickemPreview games={c.pickemGames} />
+            <PickemPreview games={c.pickemGames} timeZone={timeZone} />
           ) : c.squaresRow ? (
-            <SquaresPreview row={c.squaresRow} />
+            <SquaresPreview row={c.squaresRow} timeZone={timeZone} />
           ) : (
           <>
           {c.facts.length > 0 && (
@@ -134,12 +137,20 @@ export default function EventContestsList({
           )}
         </ContestCard>
 
-        {/* Controlled gear modal for this card. Auctions use the shared auction gear
-            (all its setup config); everything else uses the generic contest settings. */}
+        {/* Controlled gear modal for this card. Auctions use the shared auction gear and
+            Props its own settings; everything else uses the generic contest settings. */}
         {c.type === "auction" ? (
           gearFor === c.id && (
             <AuctionSettingsModal slug={slug} orgId={orgId} contestId={c.id} onClose={() => { setGearFor(null); router.refresh(); }} onSaved={() => router.refresh()} />
           )
+        ) : c.type === "props" ? (
+          <PropsSettings
+            open={gearFor === c.id}
+            apiBase={`/api/v2/orgs/${orgId}/contests/${c.id}`}
+            timeZone={timeZone}
+            onClose={() => { setGearFor(null); router.refresh(); }}
+            onSaved={() => router.refresh()}
+          />
         ) : (
           <ContestSettings
             slug={slug}

@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { getPlatformContext } from "@/lib/v2/context";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { loadThreesState } from "@/lib/v2/contests/threes-server";
-import { fetchGameScore } from "@/lib/v2/sports/espn";
+import { fetchGameScore, fetchGameSituation } from "@/lib/v2/sports/espn";
 import ThreesBoard from "@/app/new/[slug]/admin/contests/[contestId]/ThreesBoard";
 
 /**
@@ -21,10 +21,13 @@ export default async function MemberThreesBoardPage({ params }: { params: Promis
   const threes = await loadThreesState(supabase, contestId);
   if (!threes || threes.contest.org_id !== org.id) notFound();
 
-  const score =
+  const [score, situation] =
     threes.game?.league && threes.game.espnEventId
-      ? await fetchGameScore(threes.game.league, threes.game.espnEventId).catch(() => null)
-      : null;
+      ? await Promise.all([
+          fetchGameScore(threes.game.league, threes.game.espnEventId).catch(() => null),
+          fetchGameSituation(threes.game.league, threes.game.espnEventId).catch(() => null),
+        ])
+      : [null, null];
 
-  return <ThreesBoard state={threes} score={score} exitHref={`/new/${slug}`} />;
+  return <ThreesBoard state={threes} score={score} situation={situation} exitHref={`/new/${slug}`} />;
 }

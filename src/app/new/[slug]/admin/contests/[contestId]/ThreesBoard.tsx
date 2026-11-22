@@ -13,7 +13,7 @@ import {
   type ThreesEventRow,
 } from "@/lib/v2/contests/threes";
 import type { ThreesState } from "@/lib/v2/contests/threes-server";
-import type { GameScore } from "@/lib/v2/sports/espn";
+import type { GameScore, GameSituation } from "@/lib/v2/sports/espn";
 import { subscribeToThrees } from "@/lib/v2/realtime/threes-channel";
 import { playSound, preloadSounds, cachedSoundDurationMs, unlockAudio } from "@/lib/v2/soundboard-audio";
 import styles from "./threes.module.css";
@@ -114,7 +114,7 @@ async function gifLoopMs(url: string): Promise<number | null> {
   }
 }
 
-export default function ThreesBoard({ state, score, exitHref }: { state: ThreesState; score: GameScore | null; exitHref?: string }) {
+export default function ThreesBoard({ state, score, situation, exitHref }: { state: ThreesState; score: GameScore | null; situation?: GameSituation | null; exitHref?: string }) {
   const router = useRouter();
   const { game, events, reactions, streakCap, andOne } = state;
   const [audioReady, setAudioReady] = useState(false);
@@ -306,6 +306,14 @@ export default function ThreesBoard({ state, score, exitHref }: { state: ThreesS
   const liveA = liveOn ? score!.away?.current ?? null : null;
   const liveB = liveOn ? score!.home?.current ?? null : null;
   const statusText = liveOn ? score!.detail || null : null;
+  // teamA = ESPN away, teamB = ESPN home → map possession/timeout onto our sides.
+  const possSide: "a" | "b" | null =
+    situation?.possession === "away" ? "a" : situation?.possession === "home" ? "b" : null;
+  const inTimeout = liveOn && !!situation?.inTimeout;
+  const timeoutSide: "a" | "b" | "official" =
+    situation?.timeoutSide === "away" ? "a" : situation?.timeoutSide === "home" ? "b" : "official";
+  const timeoutColor =
+    timeoutSide === "a" ? game.teamA.color || "#1d4ed8" : timeoutSide === "b" ? game.teamB.color || "#b91c1c" : "#334155";
 
   return (
     <div
@@ -326,10 +334,15 @@ export default function ThreesBoard({ state, score, exitHref }: { state: ThreesS
             <span className={styles.sbScore} data-team="a">{liveA ?? "–"}</span>
             {statusText && <span className={styles.sbClock}>{statusText}</span>}
             <span className={styles.sbScore} data-team="b">{liveB ?? "–"}</span>
+            {inTimeout && (
+              <div className={styles.timeoutTag} data-side={timeoutSide} style={{ ["--to-color" as string]: timeoutColor } as React.CSSProperties}>
+                Timeout
+              </div>
+            )}
           </div>
         )}
-        <TeamHalf team={game.teamA} side="a" hot={streak.side === "a"} value={streak.value} count={streak.count} bump={landed} />
-        <TeamHalf team={game.teamB} side="b" hot={streak.side === "b"} value={streak.value} count={streak.count} bump={landed} />
+        <TeamHalf team={game.teamA} side="a" hot={streak.side === "a"} value={streak.value} count={streak.count} bump={landed} possession={possSide === "a"} />
+        <TeamHalf team={game.teamB} side="b" hot={streak.side === "b"} value={streak.value} count={streak.count} bump={landed} possession={possSide === "b"} />
 
       {andOneView && (
         <>
@@ -427,6 +440,7 @@ function TeamHalf({
   value,
   count,
   bump,
+  possession,
 }: {
   team: { name: string; shortName: string; abbrev: string | null; logo: string | null; color: string | null };
   side: "a" | "b";
@@ -434,11 +448,16 @@ function TeamHalf({
   value: number;
   count: number;
   bump: number;
+  possession?: boolean;
 }) {
   return (
     <div className={styles.half} data-side={side} data-hot={hot || undefined}>
       <div className={styles.halfTop}>
-        {team.logo && <img src={team.logo} alt="" className={styles.halfLogo} />}
+        {team.logo && (
+          <div className={styles.halfLogoWrap} data-poss={possession || undefined}>
+            <img src={team.logo} alt="" className={styles.halfLogo} />
+          </div>
+        )}
         <div className={styles.halfName}>{team.name}</div>
       </div>
       {hot && value > 0 && (

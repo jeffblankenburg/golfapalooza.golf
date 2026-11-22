@@ -7,6 +7,7 @@ import { buildGameAllocations } from "@/lib/v2/contests/squares-alloc";
 import { loadPickemBoard } from "@/lib/v2/contests/pickem-server";
 import { loadPropsBoard } from "@/lib/v2/contests/props-server";
 import { loadAuction, loadAuctionPayouts } from "@/lib/v2/contests/auction-server";
+import { resolveOrgTimeZone } from "@/lib/v2/timezone-server";
 import PropsContent from "../../props/PropsContent";
 import { pickName } from "@/lib/v2/profile";
 import SquaresPlay, { type PlayGame } from "./SquaresPlay";
@@ -22,22 +23,36 @@ export default async function ContestDetailPage({ params }: { params: Promise<{ 
   if (!ctx) redirect("/new/signup");
   const org = ctx.orgs.find((o) => o.slug === slug);
   if (!org) redirect("/new");
+  // Owners/admins may preview a contest that members can't see yet (draft/final); everyone else 404s.
+  const isAdmin = org.role === "owner" || org.role === "admin";
 
   const supabase = await v2ServerClient();
   const { data: contest } = await supabase
     .from("v2_contests")
-    .select("id, name, status, config, contest_type, org_id")
+    .select("id, name, status, config, contest_type, org_id, event_id, event:v2_events(timezone)")
     .eq("id", contestId)
     .eq("org_id", org.id)
     .maybeSingle();
   if (!contest) notFound();
 
+  // The zone all of this contest's times are shown in: the event's zone when it has
+  // one, else the org's home zone (group-scoped contests), else the platform default.
+  const ev = contest.event as unknown as { timezone: string | null } | { timezone: string | null }[] | null;
+  const eventTz = Array.isArray(ev) ? ev[0]?.timezone : ev?.timezone;
+  const timeZone = await resolveOrgTimeZone(supabase, org.id, eventTz);
+
+  // Admin-only banner shown when previewing a contest members can't see yet.
+  const previewNote = contest.status !== "active"
+    ? <div className={styles.adminPreviewNote}>Admin preview. Status: {contest.status}. Members can&apos;t see this yet.</div>
+    : null;
+
   // Pick'em detail — same member UI as the event lane, group pick endpoint.
   if (contest.contest_type === "pickem") {
-    if (contest.status !== "active") notFound(); // not open to members yet
+    if (contest.status !== "active" && !isAdmin) notFound(); // not open to members yet
     const board = await loadPickemBoard(supabase, { contestId, orgId: org.id, viewerId: ctx.userId, now: await v2Now() });
     return (
       <div className={`${styles.page} ${styles.orgPage}`}>
+        {previewNote}
         <h1 className={styles.title}>{contest.name || "Pick'em"}</h1>
         <PickemContent
           contestId={contestId}
@@ -47,6 +62,7 @@ export default async function ContestDetailPage({ params }: { params: Promise<{ 
           leaderboard={board.leaderboard}
           lockedGameIds={board.lockedGameIds}
           allLocked={board.locked}
+          timeZone={timeZone}
           meId={ctx.userId}
           totalGames={board.totalGames}
           potCents={board.potCents}
@@ -59,10 +75,11 @@ export default async function ContestDetailPage({ params }: { params: Promise<{ 
   // Props — admin-authored proposition questions; same member answer + leaderboard shape as
   // Pick'em, scope-agnostic endpoint. Hidden from members until the admin opens it (active).
   if (contest.contest_type === "props") {
-    if (contest.status !== "active") notFound();
+    if (contest.status !== "active" && !isAdmin) notFound();
     const board = await loadPropsBoard(supabase, { contestId, orgId: org.id, viewerId: ctx.userId, now: await v2Now() });
     return (
       <div className={`${styles.page} ${styles.orgPage}`}>
+        {previewNote}
         <h1 className={styles.title}>{contest.name || "Props"}</h1>
         <PropsContent
           contestId={contestId}
@@ -74,6 +91,7 @@ export default async function ContestDetailPage({ params }: { params: Promise<{ 
           locksAt={board.locksAt}
           numericRule={board.numericRule}
           settled={board.settled}
+          timeZone={timeZone}
           meId={ctx.userId}
           totalQuestions={board.totalQuestions}
           maxPoints={board.maxPoints}
@@ -87,12 +105,13 @@ export default async function ContestDetailPage({ params }: { params: Promise<{ 
   // Auction — read-only member board. Phase-aware (lobby → live → results); the results
   // phase needs the resolved prize board, so load payouts once the auction is complete.
   if (contest.contest_type === "auction") {
-    if (contest.status !== "active") notFound(); // hidden from members until the admin opens it
+    if (contest.status !== "active" && !isAdmin) notFound(); // hidden from members until the admin opens it
     const state = await loadAuction(supabase, contestId);
     if (!state) notFound();
     const payouts = state.config.complete ? await loadAuctionPayouts(supabase, contestId) : null;
     return (
       <div className={`${styles.page} ${styles.orgPage}`}>
+        {previewNote}
         <AuctionBoard state={state} viewerId={ctx.userId} payouts={payouts} />
       </div>
     );
@@ -145,6 +164,16 @@ export default async function ContestDetailPage({ params }: { params: Promise<{ 
   );
   const sliceCentsFor = new Map(resolvePayouts(potCents, allocGames).games.map((rg) => [rg.key, Object.fromEntries(rg.periods.map((p) => [p.key, p.cents]))]));
 
+  // Full-board payouts (a sold-out 100-square pot) — what each period pays if the
+  // board fills, so the pick page can show members what's up for grabs while drafting.
+  const fullPotCents = 100 * ((cfg.cell_cost_cents as number) ?? 0);
+  const fullAllocGames = buildGameAllocations(
+    (gameRows ?? []).map((g) => ({ id: g.id as string, league: g.league as string, game_alloc: g.game_alloc, period_alloc: g.period_alloc })),
+    fullPotCents,
+    { potAllocation: (cfg.pot_allocation as "equal" | "round_weighted" | "custom") ?? "equal", periodWeights: (cfg.period_weights as Record<string, Record<string, number>>) ?? {} },
+  );
+  const fullBoardFor = new Map(resolvePayouts(fullPotCents, fullAllocGames).games.map((rg) => [rg.key, rg.periods.map((p) => ({ key: p.key, cents: p.cents }))]));
+
   const games: PlayGame[] = (gameRows ?? []).map((g) => ({
     id: g.id as string,
     label: (g.label as string) ?? "Game",
@@ -158,6 +187,7 @@ export default async function ContestDetailPage({ params }: { params: Promise<{ 
     live: (g.live_score as PlayGame["live"]) ?? null,
     periodScores: (g.period_scores as PlayGame["periodScores"]) ?? null,
     periodCents: sliceCentsFor.get(g.id as string) ?? {},
+    fullBoard: fullBoardFor.get(g.id as string) ?? [],
   }));
 
   return (
@@ -169,12 +199,15 @@ export default async function ContestDetailPage({ params }: { params: Promise<{ 
       cellCostCents={(cfg.cell_cost_cents as number) ?? 0}
       maxPrimary={(cfg.max_squares_primary as number) ?? 10}
       maxSecondary={(cfg.max_squares_secondary as number | null) ?? null}
+      primaryEndsAt={(cfg.primary_ends_at as string | null) ?? null}
+      secondaryEndsAt={(cfg.secondary_ends_at as string | null) ?? null}
       games={games}
       owners={owners}
       avatars={avatars}
       mine={mine}
       myName={myName}
       myAvatar={myAvatar}
+      timeZone={timeZone}
     />
   );
 }

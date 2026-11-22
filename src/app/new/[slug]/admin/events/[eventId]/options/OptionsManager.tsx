@@ -10,6 +10,7 @@ import Modal from "@/app/new/_components/Modal";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import { OPTION_TYPES, typeHasChoices, type OptionType, type OptionChoice, type OptionSettings } from "@/lib/v2/options";
 import { OPTION_ICON_CATEGORIES } from "@/lib/v2/option-icons";
+import ZonedDateTimeField from "@/app/new/_components/ZonedDateTimeField";
 import styles from "@/app/new/new.module.css";
 
 export interface OptItem {
@@ -161,17 +162,10 @@ function ChoiceRow({ id, label, cost, isOpen, onToggle, children }: {
  * system + choices + icon + dependency + required + section + cost bundling). Options
  * move between sections via the editor's Section picker.
  */
-function toLocalInput(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 export default function OptionsManager({
-  slug, orgId, eventId, initialOptions, initialAvailable, initialGroups, initialSettings,
+  slug, orgId, eventId, timeZone, initialOptions, initialAvailable, initialGroups, initialSettings,
 }: {
-  slug: string; orgId: string; eventId: string;
+  slug: string; orgId: string; eventId: string; timeZone: string;
   initialOptions: OptionData[]; initialAvailable: OptItem[]; initialGroups: GroupData[];
   initialSettings: OptionSettings;
 }) {
@@ -814,12 +808,9 @@ export default function OptionsManager({
           only this Options-specific "visible but frozen" deadline stays here. */}
       <div className={styles.cscAcc} style={{ marginTop: 14 }}>
         <div className={styles.cscAccBody} style={{ paddingTop: 12 }}>
-          <div className={styles.field} style={{ marginBottom: 0 }}>
-            <label className={styles.label}>Selections close <span className={styles.optional}>(optional)</span></label>
-            <input type="datetime-local" className={styles.input} value={toLocalInput(settings.selection_deadline)} disabled={busy}
-              onChange={(e) => patchSettings({ selection_deadline: e.target.value ? new Date(e.target.value).toISOString() : null })} />
-            <p className={styles.roundFormHint}>After this, the Options page stays visible but members can no longer change their picks. Whether Options is visible and when it opens are set in Features.</p>
-          </div>
+          <ZonedDateTimeField label="Selections close" optional value={settings.selection_deadline} timeZone={timeZone} disabled={busy}
+            onChange={(iso) => patchSettings({ selection_deadline: iso })}
+            hint="After this, the Options page stays visible but members can no longer change their picks. Whether Options is visible and when it opens are set in Features." />
         </div>
       </div>
 

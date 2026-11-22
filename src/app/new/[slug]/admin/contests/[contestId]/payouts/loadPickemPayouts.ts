@@ -82,7 +82,7 @@ export async function loadPickemPayouts(
     supabase.from("v2_pickem_payouts").select("user_id, paid_cents, method, note").eq("contest_id", contestId),
     supabase.from("v2_financial_transactions").select("user_id, amount_cents").eq("contest_id", contestId).eq("type", "payment").eq("source", "winnings"),
     supabase.from("v2_financial_transactions").select("user_id, amount_cents").eq("contest_id", contestId).eq("type", "payment").eq("source", "deposit"),
-    supabase.from("v2_profiles").select("id, display_name, first_name, last_name, nickname, venmo_username, paypal_username, mailing_address").in("id", winnerIds),
+    supabase.from("v2_profiles").select("id, display_name, first_name, last_name, nickname, venmo_username, paypal_username, address, city, state, zip").in("id", winnerIds),
   ]);
 
   const extById = new Map<string, { cents: number; method: string | null; note: string | null }>();
@@ -121,7 +121,7 @@ export async function loadPickemPayouts(
           appliedToAccount: credit > 0,
           venmo: (p?.venmo_username as string | null) ?? null,
           paypal: (p?.paypal_username as string | null) ?? null,
-          address: (p?.mailing_address as string | null) ?? null,
+          address: [p?.address, p?.city, p?.state, p?.zip].map((v) => (v as string | null) ?? "").filter(Boolean).join(", ") || null,
           entryPaid: entryPaidFor(uid),
         };
       })

@@ -2,8 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
+import { loadResolvedFeatures } from "@/lib/v2/features-server";
 import styles from "@/app/new/new.module.css";
 import AdminGrid from "@/app/new/_components/AdminGrid";
+import FeatureVisibilityControl from "@/app/new/_components/FeatureVisibilityControl";
 
 interface EventRow {
   id: string;
@@ -37,14 +39,46 @@ export default async function EventAdmin({
   const supabase = await v2ServerClient();
   const { data } = await supabase
     .from("v2_events")
-    .select("id, name, year, start_date, end_date, status")
+    .select("id, name, year, start_date, end_date, status, timezone")
     .eq("id", eventId)
     .eq("org_id", org.id)
     .maybeSingle();
   const event = data as EventRow | null;
   if (!event) redirect(`/new/${slug}/admin`);
+  const timeZone = ((data as { timezone?: string | null }).timezone) || org.timezone;
 
   const range = dateRange(event.start_date, event.end_date);
+
+  // Member-visibility toggle rendered inline on each feature-backed card. Lights up
+  // only for available, event-scoped, non-always-on features (as more port, they get
+  // a toggle automatically via their key below).
+  const resolved = await loadResolvedFeatures(supabase, org.id, eventId);
+  const byKey = new Map(resolved.map((f) => [f.def.key, f]));
+  const control = (key: string) => {
+    const f = byKey.get(key);
+    if (!f || f.def.status !== "available" || f.def.scope !== "event" || f.def.alwaysOn) return undefined;
+    return (
+      <FeatureVisibilityControl
+        orgId={org.id}
+        eventId={eventId}
+        featureKey={key}
+        topbar={f.def.topbar}
+        timeZone={timeZone}
+        config={{
+          visibility: f.visibility,
+          pinned: f.pinned,
+          public: f.public,
+          label: f.label,
+          navOrder: f.navOrder,
+          availability: f.availability,
+          availableFrom: f.availableFrom,
+          availableUntil: f.availableUntil,
+          openNotificationTitle: f.openNotificationTitle,
+          openNotificationBody: f.openNotificationBody,
+        }}
+      />
+    );
+  };
 
   return (
     <div className={styles.page}>
@@ -74,12 +108,12 @@ export default async function EventAdmin({
             { label: "Contests", href: `/new/${slug}/admin/events/${eventId}/contests`, desc: "Scramble, Skins, Pick'em, Calcutta, Cornhole…" },
             { label: "Tee Times", desc: "Groups & start times" },
             { label: "Teams", desc: "Team assignments" },
-            { label: "Lodging", desc: "Rooms & housing" },
-            { label: "Schedule", href: `/new/${slug}/admin/events/${eventId}/schedule`, desc: "Per-day agenda & activities" },
+            { label: "Lodging", href: `/new/${slug}/admin/events/${eventId}/lodging`, desc: "Rooms & housing", control: control("rooms") },
+            { label: "Schedule", href: `/new/${slug}/admin/events/${eventId}/schedule`, desc: "Per-day agenda & activities", control: control("schedule") },
             { label: "Financials", href: `/new/${slug}/admin/events/${eventId}/financials`, desc: "Costs, trip cost & payouts" },
             { label: "Attendance", desc: "RSVPs & roster" },
             { label: "Shirts", desc: "Sizes & orders" },
-            { label: "Options", href: `/new/${slug}/admin/events/${eventId}/options`, desc: "Opt-in add-ons & their pricing" },
+            { label: "Options", href: `/new/${slug}/admin/events/${eventId}/options`, desc: "Opt-in add-ons & their pricing", control: control("options") },
             { label: "Polls", desc: "Voting" },
             { label: "Awards", desc: "Accolades & nominations" },
             { label: "Info", desc: "Event details" },

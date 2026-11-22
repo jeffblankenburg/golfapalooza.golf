@@ -11,7 +11,7 @@ import { applyProfileUpdate } from "@/lib/v2/profile-write";
  */
 
 const PROFILE_COLUMNS =
-  "id, display_name, avatar_url, phone, first_name, last_name, nickname, birthdate, zip, occupation, city, state, playing_since, swings, typical_shot, shirt_size, fun_fact, best_shot, show_on_map, venmo_username, paypal_username, mailing_address";
+  "id, display_name, avatar_url, phone, first_name, last_name, nickname, birthdate, zip, occupation, city, state, playing_since, swings, typical_shot, shirt_size, fun_fact, best_shot, venmo_username, paypal_username, address, map_visibility, allergies";
 
 export async function GET(request: Request) {
   const { userId, realUserId, simulating } = await v2GetUser(request);

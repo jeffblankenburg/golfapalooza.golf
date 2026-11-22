@@ -202,6 +202,68 @@ export async function fetchGameScore(leagueKey: string, eventId: string): Promis
   return { state, detail, away, home, spread, favorite };
 }
 
+export interface GameSituation {
+  inTimeout: boolean;
+  timeoutSide: "home" | "away" | null; // which team called it (null = official/TV timeout)
+  possession: "home" | "away" | null; // who has the ball right now (best-effort)
+}
+
+type RawScoreboardEvent = {
+  id?: string | number;
+  competitions?: Array<{
+    status?: { type?: { state?: string } };
+    competitors?: Array<{ homeAway?: string; possession?: boolean | null; team?: { id?: string | number } }>;
+    situation?: { lastPlay?: { type?: { text?: string }; text?: string; scoreValue?: number; team?: { id?: string | number } } };
+  }>;
+};
+
+/**
+ * Live in-game situation for ONE event: whether play is stopped for a timeout, and
+ * which team has the ball. Possession prefers ESPN's own live flag when the game's
+ * feed provides it; otherwise it's derived from the last play (a made basket or
+ * turnover hands the ball over; a rebound/steal keeps it). Only meaningful while
+ * the game is in progress — returns a neutral result otherwise. Pulled from the
+ * scoreboard feed (the summary endpoint we use for scores omits `situation`).
+ */
+export async function fetchGameSituation(leagueKey: string, eventId: string): Promise<GameSituation | null> {
+  const lg = getLeague(leagueKey);
+  if (!lg) return null;
+  const params = new URLSearchParams({ limit: "400" });
+  if (lg.groups) params.set("groups", lg.groups);
+  const url = `https://site.api.espn.com/apis/site/v2/sports/${lg.path}/scoreboard?${params.toString()}`;
+  const res = await fetch(url, { headers: { accept: "application/json" }, cache: "no-store" });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { events?: RawScoreboardEvent[] };
+  const comp = (data.events ?? []).find((e) => String(e.id) === String(eventId))?.competitions?.[0];
+  if (!comp || comp.status?.type?.state !== "in") return { inTimeout: false, timeoutSide: null, possession: null };
+
+  const competitors = comp.competitors ?? [];
+  const homeAwayOf = (teamId: string | number | undefined): "home" | "away" | null => {
+    const c = competitors.find((x) => String(x.team?.id) === String(teamId));
+    return c?.homeAway === "home" || c?.homeAway === "away" ? c.homeAway : null;
+  };
+
+  const lp = comp.situation?.lastPlay;
+  const lpText = `${lp?.type?.text ?? ""} ${lp?.text ?? ""}`.toLowerCase();
+  const inTimeout = /timeout/.test(lpText);
+  // Which team called it — null for an official/TV timeout (no team on the play).
+  const timeoutSide = inTimeout ? homeAwayOf(lp?.team?.id) : null;
+
+  let possession: "home" | "away" | null = null;
+  const flagged = competitors.find((c) => c.possession === true);
+  if (flagged) {
+    possession = flagged.homeAway === "home" || flagged.homeAway === "away" ? flagged.homeAway : null;
+  } else if (!inTimeout && lp?.team?.id != null) {
+    const side = homeAwayOf(lp.team.id);
+    if (side) {
+      const lost = (lp.scoreValue ?? 0) > 0 || /turnover|lost ball|traveling|offensive foul|shot clock|bad pass|3 second/.test(lpText);
+      possession = lost ? (side === "home" ? "away" : "home") : side;
+    }
+  }
+  if (inTimeout) possession = null; // nobody has the ball during a stoppage
+  return { inTimeout, timeoutSide, possession };
+}
+
 /** Map an ESPN game score onto our period keys for a structure (quarters/halves). */
 export function periodScoresFromGame(score: GameScore, structure: PeriodStructure): Record<string, { away: number; home: number } | null> {
   const idx: Record<string, number> = structure === "quarters" ? { Q1: 0, Half: 1, Q3: 2 } : { Half: 0 };

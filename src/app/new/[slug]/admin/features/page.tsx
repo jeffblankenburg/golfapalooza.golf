@@ -37,6 +37,7 @@ export default async function GroupFeaturesPage({
   return (
     <FeaturesConfig
       scope="group"
+      timeZone={org.timezone}
       endpoint={`/api/v2/orgs/${org.id}/features`}
       initial={resolved}
       backHref={`/new/${slug}/admin`}

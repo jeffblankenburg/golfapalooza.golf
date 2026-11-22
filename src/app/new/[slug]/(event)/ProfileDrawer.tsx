@@ -30,10 +30,11 @@ interface Profile {
   shirt_size: string | null;
   fun_fact: string | null;
   best_shot: string | null;
-  show_on_map: boolean;
+  allergies: string | null;
+  address: string | null;
+  map_visibility: string;
   venmo_username: string | null;
   paypal_username: string | null;
-  mailing_address: string | null;
 }
 
 const SWINGS = ["right", "left", "both"];
@@ -102,10 +103,11 @@ export default function ProfileDrawer({ active, orgId, canSim }: { active: boole
           shirt_size: p.shirt_size,
           fun_fact: p.fun_fact,
           best_shot: p.best_shot,
-          show_on_map: p.show_on_map,
           venmo_username: p.venmo_username,
           paypal_username: p.paypal_username,
-          mailing_address: p.mailing_address,
+          address: p.address,
+          map_visibility: p.map_visibility,
+          allergies: p.allergies,
         }),
       });
       if (!res.ok) throw new Error();
@@ -197,6 +199,9 @@ export default function ProfileDrawer({ active, orgId, canSim }: { active: boole
         <input type="date" className={styles.input} value={p.birthdate || ""} onChange={(e) => set("birthdate", e.target.value || null)} />
       </Field>
 
+      <Field label="Address">
+        <input className={styles.input} value={p.address || ""} onChange={(e) => set("address", e.target.value)} placeholder="Street address" />
+      </Field>
       <div className={styles.profileTwoCol}>
         <Field label="City">
           <input className={styles.input} value={p.city || ""} onChange={(e) => set("city", e.target.value)} />
@@ -208,6 +213,14 @@ export default function ProfileDrawer({ active, orgId, canSim }: { active: boole
       <Field label="ZIP">
         <input className={styles.input} value={p.zip || ""} onChange={(e) => set("zip", e.target.value)} inputMode="numeric" />
       </Field>
+      <Field label="Show my location on the member map">
+        <select className={styles.selectInput} value={p.map_visibility} onChange={(e) => set("map_visibility", e.target.value)}>
+          <option value="off">Off</option>
+          <option value="state">State only</option>
+          <option value="city">City &amp; state</option>
+          <option value="address">Full address</option>
+        </select>
+      </Field>
 
       <Field label="Occupation">
         <input className={styles.input} value={p.occupation || ""} onChange={(e) => set("occupation", e.target.value)} />
@@ -218,7 +231,7 @@ export default function ProfileDrawer({ active, orgId, canSim }: { active: boole
           <input type="number" className={styles.input} value={p.playing_since ?? ""} min={1900} max={new Date().getFullYear()} onChange={(e) => set("playing_since", e.target.value ? Number(e.target.value) : null)} />
         </Field>
         <Field label="Shirt size">
-          <select className={styles.input} value={p.shirt_size || ""} onChange={(e) => set("shirt_size", e.target.value || null)}>
+          <select className={styles.selectInput} value={p.shirt_size || ""} onChange={(e) => set("shirt_size", e.target.value || null)}>
             <option value="">—</option>
             {SHIRTS.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
@@ -227,13 +240,13 @@ export default function ProfileDrawer({ active, orgId, canSim }: { active: boole
 
       <div className={styles.profileTwoCol}>
         <Field label="Swings">
-          <select className={styles.input} value={p.swings || ""} onChange={(e) => set("swings", e.target.value || null)}>
+          <select className={styles.selectInput} value={p.swings || ""} onChange={(e) => set("swings", e.target.value || null)}>
             <option value="">—</option>
             {SWINGS.map((s) => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
           </select>
         </Field>
         <Field label="Typical shot">
-          <select className={styles.input} value={p.typical_shot || ""} onChange={(e) => set("typical_shot", e.target.value || null)}>
+          <select className={styles.selectInput} value={p.typical_shot || ""} onChange={(e) => set("typical_shot", e.target.value || null)}>
             <option value="">—</option>
             {SHOTS.map((s) => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
           </select>
@@ -246,6 +259,9 @@ export default function ProfileDrawer({ active, orgId, canSim }: { active: boole
       <Field label="Best shot">
         <textarea className={styles.textarea} value={p.best_shot || ""} onChange={(e) => set("best_shot", e.target.value)} rows={2} />
       </Field>
+      <Field label="Allergies & sensitivities">
+        <textarea className={styles.textarea} value={p.allergies || ""} onChange={(e) => set("allergies", e.target.value)} rows={2} placeholder="Food, pets, smoke, anything roommates or organizers should know" />
+      </Field>
 
       <p className={styles.profileSubhead}>Payment info</p>
       <p className={styles.profileHint}>Private — only you and your group&apos;s admins see this. Used to pay you quickly when you win.</p>
@@ -257,15 +273,6 @@ export default function ProfileDrawer({ active, orgId, canSim }: { active: boole
           <input className={styles.input} value={p.paypal_username || ""} onChange={(e) => set("paypal_username", e.target.value)} placeholder="paypal.me name" />
         </Field>
       </div>
-      <Field label="Mailing address">
-        <textarea className={styles.textarea} value={p.mailing_address || ""} onChange={(e) => set("mailing_address", e.target.value)} rows={2} placeholder="For a mailed check, if you don't use Venmo or PayPal" />
-      </Field>
-
-      <label className={styles.profileToggle}>
-        <input type="checkbox" checked={p.show_on_map} onChange={(e) => set("show_on_map", e.target.checked)} />
-        <span>Show me on the Loozer map</span>
-      </label>
-
       {error && <p className={styles.formError}>{error}</p>}
 
       {canSim && orgId && <SimControl orgId={orgId} active={active} />}

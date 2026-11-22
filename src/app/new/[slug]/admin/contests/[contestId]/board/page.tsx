@@ -4,7 +4,7 @@ import { getPlatformContext } from "@/lib/v2/context";
 import { loadAuction } from "@/lib/v2/contests/auction-server";
 import AuctionBoard from "@/app/new/_components/AuctionBoard";
 import { loadThreesState } from "@/lib/v2/contests/threes-server";
-import { fetchGameScore } from "@/lib/v2/sports/espn";
+import { fetchGameScore, fetchGameSituation } from "@/lib/v2/sports/espn";
 import ThreesBoard from "../ThreesBoard";
 
 /** Projectable full-screen contest board (admin) — open on the big screen. */
@@ -29,11 +29,14 @@ export default async function ContestBoardPage({ params }: { params: Promise<{ s
   if (c.contest_type === "3s_and_ds") {
     const threes = await loadThreesState(supabase, contestId);
     if (!threes) notFound();
-    const score =
+    const [score, situation] =
       threes.game?.league && threes.game.espnEventId
-        ? await fetchGameScore(threes.game.league, threes.game.espnEventId).catch(() => null)
-        : null;
-    return <ThreesBoard state={threes} score={score} />;
+        ? await Promise.all([
+            fetchGameScore(threes.game.league, threes.game.espnEventId).catch(() => null),
+            fetchGameSituation(threes.game.league, threes.game.espnEventId).catch(() => null),
+          ])
+        : [null, null];
+    return <ThreesBoard state={threes} score={score} situation={situation} />;
   }
 
   const state = await loadAuction(supabase, contestId);

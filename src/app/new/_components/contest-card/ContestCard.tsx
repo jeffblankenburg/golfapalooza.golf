@@ -122,6 +122,7 @@ export default function ContestCard({
   isOpen,
   onToggle,
   badge,
+  visibility,
   children,
 }: {
   kind: string;
@@ -138,6 +139,7 @@ export default function ContestCard({
   isOpen: boolean;
   onToggle: () => void;
   badge?: ReactNode; // e.g. a "Needs attention" flag beside the name
+  visibility?: "public" | "hidden"; // member visibility pill next to the type tag
   children?: ReactNode; // accordion body
 }) {
   return (
@@ -145,7 +147,10 @@ export default function ContestCard({
       <div className={styles.rowHead}>
         <button type="button" className={styles.rowMain} onClick={onToggle} aria-expanded={isOpen}>
           <span className={styles.rowHeadText}>
-            <ContestTypeTag kind={kind} label={tagLabel} />
+            <span className={styles.typeRow}>
+              <ContestTypeTag kind={kind} label={tagLabel} />
+              {visibility && <span className={styles.visTag} data-vis={visibility}>{visibility === "public" ? "Public" : "Hidden"}</span>}
+            </span>
             <span className={styles.rowName}>{name}{badge}</span>
             <span className={styles.rowMeta}>{meta}</span>
             {count != null && <span className={styles.rowCount}>{count}</span>}

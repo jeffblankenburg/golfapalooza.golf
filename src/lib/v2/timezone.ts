@@ -86,3 +86,79 @@ export function tzAbbrev(atMs: number, timeZone: string): string | null {
     return null;
   }
 }
+
+/** Reasonable default for a date+time stamp, e.g. "Sun, Feb 14, 6:00 PM". */
+const DEFAULT_DATETIME_OPTS: Intl.DateTimeFormatOptions = {
+  weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+};
+
+/**
+ * Format an absolute instant (ISO string, epoch ms, or Date) as a human string in
+ * `timeZone` — the event's zone, never the viewer's. When the format includes a
+ * time of day, the zone is labeled with its DST-AGNOSTIC generic name
+ * ("Eastern Time", not "EST"/"EDT"), so "6:00 PM Eastern Time" means the same thing
+ * in February and July. Date-only formats are rendered in-zone (so the calendar date
+ * is the event's) but without the zone label, which would read oddly on a bare date.
+ *
+ * Invalid/missing instants return "" so callers can short-circuit.
+ */
+export function formatInstant(
+  instant: string | number | Date | null | undefined,
+  timeZone: string | null | undefined,
+  opts: Intl.DateTimeFormatOptions = DEFAULT_DATETIME_OPTS,
+): string {
+  if (instant == null || instant === "") return "";
+  const d = instant instanceof Date ? instant : new Date(instant);
+  if (isNaN(d.getTime())) return "";
+  const tz = isValidTimeZone(timeZone) ? (timeZone as string) : DEFAULT_TIMEZONE;
+  const hasTime = opts.hour != null || opts.timeStyle != null;
+  return new Intl.DateTimeFormat("en-US", {
+    ...opts,
+    timeZone: tz,
+    ...(hasTime && opts.timeZoneName == null ? { timeZoneName: "longGeneric" } : {}),
+  }).format(d);
+}
+
+/**
+ * A stored instant → the "YYYY-MM-DDTHH:MM" value for a <input type="datetime-local">,
+ * expressed as WALL-CLOCK TIME IN `timeZone` (not the browser's zone). Pair with
+ * `zonedInputToIso` on save so an admin anywhere enters/reads the event's local time.
+ * Empty/invalid → "".
+ */
+export function isoToZonedInput(iso: string | null | undefined, timeZone: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const tz = isValidTimeZone(timeZone) ? (timeZone as string) : DEFAULT_TIMEZONE;
+  const parts: Record<string, string> = {};
+  for (const p of new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hour12: false, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+  }).formatToParts(d)) parts[p.type] = p.value;
+  const hour = parts.hour === "24" ? "00" : parts.hour; // some runtimes emit "24" at midnight
+  return `${parts.year}-${parts.month}-${parts.day}T${hour}:${parts.minute}`;
+}
+
+/**
+ * A <input type="datetime-local"> value ("YYYY-MM-DDTHH:MM"), read as WALL-CLOCK TIME
+ * IN `timeZone`, → the absolute UTC instant (ISO) to store. Inverse of `isoToZonedInput`.
+ * Empty/invalid → null.
+ */
+export function zonedInputToIso(local: string | null | undefined, timeZone: string | null | undefined): string | null {
+  if (!local) return null;
+  const [date, time] = local.split("T");
+  if (!date || !time) return null;
+  const tz = isValidTimeZone(timeZone) ? (timeZone as string) : DEFAULT_TIMEZONE;
+  const ms = wallTimeToUtcMs(date, time, tz);
+  return isNaN(ms) ? null : new Date(ms).toISOString();
+}
+
+/** The DST-agnostic zone name on its own, e.g. "Eastern Time". Best-effort. */
+export function tzLongName(timeZone: string | null | undefined, atMs: number = Date.now()): string | null {
+  const tz = isValidTimeZone(timeZone) ? (timeZone as string) : DEFAULT_TIMEZONE;
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "longGeneric" }).formatToParts(new Date(atMs));
+    return parts.find((p) => p.type === "timeZoneName")?.value ?? null;
+  } catch {
+    return null;
+  }
+}

@@ -20,8 +20,6 @@ interface Member {
   avatarUrl: string | null;
   sponsorId: string | null;
   isFounder: boolean;
-  latitude: number | null;
-  longitude: number | null;
   city: string | null;
   state: string | null;
   eventsAttended: number;
@@ -46,21 +44,26 @@ export default function MembersDirectory({
   orgId,
   viewerId,
   title,
+  initialMembers,
+  initialFollowing,
 }: {
   slug: string;
   orgId: string;
   viewerId: string;
   title: string;
+  initialMembers?: Member[];
+  initialFollowing?: string[];
 }) {
-  const [members, setMembers] = useState<Member[]>([]);
-  const [following, setFollowing] = useState<Set<string>>(new Set());
-  const [loaded, setLoaded] = useState(false);
+  const [members, setMembers] = useState<Member[]>(initialMembers ?? []);
+  const [following, setFollowing] = useState<Set<string>>(new Set(initialFollowing ?? []));
+  const [loaded, setLoaded] = useState(!!initialMembers);
   const [q, setQ] = useState("");
   const [view, setView] = useState<View>("grid");
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
+    if (initialMembers) return; // already hydrated by the server page
     let cancelled = false;
     (async () => {
       try {
@@ -80,7 +83,7 @@ export default function MembersDirectory({
     return () => {
       cancelled = true;
     };
-  }, [orgId]);
+  }, [orgId, initialMembers]);
 
   const query = q.trim().toLowerCase();
   const shown = members.filter(
@@ -149,7 +152,7 @@ export default function MembersDirectory({
         )}
         <span className={styles.avatarWrap}>
           {m.avatarUrl ? (
-            <img src={m.avatarUrl} alt="" className={styles.avatar} />
+            <img src={m.avatarUrl} alt="" className={styles.avatar} loading="lazy" decoding="async" />
           ) : (
             <span className={styles.avatarFallback}>{initials(m.displayName)}</span>
           )}

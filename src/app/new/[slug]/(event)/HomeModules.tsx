@@ -2,6 +2,7 @@ import Link from "next/link";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { stripMarkdown } from "@/lib/v2/text";
 import { pickName, type NameMode } from "@/lib/v2/profile";
+import { formatInstant } from "@/lib/v2/timezone";
 import { todayInTimezone, ageTurningToday } from "@/lib/v2/birthday";
 import { v2Now } from "@/lib/v2/simulator";
 import BirthdayBanner, { type BirthdayPerson } from "./BirthdayBanner";
@@ -76,6 +77,7 @@ export default async function HomeModules({
   optionsOpen,
   moneyVisible,
   activityProducers,
+  timeZone,
 }: {
   orgId: string;
   eventId: string | null;
@@ -90,6 +92,7 @@ export default async function HomeModules({
   optionsOpen: boolean;
   moneyVisible: boolean;
   activityProducers: string[];
+  timeZone: string;
 }) {
   const supabase = await v2ServerClient();
 
@@ -237,7 +240,7 @@ export default async function HomeModules({
       <AuctionHomeCards orgId={orgId} userId={userId} slug={slug} eventId={eventId} />
       <PropsHomeCards orgId={orgId} userId={userId} slug={slug} eventId={eventId} />
       <ThreesHomeCards orgId={orgId} slug={slug} eventId={eventId} />
-      {articlesVisible && article && <ArticleModule article={article} slug={slug} />}
+      {articlesVisible && article && <ArticleModule article={article} slug={slug} timeZone={timeZone} />}
       {eventId && (
         <RsvpModule
           eventId={eventId}
@@ -306,11 +309,11 @@ const STUB_ARTICLE: FeaturedArticle = {
   authorAvatar: null,
 };
 
-function ArticleModule({ article, slug }: { article: FeaturedArticle | null; slug: string }) {
+function ArticleModule({ article, slug, timeZone }: { article: FeaturedArticle | null; slug: string; timeZone: string }) {
   if (!article && !PREVIEW) return null;
   const a = article ?? STUB_ARTICLE;
 
-  const dateText = new Date(a.publishAt).toLocaleDateString("en-US", {
+  const dateText = formatInstant(a.publishAt, timeZone, {
     month: "long",
     day: "numeric",
     year: "numeric",

@@ -31,10 +31,11 @@ interface Member {
   shirt_size: string | null;
   fun_fact: string | null;
   best_shot: string | null;
-  show_on_map: boolean;
+  allergies: string | null;
+  address: string | null;
+  map_visibility: string;
   venmo_username: string | null;
   paypal_username: string | null;
-  mailing_address: string | null;
   permissions: PermissionMap;
 }
 interface Invite {
@@ -58,7 +59,7 @@ const fullName = (m: { first_name: string | null; last_name: string | null }) =>
 const EMPTY_EXT = {
   city: "", state: "", zip: "", occupation: "", playing_since: "",
   swings: "", typical_shot: "", shirt_size: "", fun_fact: "", best_shot: "",
-  venmo_username: "", paypal_username: "", mailing_address: "", show_on_map: true,
+  venmo_username: "", paypal_username: "", address: "", map_visibility: "off", allergies: "",
 };
 const SWING_OPTS = ["right", "left", "both"];
 const SHOT_OPTS = ["straight", "slice", "hook", "draw", "fade"];
@@ -189,9 +190,9 @@ export default function MembersManager({
       city: m.city || "", state: m.state || "", zip: m.zip || "",
       occupation: m.occupation || "", playing_since: m.playing_since != null ? String(m.playing_since) : "",
       swings: m.swings || "", typical_shot: m.typical_shot || "", shirt_size: m.shirt_size || "",
-      fun_fact: m.fun_fact || "", best_shot: m.best_shot || "",
+      fun_fact: m.fun_fact || "", best_shot: m.best_shot || "", allergies: m.allergies || "",
       venmo_username: m.venmo_username || "", paypal_username: m.paypal_username || "",
-      mailing_address: m.mailing_address || "", show_on_map: m.show_on_map ?? true,
+      address: m.address || "", map_visibility: m.map_visibility || "off",
     });
     setEError(null);
   }
@@ -227,10 +228,11 @@ export default function MembersManager({
         shirt_size: eExt.shirt_size || null,
         fun_fact: eExt.fun_fact,
         best_shot: eExt.best_shot,
+        allergies: eExt.allergies,
         venmo_username: eExt.venmo_username,
         paypal_username: eExt.paypal_username,
-        mailing_address: eExt.mailing_address,
-        show_on_map: eExt.show_on_map,
+        address: eExt.address,
+        map_visibility: eExt.map_visibility,
       },
     };
     if (canManage && ePhone.trim() && ePhone.trim() !== (editing.phone || "")) body.phone = ePhone.trim();
@@ -496,6 +498,10 @@ export default function MembersManager({
             <input className={styles.input} value={eExt.occupation} onChange={(e) => setEExt({ ...eExt, occupation: e.target.value })} maxLength={80} />
           </div>
           <div className={styles.field}>
+            <label className={styles.label}>Address <span className={styles.optional}>(optional)</span></label>
+            <input className={styles.input} value={eExt.address} onChange={(e) => setEExt({ ...eExt, address: e.target.value })} maxLength={200} placeholder="Street address" />
+          </div>
+          <div className={styles.field}>
             <label className={styles.label}>City <span className={styles.optional}>(optional)</span></label>
             <input className={styles.input} value={eExt.city} onChange={(e) => setEExt({ ...eExt, city: e.target.value })} maxLength={60} />
           </div>
@@ -506,10 +512,6 @@ export default function MembersManager({
           <div className={styles.field}>
             <label className={styles.label}>ZIP <span className={styles.optional}>(optional)</span></label>
             <input className={styles.input} inputMode="numeric" value={eExt.zip} onChange={(e) => setEExt({ ...eExt, zip: e.target.value })} maxLength={10} />
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Mailing address <span className={styles.optional}>(optional)</span></label>
-            <input className={styles.input} value={eExt.mailing_address} onChange={(e) => setEExt({ ...eExt, mailing_address: e.target.value })} maxLength={200} />
           </div>
           <div className={styles.field}>
             <label className={styles.label}>Venmo <span className={styles.optional}>(username)</span></label>
@@ -553,10 +555,17 @@ export default function MembersManager({
             <input className={styles.input} value={eExt.best_shot} onChange={(e) => setEExt({ ...eExt, best_shot: e.target.value })} maxLength={200} />
           </div>
           <div className={styles.field}>
-            <label className={styles.label} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <input type="checkbox" checked={eExt.show_on_map} onChange={(e) => setEExt({ ...eExt, show_on_map: e.target.checked })} />
-              Show on members map
-            </label>
+            <label className={styles.label}>Allergies &amp; sensitivities <span className={styles.optional}>(optional)</span></label>
+            <input className={styles.input} value={eExt.allergies} onChange={(e) => setEExt({ ...eExt, allergies: e.target.value })} maxLength={300} placeholder="Food, pets, smoke…" />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Show on members map <span className={styles.optional}>(precision)</span></label>
+            <select className={styles.roleSelect} value={eExt.map_visibility} onChange={(e) => setEExt({ ...eExt, map_visibility: e.target.value })}>
+              <option value="off">Off</option>
+              <option value="state">State only</option>
+              <option value="city">City &amp; state</option>
+              <option value="address">Full address</option>
+            </select>
           </div>
 
           {editingCanManage && (

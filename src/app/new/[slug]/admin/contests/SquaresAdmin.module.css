@@ -348,6 +348,23 @@
   font-size: 0.74rem;
   color: var(--ink-soft, #59635b);
 }
+/* Draft accordion: grouped by phase — Primary / Secondary / Number reveal. */
+.draftGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.draftGroup + .draftGroup {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line, rgba(23, 33, 29, 0.12));
+}
+.draftGroupTitle {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--ink, #17211c);
+  margin-bottom: 2px;
+}
 .periodApplies {
   font-size: 0.72rem;
   font-weight: 600;
@@ -450,9 +467,21 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.payGameSub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
 .payGameLeague {
   font-size: 0.68rem;
   font-weight: 700;
+  color: var(--ink-soft, #59635b);
+  white-space: nowrap;
+}
+.payGameWhen {
+  font-size: 0.68rem;
+  font-weight: 600;
   color: var(--ink-soft, #59635b);
   white-space: nowrap;
   overflow: hidden;

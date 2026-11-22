@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import { pickName, type NameMode } from "@/lib/v2/profile";
+import { formatInstant } from "@/lib/v2/timezone";
+import ZonedDateTimeField from "@/app/new/_components/ZonedDateTimeField";
 import styles from "@/app/new/new.module.css";
 
 type Audience = "everyone" | "event" | "custom";
@@ -37,12 +39,8 @@ interface EventLite {
   status: string;
 }
 
-/** ISO → value for <input type="datetime-local"> in the viewer's local zone. */
-function toLocalInput(iso: string | null): string {
-  const d = iso ? new Date(iso) : new Date(Date.now() + 60 * 60 * 1000); // default +1h
-  const off = d.getTimezoneOffset();
-  return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16);
-}
+/** Default when scheduling a new announcement: one hour from now (ISO). */
+const defaultScheduleAt = () => new Date(Date.now() + 60 * 60 * 1000).toISOString();
 
 function memberSortKey(m: MemberLite, mode: NameMode): string {
   const k =
@@ -55,9 +53,11 @@ function memberSortKey(m: MemberLite, mode: NameMode): string {
 export default function AnnouncementManager({
   orgId,
   nameMode,
+  timeZone,
 }: {
   orgId: string;
   nameMode: NameMode;
+  timeZone: string;
 }) {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [members, setMembers] = useState<MemberLite[]>([]);
@@ -76,7 +76,7 @@ export default function AnnouncementManager({
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [memberQuery, setMemberQuery] = useState("");
   const [timing, setTiming] = useState<"now" | "schedule">("now");
-  const [scheduleAt, setScheduleAt] = useState("");
+  const [scheduleAt, setScheduleAt] = useState<string | null>(null);
   const [asSystem, setAsSystem] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,7 +134,7 @@ export default function AnnouncementManager({
     setPicked(new Set());
     setMemberQuery("");
     setTiming("now");
-    setScheduleAt(toLocalInput(null));
+    setScheduleAt(defaultScheduleAt());
     setAsSystem(false);
     setError(null);
     setEditingId(null);
@@ -153,7 +153,7 @@ export default function AnnouncementManager({
     setPicked(new Set(a.audience_user_ids || []));
     setMemberQuery("");
     setTiming(a.scheduled_for ? "schedule" : "now");
-    setScheduleAt(toLocalInput(a.scheduled_for));
+    setScheduleAt(a.scheduled_for ?? defaultScheduleAt());
     setAsSystem(a.send_as_system);
     setError(null);
     setEditingId(a.id);
@@ -196,7 +196,7 @@ export default function AnnouncementManager({
       audience_type: audience,
       audience_user_ids: audience === "custom" ? [...picked] : undefined,
       event_id: audience === "event" ? eventId : null,
-      scheduled_for: timing === "schedule" ? new Date(scheduleAt).toISOString() : null,
+      scheduled_for: timing === "schedule" ? scheduleAt : null,
       send_now: timing === "now",
       send_as_system: asSystem,
     };
@@ -262,16 +262,15 @@ export default function AnnouncementManager({
   }
 
   function whenLabel(a: Announcement): string {
+    const fmt = { month: "short" as const, day: "numeric" as const, hour: "numeric" as const, minute: "2-digit" as const };
     if (a.status === "sent" && a.sent_at) {
-      const d = new Date(a.sent_at);
-      const rc = a.recipient_count != null ? ` · ${a.recipient_count} notified` : "";
-      return `Sent ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${rc}`;
+      const rc = a.recipient_count != null ? `, ${a.recipient_count} notified` : "";
+      return `Sent ${formatInstant(a.sent_at, timeZone, fmt)}${rc}`;
     }
     if (a.status === "cancelled") return "Cancelled";
     if (a.scheduled_for) {
-      const d = new Date(a.scheduled_for);
-      const past = d.getTime() <= now;
-      return `${past ? "Sending" : "Scheduled"} ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+      const past = new Date(a.scheduled_for).getTime() <= now;
+      return `${past ? "Sending" : "Scheduled"} ${formatInstant(a.scheduled_for, timeZone, fmt)}`;
     }
     return "Draft";
   }
@@ -408,13 +407,9 @@ export default function AnnouncementManager({
               ))}
             </div>
             {timing === "schedule" && (
-              <input
-                className={styles.input}
-                type="datetime-local"
-                value={scheduleAt}
-                onChange={(e) => setScheduleAt(e.target.value)}
-                style={{ marginTop: 10 }}
-              />
+              <div style={{ marginTop: 10 }}>
+                <ZonedDateTimeField label="Send at" value={scheduleAt} timeZone={timeZone} onChange={setScheduleAt} />
+              </div>
             )}
             <p className={styles.swatchHint}>
               {timing === "now"

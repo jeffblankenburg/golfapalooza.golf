@@ -8,6 +8,7 @@ import SquaresGrid from "@/components/v2/contests/SquaresGrid";
 import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import type { SquaresGridState, Cell } from "@/lib/v2/contests/squares";
 import { venmoLink, paypalLink } from "@/lib/v2/payments";
+import { formatInstant, isoToZonedInput, zonedInputToIso } from "@/lib/v2/timezone";
 import SquaresGamePayoutModal from "./SquaresGamePayoutModal";
 
 export interface ManageGame {
@@ -52,17 +53,10 @@ export interface GameBox {
   home: { abbrev: string; pts: (number | null)[]; cum: (number | null)[]; total: number | null };
 }
 
-const isoToLocal = (iso: string | null): string => {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-};
-const localToISO = (s: string): string | null => (s ? new Date(s).toISOString() : null);
-const whenLabel = (iso: string | null): string =>
-  iso ? new Date(iso).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
-const shortDate = (iso: string | null): string =>
-  iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
+const whenLabel = (iso: string | null, timeZone: string): string =>
+  formatInstant(iso, timeZone, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+const shortDate = (iso: string | null, timeZone: string): string =>
+  formatInstant(iso, timeZone, { month: "short", day: "numeric" });
 
 const money = (c: number) => `$${c / 100 % 1 === 0 ? (c / 100).toFixed(0) : (c / 100).toFixed(2)}`;
 
@@ -81,10 +75,10 @@ const PHASE_LABEL: Record<string, string> = {
 };
 
 /** A game's reveal/scoring status for the accordion header chip. */
-function gameStatus(g: ManageGame): { label: string; tone: string } {
+function gameStatus(g: ManageGame, timeZone: string): { label: string; tone: string } {
   if (g.final) return { label: "Final", tone: "final" };
   if (g.locked) return { label: "Numbers revealed", tone: "revealed" };
-  if (g.revealAt) return { label: `Reveals ${shortDate(g.revealAt)}`, tone: "scheduled" };
+  if (g.revealAt) return { label: `Reveals ${shortDate(g.revealAt, timeZone)}`, tone: "scheduled" };
   return { label: "Numbers hidden", tone: "hidden" };
 }
 
@@ -103,10 +97,12 @@ export default function SquaresManage({
   winnersByGame,
   scoresByGame,
   scoredGameIds,
+  timeZone,
 }: {
   // Scope-agnostic: `base` is this contest's API root; the hrefs are the admin
   // links (back / payouts / player view / edit) for whichever scope mounted it.
   base: string;
+  timeZone: string; // event/org zone for kickoff + reveal labels
   backHref: string;
   payoutsHref: string;
   playerHref: string;
@@ -139,6 +135,9 @@ export default function SquaresManage({
 
   const allConcluded = games.length > 0 && games.every((x) => x.final);
   const full = claimed >= 100;
+  // The board can be unlocked while no game's numbers are drawn yet (locking only
+  // froze ownership + seeded reveal times — nothing irreversible has happened).
+  const canUnlock = phase === "locked" && !games.some((g) => g.locked);
 
   const active = games.filter((g) => !g.final);
   const completed = games.filter((g) => g.final);
@@ -273,7 +272,7 @@ export default function SquaresManage({
 
   function renderGame(g: ManageGame) {
     const isOpen = openGames.has(g.id);
-    const st = gameStatus(g);
+    const st = gameStatus(g, timeZone);
     const grid: SquaresGridState = { owners, rowDigits: g.rowDigits, colDigits: g.colDigits };
     const winners = winnersByGame[g.id] ?? [];
     const payouts = payoutsByGame[g.id] ?? [];
@@ -284,7 +283,7 @@ export default function SquaresManage({
           <button type="button" className={styles.gameHeadMain} onClick={() => toggleGame(g.id)} aria-expanded={isOpen}>
             <span className={styles.gameHeadText}>
               <span className={styles.gameName}>{g.label}</span>
-              <span className={styles.gameWhen}>{g.startTime ? whenLabel(g.startTime) : "Kickoff TBD"}</span>
+              <span className={styles.gameWhen}>{g.startTime ? whenLabel(g.startTime, timeZone) : "Kickoff TBD"}</span>
             </span>
             <span className={styles.gameStatus} data-tone={st.tone}>{st.label}</span>
             <svg className={styles.chev} data-open={isOpen || undefined} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
@@ -313,8 +312,8 @@ export default function SquaresManage({
                   <input
                     className={styles.revInput}
                     type="datetime-local"
-                    value={isoToLocal(g.revealAt)}
-                    onChange={(e) => doAction("schedule_reveal", { gameId: g.id, revealAt: localToISO(e.target.value) })}
+                    value={isoToZonedInput(g.revealAt, timeZone)}
+                    onChange={(e) => doAction("schedule_reveal", { gameId: g.id, revealAt: zonedInputToIso(e.target.value, timeZone) })}
                   />
                   <button type="button" className={styles.revNow} disabled={!!busy} onClick={() => setRevealTarget(g)}>Reveal now</button>
                 </span>
@@ -366,7 +365,7 @@ export default function SquaresManage({
       {/* Lifecycle controls — no pool-level action once the board is locked
           (numbers reveal per game, from each accordion), so the card is hidden
           then unless there's an error to show. */}
-      {(phase !== "locked" || err) && (
+      {(phase !== "locked" || err || canUnlock) && (
       <div className={styles.controls}>
         {phase === "setup" && <button type="button" className={styles.action} disabled={!!busy} onClick={() => doAction("open_primary")}>Open primary draft</button>}
         {phase === "primary" && (
@@ -380,7 +379,7 @@ export default function SquaresManage({
           <>
             {confirmDraw ? (
               <div className={styles.confirm}>
-                <span className={styles.confirmText}>This locks the board (ownership frozen). Numbers then reveal <strong>per game</strong> — a week before each kickoff by default, or whenever you hit the reveal button. Lock it in?</span>
+                <span className={styles.confirmText}>This locks the board (ownership frozen). Each game&apos;s numbers then reveal at its scheduled time, or whenever you hit reveal. Lock it in?</span>
                 <div className={styles.confirmBtns}>
                   <button type="button" className={styles.action} disabled={!!busy} onClick={() => doAction("lock_board")}>Yes, lock the board</button>
                   <button type="button" className={styles.actionGhost} onClick={() => setConfirmDraw(false)}>Cancel</button>
@@ -393,6 +392,12 @@ export default function SquaresManage({
               </>
             )}
             {!full && !confirmDraw && <p className={styles.warn}>Only {claimed}/100 squares are claimed — unclaimed winning squares pay no one.</p>}
+          </>
+        )}
+        {canUnlock && (
+          <>
+            <button type="button" className={styles.actionGhost} disabled={!!busy} onClick={() => doAction("unlock_board")}>Unlock board</button>
+            <span className={styles.warn}>No numbers are drawn yet, so you can reopen the draft.</span>
           </>
         )}
         {phase === "final" && (

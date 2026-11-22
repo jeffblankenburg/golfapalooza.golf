@@ -82,16 +82,38 @@
   color: var(--ink-soft, #59635b);
 }
 /* Contest-type badge (glyph + label) — mirrors the home-page SquaresTag. */
+.typeRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  align-self: flex-start;
+  margin-bottom: 2px;
+}
 .typeTag {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  align-self: flex-start;
-  margin-bottom: 2px;
   font-size: 0.68rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  color: var(--ink-soft, #59635b);
+}
+.visTag {
+  font-size: 0.58rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  line-height: 1.4;
+}
+.visTag[data-vis="public"] {
+  background: color-mix(in srgb, var(--brand, #0a5c36) 14%, var(--card, #fff));
+  color: var(--brand, #0a5c36);
+}
+.visTag[data-vis="hidden"] {
+  background: color-mix(in srgb, var(--ink, #17211c) 8%, var(--card, #fff));
   color: var(--ink-soft, #59635b);
 }
 .typeTag svg {

@@ -399,7 +399,15 @@
 }
 .fadeStreak[data-side="a"] { left: 0; right: 50%; }
 .fadeStreak[data-side="b"] { left: 50%; right: 0; }
+.halfLogoWrap { position: relative; display: grid; place-items: center; }
 .halfLogo { width: min(34vh, 380px); height: min(34vh, 380px); object-fit: contain; }
+/* Possession: a pulsing glow in the logo's EXACT shape (drop-shadow follows the
+   image alpha), extending beyond the logo. */
+.halfLogoWrap[data-poss] .halfLogo { animation: possessionGlow 1.6s ease-in-out infinite; }
+@keyframes possessionGlow {
+  0%, 100% { filter: drop-shadow(0 0 6px var(--half-color)) drop-shadow(0 0 14px var(--half-color)); }
+  50% { filter: drop-shadow(0 0 14px var(--half-color)) drop-shadow(0 0 30px var(--half-color)) drop-shadow(0 0 48px var(--half-color)); }
+}
 .halfName { font-size: clamp(1.9rem, 5vw, 4.2rem); font-weight: 800; color: #fff; line-height: 1.05; }
 
 /* One centered scoreboard hanging from the top — away score · clock · home score. */
@@ -415,6 +423,24 @@
 .sbScore[data-team="a"] { border-bottom-color: var(--team-a, #1d4ed8); }
 .sbScore[data-team="b"] { border-bottom-color: var(--team-b, #b91c1c); }
 .sbClock { font-size: clamp(1.1rem, 2.6vw, 2.3rem); font-weight: 700; color: #fff; opacity: 0.78; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
+
+/* Timeout indicator — a tab flush against the scoreboard's bottom edge, biased to
+   the team that called it, revealed top-down (clip-path) so it looks like it slides
+   out from under the scoreboard. Inset past the scoreboard's rounded corner so the
+   tab's top meets the flat part of the edge (no corner notch). */
+.timeoutTag {
+  position: absolute; top: calc(100% - 2px);
+  padding: clamp(4px, 0.8vh, 8px) clamp(14px, 1.8vw, 24px) clamp(6px, 1vh, 10px);
+  border-radius: 0 0 12px 12px;
+  background: var(--to-color, #334155); color: #fff;
+  font-weight: 800; font-size: clamp(0.68rem, 1.5vw, 1.1rem); letter-spacing: 0.14em; text-transform: uppercase;
+  white-space: nowrap; box-shadow: 0 10px 16px rgba(0, 0, 0, 0.35);
+  animation: timeoutReveal 0.42s cubic-bezier(0.18, 0.85, 0.2, 1) both;
+}
+.timeoutTag[data-side="a"] { left: clamp(24px, 4vw, 48px); }
+.timeoutTag[data-side="b"] { right: clamp(24px, 4vw, 48px); }
+.timeoutTag[data-side="official"] { left: 50%; transform: translateX(-50%); }
+@keyframes timeoutReveal { from { clip-path: inset(0 0 100% 0); opacity: 0; } to { clip-path: inset(0 0 0 0); opacity: 1; } }
 /* Absolutely positioned at the bottom so the logo + name/score stay put. */
 .halfStreak {
   position: absolute; bottom: clamp(28px, 7vh, 84px); left: 0; right: 0;

@@ -6,6 +6,7 @@ import styles from "@/app/new/new.module.css";
 import { subscribeToPickem } from "@/lib/v2/realtime/pickem-channel";
 import { pickIsCorrect, gameIsScored, pickemTeamLabel, type PickemGame } from "@/lib/v2/contests/pickem";
 import { placeLabel } from "@/lib/v2/contests/payouts";
+import { formatInstant } from "@/lib/v2/timezone";
 /* eslint-disable @next/next/no-img-element */
 
 export interface LeaderEntry {
@@ -40,12 +41,13 @@ function spreadFor(g: PickemGame, side: "away" | "home"): string {
 
 export default function PickemContent({
   contestId, pickUrl, games, initialPicks, leaderboard, lockedGameIds, allLocked, meId, totalGames,
-  potCents = 0, placePayouts = [],
+  timeZone, potCents = 0, placePayouts = [],
 }: {
   // Scope-agnostic: the mount supplies the endpoint to POST a pick to (event-
   // scoped or group-scoped). The pick UI is identical in either case.
   contestId: string;
   pickUrl: string;
+  timeZone: string;        // event/org zone for displaying game times
   games: PickemGame[];
   initialPicks: Record<string, MyPick>;
   leaderboard: LeaderEntry[];
@@ -154,7 +156,7 @@ export default function PickemContent({
             {games.map((g) => (
               <div key={g.id} className={styles.pickCard}>
                 <div className={styles.pickCardMeta}>
-                  {g.game_time ? new Date(g.game_time).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" }) : ""}
+                  {g.game_time ? formatInstant(g.game_time, timeZone, { weekday: "short", hour: "numeric", minute: "2-digit" }) : ""}
                   {g.tv_channel ? `, ${g.tv_channel}` : ""}
                   {g.is_tiebreaker ? "  ★ Tiebreaker" : ""}
                 </div>

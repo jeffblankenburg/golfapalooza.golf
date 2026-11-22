@@ -6,6 +6,7 @@ import rehypeRaw from "rehype-raw";
 import { v2ServerClient } from "@/lib/v2/supabase";
 import { getPlatformContext } from "@/lib/v2/context";
 import { pickName } from "@/lib/v2/profile";
+import { formatInstant } from "@/lib/v2/timezone";
 import { loadResolvedFeatures } from "@/lib/v2/features-server";
 import { isFeatureVisible } from "@/lib/v2/features";
 import ArticleViewPing from "../ArticleViewPing";
@@ -66,7 +67,7 @@ export default async function ArticlePage({
   const author = Array.isArray(a.author) ? a.author[0] ?? null : a.author;
   const authorName = author ? pickName(author, org.name_display) : null;
   const dateText = a.publish_at
-    ? new Date(a.publish_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    ? formatInstant(a.publish_at, org.timezone, { month: "long", day: "numeric", year: "numeric" })
     : null;
 
   return (

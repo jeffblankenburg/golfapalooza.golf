@@ -16,7 +16,6 @@ import { listGames } from "@/lib/v2/contests/pickem-server";
 import { loadAuction, loadAuctionPayouts } from "@/lib/v2/contests/auction-server";
 import AuctionManager from "./AuctionManager";
 import { listQuestions, loadPropsPayouts } from "@/lib/v2/contests/props-server";
-import { propsConfigOf } from "@/lib/v2/contests/props";
 import PropsAdmin from "./PropsAdmin";
 import { loadThreesState } from "@/lib/v2/contests/threes-server";
 import ThreesManager from "./ThreesManager";
@@ -60,6 +59,7 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
           initialSplits={(contest.payout_splits as PayoutSplit[] | null) ?? []}
           enrolledCount={enrolled ?? 0}
           initialGames={pickemGames as Game[]}
+          timeZone={org.timezone}
         />
         <ContestEntryPaid orgId={org.id} contestId={contestId} title="Who's paid their entry" emptyText="No one's entered yet." />
         <details style={{ marginTop: 20, border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
@@ -91,13 +91,11 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
     );
   }
 
-  // Props manage view — authoring + settlement + winnings, all on one page.
+  // Props manage view — question authoring + settlement + winnings (settings live on the card gear).
   if (contest.contest_type === "props") {
-    const cfg = propsConfigOf(contest.config as Record<string, unknown> | null);
-    const [questions, propsPayouts, { count: enrolled }] = await Promise.all([
+    const [questions, propsPayouts] = await Promise.all([
       listQuestions(supabase, contestId),
       loadPropsPayouts(supabase, contestId, org.name_display),
-      supabase.from("v2_contest_participants").select("id", { count: "exact", head: true }).eq("contest_id", contestId),
     ]);
     return (
       <PropsAdmin
@@ -106,13 +104,7 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
         apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`}
         backHref={`/new/${slug}/admin/contests`}
         initialName={contest.name as string}
-        initialStatus={contest.status as string}
-        initialLocksAt={cfg.locksAt}
-        initialNumericRule={cfg.numericRule}
-        initialEntryCents={cfg.entryCents}
-        initialSplits={(contest.payout_splits as PayoutSplit[] | null) ?? []}
         initialQuestions={questions}
-        participantCount={enrolled ?? 0}
         payouts={propsPayouts}
       />
     );
@@ -152,6 +144,7 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
         payoutsHref={`/new/${slug}/admin/contests/${contestId}/payouts`}
         playerHref={`/new/${slug}/contests/${contestId}`}
         nameMode={org.name_display}
+        timeZone={org.timezone}
       />
       <div className={styles.page} style={{ paddingTop: 0 }}>
         <SquaresGamesButton
@@ -159,6 +152,7 @@ export default async function SquaresDetailPage({ params }: { params: Promise<{ 
           collectionBase={`/api/v2/orgs/${org.id}/contests`}
           nameMode={org.name_display}
           currentUserId={ctx.userId}
+          timeZone={org.timezone}
         />
         <ContestEntryPaid orgId={org.id} contestId={contestId} title="Who's paid for their squares" emptyText="No squares claimed yet." />
         <details style={{ marginTop: 20, border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>

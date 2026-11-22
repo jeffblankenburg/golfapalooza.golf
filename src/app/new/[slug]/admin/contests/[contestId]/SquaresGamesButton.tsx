@@ -15,11 +15,13 @@ export default function SquaresGamesButton({
   collectionBase,
   nameMode,
   currentUserId,
+  timeZone,
 }: {
   row: SquaresContestRow;
   collectionBase: string;
   nameMode: NameMode;
   currentUserId: string;
+  timeZone: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -34,6 +36,7 @@ export default function SquaresGamesButton({
           collectionBase={collectionBase}
           nameMode={nameMode}
           currentUserId={currentUserId}
+          timeZone={timeZone}
           onClose={() => setOpen(false)}
           onSaved={() => setOpen(false)}
         />

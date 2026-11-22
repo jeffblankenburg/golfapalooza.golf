@@ -3,69 +3,49 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors, type DragEndEvent,
+} from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import styles from "@/app/new/new.module.css";
+import Modal from "@/app/new/_components/Modal";
+import ConfirmModal from "@/app/new/_components/ConfirmModal";
 import { ContestTypeIcon } from "@/app/new/_components/contest-card/ContestCard";
-import PayoutSplitsEditor from "../../events/[eventId]/contests/[contestId]/PayoutSplitsEditor";
-import type { PayoutSplit } from "@/lib/v2/contests/payouts";
 import { subscribeToProps } from "@/lib/v2/realtime/props-channel";
-import { PROP_TYPES, NUMERIC_RULES, correctChoiceFor, questionSettled, type PropQuestion, type PropType, type NumericRule } from "@/lib/v2/contests/props";
+import { PROP_TYPES, NUMERIC_RULES, correctChoiceFor, questionSettled, type PropQuestion, type PropChoice, type PropType, type NumericRule } from "@/lib/v2/contests/props";
 import PropsPayouts from "./PropsPayouts";
 import type { PropsPayouts as PropsPayoutsData } from "@/lib/v2/contests/props-server";
 /* eslint-disable @next/next/no-img-element */
 
-const money = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { maximumFractionDigits: cents % 100 === 0 ? 0 : 2 })}`;
 const LABEL = { display: "block", fontSize: "0.8125rem", fontWeight: 600, marginBottom: 4 } as const;
 
-function isoToLocal(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-function localToISO(local: string): string | null {
-  if (!local) return null;
-  const d = new Date(local);
-  return isNaN(d.getTime()) ? null : d.toISOString();
-}
-
-type Tab = "setup" | "questions" | "results";
-type Act = (method: "POST" | "PATCH" | "DELETE", body?: Record<string, unknown>, qs?: string) => Promise<boolean>;
+type Tab = "questions" | "results";
+type ActResult = { ok: boolean; error?: string };
+type Act = (method: "POST" | "PATCH" | "DELETE", body?: Record<string, unknown>, qs?: string) => Promise<ActResult>;
 
 /**
- * Props admin — three focused views behind a segmented control so no single screen gets long:
- *   Setup     — name, status, lock, numeric rule, buy-in, payouts.
+ * Props admin detail — two focused views behind a segmented control:
  *   Questions — authoring: add / edit / reorder / delete, each with an optional image/GIF.
  *   Results   — the easy "assign answers + update scores" surface: tap the correct answer per
  *               question (or type the number), void anything, then settle winnings. Points +
  *               the leaderboard recompute automatically as answers land.
- * Scope-agnostic (keyed by orgId + contestId), so the same component serves the group and
- * event lanes.
+ * Contest-level settings (name, status, lock, scoring, buy-in, payouts) live in the gear
+ * on the contest CARD (PropsSettings), not here. Scope-agnostic (keyed by orgId + contestId),
+ * so the same component serves the group and event lanes.
  */
 export default function PropsAdmin({
-  slug, contestId, apiBase, backHref,
-  initialName, initialStatus, initialLocksAt, initialNumericRule, initialEntryCents, initialSplits,
-  initialQuestions, participantCount, payouts,
+  slug, contestId, apiBase, backHref, initialName, initialQuestions, payouts,
 }: {
   slug: string; contestId: string; apiBase: string; backHref: string;
-  initialName: string; initialStatus: string; initialLocksAt: string | null; initialNumericRule: NumericRule;
-  initialEntryCents: number; initialSplits: PayoutSplit[];
-  initialQuestions: PropQuestion[]; participantCount: number; payouts: PropsPayoutsData | null;
+  initialName: string; initialQuestions: PropQuestion[]; payouts: PropsPayoutsData | null;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>(initialQuestions.length === 0 ? "questions" : "setup");
+  const [tab, setTab] = useState<Tab>("questions");
   const [questions, setQuestions] = useState<PropQuestion[]>(initialQuestions);
-  const [name, setName] = useState(initialName);
-  const [status, setStatus] = useState(initialStatus);
-  const [locksLocal, setLocksLocal] = useState(isoToLocal(initialLocksAt));
-  const [rule, setRule] = useState<NumericRule>(initialNumericRule);
-  const [fee, setFee] = useState(initialEntryCents ? String(initialEntryCents / 100) : "");
-  const [splits, setSplits] = useState<PayoutSplit[]>(initialSplits);
-  const [savedAt, setSavedAt] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const feeCents = Math.round((Number(fee) || 0) * 100);
   const uploadUrl = `${apiBase}/props/upload`;
   const live = questions.filter((q) => !q.voided);
   const settledCount = live.filter(questionSettled).length;
@@ -80,34 +60,32 @@ export default function PropsAdmin({
     return () => { unsub(); };
   }, [contestId, router, reload]);
 
-  async function saveSettings(patch: Record<string, unknown>) {
-    setErr(null);
-    const res = await fetch(apiBase, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
-    if (!res.ok) { setErr((await res.json().catch(() => ({}))).error || "Could not save"); return; }
-    setSavedAt(new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }));
-    router.refresh();
-  }
-
   const act: Act = async (method, body, qs) => {
-    if (busy) return false;
+    if (busy) return { ok: false };
     setBusy(true); setErr(null);
     try {
       const res = await fetch(`${apiBase}/props${qs ?? ""}`, { method, headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
-      if (!res.ok) { setErr((await res.json().catch(() => ({}))).error || "Something went wrong."); setBusy(false); return false; }
-      await reload(); router.refresh(); setBusy(false); return true;
-    } catch { setErr("Something went wrong."); setBusy(false); return false; }
+      if (!res.ok) { const error = (await res.json().catch(() => ({}))).error || "Something went wrong."; setErr(error); setBusy(false); return { ok: false, error }; }
+      await reload(); router.refresh(); setBusy(false); return { ok: true };
+    } catch { setErr("Something went wrong."); setBusy(false); return { ok: false, error: "Something went wrong." }; }
   };
 
-  async function move(idx: number, dir: -1 | 1) {
-    const next = [...questions];
-    const j = idx + dir;
-    if (j < 0 || j >= next.length) return;
-    [next[idx], next[j]] = [next[j], next[idx]];
-    setQuestions(next);
-    await act("PATCH", { action: "reorder", orderedIds: next.map((q) => q.id) });
-  }
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+  );
 
-  const pot = feeCents * participantCount;
+  async function reorder(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const oldIdx = questions.findIndex((q) => q.id === active.id);
+    const newIdx = questions.findIndex((q) => q.id === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+    const before = questions;
+    const next = arrayMove(questions, oldIdx, newIdx);
+    setQuestions(next); // optimistic
+    if (!(await act("PATCH", { action: "reorder", orderedIds: next.map((q) => q.id) })).ok) setQuestions(before);
+  }
 
   return (
     <div className={styles.page} style={{ paddingTop: 16 }}>
@@ -117,72 +95,29 @@ export default function PropsAdmin({
           <ContestTypeIcon kind="props" size={16} /> Props
         </span>
       </div>
-      <div className={styles.titleRow}><h1 className={styles.title}>{name || "Props"}</h1></div>
+      <div className={styles.titleRow}><h1 className={styles.title}>{initialName || "Props"}</h1></div>
 
       <div className={styles.segmented} style={{ marginTop: 12 }}>
-        <button type="button" className={styles.segmentBtn} data-on={tab === "setup" || undefined} onClick={() => setTab("setup")}>Setup</button>
         <button type="button" className={styles.segmentBtn} data-on={tab === "questions" || undefined} onClick={() => setTab("questions")}>Questions{questions.length ? ` (${questions.length})` : ""}</button>
         <button type="button" className={styles.segmentBtn} data-on={tab === "results" || undefined} onClick={() => setTab("results")}>Results{live.length ? ` (${settledCount}/${live.length})` : ""}</button>
       </div>
 
       {err && <p className={styles.err} style={{ marginTop: 12 }}>{err}</p>}
 
-      {/* ---- Setup ---- */}
-      {tab === "setup" && (
-        <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-          <label><span style={LABEL}>Name</span>
-            <input className={styles.input} style={{ width: "100%" }} value={name} maxLength={80}
-              onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name !== initialName && void saveSettings({ name: name.trim() })} />
-          </label>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <label style={{ flex: "1 1 160px" }}><span style={LABEL}>Status</span>
-              <select className={styles.selectInput} value={status} onChange={(e) => { setStatus(e.target.value); void saveSettings({ status: e.target.value }); }}>
-                <option value="draft">Draft (hidden from members)</option>
-                <option value="active">Open (members can answer)</option>
-                <option value="final">Final (closed)</option>
-              </select>
-            </label>
-            <label style={{ flex: "1 1 200px" }}><span style={LABEL}>Answers lock at</span>
-              <input className={styles.input} style={{ width: "100%" }} type="datetime-local" value={locksLocal}
-                onChange={(e) => { setLocksLocal(e.target.value); void saveSettings({ locks_at: localToISO(e.target.value) }); }} />
-            </label>
-          </div>
-          <label><span style={LABEL}>Default numeric scoring</span>
-            <select className={styles.selectInput} value={rule} onChange={(e) => { setRule(e.target.value as NumericRule); void saveSettings({ numeric_rule: e.target.value }); }}>
-              {NUMERIC_RULES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-            </select>
-            <p className={styles.roundFormHint} style={{ marginTop: 4 }}>{NUMERIC_RULES.find((r) => r.value === rule)?.hint}</p>
-          </label>
-          <label><span style={LABEL}>Buy-in <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(per player, optional)</span></span>
-            <span style={{ position: "relative", display: "block", maxWidth: 160 }}>
-              <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--ink-soft)", pointerEvents: "none" }}>$</span>
-              <input className={styles.input} style={{ width: "100%", paddingLeft: 26 }} inputMode="decimal" value={fee} placeholder="0"
-                onChange={(e) => setFee(e.target.value.replace(/[^0-9.]/g, ""))} onBlur={() => void saveSettings({ entry_cents: feeCents })} />
-            </span>
-          </label>
-          <div>
-            <span style={LABEL}>Payouts <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(share of the pot by place)</span></span>
-            <PayoutSplitsEditor value={splits} onSave={(s) => { setSplits(s); void saveSettings({ payout_splits: s }); }} />
-            {feeCents > 0 && (
-              <p className={styles.roundFormHint} style={{ marginTop: 6 }}>
-                Pot: {money(feeCents)} × {participantCount} in = <strong style={{ color: "var(--brand)" }}>{money(pot)}</strong>
-              </p>
-            )}
-          </div>
-          {savedAt && <p className={styles.roundFormHint} style={{ margin: 0 }}>Saved {savedAt}.</p>}
-        </div>
-      )}
-
       {/* ---- Questions (authoring) ---- */}
       {tab === "questions" && (
         <div style={{ marginTop: 14 }}>
           <p className={styles.roundFormHint} style={{ marginTop: 0 }}>Write the props here. Enter the correct answers on the Results tab after the event.</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
-            {questions.map((q, i) => (
-              <QuestionRow key={q.id} q={q} idx={i} count={questions.length} busy={busy} uploadUrl={uploadUrl} onMove={move} onAct={act} />
-            ))}
-            {questions.length === 0 && <p className={styles.roundFormHint} style={{ margin: 0 }}>No questions yet. Add the first one below.</p>}
-          </div>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => void reorder(e)}>
+            <SortableContext items={questions.map((q) => q.id)} strategy={verticalListSortingStrategy}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+                {questions.map((q, i) => (
+                  <QuestionRow key={q.id} q={q} idx={i} busy={busy} uploadUrl={uploadUrl} onAct={act} />
+                ))}
+                {questions.length === 0 && <p className={styles.roundFormHint} style={{ margin: 0 }}>No questions yet. Add the first one below.</p>}
+              </div>
+            </SortableContext>
+          </DndContext>
           <AddQuestion busy={busy} uploadUrl={uploadUrl} onAdd={(body) => act("POST", body)} />
         </div>
       )}
@@ -215,50 +150,213 @@ export default function PropsAdmin({
   );
 }
 
-/* ---- one authored question (edit + reorder + delete + media) — no settlement here ---- */
-function QuestionRow({
-  q, idx, count, busy, uploadUrl, onMove, onAct,
-}: {
-  q: PropQuestion; idx: number; count: number; busy: boolean; uploadUrl: string;
-  onMove: (idx: number, dir: -1 | 1) => void; onAct: Act;
+/* Question field: a textarea that grows to fit its content so a long, wrapping question is fully visible. */
+function QuestionTextarea({ value, onChange, onBlur, autoFocus, placeholder }: {
+  value: string; onChange: (v: string) => void; onBlur?: () => void; autoFocus?: boolean; placeholder?: string;
 }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const fit = (el: HTMLTextAreaElement | null) => { if (el) { el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`; } };
+  useEffect(() => { fit(ref.current); }, [value]);
+  return (
+    <textarea ref={ref} className={styles.textarea} style={{ resize: "none", overflow: "hidden" }} rows={2}
+      value={value} autoFocus={autoFocus} placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)} onBlur={onBlur} />
+  );
+}
+
+/* A choice while editing: the server choice plus a stable client key (new rows have no id yet, so key drives React + drag). */
+type EditChoice = PropChoice & { key: string };
+const seedChoices = (cs: PropChoice[]): EditChoice[] => cs.map((c, i) => ({ ...c, key: c.id || `seed-${i}` }));
+
+/* ---- one draggable choice inside the edit modal ---- */
+function ChoiceRow({ choice, index, canRemove, busy, onLabel, onBlur, onRemove }: {
+  choice: EditChoice; index: number; canRemove: boolean; busy: boolean;
+  onLabel: (v: string) => void; onBlur: () => void; onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: choice.key });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1 };
+  return (
+    <div ref={setNodeRef} style={{ ...style, display: "flex", gap: 6, alignItems: "center" }}>
+      <button type="button" className={styles.finGrab} aria-label="Drag to reorder" {...listeners} {...attributes}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+          <circle cx="5" cy="3" r="1.4" /><circle cx="11" cy="3" r="1.4" />
+          <circle cx="5" cy="8" r="1.4" /><circle cx="11" cy="8" r="1.4" />
+          <circle cx="5" cy="13" r="1.4" /><circle cx="11" cy="13" r="1.4" />
+        </svg>
+      </button>
+      <input className={styles.input} style={{ flex: 1 }} value={choice.label} placeholder={`Choice ${index + 1}`}
+        onChange={(e) => onLabel(e.target.value)} onBlur={onBlur} />
+      {canRemove && <button type="button" aria-label="Remove choice" className={styles.linkAction} style={{ background: "none", border: "none", cursor: "pointer" }} disabled={busy} onClick={onRemove}>✕</button>}
+    </div>
+  );
+}
+
+/* ---- one authored question: a compact row (drag handle + number + text); everything else lives in the edit modal ---- */
+function QuestionRow({
+  q, idx, busy, uploadUrl, onAct,
+}: {
+  q: PropQuestion; idx: number; busy: boolean; uploadUrl: string; onAct: Act;
+}) {
+  const [editOpen, setEditOpen] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
   const [prompt, setPrompt] = useState(q.prompt);
   const [points, setPoints] = useState(String(q.points));
+  const [choices, setChoices] = useState<EditChoice[]>(() => seedChoices(q.choices));
+  const [line, setLine] = useState(q.line != null ? String(q.line) : "");
+  const [rowErr, setRowErr] = useState<string | null>(null);
+  const newKey = useRef(0);
   const typeLabel = PROP_TYPES.find((t) => t.value === q.qtype)?.label ?? q.qtype;
 
+  // Re-seed the local editors when the stored question changes externally (sync during render, not an effect).
+  const [prevQ, setPrevQ] = useState(q);
+  if (prevQ !== q) { setPrevQ(q); setChoices(seedChoices(q.choices)); setLine(q.line != null ? String(q.line) : ""); if (prompt === prevQ.prompt) setPrompt(q.prompt); if (points === String(prevQ.points)) setPoints(String(q.points)); }
+
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: q.id });
+  const sortStyle = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1 };
+
+  const choiceSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+  );
+
+  async function save(patch: Record<string, unknown>) {
+    const r = await onAct("PATCH", { questionId: q.id, ...patch });
+    setRowErr(r.ok ? null : (r.error ?? "Could not save."));
+  }
+  async function saveChoices(next: EditChoice[]): Promise<boolean> {
+    if (next.map((c) => c.label.trim()).filter(Boolean).length < 2) { setRowErr("Give at least two choices."); return false; }
+    setRowErr(null);
+    const r = await onAct("PATCH", { questionId: q.id, choices: next.map((c) => ({ id: c.id || undefined, label: c.label.trim() })) });
+    setRowErr(r.ok ? null : (r.error ?? "Could not save."));
+    return r.ok;
+  }
+  async function reorderChoices(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const oldIdx = choices.findIndex((c) => c.key === active.id);
+    const newIdx = choices.findIndex((c) => c.key === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+    const before = choices;
+    const next = arrayMove(choices, oldIdx, newIdx);
+    setChoices(next); // optimistic
+    if (!(await saveChoices(next))) setChoices(before);
+  }
+
   return (
-    <div style={{ border: "1px solid var(--line)", borderRadius: 12, padding: 12, background: "var(--card)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-        <span style={{ fontSize: "0.68rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.3, color: "var(--ink-soft)" }}>{typeLabel}</span>
-        {q.voided && <span className={styles.propVoid}>Voided</span>}
-        <span style={{ flex: 1 }} />
-        <button type="button" aria-label="Move up" disabled={busy || idx === 0} onClick={() => onMove(idx, -1)} className={styles.linkAction} style={{ background: "none", border: "none", cursor: "pointer", opacity: idx === 0 ? 0.3 : 1 }}>↑</button>
-        <button type="button" aria-label="Move down" disabled={busy || idx === count - 1} onClick={() => onMove(idx, 1)} className={styles.linkAction} style={{ background: "none", border: "none", cursor: "pointer", opacity: idx === count - 1 ? 0.3 : 1 }}>↓</button>
+    <>
+      {/* compact list row */}
+      <div ref={setNodeRef} style={{ ...sortStyle, display: "flex", alignItems: "center", gap: 8, border: "1px solid var(--line)", borderRadius: 12, padding: "8px 10px", background: "var(--card)" }}>
+        <button type="button" className={styles.finGrab} aria-label="Drag to reorder" {...listeners} {...attributes}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+            <circle cx="5" cy="3" r="1.4" /><circle cx="11" cy="3" r="1.4" />
+            <circle cx="5" cy="8" r="1.4" /><circle cx="11" cy="8" r="1.4" />
+            <circle cx="5" cy="13" r="1.4" /><circle cx="11" cy="13" r="1.4" />
+          </svg>
+        </button>
+        <span style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.78rem", fontWeight: 800, color: "var(--ink-soft)", background: "color-mix(in srgb, var(--ink) 6%, var(--card))" }}>{idx + 1}</span>
+        <button type="button" onClick={() => setEditOpen(true)} style={{ flex: 1, minWidth: 0, textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit", fontSize: "0.9rem", color: "var(--ink)" }}>
+          {q.prompt || <span style={{ color: "var(--ink-soft)", fontStyle: "italic" }}>Untitled question</span>}
+          {q.voided && <span className={styles.propVoid} style={{ marginLeft: 8, verticalAlign: "middle" }}>Voided</span>}
+        </button>
       </div>
 
-      <input className={styles.input} style={{ width: "100%" }} value={prompt} onChange={(e) => setPrompt(e.target.value)}
-        onBlur={() => prompt.trim() && prompt !== q.prompt && void onAct("PATCH", { questionId: q.id, prompt: prompt.trim() })} />
+      {/* edit modal — type / prompt / media / points, plus delete */}
+      <Modal open={editOpen} title={`Question ${idx + 1}`} onClose={() => setEditOpen(false)}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: "0.68rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.3, color: "var(--ink-soft)" }}>{typeLabel}</span>
+            {q.voided && <span className={styles.propVoid}>Voided</span>}
+          </div>
 
-      <div style={{ marginTop: 8 }}>
-        <QuestionMediaPicker value={q.imageUrl} uploadUrl={uploadUrl} disabled={busy}
-          onChange={(url) => void onAct("PATCH", { questionId: q.id, imageUrl: url })} />
-      </div>
+          <label><span style={LABEL}>Question</span>
+            <QuestionTextarea value={prompt} onChange={setPrompt}
+              onBlur={() => prompt.trim() && prompt !== q.prompt && void save({ prompt: prompt.trim() })} />
+          </label>
 
-      <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginTop: 8 }}>
-        <label style={{ flex: "0 0 90px" }}><span style={LABEL}>Points</span>
-          <input className={styles.input} style={{ width: "100%" }} inputMode="numeric" value={points}
-            onChange={(e) => setPoints(e.target.value.replace(/\D/g, ""))}
-            onBlur={() => { const n = Math.max(1, parseInt(points, 10) || 1); if (n !== q.points) void onAct("PATCH", { questionId: q.id, points: n }); setPoints(String(n)); }} />
-        </label>
-        {q.qtype === "over_under" && <span style={{ fontSize: "0.82rem", color: "var(--ink-soft)" }}>Line: <strong>{q.line}</strong></span>}
-        {q.qtype === "multiple_choice" && <span style={{ fontSize: "0.82rem", color: "var(--ink-soft)" }}>{q.choices.map((c) => c.label).join(", ")}</span>}
-      </div>
+          {q.qtype === "multiple_choice" && (
+            <div>
+              <span style={LABEL}>Choices</span>
+              <DndContext sensors={choiceSensors} collisionDetection={closestCenter} onDragEnd={(e) => void reorderChoices(e)}>
+                <SortableContext items={choices.map((c) => c.key)} strategy={verticalListSortingStrategy}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {choices.map((c, i) => (
+                      <ChoiceRow key={c.key} choice={c} index={i} canRemove={choices.length > 2} busy={busy}
+                        onLabel={(v) => setChoices((cs) => cs.map((x, j) => (j === i ? { ...x, label: v } : x)))}
+                        onBlur={() => void saveChoices(choices)}
+                        onRemove={() => { const next = choices.filter((_, j) => j !== i); setChoices(next); void saveChoices(next); }} />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+              <button type="button" className={styles.linkAction} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.8rem", marginTop: 6 }} onClick={() => setChoices((cs) => [...cs, { id: "", label: "", key: `new-${newKey.current++}` }])}>+ Add choice</button>
+            </div>
+          )}
+          {q.qtype === "over_under" && (
+            <label><span style={LABEL}>Over / under line</span>
+              <input className={styles.input} style={{ width: 140 }} inputMode="decimal" value={line} placeholder="e.g. 48.5"
+                onChange={(e) => setLine(e.target.value.replace(/[^0-9.]/g, ""))}
+                onBlur={() => { if (line === "") { setRowErr("Set the over/under line."); return; } if (Number(line) !== q.line) void save({ line: Number(line) }); }} />
+            </label>
+          )}
+          {q.qtype === "numeric" && (
+            <>
+              <label><span style={LABEL}>Answer format</span>
+                <select className={styles.selectInput} value={q.format ?? "number"} onChange={(e) => void save({ format: e.target.value })}>
+                  <option value="number">Plain number</option>
+                  <option value="duration">Duration (mm:ss, entered as seconds)</option>
+                </select>
+              </label>
+              <label><span style={LABEL}>Scoring override <span style={{ fontWeight: 400, color: "var(--ink-soft)" }}>(optional)</span></span>
+                <select className={styles.selectInput} value={q.numericRule ?? ""} onChange={(e) => void save({ numericRule: e.target.value || null })}>
+                  <option value="">Use the set default</option>
+                  {NUMERIC_RULES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+              </label>
+            </>
+          )}
+          {q.qtype === "yes_no" && <p className={styles.roundFormHint} style={{ margin: 0 }}>Answers are fixed to Yes / No.</p>}
 
-      <div style={{ marginTop: 10 }}>
-        <button type="button" className={styles.linkAction} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "0.8rem", color: "var(--err, #c0392b)" }} disabled={busy}
-          onClick={() => void onAct("DELETE", undefined, `?questionId=${q.id}`)}>Delete</button>
-      </div>
-    </div>
+          <QuestionMediaPicker value={q.imageUrl} uploadUrl={uploadUrl} disabled={busy}
+            onChange={(url) => void save({ imageUrl: url })} />
+
+          <label style={{ maxWidth: 120 }}><span style={LABEL}>Points</span>
+            <input className={styles.input} style={{ width: "100%" }} inputMode="numeric" value={points}
+              onChange={(e) => setPoints(e.target.value.replace(/\D/g, ""))}
+              onBlur={() => { const n = Math.max(1, parseInt(points, 10) || 1); if (n !== q.points) void save({ points: n }); setPoints(String(n)); }} />
+          </label>
+
+          {rowErr && <p className={styles.err} style={{ margin: 0 }}>{rowErr}</p>}
+
+          <div style={{ marginTop: 2, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+            <button type="button" className={styles.deleteBtn} disabled={busy} onClick={() => setConfirmDel(true)}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+              <TrashIcon /> Delete question
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <ConfirmModal
+        open={confirmDel}
+        title="Delete question?"
+        message={q.prompt ? `Delete "${q.prompt}"? This can't be undone.` : "Delete this question? This can't be undone."}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => { setConfirmDel(false); setEditOpen(false); void onAct("DELETE", undefined, `?questionId=${q.id}`); }}
+        onCancel={() => setConfirmDel(false)}
+      />
+    </>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
   );
 }
 
@@ -330,7 +428,7 @@ function ResultRow({ q, busy, onAct }: { q: PropQuestion; busy: boolean; onAct: 
 }
 
 /* ---- add a question ---- */
-function AddQuestion({ busy, uploadUrl, onAdd }: { busy: boolean; uploadUrl: string; onAdd: (body: Record<string, unknown>) => Promise<boolean> }) {
+function AddQuestion({ busy, uploadUrl, onAdd }: { busy: boolean; uploadUrl: string; onAdd: (body: Record<string, unknown>) => Promise<ActResult> }) {
   const [open, setOpen] = useState(false);
   const [qtype, setQtype] = useState<PropType>("multiple_choice");
   const [prompt, setPrompt] = useState("");
@@ -343,6 +441,8 @@ function AddQuestion({ busy, uploadUrl, onAdd }: { busy: boolean; uploadUrl: str
 
   function reset() { setPrompt(""); setChoices(["", ""]); setLine(""); setPoints("1"); setFormat("number"); setRule(""); setQtype("multiple_choice"); setImageUrl(null); }
 
+  function close() { reset(); setOpen(false); }
+
   async function submit() {
     const body: Record<string, unknown> = {
       prompt: prompt.trim(), qtype, points: Math.max(1, parseInt(points, 10) || 1),
@@ -351,20 +451,21 @@ function AddQuestion({ busy, uploadUrl, onAdd }: { busy: boolean; uploadUrl: str
     if (qtype === "multiple_choice") body.choices = choices.map((c) => c.trim()).filter(Boolean);
     if (qtype === "over_under") body.line = Number(line);
     if (qtype === "numeric") body.format = format;
-    if (await onAdd(body)) { reset(); setOpen(false); }
+    if ((await onAdd(body)).ok) close();
   }
 
-  if (!open) return <button type="button" className={styles.createBtnGhost} style={{ marginTop: 12 }} onClick={() => setOpen(true)}>+ Add question</button>;
-
   return (
-    <div style={{ marginTop: 12, border: "1px solid var(--line)", borderRadius: 12, padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+    <>
+      <button type="button" className={styles.createBtnGhost} style={{ marginTop: 12 }} onClick={() => setOpen(true)}>+ Add question</button>
+      <Modal open={open} title="Add question" onClose={close}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <label><span style={LABEL}>Type</span>
         <select className={styles.selectInput} value={qtype} onChange={(e) => setQtype(e.target.value as PropType)}>
           {PROP_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
       </label>
       <label><span style={LABEL}>Question</span>
-        <input className={styles.input} style={{ width: "100%" }} value={prompt} autoFocus placeholder="e.g. How long is the national anthem (seconds)?" onChange={(e) => setPrompt(e.target.value)} />
+        <QuestionTextarea value={prompt} autoFocus placeholder="e.g. How long is the national anthem (seconds)?" onChange={setPrompt} />
       </label>
 
       {qtype === "multiple_choice" && (
@@ -408,11 +509,13 @@ function AddQuestion({ busy, uploadUrl, onAdd }: { busy: boolean; uploadUrl: str
 
       <QuestionMediaPicker value={imageUrl} uploadUrl={uploadUrl} disabled={busy} onChange={setImageUrl} />
 
-      <div style={{ display: "flex", gap: 10 }}>
-        <button type="button" className={styles.createBtn} style={{ width: "auto", padding: "10px 16px" }} disabled={busy || !prompt.trim() || (qtype === "multiple_choice" && choices.filter((c) => c.trim()).length < 2) || (qtype === "over_under" && line === "")} onClick={() => void submit()}>Add question</button>
-        <button type="button" className={styles.createBtnGhost} style={{ width: "auto", padding: "10px 16px" }} onClick={() => { reset(); setOpen(false); }}>Cancel</button>
+      <div style={{ display: "flex", gap: 10, marginTop: 6, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
+        <button type="button" className={styles.createBtn} style={{ flex: 1 }} disabled={busy || !prompt.trim() || (qtype === "multiple_choice" && choices.filter((c) => c.trim()).length < 2) || (qtype === "over_under" && line === "")} onClick={() => void submit()}>Add question</button>
+        <button type="button" className={styles.createBtnGhost} style={{ width: "auto", padding: "10px 16px" }} onClick={close}>Cancel</button>
       </div>
-    </div>
+        </div>
+      </Modal>
+    </>
   );
 }
 

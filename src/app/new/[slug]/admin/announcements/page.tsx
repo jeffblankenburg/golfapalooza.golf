@@ -38,7 +38,7 @@ export default async function AdminAnnouncementsPage({
         </svg>
         Administration
       </Link>
-      <AnnouncementManager orgId={org.id} nameMode={org.name_display} />
+      <AnnouncementManager orgId={org.id} nameMode={org.name_display} timeZone={org.timezone} />
     </div>
   );
 }

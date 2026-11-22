@@ -8,6 +8,7 @@ import {
   correctChoiceFor, questionSettled, numericWinners, type PropQuestion, type PropAnswer, type NumericRule,
 } from "@/lib/v2/contests/props";
 import { placeLabel } from "@/lib/v2/contests/payouts";
+import { formatInstant } from "@/lib/v2/timezone";
 import type { PropsLeaderEntry } from "@/lib/v2/contests/props-server";
 /* eslint-disable @next/next/no-img-element */
 
@@ -41,7 +42,7 @@ function correctLabel(q: PropQuestion): string {
 
 export default function PropsContent({
   contestId, answerUrl, questions, initialAnswers, leaderboard, locked, locksAt, numericRule, settled,
-  meId, totalQuestions, maxPoints, potCents = 0, placePayouts = [],
+  timeZone, meId, totalQuestions, maxPoints, potCents = 0, placePayouts = [],
 }: {
   contestId: string;
   answerUrl: string;
@@ -52,6 +53,7 @@ export default function PropsContent({
   locksAt: string | null;
   numericRule: NumericRule;  // set default (for grading numeric)
   settled: boolean;          // every live question settled → final
+  timeZone: string;          // the event/org zone all times here are shown in
   meId: string;
   totalQuestions: number;
   maxPoints: number;
@@ -99,6 +101,9 @@ export default function PropsContent({
   const payingPlaces = placePayouts.filter((p) => p.amountCents > 0);
   const hasMoney = potCents > 0 && payingPlaces.length > 0;
   const anyScored = questions.some(questionSettled);
+  // Per-question point badges only earn their keep when questions are weighted differently;
+  // if every (live) question is worth the same, the badge is noise.
+  const pointsVary = new Set(questions.filter((q) => !q.voided).map((q) => q.points)).size > 1;
   const showWinnings = hasMoney && anyScored;
   const me = leaderboard.find((e) => e.userId === meId);
   const cutIdx =
@@ -112,7 +117,7 @@ export default function PropsContent({
   const rankText = (rank: number) => (isTie(rank) ? `T${rank}` : String(rank));
   const rankPhrase = (rank: number) => `${isTie(rank) ? "tied for " : ""}${ordinal(rank)}`;
 
-  const lockLabel = locksAt ? new Date(locksAt).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null;
+  const lockLabel = locksAt ? formatInstant(locksAt, timeZone) : null;
 
   /** One answerable question card. */
   function questionCard(q: PropQuestion) {
@@ -142,9 +147,11 @@ export default function PropsContent({
 
     return (
       <div key={q.id} className={styles.pickCard}>
-        <div className={styles.pickCardMeta} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-          <span>{q.voided ? <span className={styles.propVoid}>Voided</span> : <span className={styles.propPts}>{q.points} {q.points === 1 ? "pt" : "pts"}</span>}</span>
-        </div>
+        {(q.voided || pointsVary) && (
+          <div className={styles.pickCardMeta} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+            <span>{q.voided ? <span className={styles.propVoid}>Voided</span> : <span className={styles.propPts}>{q.points} {q.points === 1 ? "pt" : "pts"}</span>}</span>
+          </div>
+        )}
         <p style={{ margin: "0 0 10px", fontWeight: 700, fontSize: "0.95rem" }}>{q.prompt}</p>
         {q.imageUrl && <img src={q.imageUrl} alt="" className={styles.propImage} />}
 
@@ -267,7 +274,11 @@ export default function PropsContent({
                 </div>
               );
             })}
-            <p className={styles.pickMoneyNote} style={{ marginTop: 6 }}>{maxPoints} {maxPoints === 1 ? "point" : "points"} possible across {totalQuestions} {totalQuestions === 1 ? "question" : "questions"}.</p>
+            <p className={styles.pickMoneyNote} style={{ marginTop: 6 }}>
+              {pointsVary
+                ? `${maxPoints} ${maxPoints === 1 ? "point" : "points"} possible across ${totalQuestions} ${totalQuestions === 1 ? "question" : "questions"}.`
+                : `${totalQuestions} ${totalQuestions === 1 ? "question" : "questions"}.`}
+            </p>
           </div>
         )
       )}

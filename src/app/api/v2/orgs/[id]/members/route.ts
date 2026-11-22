@@ -48,7 +48,7 @@ export async function GET(
   const { data } = await g.admin
     .from("v2_memberships")
     .select(
-      "user_id, role, status, archived_at, profile:v2_profiles(display_name, first_name, last_name, nickname, birthdate, avatar_url, is_system, phone, zip, occupation, city, state, playing_since, swings, typical_shot, shirt_size, fun_fact, best_shot, show_on_map, venmo_username, paypal_username, mailing_address)",
+      "user_id, role, status, archived_at, profile:v2_profiles(display_name, first_name, last_name, nickname, birthdate, avatar_url, is_system, phone, zip, occupation, city, state, playing_since, swings, typical_shot, shirt_size, fun_fact, best_shot, venmo_username, paypal_username, address, map_visibility, allergies)",
     )
     .eq("org_id", id)
     .order("role");
@@ -83,10 +83,11 @@ export async function GET(
         shirt_size?: string | null;
         fun_fact?: string | null;
         best_shot?: string | null;
-        show_on_map?: boolean | null;
+        address?: string | null;
+        map_visibility?: string | null;
         venmo_username?: string | null;
         paypal_username?: string | null;
-        mailing_address?: string | null;
+        allergies?: string | null;
       } | null;
       return {
         user_id: m.user_id,
@@ -111,10 +112,11 @@ export async function GET(
         shirt_size: p?.shirt_size ?? null,
         fun_fact: p?.fun_fact ?? null,
         best_shot: p?.best_shot ?? null,
-        show_on_map: p?.show_on_map ?? true,
+        address: p?.address ?? null,
+        map_visibility: p?.map_visibility ?? "off",
         venmo_username: p?.venmo_username ?? null,
         paypal_username: p?.paypal_username ?? null,
-        mailing_address: p?.mailing_address ?? null,
+        allergies: p?.allergies ?? null,
         permissions: permsByUser.get(m.user_id) ?? {},
       };
     })

@@ -4,6 +4,7 @@ import { getPlatformContext } from "@/lib/v2/context";
 import { v2AdminClient } from "@/lib/v2/supabase";
 import { OPTION_SELECT, OPTION_GROUP_SELECT, loadOptionPrices, tripCostCents, loadOptionSettings, ensureTripCostOption, type Option, type OptionGroup } from "@/lib/v2/options";
 import { loadCostCategories } from "@/lib/v2/cost-categories";
+import { resolveOrgTimeZone } from "@/lib/v2/timezone-server";
 import OptionsManager, { type OptionData, type OptItem } from "./OptionsManager";
 import styles from "@/app/new/new.module.css";
 
@@ -20,8 +21,9 @@ export default async function EventOptionsPage({ params }: { params: Promise<{ s
   if (!org || (org.role !== "owner" && org.role !== "admin")) redirect(`/new/${slug}`);
 
   const admin = v2AdminClient();
-  const { data: event } = await admin.from("v2_events").select("id, name").eq("id", eventId).eq("org_id", org.id).maybeSingle();
+  const { data: event } = await admin.from("v2_events").select("id, name, timezone").eq("id", eventId).eq("org_id", org.id).maybeSingle();
   if (!event) redirect(`/new/${slug}/admin/events`);
+  const timeZone = await resolveOrgTimeZone(admin, org.id, (event as { timezone: string | null }).timezone);
 
   // The unremovable Trip Cost option exists for every event; create it on first visit.
   // (It's then loaded with the rest below and rendered as a draggable option.)
@@ -121,6 +123,7 @@ export default async function EventOptionsPage({ params }: { params: Promise<{ s
         slug={slug}
         orgId={org.id}
         eventId={eventId}
+        timeZone={timeZone}
         initialOptions={initialOptions}
         initialAvailable={available}
         initialGroups={groups.map((g) => ({ id: g.id, name: g.name, description: g.description, icon: g.icon }))}

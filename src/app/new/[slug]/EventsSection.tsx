@@ -5,6 +5,7 @@ import Link from "next/link";
 import ConfirmModal from "../_components/ConfirmModal";
 import Modal from "../_components/Modal";
 import { pickName, type NameMode } from "@/lib/v2/profile";
+import { TIME_ZONES, detectTz } from "@/lib/v2/timezones";
 import styles from "../new.module.css";
 
 interface EventRow {
@@ -14,6 +15,7 @@ interface EventRow {
   start_date: string | null;
   start_time: string | null;
   end_date: string | null;
+  end_time: string | null;
   timezone: string | null;
   status: "draft" | "active" | "archived";
   location: string | null;
@@ -26,32 +28,7 @@ interface MemberOpt {
   venmo: string | null;
 }
 
-const empty = { name: "", year: "", start_date: "", start_time: "", end_date: "", timezone: "", status: "draft", location: "", treasurer_user_id: "" };
-
-// Full IANA zone list for the picker (falls back to common US zones + UTC on
-// older runtimes). Static — same on server and client.
-const TIME_ZONES: string[] = (() => {
-  try {
-    const sv = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf;
-    const list = sv?.("timeZone");
-    if (Array.isArray(list) && list.length) return list;
-  } catch {
-    /* fall through */
-  }
-  return [
-    "America/New_York", "America/Chicago", "America/Denver", "America/Phoenix",
-    "America/Los_Angeles", "America/Anchorage", "Pacific/Honolulu", "UTC",
-  ];
-})();
-
-/** The organizer's current zone — a sensible default for a new event. */
-function detectTz(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York";
-  } catch {
-    return "America/New_York";
-  }
-}
+const empty = { name: "", year: "", start_date: "", start_time: "", end_date: "", end_time: "", timezone: "", status: "draft", location: "", treasurer_user_id: "" };
 
 export default function EventsSection({
   orgId,
@@ -118,6 +95,7 @@ export default function EventsSection({
       start_date: e.start_date || "",
       start_time: (e.start_time || "").slice(0, 5), // "HH:MM:SS" → "HH:MM" for the input
       end_date: e.end_date || "",
+      end_time: (e.end_time || "").slice(0, 5),
       timezone: e.timezone || detectTz(),
       status: e.status,
       location: e.location || "",
@@ -138,6 +116,7 @@ export default function EventsSection({
       start_date: form.start_date || null,
       start_time: form.start_time || null,
       end_date: form.end_date || null,
+      end_time: form.end_time || null,
       timezone: form.timezone || detectTz(),
       status: form.status,
       location: form.location.trim() || null,
@@ -247,18 +226,27 @@ export default function EventsSection({
             />
           </div>
           <div className={styles.field}>
-            <label className={styles.label}>Start date <span className={styles.optional}>(optional)</span></label>
-            <input className={styles.input} type="date" value={form.start_date}
-              onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
+            <label className={styles.label}>Starts <span className={styles.optional}>(optional, date &amp; time)</span></label>
+            <div className={styles.dateTimePair}>
+              <input className={styles.input} type="date" value={form.start_date} aria-label="Start date"
+                onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
+              <input className={styles.input} type="time" value={form.start_time} aria-label="Start time"
+                onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
+            </div>
           </div>
           <div className={styles.field}>
-            <label className={styles.label}>Start time <span className={styles.optional}>(optional, e.g. first tee)</span></label>
-            <input className={styles.input} type="time" value={form.start_time}
-              onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
+            <label className={styles.label}>Ends <span className={styles.optional}>(optional, e.g. a few-hour party)</span></label>
+            <div className={styles.dateTimePair}>
+              <input className={styles.input} type="date" value={form.end_date} aria-label="End date"
+                min={form.start_date || undefined}
+                onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
+              <input className={styles.input} type="time" value={form.end_time} aria-label="End time"
+                onChange={(e) => setForm({ ...form, end_time: e.target.value })} />
+            </div>
           </div>
           <div className={styles.field}>
             <label className={styles.label}>Timezone</label>
-            <select className={styles.roleSelect} value={form.timezone}
+            <select className={styles.selectInput} value={form.timezone}
               onChange={(e) => setForm({ ...form, timezone: e.target.value })}>
               {!TIME_ZONES.includes(form.timezone) && form.timezone && (
                 <option value={form.timezone}>{form.timezone}</option>
@@ -267,12 +255,6 @@ export default function EventsSection({
                 <option key={tz} value={tz}>{tz.replace(/_/g, " ")}</option>
               ))}
             </select>
-          </div>
-          <div className={styles.field}>
-            <label className={styles.label}>End date <span className={styles.optional}>(optional)</span></label>
-            <input className={styles.input} type="date" value={form.end_date}
-              min={form.start_date || undefined}
-              onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
           </div>
           <div className={styles.field}>
             <label className={styles.label}>Location <span className={styles.optional}>(optional)</span></label>
@@ -286,7 +268,7 @@ export default function EventsSection({
           </div>
           <div className={styles.field}>
             <label className={styles.label}>Treasurer <span className={styles.optional}>(collects event money via Venmo)</span></label>
-            <select className={styles.roleSelect} value={form.treasurer_user_id}
+            <select className={styles.selectInput} value={form.treasurer_user_id}
               onChange={(e) => setForm({ ...form, treasurer_user_id: e.target.value })}>
               <option value="">Event creator (default)</option>
               {form.treasurer_user_id && !members.some((m) => m.user_id === form.treasurer_user_id) && (
@@ -301,11 +283,11 @@ export default function EventsSection({
           </div>
           <div className={styles.field}>
             <label className={styles.label}>Status</label>
-            <select className={styles.roleSelect} value={form.status}
+            <select className={styles.selectInput} value={form.status}
               onChange={(e) => setForm({ ...form, status: e.target.value })}>
-              <option value="draft">draft</option>
-              <option value="active">active</option>
-              <option value="archived">archived</option>
+              <option value="draft">Draft</option>
+              <option value="active">Active</option>
+              <option value="archived">Archived</option>
             </select>
           </div>
           {form.status === "active" && (

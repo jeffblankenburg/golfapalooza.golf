@@ -65,14 +65,22 @@ export default function ContestEntryPaid({
           <div className={styles.memberList} style={{ marginTop: 4 }}>
             {roster.map((r) => {
               const paid = r.paidCents >= r.owedCents && r.owedCents > 0;
+              const due = Math.max(0, r.owedCents - r.paidCents);
+              const over = Math.max(0, r.paidCents - r.owedCents);
+              // The whole story: total commitment, what's in, and what's still due.
+              let meta: React.ReactNode;
+              if (r.paidCents === 0) meta = <>{money(r.owedCents)} due</>;
+              else if (due > 0) meta = <><strong style={{ color: "#a3341f" }}>{money(due)} still due</strong> <span style={{ color: "var(--ink-soft)" }}>({money(r.paidCents)} of {money(r.owedCents)} paid)</span></>;
+              else if (over > 0) meta = <>Paid {money(r.paidCents)} <span style={{ color: "var(--ink-soft)" }}>(overpaid {money(over)})</span></>;
+              else meta = <>Paid {money(r.owedCents)} in full</>;
               return (
                 <div key={r.userId} className={styles.finRow}>
-                  <div className={styles.finRowMain} style={{ minWidth: 0 }}>
+                  <div className={styles.finRowMain} style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
                     <span className={styles.finRowName}>{r.name}</span>
-                    {r.owedCents > 0 && <span className={styles.cscAllMeta}>{money(r.owedCents)}</span>}
+                    {r.owedCents > 0 && <span className={styles.cscAllMeta}>{meta}</span>}
                   </div>
                   <button type="button" className={paid ? styles.paidToggleOn : styles.paidToggle} disabled={busy === r.userId} onClick={() => toggle(r)}>
-                    {busy === r.userId ? "…" : paid ? "Paid ✓" : "Mark paid"}
+                    {busy === r.userId ? "…" : paid ? "Paid ✓" : due > 0 && r.paidCents > 0 ? `Collect ${money(due)}` : "Mark paid"}
                   </button>
                 </div>
               );

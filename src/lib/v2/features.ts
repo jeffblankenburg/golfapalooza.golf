@@ -18,6 +18,8 @@
  * See docs/v2-information-architecture.md.
  */
 
+import { formatInstant } from "@/lib/v2/timezone";
+
 export type FeatureBucket = "scores" | "schedule" | "community" | "stories" | "you";
 
 /** 'available' = built & wired; 'planned' = catalogued but not yet portable. */
@@ -109,7 +111,7 @@ export const FEATURE_CATALOG: FeatureDef[] = [
   // ── Schedule & Logistics (mostly per event) ──────────────────────────────
   { key: "schedule", label: "Schedule", bucket: "schedule", scope: "event", icon: "calendar", status: "available", surface: "route", blurb: "The event itinerary." },
   { key: "courses", label: "Courses", bucket: "schedule", scope: "group", icon: "map", status: "available", surface: "route", blurb: "Course library & scorecards." },
-  { key: "rooms", label: "Rooms", bucket: "schedule", scope: "event", icon: "bed", status: "planned", surface: "route", blurb: "Lodging & room assignments." },
+  { key: "rooms", label: "Lodging", bucket: "schedule", scope: "event", icon: "bed", status: "available", surface: "route", blurb: "Room assignments & housing." },
   { key: "trip_info", label: "Trip Info", bucket: "schedule", scope: "event", icon: "info", status: "planned", surface: "route", blurb: "Logistics, links & the essentials." },
   { key: "shirt_guide", label: "Shirt Guide", bucket: "schedule", scope: "event", icon: "shirt", status: "planned", surface: "route", blurb: "What to wear each day." },
   { key: "options", label: "Options", bucket: "schedule", scope: "event", icon: "list", status: "available", surface: "route", blurb: "Add-ons & extras you opt into." },
@@ -341,6 +343,7 @@ const FEATURE_ROUTES: Record<string, (slug: string) => string> = {
   courses: (slug) => `/new/${slug}/courses`,
   loozers: (slug) => `/new/${slug}/members`,
   schedule: (slug) => `/new/${slug}/schedule`,
+  rooms: (slug) => `/new/${slug}/rooms`,
   options: (slug) => `/new/${slug}/options`,
   balance: (slug) => `/new/${slug}/balance`,
   my_money: (slug) => `/new/${slug}/money`,
@@ -352,8 +355,8 @@ export function featureHref(slug: string, def: FeatureDef): string | null {
   return build ? build(slug) : null;
 }
 
-function fmtShortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+function fmtShortDate(iso: string, timeZone?: string): string {
+  return formatInstant(iso, timeZone, { month: "short", day: "numeric" });
 }
 
 /** A resolved feature flattened for the shell (bottom bar + launcher). */
@@ -372,10 +375,10 @@ export interface NavFeature {
   adminOnly: boolean;
 }
 
-function lockReasonFor(f: ResolvedFeature, href: string | null, now: Date): string | null {
+function lockReasonFor(f: ResolvedFeature, href: string | null, now: Date, timeZone?: string): string | null {
   if (f.availability === "window") {
     if (f.availableFrom && now.getTime() < new Date(f.availableFrom).getTime()) {
-      return `Opens ${fmtShortDate(f.availableFrom)}`;
+      return `Opens ${fmtShortDate(f.availableFrom, timeZone)}`;
     }
     if (f.availableUntil && now.getTime() > new Date(f.availableUntil).getTime()) {
       return "Closed";
@@ -384,9 +387,9 @@ function lockReasonFor(f: ResolvedFeature, href: string | null, now: Date): stri
   return href ? null : "Coming soon";
 }
 
-export function toNavFeature(slug: string, f: ResolvedFeature, now = new Date()): NavFeature {
+export function toNavFeature(slug: string, f: ResolvedFeature, now = new Date(), timeZone?: string): NavFeature {
   const href = featureHref(slug, f.def);
-  const lockReason = lockReasonFor(f, href, now);
+  const lockReason = lockReasonFor(f, href, now, timeZone);
   return {
     key: f.def.key,
     label: f.label,
@@ -417,12 +420,13 @@ export function buildEventNav(
   resolved: ResolvedFeature[],
   viewerIsAdmin: boolean,
   now = new Date(),
+  timeZone?: string,
 ): { pinned: NavFeature[]; launcher: LauncherGroup[] } {
-  const pinned = pinnedFeatures(resolved, viewerIsAdmin).map((f) => toNavFeature(slug, f, now));
+  const pinned = pinnedFeatures(resolved, viewerIsAdmin).map((f) => toNavFeature(slug, f, now, timeZone));
   const launcher = launcherBuckets(resolved, viewerIsAdmin).map((g) => ({
     bucketKey: g.bucket.key,
     bucketLabel: g.bucket.label,
-    features: g.features.map((f) => toNavFeature(slug, f, now)),
+    features: g.features.map((f) => toNavFeature(slug, f, now, timeZone)),
   }));
   return { pinned, launcher };
 }

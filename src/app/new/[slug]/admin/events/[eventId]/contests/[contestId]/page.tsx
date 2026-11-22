@@ -17,7 +17,7 @@ import AuctionManager from "../../../../contests/[contestId]/AuctionManager";
 import { loadAuction, loadAuctionPayouts } from "@/lib/v2/contests/auction-server";
 import PropsAdmin from "../../../../contests/[contestId]/PropsAdmin";
 import { listQuestions, loadPropsPayouts } from "@/lib/v2/contests/props-server";
-import { propsConfigOf } from "@/lib/v2/contests/props";
+import { resolveOrgTimeZone } from "@/lib/v2/timezone-server";
 import SquaresEditLauncher from "../../../../contests/[contestId]/SquaresEditLauncher";
 import ContestParticipants from "@/components/v2/contests/ContestParticipants";
 import ContestCollector from "@/components/v2/contests/ContestCollector";
@@ -48,6 +48,9 @@ export default async function ContestDetailPage({ params, searchParams }: { para
   const contest = contestRow as Contest | null;
   if (!contest) redirect(`/new/${slug}/admin/events/${eventId}/contests`);
 
+  const { data: eventRow } = await admin.from("v2_events").select("timezone").eq("id", eventId).maybeSingle();
+  const timeZone = await resolveOrgTimeZone(admin, org.id, (eventRow as { timezone: string | null } | null)?.timezone);
+
   // Pick'em has its own admin surface (game slate + results + open/close + money).
   if (contest.contest_type === "pickem") {
     const [feeMap, { count: enrolled }, pickemGames] = await Promise.all([
@@ -72,6 +75,7 @@ export default async function ContestDetailPage({ params, searchParams }: { para
           initialSplits={(contest.payout_splits as { place: number; kind: string; amount: number }[] | null) ?? []}
           enrolledCount={enrolled ?? 0}
           initialGames={pickemGames as Game[]}
+          timeZone={timeZone}
         />
         <ContestCollector
           base={`/api/v2/orgs/${org.id}/events/${eventId}/contests/${contestId}`}
@@ -108,11 +112,9 @@ export default async function ContestDetailPage({ params, searchParams }: { para
   // Props reuses the scope-agnostic authoring/settlement surface (keyed by contestId), so an
   // event-scoped Props contest drives off the same /contests/{id}/props base as a group one.
   if (contest.contest_type === "props") {
-    const cfg = propsConfigOf(contest.config as Record<string, unknown> | null);
-    const [questions, propsPayouts, { count: enrolled }] = await Promise.all([
+    const [questions, propsPayouts] = await Promise.all([
       listQuestions(admin, contestId),
       loadPropsPayouts(admin, contestId, org.name_display),
-      admin.from("v2_contest_participants").select("id", { count: "exact", head: true }).eq("contest_id", contestId),
     ]);
     return (
       <PropsAdmin
@@ -121,13 +123,7 @@ export default async function ContestDetailPage({ params, searchParams }: { para
         apiBase={`/api/v2/orgs/${org.id}/contests/${contestId}`}
         backHref={`/new/${slug}/admin/events/${eventId}/contests`}
         initialName={contest.name}
-        initialStatus={contest.status}
-        initialLocksAt={cfg.locksAt}
-        initialNumericRule={cfg.numericRule}
-        initialEntryCents={cfg.entryCents}
-        initialSplits={(contest.payout_splits as PayoutSplit[] | null) ?? []}
         initialQuestions={questions}
-        participantCount={enrolled ?? 0}
         payouts={propsPayouts}
       />
     );
@@ -140,7 +136,7 @@ export default async function ContestDetailPage({ params, searchParams }: { para
     const manageUrl = `/new/${slug}/admin/events/${eventId}/contests/${contestId}`;
     if ((await searchParams)?.edit) {
       const row = await loadSquaresContestRow(admin, contest);
-      return <SquaresEditLauncher row={row} collectionBase={`/api/v2/orgs/${org.id}/contests`} returnHref={manageUrl} nameMode={org.name_display} currentUserId={ctx.userId} />;
+      return <SquaresEditLauncher row={row} collectionBase={`/api/v2/orgs/${org.id}/contests`} returnHref={manageUrl} nameMode={org.name_display} currentUserId={ctx.userId} timeZone={timeZone} />;
     }
     return (
       <>
@@ -153,6 +149,7 @@ export default async function ContestDetailPage({ params, searchParams }: { para
           playerHref={`/new/${slug}/contests/${contestId}`}
           editHref={`${manageUrl}?edit=1`}
           nameMode={org.name_display}
+          timeZone={timeZone}
         />
         <div className={styles.page} style={{ paddingTop: 0 }}>
           <ContestCollector
